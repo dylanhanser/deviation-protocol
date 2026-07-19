@@ -27,6 +27,11 @@ from deviation_protocol.application.ports import PersistedSession, UnitOfWorkFac
 from deviation_protocol.application.scenario_event_bridge import (
     bind_public_decision_frame,
 )
+from deviation_protocol.application.scenario_initialization import (
+    ScenarioInitializationError,
+    initialize_scenario_state,
+    profession_tags_for,
+)
 from deviation_protocol.application.story_director import (
     DeterministicStoryDirector,
     StoryDirectorError,
@@ -223,14 +228,16 @@ class SessionService:
             )
             initial_frame: NarrativeFrame | None = None
             if definition is not None:
-                self._spawn_scenario_npcs(state, definition)
-                started = self.story_director.start_scenario(
-                    state,
-                    definition,
-                    profession_tags=self._profession_tags(
-                        character.tags, definition
-                    ),
-                )
+                try:
+                    started = initialize_scenario_state(
+                        state,
+                        self.catalog,
+                        definition,
+                        character_tags=character.tags,
+                        story_director=self.story_director,
+                    )
+                except ScenarioInitializationError:
+                    raise InvalidScenarioDefinitionError(definition.scenario_id) from None
                 state = started.candidate_state
                 initial_frame = bind_public_decision_frame(
                     started.frame,
@@ -402,7 +409,7 @@ class SessionService:
             frame = self.story_director.plan_initial_frame(
                 state,
                 definition,
-                profession_tags=self._profession_tags(character.tags, definition),
+                profession_tags=profession_tags_for(character.tags, definition),
             )
             frame = bind_public_decision_frame(
                 frame,
@@ -431,35 +438,6 @@ class SessionService:
         if definition is None:
             raise InvalidScenarioDefinitionError(scenario_id)
         return definition
-
-    def _spawn_scenario_npcs(
-        self, state: GameState, definition: ScenarioDefinition
-    ) -> None:
-        for index, reference in enumerate(definition.npc_references, start=1):
-            npc_definition = self.catalog.npc(reference.npc_definition_id)
-            if npc_definition is None:  # protected by catalog validation
-                raise InvalidScenarioDefinitionError(definition.scenario_id)
-            npc_character = self.catalog.character(
-                npc_definition.character_definition_id
-            )
-            if (
-                npc_character is None
-                or "npc" not in npc_character.tags
-                or npc_character.definition_id
-                == state.player.character_definition_id
-            ):
-                raise InvalidScenarioDefinitionError(definition.scenario_id)
-            state.spawn_npc(
-                self.catalog,
-                reference.npc_definition_id,
-                f"scenario-npc-{index}",
-            )
-
-    @staticmethod
-    def _profession_tags(
-        character_tags: tuple[str, ...], definition: ScenarioDefinition
-    ) -> frozenset[str]:
-        return frozenset(character_tags) & set(definition.available_profession_tags)
 
     def _metadata(self, persisted: PersistedSession) -> SessionMetadata:
         character_id = persisted.character_definition_id

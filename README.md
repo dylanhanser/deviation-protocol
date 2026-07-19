@@ -56,6 +56,14 @@ Windows 开发需要 PowerShell 7+（`pwsh`）。仓库 `.venv` 中的 Python 3.
 
 live DeepSeek 测试默认关闭，必须由用户在独立命令中显式 opt-in。只要 `RUN_LIVE_DEEPSEEK_TEST` 为真值，以上四种普通验证都会在 pytest 启动前拒绝执行，避免意外网络请求和 Token 消耗。
 
+本地只读副本内容检查可使用 Scenario Workbench：
+
+```powershell
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario validate config/scenarios/death_certificate_v1.json
+```
+
+它提供 `validate`、`analyze`、`preview` 和稳定 `--json` 输出，不连接数据库或调用模型。完整用法与静态分析边界见 [`docs/scenario_workbench.md`](docs/scenario_workbench.md)。
+
 ## 运行环境与依赖
 
 项目目标为 Python 3.12，依赖通过 `pyproject.toml` 管理：

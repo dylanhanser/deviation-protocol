@@ -4,6 +4,8 @@ import asyncio
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
+import hashlib
+import json
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -205,6 +207,48 @@ async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
         "scenario-npc-2",
         "scenario-npc-3",
     }
+    assert tuple(state.npcs) == (
+        "scenario-npc-1",
+        "scenario-npc-2",
+        "scenario-npc-3",
+    )
+    assert [
+        (npc_id, npc.definition_id)
+        for npc_id, npc in state.npcs.items()
+    ] == [
+        (
+            "scenario-npc-1",
+            "npc.death_certificate.triage_coordinator",
+        ),
+        (
+            "scenario-npc-2",
+            "npc.death_certificate.records_custodian",
+        ),
+        (
+            "scenario-npc-3",
+            "npc.death_certificate.underground_patient",
+        ),
+    ]
+    stable_json = lambda value: json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode("utf-8")
+    assert hashlib.sha256(stable_json(snapshot.state)).hexdigest() == (
+        "900bf732d802a47b53371389f2ccbceaaef6a0ab6a8f2bef4d5890e0c975d48f"
+    )
+    assert result.narrative_frame.decision_id == (
+        "decision.758c3b9771b465e887dedbdd889c41b6"
+    )
+    assert result.narrative_frame.frame_id == "frame.a574b515114fbc5bd5a077d1"
+    assert hashlib.sha256(
+        stable_json(result.narrative_frame.model_dump(mode="json"))
+    ).hexdigest() == "b87ede1103fce1af130b56bede83f760b87a842b34057683162c8eced79e3d48"
+    assert hashlib.sha256(
+        stable_json(result.model_dump(mode="json"))
+    ).hexdigest() == "16c1b4f844175b21f80b9af1c1e1c17628ef84883268fa9baf41c28562760ae8"
     projection = await service.get_visible_state(principal(), result.session_id)
     assert [(item.npc_id, item.npc_definition_id) for item in projection.visible_npcs] == [
         (
@@ -228,15 +272,18 @@ async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
 async def test_scenario_creation_replay_returns_same_frame_and_conflicts_on_scenario(
     scenario_service_and_store: tuple[SessionService, Store],
 ) -> None:
-    service, _ = scenario_service_and_store
+    service, store = scenario_service_and_store
     kwargs = {
         "client_request_id": "create-replay-frame",
         "character_definition_id": "character.death_certificate.investigator",
         "scenario_id": "death_certificate",
     }
     first = await service.create(principal(), **kwargs)
+    snapshot_before = deepcopy(store.snapshots[first.session_id])
     replay = await service.create(principal(), **kwargs)
     assert first == replay
+    assert store.snapshots[first.session_id] == snapshot_before
+    assert len(store.sessions) == len(store.snapshots) == 1
 
     scenario_catalog = service.scenario_catalog
     assert scenario_catalog is not None

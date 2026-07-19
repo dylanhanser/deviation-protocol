@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections import Counter, defaultdict
+from collections import Counter
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from typing import Annotated, Any, Literal, TypeAlias
@@ -813,29 +813,42 @@ class ScenarioDefinition(ScenarioDefinitionModel):
     def _reject_unbounded_automatic_cycles(
         self, phases: Mapping[str, ScenePhaseDefinition]
     ) -> None:
-        graph: dict[str, list[TransitionDefinition]] = defaultdict(list)
-        for phase in self.phases:
-            graph[phase.phase_id].extend(
-                transition
-                for transition in phase.transitions
-                if transition.trigger is TransitionTrigger.AUTOMATIC
-            )
+        # A cycle is unbounded exactly when every phase in it lacks max_visits and
+        # every automatic edge in it lacks max_uses.  Remove all bounded phases and
+        # edges, then use Kahn's algorithm to detect a remaining cycle in O(V + E).
+        # The former simple-path enumeration was exponential on dense acyclic input.
+        unbounded_phase_ids = {
+            phase_id
+            for phase_id, phase in phases.items()
+            if phase.max_visits is None
+        }
+        adjacency: dict[str, list[str]] = {
+            phase_id: [] for phase_id in unbounded_phase_ids
+        }
+        indegree = {phase_id: 0 for phase_id in unbounded_phase_ids}
+        for phase_id in sorted(unbounded_phase_ids):
+            for transition in phases[phase_id].transitions:
+                if (
+                    transition.trigger is TransitionTrigger.AUTOMATIC
+                    and transition.max_uses is None
+                    and transition.target_phase_id in unbounded_phase_ids
+                ):
+                    adjacency[phase_id].append(transition.target_phase_id)
+                    indegree[transition.target_phase_id] += 1
 
-        def walk(start: str, current: str, path: tuple[str, ...], edges: tuple[TransitionDefinition, ...]) -> None:
-            for transition in graph[current]:
-                target = transition.target_phase_id
-                if target == start:
-                    cycle_phases = (*path, current)
-                    cycle_edges = (*edges, transition)
-                    if not any(phases[item].max_visits for item in cycle_phases) and not any(
-                        item.max_uses for item in cycle_edges
-                    ):
-                        raise ContentDefinitionError("unbounded automatic transition cycle")
-                elif target not in path and len(path) < len(phases):
-                    walk(start, target, (*path, current), (*edges, transition))
-
-        for phase_id in phases:
-            walk(phase_id, phase_id, (), ())
+        frontier = [
+            phase_id for phase_id, degree in indegree.items() if degree == 0
+        ]
+        visited = 0
+        while frontier:
+            phase_id = frontier.pop()
+            visited += 1
+            for target in adjacency[phase_id]:
+                indegree[target] -= 1
+                if indegree[target] == 0:
+                    frontier.append(target)
+        if visited != len(unbounded_phase_ids):
+            raise ContentDefinitionError("unbounded automatic transition cycle")
 
     def phase(self, phase_id: str) -> ScenePhaseDefinition:
         return next(item for item in self.phases if item.phase_id == phase_id)
