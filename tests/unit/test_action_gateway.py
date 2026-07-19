@@ -151,6 +151,7 @@ def test_signature_covers_every_settlement_field_and_ignores_input_key_order() -
         "tool_ids": ["tool-b", "tool-a"],
         "description": "尝试装备",
         "dialogue": "unused dialogue",
+        "decision_id": "decision-1",
         "choice_id": "choice-1",
         "item_instance_id": "item-instance-1",
         "equipment_slot_id": "hand.main",
@@ -165,6 +166,53 @@ def test_signature_covers_every_settlement_field_and_ignores_input_key_order() -
     assert set(first.signature_payload()) == set(ActionSubmission.model_fields) - {
         "client_request_id"
     }
+
+    changed_values: dict[str, object] = {
+        "session_id": "session-2",
+        "turn_id": "turn-8",
+        "action_type": ActionType.TALK,
+        "target_ids": ("target-c",),
+        "tool_ids": ("tool-c",),
+        "description": "不同描述",
+        "dialogue": "不同对话",
+        "decision_id": "decision-2",
+        "choice_id": "choice-2",
+        "item_instance_id": "item-instance-2",
+        "equipment_slot_id": "hand.off",
+        "skill_definition_id": "skill.precision",
+    }
+    for field_name in set(ActionSubmission.model_fields) - {"client_request_id"}:
+        changed = first.model_copy(
+            update={field_name: changed_values[field_name]}
+        )
+        assert changed.action_signature() != first.action_signature(), field_name
+    assert first.model_copy(
+        update={"client_request_id": "request-b"}
+    ).action_signature() == first.action_signature()
+
+
+def test_decision_and_choice_are_both_required_and_exclusive(
+    gateway: ActionGateway,
+) -> None:
+    base = submission(
+        action_type=ActionType.CHOOSE,
+        description=None,
+        decision_id="decision.current",
+        choice_id="choice.current",
+    )
+    assert gateway.evaluate(context(base)).route is ActionRoute.NARRATIVE_NORMAL
+
+    for changed in (
+        base.model_copy(update={"decision_id": None}),
+        base.model_copy(update={"choice_id": None}),
+        base.model_copy(update={"target_ids": ("door",)}),
+        base.model_copy(update={"tool_ids": ("mirror",)}),
+        base.model_copy(update={"description": "冒充结构化响应"}),
+        submission(description="普通文本", decision_id="decision.current"),
+        submission(description="普通文本", choice_id="choice.current"),
+    ):
+        result = gateway.evaluate(context(changed))
+        assert result.route is ActionRoute.REJECT_LOCAL
 
 
 def test_structured_instance_skill_and_slot_identifiers_cannot_collide() -> None:

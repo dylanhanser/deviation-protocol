@@ -33,10 +33,22 @@ from deviation_protocol.application.ports import (
     UnitOfWorkFactory,
 )
 from deviation_protocol.application.resolution import ResolutionResult, ResolutionStatus
+from deviation_protocol.application.resolution import PlayerFeedback
+from deviation_protocol.application.scenario_event_bridge import (
+    ScenarioDecisionResponsePolicy,
+    TrustedScenarioEventIssuer,
+    bind_public_decision_frame,
+)
+from deviation_protocol.application.story_director import (
+    DeterministicStoryDirector,
+    StoryDirectorError,
+)
 from deviation_protocol.application.turn_response import TurnResponse
-from deviation_protocol.domain.actions import ActionSubmission
+from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.content import ContentCatalog
-from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.events import DomainEvent, DomainEventDraft
+from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.state import (
     DomainErrorCode,
     DomainRuleViolation,
@@ -63,11 +75,28 @@ class FirstPhaseTurnOrchestrator:
     resolver: RuleResolver
     uow_factory: UnitOfWorkFactory
     catalog: ContentCatalog
+    scenario_catalog: ScenarioCatalog | None = None
+    story_director: DeterministicStoryDirector = field(
+        default_factory=DeterministicStoryDirector
+    )
+    decision_policy: ScenarioDecisionResponsePolicy = field(
+        default_factory=ScenarioDecisionResponsePolicy
+    )
+    scenario_event_issuer: TrustedScenarioEventIssuer = field(
+        default_factory=TrustedScenarioEventIssuer
+    )
     context_factory: AuthoritativeActionContextFactory = field(
         default_factory=AuthoritativeActionContextFactory
     )
     clock: Clock = system_utc_clock
     event_id_generator: EventIdGenerator = uuid_event_id
+
+    def __post_init__(self) -> None:
+        if (
+            self.scenario_catalog is not None
+            and self.scenario_catalog.content_catalog != self.catalog
+        ):
+            raise ValueError("TurnOrchestrator catalogs must describe the same content")
 
     async def handle(self, submission: ActionSubmission) -> TurnResponse:
         try:
@@ -102,6 +131,11 @@ class FirstPhaseTurnOrchestrator:
             state = self._load_state(snapshot.state, submission.session_id)
             if state.player.player_id != game_session.player_id:
                 raise SnapshotSessionMismatchError(submission.session_id)
+            definition = self._scenario_definition(
+                state, game_session.scenario_id, game_session.scenario_version,
+                submission.session_id,
+            )
+            visible_npc_ids = self._visible_runtime_npc_ids(state, definition)
 
             # This capability is minted only after the authoritative state has been
             # loaded. Scene visibility and skill-learning authority remain empty
@@ -112,8 +146,8 @@ class FirstPhaseTurnOrchestrator:
                 catalog=self.catalog,
                 current_turn_id=submission.turn_id,
                 session_phase=game_session.phase,
-                visible_entity_ids=(),
-                interactable_entity_ids=(),
+                visible_entity_ids=visible_npc_ids,
+                interactable_entity_ids=visible_npc_ids,
                 environment_tool_ids=(),
                 skill_learning_authorization=None,
                 processed_client_request_ids=(),
@@ -125,6 +159,13 @@ class FirstPhaseTurnOrchestrator:
             )
             if resolution.status is ResolutionStatus.ANOMALY_EVALUATION_REQUIRED:
                 raise UnsupportedResolutionError(submission.session_id)
+            resolution, narrative_frame = self._coordinate_scenario(
+                submission,
+                state,
+                resolution,
+                definition,
+                state_version=game_session.state_version,
+            )
 
             expected_version = game_session.state_version
             resulting_version = expected_version
@@ -154,6 +195,7 @@ class FirstPhaseTurnOrchestrator:
                 submission,
                 resolution,
                 resulting_version,
+                narrative_frame,
             )
             await uow.turn_requests.add(
                 submission,
@@ -191,7 +233,15 @@ class FirstPhaseTurnOrchestrator:
         if payload.get("content_version") != self.catalog.content_version:
             raise SnapshotContentVersionMismatchError(session_id)
         try:
-            return GameState.from_snapshot(payload, catalog=self.catalog)
+            return GameState.from_snapshot(
+                payload,
+                catalog=self.catalog,
+                scenario_catalog=(
+                    self.scenario_catalog
+                    if payload.get("scenario_runtime") is not None
+                    else None
+                ),
+            )
         except DomainRuleViolation as exc:
             if exc.code is DomainErrorCode.SNAPSHOT_CONTENT_MISMATCH:
                 raise SnapshotContentVersionMismatchError(session_id) from None
@@ -215,7 +265,15 @@ class FirstPhaseTurnOrchestrator:
             raise CandidateStateInvalidError(session_id)
         try:
             snapshot = candidate.to_snapshot()
-            GameState.from_snapshot(snapshot, catalog=self.catalog)
+            GameState.from_snapshot(
+                snapshot,
+                catalog=self.catalog,
+                scenario_catalog=(
+                    self.scenario_catalog
+                    if snapshot.get("scenario_runtime") is not None
+                    else None
+                ),
+            )
             return snapshot
         except (DomainRuleViolation, ValidationError, TypeError, ValueError):
             raise CandidateStateInvalidError(session_id) from None
@@ -260,6 +318,7 @@ class FirstPhaseTurnOrchestrator:
         submission: ActionSubmission,
         resolution: ResolutionResult,
         resulting_state_version: int,
+        narrative_frame: NarrativeFrame | None,
     ) -> TurnResponse:
         is_query = (
             resolution.status is ResolutionStatus.RESOLVED_LOCAL
@@ -279,9 +338,203 @@ class FirstPhaseTurnOrchestrator:
             state_changed=resolution.state_changed,
             narrative_required=is_narrative,
             narrative_pending=is_narrative,
+            narrative_frame=narrative_frame,
             local_query_result=(
                 _writable_json_copy(resolution.feedback.parameters) if is_query else None
             ),
+        )
+
+    def _scenario_definition(
+        self,
+        state: GameState,
+        session_scenario_id: str,
+        session_scenario_version: str,
+        session_id: str,
+    ) -> ScenarioDefinition | None:
+        runtime = state.scenario_runtime
+        if runtime is None:
+            return None
+        definition = (
+            self.scenario_catalog.scenario(runtime.scenario_id)
+            if self.scenario_catalog is not None
+            else None
+        )
+        if (
+            definition is None
+            or runtime.scenario_id != session_scenario_id
+            or runtime.scenario_content_version != session_scenario_version
+        ):
+            raise SnapshotSessionMismatchError(session_id)
+        return definition
+
+    @staticmethod
+    def _visible_runtime_npc_ids(
+        state: GameState,
+        definition: ScenarioDefinition | None,
+    ) -> tuple[str, ...]:
+        if definition is None or state.scenario_runtime is None:
+            return ()
+        location = next(
+            item
+            for item in definition.locations
+            if item.location_id == state.scenario_runtime.current_location_id
+        )
+        visible_definitions = set(location.visible_entity_ids)
+        return tuple(
+            npc_id
+            for npc_id, npc in sorted(state.npcs.items())
+            if npc.definition_id in visible_definitions
+        )
+
+    def _coordinate_scenario(
+        self,
+        submission: ActionSubmission,
+        state: GameState,
+        resolution: ResolutionResult,
+        definition: ScenarioDefinition | None,
+        *,
+        state_version: int,
+    ) -> tuple[ResolutionResult, NarrativeFrame | None]:
+        if definition is None:
+            return resolution, None
+        character = self.catalog.character(state.player.character_definition_id)
+        if character is None:
+            raise CandidateStateInvalidError(submission.session_id)
+        profession_tags = frozenset(character.tags) & set(
+            definition.available_profession_tags
+        )
+        try:
+            current_frame = bind_public_decision_frame(
+                self.story_director.plan_frame(
+                    state,
+                    definition,
+                    profession_tags=profession_tags,
+                ),
+                session_id=submission.session_id,
+                state_version=state_version,
+                scenario_content_version=definition.content_version,
+            )
+            if resolution.status is ResolutionStatus.REJECTED_LOCAL:
+                return resolution, current_frame
+            runtime = state.scenario_runtime
+            assert runtime is not None
+            if (
+                resolution.status is ResolutionStatus.RESOLVED_LOCAL
+                and not resolution.state_changed
+            ):
+                return resolution, current_frame
+            if runtime.ending_status is not EndingStatus.ACTIVE:
+                return self._scenario_rejection("SCENARIO_ENDED"), current_frame
+            if (
+                resolution.status is ResolutionStatus.RESOLVED_LOCAL
+                and submission.action_type is not ActionType.CHOOSE
+            ):
+                if runtime.current_decision_id is not None:
+                    return (
+                        self._scenario_rejection("DECISION_RESPONSE_REQUIRED"),
+                        current_frame,
+                    )
+                frame_state = resolution.updated_state or state
+                return resolution, bind_public_decision_frame(
+                    self.story_director.plan_frame(
+                        frame_state,
+                        definition,
+                        profession_tags=profession_tags,
+                    ),
+                    session_id=submission.session_id,
+                    state_version=state_version + 1,
+                    scenario_content_version=definition.content_version,
+                )
+            if submission.action_type is not ActionType.CHOOSE:
+                return resolution, current_frame
+            if runtime.current_decision_id is None:
+                return self._scenario_rejection("STALE_DECISION"), current_frame
+            if submission.decision_id != current_frame.decision_id:
+                return self._scenario_rejection("STALE_DECISION"), current_frame
+            try:
+                validated = self.decision_policy.validate(
+                    submission,
+                    current_frame,
+                    state=state,
+                    definition=definition,
+                    state_version=state_version,
+                )
+            except ValueError:
+                return self._scenario_rejection("INVALID_DECISION_CHOICE"), current_frame
+            issued = self.scenario_event_issuer.issue_decision_response(
+                validated,
+                submission=submission,
+                state=state,
+                definition=definition,
+                state_version=state_version,
+                current_decision_id=runtime.current_decision_id,
+            )
+            base_state = state
+            mechanical_events: tuple[DomainEventDraft, ...] = ()
+            if resolution.status is ResolutionStatus.RESOLVED_LOCAL:
+                if resolution.updated_state is None or not resolution.state_changed:
+                    raise StoryDirectorError(
+                        "local decision resolution lacks a mechanical candidate"
+                    )
+                if resolution.updated_state.scenario_runtime != state.scenario_runtime:
+                    raise StoryDirectorError(
+                        "mechanical decision candidate modified scenario runtime"
+                    )
+                base_state = resolution.updated_state
+                mechanical_events = resolution.events
+            directed = self.story_director.advance_after_verified_result(
+                base_state,
+                definition,
+                (issued.sealed_event,),
+                profession_tags=profession_tags,
+            )
+            generated_drafts = tuple(
+                DomainEventDraft(
+                    "ScenarioRuntimeEventGenerated",
+                    {
+                        "scenario_event_id": item.event_id,
+                        "scenario_event_type": item.event_type,
+                    },
+                )
+                for item in directed.generated_events
+            )
+            return (
+                ResolutionResult(
+                    status=ResolutionStatus.RESOLVED_LOCAL,
+                    success=True,
+                    result_code="SCENARIO_DECISION_RECORDED",
+                    updated_state=directed.candidate_state,
+                    state_changed=True,
+                    events=(
+                        *mechanical_events,
+                        issued.audit_event,
+                        *generated_drafts,
+                    ),
+                    feedback=PlayerFeedback(
+                        "SCENARIO_DECISION_RECORDED",
+                        {
+                            "decision_id": validated.decision_id,
+                            "selected_action_id": validated.selected_action.action_id,
+                        },
+                    ),
+                ),
+                bind_public_decision_frame(
+                    directed.frame,
+                    session_id=submission.session_id,
+                    state_version=state_version + 1,
+                    scenario_content_version=definition.content_version,
+                ),
+            )
+        except StoryDirectorError:
+            raise CandidateStateInvalidError(submission.session_id) from None
+
+    @staticmethod
+    def _scenario_rejection(code: str) -> ResolutionResult:
+        return ResolutionResult(
+            status=ResolutionStatus.REJECTED_LOCAL,
+            success=False,
+            result_code=code,
+            feedback=PlayerFeedback(code),
         )
 
     @staticmethod

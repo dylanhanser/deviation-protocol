@@ -86,6 +86,7 @@ class NarrativeFrame(NarrativeModel):
     min_length: Annotated[int, Field(strict=True, ge=1)]
     max_length: Annotated[int, Field(strict=True, ge=1)]
     decision_required: StrictBool
+    decision_id: DefinitionId | None = None
     decision_reason: DecisionReason | None = None
     suggested_actions: tuple[SuggestedAction, ...] = ()
     allowed_custom_action_constraints: AllowedCustomActionConstraints | None = None
@@ -110,13 +111,20 @@ class NarrativeFrame(NarrativeModel):
             if len(values) > maximum:
                 raise ValueError(f"narrative frame {label} exceed the size limit")
         if self.decision_required:
-            if self.decision_reason is None or not self.suggested_actions:
-                raise ValueError("decision frame requires one reason and suggested actions")
+            if (
+                self.decision_id is None
+                or self.decision_reason is None
+                or not self.suggested_actions
+            ):
+                raise ValueError(
+                    "decision frame requires one id, reason and suggested actions"
+                )
             if self.stop_condition != "AWAIT_PLAYER":
                 raise ValueError("decision frame must stop for player input")
         elif any(
             (
                 self.decision_reason is not None,
+                self.decision_id is not None,
                 bool(self.suggested_actions),
                 self.allowed_custom_action_constraints is not None,
             )

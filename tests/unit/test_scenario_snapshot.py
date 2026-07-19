@@ -139,6 +139,7 @@ def test_all_scenario_runtime_mutations_round_trip_through_snapshot() -> None:
                 event_id="event.route",
                 event_type="route.chosen",
                 action_type="move",
+                decision_id="alpine.decision.route",
                 resolves_current_decision=True,
             ),
         ),

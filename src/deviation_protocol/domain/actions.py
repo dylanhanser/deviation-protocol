@@ -53,7 +53,16 @@ class ActionSubmission(BaseModel):
     tool_ids: tuple[str, ...] = ()
     description: str | None = Field(default=None, max_length=150)
     dialogue: str | None = Field(default=None, max_length=200)
-    choice_id: str | None = Field(default=None, max_length=64)
+    decision_id: str | None = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    )
+    choice_id: str | None = Field(
+        default=None,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    )
     item_instance_id: str | None = Field(
         default=None,
         min_length=1,
@@ -79,6 +88,7 @@ class ActionSubmission(BaseModel):
         "client_request_id",
         "description",
         "dialogue",
+        "decision_id",
         "choice_id",
         mode="before",
     )
@@ -119,6 +129,7 @@ class ActionSubmission(BaseModel):
             "tool_ids": sorted(self.tool_ids),
             "description": self._normalize_text(self.description),
             "dialogue": self._normalize_text(self.dialogue),
+            "decision_id": self.decision_id,
             "choice_id": self.choice_id,
         }
         # Preserve Phase 1 signatures for legacy actions while including every new

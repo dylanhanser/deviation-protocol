@@ -7,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
+from deviation_protocol.domain.narrative import NarrativeFrame
 
 
 SafeId64 = Annotated[
@@ -51,6 +52,7 @@ class StrictApiModel(BaseModel):
 class CreateSessionRequest(StrictApiModel):
     client_request_id: SafeId64
     character_definition_id: SafeId128
+    scenario_id: SafeId128
 
 
 class ActionRequest(StrictApiModel):
@@ -61,7 +63,8 @@ class ActionRequest(StrictApiModel):
     tool_ids: tuple[SafeId128, ...] = Field(default=(), max_length=16)
     description: Annotated[str, Field(strict=True, min_length=1, max_length=150)] | None = None
     dialogue: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = None
-    choice_id: SafeId64 | None = None
+    decision_id: SafeId128 | None = None
+    choice_id: SafeId128 | None = None
     item_instance_id: SafeId128 | None = None
     equipment_slot_id: SafeId128 | None = None
     skill_definition_id: SafeId128 | None = None
@@ -92,6 +95,7 @@ class ActionResponse(BaseModel):
     state_changed: bool
     narrative_required: bool
     narrative_pending: bool
+    narrative_frame: NarrativeFrame | None = None
     local_query_result: dict[str, Any] | None = None
 
     @classmethod

@@ -1,6 +1,6 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-第一阶段基础架构：本地行动闸门、确定性规则结算、剧情事实边界、确定性 `TurnOrchestrator`、MySQL 事件/快照持久化、异步 Unit of Work，以及最小 FastAPI 健康检查。本阶段不连接任何真实大模型，也不包含完整副本。
+当前实现到 Phase 2.2a：本地行动闸门、确定性规则结算、通用剧情运行时、`StoryDirector`、确定性 `TurnOrchestrator`、MySQL 事件/快照事务、异步 Unit of Work，以及玩家安全 FastAPI 会话边界。本阶段不连接任何真实大模型，也不生成文学正文。
 
 ## 结构
 
@@ -179,4 +179,36 @@ Phase 2.1 新增与具体题材无关的 `ScenarioDefinition`、`ScenarioRuntime
 
 决策窗口由独立策略控制。开局可声明一次立即生存决策，前期以较大的 beat 间隔保持低频，调查阶段只在声明的关键窗口停下，核心冲突可进入 rapid 模式缩短间隔。普通移动、开门、读取必要信息或本地查询不会自行制造决策；本地查询也不推进 beat 或时钟。每帧的数据结构最多容纳一个决策，阶段最大自动 beat 和严格失败路径共同防止无限自动推进或永不决策。
 
-首个正式结构化内容包位于 `config/scenarios/death_certificate_v1.json`，规格见 `docs/scenarios/death_certificate_v1.md`。仓库只包含原创的结构化设计，没有参考小说原文或改写文本。Phase 2.1 不把剧情运行时接入生产 `TurnOrchestrator` 或 API；该编排与 `NarrativeProvider` 接线留给 Phase 2.2。
+首个正式结构化内容包位于 `config/scenarios/death_certificate_v1.json`，规格见 `docs/scenarios/death_certificate_v1.md`。仓库只包含原创的结构化设计，没有参考小说原文或改写文本。Phase 2.1 的领域能力现已由下述 Phase 2.2a 事务接线投入生产路径；真实 `NarrativeProvider` 仍未接入。
+
+## Phase 2.2a 场景事务接线
+
+`POST /v1/sessions` 现在必须由玩家显式提交服务器允许的 `scenario_id`，同时继续提交经 `ContentCatalog` 验证的 `character_definition_id`。玩家不能提交 scenario 内容版本、初始 phase、事实、线索、时钟、`ScenarioRuntimeState`、`NarrativeFrame` 或可信事件。lifespan 加载 `ScenarioCatalog` 及其匹配的 `ContentCatalog`；`SessionService` 创建基础 `GameState` 和场景引用的运行时 NPC，再调用纯 `DeterministicStoryDirector.start_scenario()`。得到的 v2 快照、session 行与创建幂等绑定在同一个 UoW 中一次提交，响应只附带安全初始 `NarrativeFrame`。同一玩家的创建键同时绑定角色与 scenario；任一项不同均为 409，不同玩家仍可复用同一键。
+
+实际创建流为：
+
+```text
+principal + creation key + character_definition_id + scenario_id
+  -> ContentCatalog / ScenarioCatalog 校验
+  -> GameState + runtime NPCs
+  -> StoryDirector.start_scenario
+  -> ScenarioRuntimeState + safe NarrativeFrame
+  -> game_sessions + v2 game_snapshots（同一事务）
+```
+
+行动仍先锁定 session 行并检查 `(session_id, client_request_id)` 幂等记录，然后加载版本一致的 v2 `GameState` 与匹配的两个目录。`ActionGateway` 和 `DeterministicRuleResolver` 永远先运行；Director 不访问 Repository、UoW、数据库或 API。处理规则为：
+
+- `REJECTED_LOCAL`：只保存幂等响应与当前只读 Frame，不推进 phase、beat、时钟、决策或版本。
+- 本地查询：只返回权威查询结果与当前只读 Frame，不调用 Director 推进方法、不写快照或成功事件。
+- 本地机械突变：仅提交 resolver 已确认的机械候选；Phase 2.2a 没有机械结果到剧情事实的映射，因此只重新规划 Frame，不猜测剧情结果。
+- `NARRATIVE_REQUIRED`：返回 required/pending 与当前安全 Frame；没有 Provider 时不把意图当结果，不写事实、线索、时钟或 NPC 响应，版本不变。
+- 当前声明式决策：`CHOOSE` 必须同时提交当前 Frame 公开的 `decision_id` 与其中一个 choice ID，且不能混入文本、target、tool 或其他结构化结算字段。公开 `decision_id` 是绑定 session、state version、scenario 内容版本与内部决策定义的确定性 token，不是可跨会话复用的 catalog ID。服务器策略验证 choice 后签发密封的 `player.decision.selected`，Director 才能记录该选择并执行内容包明确定义的决策转场/时间成本；选择本身不会声称 NPC 承认、线索发现或行动成功。
+- 终局：普通叙事推进返回 `SCENARIO_ENDED`，安全结算 Frame 仍可读取。
+
+可信剧情桥梁由应用层 `ScenarioDecisionResponsePolicy` 与不可重建的 `TrustedScenarioEventIssuer` capability 组成。capability 绑定 session、turn、request、action signature、state version、完整状态指纹、scenario 内容版本和当前决策；issuer 会以锁内权威状态再次交叉校验。来源与事件类型使用封闭白名单，密封事件还绑定 source 与内部 decision ID；当前只有“服务器验证过的活动决策响应”拥有非空白名单。玩家 JSON、`PlayerAction`、普通 `VerifiedScenarioEvent`、未来模型输出或密封后修改的副本都不能通过真实性检查。RuleResolver 机械映射和 Phase 2.2b 的 NarrativeResult 验证入口已保留为无权限来源，本阶段不会签发任何结果事件。特别地，玩家输入“护士承认我活着”只会保持 pending，绝不会完成真实 NPC 承认目标。
+
+成功决策在同一个深度隔离候选上形成剧情状态与稳定 `DomainEventDraft`，候选快照、连续事件、session 版本和幂等响应共用一个 `AsyncSession` 并只 commit 一次；任一步失败全部 rollback，一次成功回合 `state_version` 只增加一次。旧的 v1/v2 无 `scenario_runtime` 快照仍走兼容读取路径，不会补造场景副本。
+
+公共行动响应不含 `action_signature`、快照、完整 `GameState`、Scenario 定义、隐藏事实、未来结局、密封信息或异常评估状态。`NarrativeFrame` 继续由 Director 从玩家已知事实、当前位置与真实 NPC 的安全交集构建；`/state` 的 `visible_npcs` 也使用同一类权威交集，而不是暴露全部 NPC。
+
+Phase 2.2b 的 `NarrativeProvider` 只能提出候选叙事结果；候选必须先经过独立服务器验证才能获得密封能力，Provider 永远不能直接修改 `GameState`、事实、线索、时钟或决策。本仓库当前仍无模型 SDK/API 调用、`DeviationEvaluator`、异常评估、场景崩坏、战斗系统或长篇文学正文生成。

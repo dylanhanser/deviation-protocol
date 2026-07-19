@@ -316,6 +316,8 @@ class VerifiedScenarioEvent(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
     event_id: DefinitionId
     event_type: DefinitionId
+    source: DefinitionId | None = None
+    decision_id: DefinitionId | None = None
     action_type: DefinitionId | None = None
     local_query: StrictBool = False
     discovered_clue_ids: tuple[DefinitionId, ...] = ()
@@ -331,6 +333,10 @@ class VerifiedScenarioEvent(BaseModel):
 
     @model_validator(mode="after")
     def validate_query_is_read_only(self) -> VerifiedScenarioEvent:
+        if self.resolves_current_decision and self.decision_id is None:
+            raise ValueError("decision-resolving event requires decision_id")
+        if not self.resolves_current_decision and self.decision_id is not None:
+            raise ValueError("non-decision event cannot carry decision_id")
         has_mutation = any(
             (
                 self.discovered_clue_ids,

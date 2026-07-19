@@ -732,7 +732,7 @@ async def test_real_mysql_turn_response_insert_failure_rolls_back_mutation(
         event_id_generator=lambda: "it-response-failure-event",
     )
 
-    with pytest.raises(IntegrityError):
+    with pytest.raises(RuntimeError, match="no committed winner"):
         await service.handle(action)
 
     async with mysql_session_factory() as session:

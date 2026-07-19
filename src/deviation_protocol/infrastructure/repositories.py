@@ -5,9 +5,14 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deviation_protocol.application.action_gateway import ActionRoute
+from deviation_protocol.application.errors import (
+    ConcurrentSessionCreateError,
+    ConcurrentTurnRequestError,
+)
 from deviation_protocol.application.ports import (
     GameSessionRepository,
     PersistedSession,
@@ -81,22 +86,27 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
         state: Mapping[str, Any],
         created_at: datetime,
     ) -> None:
-        self._session.add(
-            GameSessionRow(
-                session_id=session.session_id,
-                player_id=session.player_id,
-                creation_client_request_id=creation_client_request_id,
-                character_definition_id=character_definition_id,
-                scenario_id=session.scenario_id,
-                scenario_version=session.scenario_version,
-                phase=session.phase,
-                turn_number=session.turn_number,
-                state_version=session.state_version,
-                random_seed=session.random_seed,
-                created_at=created_at,
-                updated_at=created_at,
-            )
+        session_row = GameSessionRow(
+            session_id=session.session_id,
+            player_id=session.player_id,
+            creation_client_request_id=creation_client_request_id,
+            character_definition_id=character_definition_id,
+            scenario_id=session.scenario_id,
+            scenario_version=session.scenario_version,
+            phase=session.phase,
+            turn_number=session.turn_number,
+            state_version=session.state_version,
+            random_seed=session.random_seed,
+            created_at=created_at,
+            updated_at=created_at,
         )
+        self._session.add(session_row)
+        try:
+            await self._session.flush((session_row,))
+        except IntegrityError as exc:
+            if _is_mysql_duplicate_key(exc):
+                raise ConcurrentSessionCreateError from exc
+            raise
         self._session.add(
             GameSnapshotRow(
                 session_id=session.session_id,
@@ -249,16 +259,27 @@ class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
         route: ActionRoute,
         response: Mapping[str, Any],
     ) -> None:
-        self._session.add(
-            TurnRequestRow(
-                request_id=str(uuid4()),
-                session_id=submission.session_id,
-                turn_id=submission.turn_id,
-                client_request_id=submission.client_request_id,
-                action_signature=action_signature,
-                route=route.value,
-                request_json=submission.model_dump(mode="json"),
-                response_json=dict(response),
-                error_text=None,
-            )
+        row = TurnRequestRow(
+            request_id=str(uuid4()),
+            session_id=submission.session_id,
+            turn_id=submission.turn_id,
+            client_request_id=submission.client_request_id,
+            action_signature=action_signature,
+            route=route.value,
+            request_json=submission.model_dump(mode="json"),
+            response_json=dict(response),
+            error_text=None,
         )
+        self._session.add(row)
+        try:
+            await self._session.flush((row,))
+        except IntegrityError as exc:
+            if _is_mysql_duplicate_key(exc):
+                raise ConcurrentTurnRequestError from exc
+            raise
+
+
+def _is_mysql_duplicate_key(error: IntegrityError) -> bool:
+    arguments = getattr(error.orig, "args", ())
+    error_code = arguments[0] if arguments else None
+    return type(error_code) is int and error_code == 1062

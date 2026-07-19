@@ -98,7 +98,7 @@ class DeterministicEffectExecutor:
         if isinstance(effects, (str, bytes)) or not isinstance(effects, Sequence):
             return EffectExecutionResult(False, "UNORDERED_EFFECT_SEQUENCE")
         try:
-            candidate = GameState.from_snapshot(state.to_snapshot(), catalog=catalog)
+            candidate = state.detached_copy(catalog)
         except DomainRuleViolation as exc:
             return EffectExecutionResult(False, exc.code.value.upper())
         except ValueError:

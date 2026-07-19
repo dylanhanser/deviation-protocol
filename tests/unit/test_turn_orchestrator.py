@@ -5,6 +5,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
+import json
 from pathlib import Path
 from typing import Any
 
@@ -33,18 +34,33 @@ from deviation_protocol.application.resolution import (
     ResolutionStatus,
 )
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
+from deviation_protocol.application.scenario_event_bridge import (
+    bind_public_decision_frame,
+)
+from deviation_protocol.application.story_director import (
+    DeterministicStoryDirector,
+    StoryDirectorError,
+)
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent, DomainEventDraft
 from deviation_protocol.domain.models import GameSession
+from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog
 from deviation_protocol.domain.state import GameState, PlayerState
 from deviation_protocol.infrastructure.content_loader import JsonContentCatalogLoader
+from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 
 
 CONTENT_PACK = Path(__file__).parents[2] / "config" / "demo_content_pack.json"
+SCENARIO_PACK = (
+    Path(__file__).parents[2]
+    / "config"
+    / "scenarios"
+    / "death_certificate_v1.json"
+)
 FIXED_TIME = datetime(2026, 7, 19, 12, 30, tzinfo=timezone.utc)
 
 
@@ -71,6 +87,23 @@ def submission(action_type: ActionType, **overrides: object) -> ActionSubmission
     }
     values.update(overrides)
     return ActionSubmission(**values)
+
+
+def current_public_decision_id(
+    state: GameState,
+    scenario_catalog: ScenarioCatalog,
+    *,
+    state_version: int = 4,
+) -> str:
+    definition = scenario_catalog.scenarios[0]
+    frame = bind_public_decision_frame(
+        DeterministicStoryDirector().plan_frame(state, definition),
+        session_id="session-1",
+        state_version=state_version,
+        scenario_content_version=definition.content_version,
+    )
+    assert frame.decision_id is not None
+    return frame.decision_id
 
 
 class FakeStore:
@@ -283,15 +316,64 @@ def orchestrator(
     resolver: object | None = None,
     *,
     ids: list[str] | None = None,
+    scenario_catalog: ScenarioCatalog | None = None,
+    story_director: DeterministicStoryDirector | None = None,
 ) -> FirstPhaseTurnOrchestrator:
     event_ids = iter(ids or [f"event-{index}" for index in range(1, 20)])
     return FirstPhaseTurnOrchestrator(
         resolver=resolver or DeterministicRuleResolver(),  # type: ignore[arg-type]
         uow_factory=lambda: FakeUnitOfWork(store),
         catalog=catalog,
+        scenario_catalog=scenario_catalog,
+        story_director=story_director or DeterministicStoryDirector(),
         clock=lambda: FIXED_TIME,
         event_id_generator=lambda: next(event_ids),
     )
+
+
+def scenario_state_and_store(
+    scenario_catalog: ScenarioCatalog,
+) -> tuple[GameState, FakeStore]:
+    definition = scenario_catalog.scenario("death_certificate")
+    character = scenario_catalog.content_catalog.character(
+        "character.death_certificate.investigator"
+    )
+    assert definition is not None and character is not None
+    state = GameState(
+        content_version=scenario_catalog.content_version,
+        player=PlayerState.from_definition("player-1", character),
+    )
+    for index, reference in enumerate(definition.npc_references, start=1):
+        state.spawn_npc(
+            scenario_catalog.content_catalog,
+            reference.npc_definition_id,
+            f"scenario-npc-{index}",
+        )
+    state = DeterministicStoryDirector().start_scenario(
+        state, definition
+    ).candidate_state
+    store = FakeStore(state)
+    assert store.session is not None
+    store.session.scenario_id = definition.scenario_id
+    store.session.scenario_version = definition.content_version
+    return state, store
+
+
+class SpyStoryDirector(DeterministicStoryDirector):
+    def __init__(self) -> None:
+        super().__init__()
+        self.plan_calls = 0
+        self.advance_calls = 0
+
+    def plan_frame(self, *args: object, **kwargs: object):
+        self.plan_calls += 1
+        return super().plan_frame(*args, **kwargs)  # type: ignore[arg-type]
+
+    def advance_after_verified_result(self, *args: object, **kwargs: object):
+        self.advance_calls += 1
+        return super().advance_after_verified_result(  # type: ignore[arg-type]
+            *args, **kwargs
+        )
 
 
 @pytest.mark.asyncio
@@ -1093,3 +1175,525 @@ def test_turn_response_rejects_internal_or_non_json_fields() -> None:
 
     reordered = dict(reversed(list(payload.items())))
     assert TurnResponse.model_validate(reordered) == TurnResponse.model_validate(payload)
+
+
+@pytest.fixture
+def scenario_catalog() -> ScenarioCatalog:
+    return JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+
+
+@pytest.mark.asyncio
+async def test_scenario_rejection_and_query_never_advance_story_or_version(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    spy = SpyStoryDirector()
+    service = orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        story_director=spy,
+    )
+    rejected = await service.handle(
+        submission(
+            ActionType.CUSTOM,
+            client_request_id="scenario-rejected",
+            description="啊啊啊啊啊啊啊",
+        )
+    )
+    queried = await service.handle(
+        submission(
+            ActionType.INSPECT_STATUS,
+            client_request_id="scenario-query",
+        )
+    )
+
+    assert rejected.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert queried.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
+    assert rejected.narrative_frame is not None
+    assert queried.narrative_frame is not None
+    assert spy.advance_calls == 0
+    assert store.session is not None and store.session.state_version == 4
+    assert store.snapshot is not None
+    assert store.snapshot.state == original.to_snapshot()
+    assert store.events == []
+
+
+@pytest.mark.asyncio
+async def test_narrative_required_cannot_turn_player_claim_into_npc_acknowledgement(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    spy = SpyStoryDirector()
+    response = await orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        story_director=spy,
+    ).handle(
+        submission(
+            ActionType.TALK,
+            client_request_id="scenario-false-npc-claim",
+            dialogue="护士承认我还活着",
+        )
+    )
+
+    assert response.resolution_kind is ResolutionStatus.NARRATIVE_REQUIRED
+    assert response.narrative_pending is True
+    assert response.resulting_state_version == 4
+    assert spy.advance_calls == 0
+    assert store.snapshot is not None
+    assert store.snapshot.state == original.to_snapshot()
+    serialized = json.dumps(response.to_persistence(), ensure_ascii=False)
+    assert "player_is_alive" not in serialized
+    assert "vitals.verified" not in serialized
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "choice_id",
+    [
+        "death_certificate.action.seek_records",
+        "death_certificate.action.fabricated",
+        "death_certificate.decision.core_one",
+    ],
+)
+async def test_only_current_public_decision_choices_are_accepted(
+    scenario_catalog: ScenarioCatalog,
+    choice_id: str,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    response = await orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+    ).handle(
+        submission(
+            ActionType.CHOOSE,
+            client_request_id=f"invalid-choice-{choice_id.rsplit('.', 1)[-1]}",
+            decision_id=current_public_decision_id(original, scenario_catalog),
+            choice_id=choice_id,
+        )
+    )
+    assert response.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert response.result_code == "INVALID_DECISION_CHOICE"
+    assert response.resulting_state_version == 4
+    assert store.snapshot is not None
+    assert store.snapshot.state == original.to_snapshot()
+    assert store.events == []
+
+
+@pytest.mark.asyncio
+async def test_valid_decision_is_sealed_recorded_once_without_claiming_outcomes(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    spy = SpyStoryDirector()
+    service = orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        story_director=spy,
+        ids=["decision-domain-event"],
+    )
+    action = submission(
+        ActionType.CHOOSE,
+        client_request_id="valid-current-choice",
+        decision_id=current_public_decision_id(original, scenario_catalog),
+        choice_id="death_certificate.action.move_fingers_rhythmically",
+    )
+    first = await service.handle(action)
+    replay = await service.handle(action)
+    stale = await service.handle(
+        action.model_copy(update={"client_request_id": "stale-after-completion"})
+    )
+
+    assert first == replay
+    assert first.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
+    assert first.result_code == "SCENARIO_DECISION_RECORDED"
+    assert first.resulting_state_version == 5
+    assert spy.advance_calls == 1
+    assert stale.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert stale.result_code == "STALE_DECISION"
+    assert stale.resulting_state_version == 5
+    assert len(store.events) == 1
+    audit = store.events[0]
+    assert audit.event_type == "ScenarioDecisionSelected"
+    assert audit.payload["source"] == "VALIDATED_DECISION_RESPONSE"
+    assert audit.payload["decision_id"] == (
+        "death_certificate.decision.immediate_survival"
+    )
+    assert audit.payload["selected_action_id"] == action.choice_id
+    assert not (
+        {"npc_acknowledged", "clues", "facts", "clock_delta", "sealed_payload"}
+        & set(audit.payload)
+    )
+    serialized = json.dumps(
+        first.model_dump(mode="json", exclude={"action_signature"}),
+        ensure_ascii=False,
+    )
+    for forbidden in (
+        "prediction_causes_outcome",
+        "underground_patient_alive",
+        "security_alert",
+        "death_certificate.decision.",
+        "_issuer",
+        "_sealed_payload",
+        "action_signature",
+        "policy_trace",
+        "database_url",
+    ):
+        assert forbidden not in serialized
+    assert store.snapshot is not None
+    runtime = store.snapshot.state["scenario_runtime"]
+    assert runtime["current_phase_id"] == "death_certificate.life_disputed"
+    assert runtime["decisions_made"] == [
+        "death_certificate.decision.immediate_survival"
+    ]
+
+
+@pytest.mark.asyncio
+async def test_public_decision_id_from_another_session_is_stale(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    definition = scenario_catalog.scenarios[0]
+    foreign_frame = bind_public_decision_frame(
+        DeterministicStoryDirector().plan_frame(original, definition),
+        session_id="session-2",
+        state_version=4,
+        scenario_content_version=definition.content_version,
+    )
+    response = await orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+    ).handle(
+        submission(
+            ActionType.CHOOSE,
+            client_request_id="cross-session-decision",
+            decision_id=foreign_frame.decision_id,
+            choice_id="death_certificate.action.observe_quietly",
+        )
+    )
+    assert response.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert response.result_code == "STALE_DECISION"
+    assert response.resulting_state_version == 4
+    assert store.events == []
+
+
+@pytest.mark.asyncio
+async def test_mechanical_and_scenario_candidates_merge_without_lost_update(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    payload = scenario_catalog.model_dump(mode="json")
+    payload["content_catalog"]["items"].append(
+        {
+            "definition_id": "item.scenario.token",
+            "display_name": "事务测试令牌",
+            "stack_limit": 2,
+            "tags": ["consumable"],
+        }
+    )
+    extended = ScenarioCatalog.model_validate(payload)
+    original, store = scenario_state_and_store(extended)
+    original.grant_item(
+        extended.content_catalog,
+        "item.scenario.token",
+        2,
+        instance_id="scenario-token",
+    )
+    store.snapshot = PersistedSnapshot(4, original.to_snapshot())
+    candidate = original.detached_copy(extended.content_catalog)
+    candidate.remove_item("scenario-token", 1)
+    resolver = ResultResolver(
+        ResolutionResult(
+            status=ResolutionStatus.RESOLVED_LOCAL,
+            success=True,
+            result_code="MECHANICAL_DECISION_APPLIED",
+            updated_state=candidate,
+            state_changed=True,
+            events=(
+                DomainEventDraft(
+                    "MechanicalDecisionApplied", {"item_instance_id": "scenario-token"}
+                ),
+            ),
+            feedback=PlayerFeedback("MECHANICAL_DECISION_APPLIED"),
+        )
+    )
+    action = submission(
+        ActionType.CHOOSE,
+        client_request_id="combined-decision",
+        decision_id=current_public_decision_id(original, extended),
+        choice_id="death_certificate.action.observe_quietly",
+    )
+    response = await orchestrator(
+        store,
+        extended.content_catalog,
+        resolver,
+        scenario_catalog=extended,
+        ids=["mechanical-event", "decision-event"],
+    ).handle(action)
+
+    assert response.resulting_state_version == 5
+    assert store.snapshot is not None
+    restored = GameState.from_snapshot(
+        store.snapshot.state,
+        catalog=extended.content_catalog,
+        scenario_catalog=extended,
+    )
+    assert restored.player.inventory.items["scenario-token"].quantity == 1
+    assert restored.scenario_runtime is not None
+    assert restored.scenario_runtime.current_phase_id == (
+        "death_certificate.life_disputed"
+    )
+    assert [event.event_type for event in store.events] == [
+        "MechanicalDecisionApplied",
+        "ScenarioDecisionSelected",
+    ]
+    assert [event.sequence_no for event in store.events] == [1, 2]
+    assert original.player.inventory.items["scenario-token"].quantity == 2
+    assert original.scenario_runtime is not None
+    assert original.scenario_runtime.current_decision_id is not None
+
+
+@pytest.mark.asyncio
+async def test_mechanical_candidate_is_rolled_back_when_story_coordination_fails(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    class FailingDirector(DeterministicStoryDirector):
+        def advance_after_verified_result(self, *args: object, **kwargs: object):
+            raise StoryDirectorError("simulated combined story failure")
+
+    original, store = scenario_state_and_store(scenario_catalog)
+    candidate = original.detached_copy(scenario_catalog.content_catalog)
+    candidate.player.resources["composure"].current -= 1
+    resolver = ResultResolver(
+        ResolutionResult(
+            status=ResolutionStatus.RESOLVED_LOCAL,
+            success=True,
+            result_code="MECHANICAL_DECISION_APPLIED",
+            updated_state=candidate,
+            state_changed=True,
+            events=(DomainEventDraft("ComposureSpent", {"amount": 1}),),
+            feedback=PlayerFeedback("MECHANICAL_DECISION_APPLIED"),
+        )
+    )
+    action = submission(
+        ActionType.CHOOSE,
+        client_request_id="combined-story-failure",
+        decision_id=current_public_decision_id(original, scenario_catalog),
+        choice_id="death_certificate.action.observe_quietly",
+    )
+    with pytest.raises(CandidateStateInvalidError):
+        await orchestrator(
+            store,
+            scenario_catalog.content_catalog,
+            resolver,
+            scenario_catalog=scenario_catalog,
+            story_director=FailingDirector(),
+        ).handle(action)
+    assert store.snapshot is not None
+    assert store.snapshot.state == original.to_snapshot()
+    assert store.session is not None and store.session.state_version == 4
+    assert store.events == []
+    assert store.requests == {}
+
+
+@pytest.mark.asyncio
+async def test_open_decision_blocks_mechanical_mutation_without_advancing(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    payload = scenario_catalog.model_dump(mode="json")
+    payload["content_catalog"]["items"].append(
+        {
+            "definition_id": "item.scenario.medkit",
+            "display_name": "场景测试医疗包",
+            "stack_limit": 2,
+            "tags": ["consumable"],
+        }
+    )
+    extended = ScenarioCatalog.model_validate(payload)
+    original, store = scenario_state_and_store(extended)
+    original.grant_item(
+        extended.content_catalog,
+        "item.scenario.medkit",
+        2,
+        instance_id="scenario-medkit",
+    )
+    store.snapshot = PersistedSnapshot(4, original.to_snapshot())
+    before_runtime = deepcopy(original.to_snapshot()["scenario_runtime"])
+    spy = SpyStoryDirector()
+    response = await orchestrator(
+        store,
+        extended.content_catalog,
+        scenario_catalog=extended,
+        story_director=spy,
+        ids=["scenario-mechanical-event"],
+    ).handle(
+        submission(
+            ActionType.USE_ITEM,
+            client_request_id="scenario-mechanical",
+            item_instance_id="scenario-medkit",
+        )
+    )
+
+    assert response.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert response.result_code == "DECISION_RESPONSE_REQUIRED"
+    assert response.resulting_state_version == 4
+    assert spy.advance_calls == 0
+    assert store.snapshot is not None
+    assert store.snapshot.state["scenario_runtime"] == before_runtime
+    assert store.snapshot.state["player"]["inventory"]["items"][
+        "scenario-medkit"
+    ]["quantity"] == 2
+    assert store.events == []
+
+
+@pytest.mark.asyncio
+async def test_mechanical_mutation_after_decision_preserves_scenario_runtime(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    payload = scenario_catalog.model_dump(mode="json")
+    payload["content_catalog"]["items"].append(
+        {
+            "definition_id": "item.scenario.medkit",
+            "display_name": "场景测试医疗包",
+            "stack_limit": 2,
+            "tags": ["consumable"],
+        }
+    )
+    extended = ScenarioCatalog.model_validate(payload)
+    original, store = scenario_state_and_store(extended)
+    original.grant_item(
+        extended.content_catalog,
+        "item.scenario.medkit",
+        2,
+        instance_id="scenario-medkit",
+    )
+    store.snapshot = PersistedSnapshot(4, original.to_snapshot())
+    spy = SpyStoryDirector()
+    service = orchestrator(
+        store,
+        extended.content_catalog,
+        scenario_catalog=extended,
+        story_director=spy,
+        ids=["decision-event", "mechanical-event"],
+    )
+    decision = await service.handle(
+        submission(
+            ActionType.CHOOSE,
+            client_request_id="decision-before-mechanical",
+            decision_id=current_public_decision_id(original, extended),
+            choice_id="death_certificate.action.observe_quietly",
+        )
+    )
+    assert decision.resulting_state_version == 5
+    assert store.snapshot is not None
+    runtime_before = deepcopy(store.snapshot.state["scenario_runtime"])
+
+    response = await service.handle(
+        submission(
+            ActionType.USE_ITEM,
+            client_request_id="scenario-mechanical-after-decision",
+            item_instance_id="scenario-medkit",
+        )
+    )
+
+    assert response.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
+    assert response.resulting_state_version == 6
+    assert spy.advance_calls == 1
+    assert store.snapshot is not None
+    assert store.snapshot.state["scenario_runtime"] == runtime_before
+    assert store.snapshot.state["player"]["inventory"]["items"][
+        "scenario-medkit"
+    ]["quantity"] == 1
+    assert [event.event_type for event in store.events] == [
+        "ScenarioDecisionSelected",
+        "ItemConsumed",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_story_failure_and_event_write_failure_rollback_the_whole_decision(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    class FailingDirector(DeterministicStoryDirector):
+        def advance_after_verified_result(self, *args: object, **kwargs: object):
+            raise StoryDirectorError("simulated story failure")
+
+    original, story_store = scenario_state_and_store(scenario_catalog)
+    action = submission(
+        ActionType.CHOOSE,
+        client_request_id="rollback-current-choice",
+        decision_id=current_public_decision_id(original, scenario_catalog),
+        choice_id="death_certificate.action.observe_quietly",
+    )
+    with pytest.raises(CandidateStateInvalidError):
+        await orchestrator(
+            story_store,
+            scenario_catalog.content_catalog,
+            scenario_catalog=scenario_catalog,
+            story_director=FailingDirector(),
+        ).handle(action)
+    assert story_store.snapshot is not None
+    assert story_store.snapshot.state == original.to_snapshot()
+    assert story_store.events == []
+    assert story_store.requests == {}
+
+    original, write_store = scenario_state_and_store(scenario_catalog)
+    write_store.fail_event = True
+    with pytest.raises(RuntimeError, match="event failure"):
+        await orchestrator(
+            write_store,
+            scenario_catalog.content_catalog,
+            scenario_catalog=scenario_catalog,
+        ).handle(action)
+    assert write_store.snapshot is not None
+    assert write_store.snapshot.state == original.to_snapshot()
+    assert write_store.session is not None and write_store.session.state_version == 4
+    assert write_store.events == []
+    assert write_store.requests == {}
+
+
+@pytest.mark.asyncio
+async def test_ended_scenario_rejects_further_narrative_progress(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    _, store = scenario_state_and_store(scenario_catalog)
+    assert store.snapshot is not None
+    state = GameState.from_snapshot(
+        store.snapshot.state,
+        catalog=scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+    )
+    runtime = state.scenario_runtime
+    assert runtime is not None
+    runtime.current_phase_id = "death_certificate.resolution"
+    runtime.current_location_id = "death_certificate.control_room"
+    runtime.opened_location_ids = runtime.opened_location_ids | {
+        "death_certificate.control_room"
+    }
+    runtime.current_decision_id = None
+    runtime.phase_beat_index = 0
+    runtime.phase_visit_counts["death_certificate.resolution"] = 1
+    runtime.ending_status = EndingStatus.RESOLVED
+    runtime.ending_id = "death_certificate.ending.record_challenged"
+    store.snapshot = PersistedSnapshot(4, state.to_snapshot())
+
+    response = await orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+    ).handle(
+        submission(
+            ActionType.OBSERVE,
+            client_request_id="ended-observe",
+            description="继续观察",
+        )
+    )
+    assert response.resolution_kind is ResolutionStatus.REJECTED_LOCAL
+    assert response.result_code == "SCENARIO_ENDED"
+    assert response.resulting_state_version == 4
+    assert response.narrative_frame is not None
+    assert response.narrative_frame.stop_condition == "SCENARIO_ENDED"

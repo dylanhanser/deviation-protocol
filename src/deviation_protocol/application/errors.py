@@ -69,3 +69,11 @@ class InvalidCharacterDefinitionError(ValueError):
     def __init__(self, character_definition_id: str) -> None:
         self.character_definition_id = character_definition_id
         super().__init__(self.code)
+
+
+class InvalidScenarioDefinitionError(ValueError):
+    code = "INVALID_SCENARIO_DEFINITION"
+
+    def __init__(self, scenario_id: str) -> None:
+        self.scenario_id = scenario_id
+        super().__init__(self.code)

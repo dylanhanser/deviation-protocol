@@ -231,6 +231,8 @@ class GameState(RuntimeModel):
         for npc_id, npc in self.npcs.items():
             if npc_id != npc.npc_id:
                 raise ValueError("NPC state key must match npc_id")
+            if npc_id == self.player.player_id:
+                raise ValueError("NPC runtime ID must not collide with player_id")
         return self
 
     def to_snapshot(self) -> dict[str, Any]:
@@ -241,6 +243,18 @@ class GameState(RuntimeModel):
         # from crossing the snapshot persistence boundary.
         type(self).model_validate(payload)
         return payload
+
+    def detached_copy(self, catalog: ContentCatalog) -> GameState:
+        """Deeply clone a validated aggregate without re-resolving scenario files.
+
+        Transaction boundaries validate scenario runtime against ScenarioCatalog.
+        Pure mechanical rules only need a detached copy and must not gain a file or
+        scenario-catalog dependency merely to preserve the untouched runtime subtree.
+        """
+        self.validate_against(catalog)
+        copied = type(self).model_validate(self.to_snapshot())
+        copied.validate_against(catalog)
+        return copied
 
     @classmethod
     def from_snapshot(
@@ -670,6 +684,11 @@ class GameState(RuntimeModel):
                 DomainErrorCode.RUNTIME_ID_COLLISION,
                 f"NPC runtime ID {npc_id!r} collides with a static definition",
             )
+        if npc_id == self.player.player_id:
+            raise DomainRuleViolation(
+                DomainErrorCode.RUNTIME_ID_COLLISION,
+                f"NPC runtime ID {npc_id!r} collides with player_id",
+            )
         if npc_id in self.npcs:
             raise DomainRuleViolation(
                 DomainErrorCode.DUPLICATE_NPC,
@@ -855,7 +874,7 @@ class AuthoritativeStateView:
     _currencies: tuple[tuple[str, int], ...]
 
     def __init__(self, state: GameState, catalog: ContentCatalog) -> None:
-        state = GameState.from_snapshot(state.to_snapshot(), catalog=catalog)
+        state = state.detached_copy(catalog)
         quantities: dict[str, int] = {}
         item_definitions: list[tuple[str, str]] = []
         equipment_instance_ids: set[str] = set()

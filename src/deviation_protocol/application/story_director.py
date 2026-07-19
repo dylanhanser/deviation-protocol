@@ -434,6 +434,10 @@ class DeterministicStoryDirector:
         if event.resolves_current_decision:
             if runtime.current_decision_id is None:
                 raise StoryDirectorError("verified result cannot resolve a missing decision")
+            if event.decision_id != runtime.current_decision_id:
+                raise StoryDirectorError(
+                    "verified result cannot resolve a different decision"
+                )
             if len(runtime.decisions_made) >= MAX_DECISIONS_MADE:
                 raise StoryDirectorError("completed decision history limit reached")
             runtime.decisions_made = (*runtime.decisions_made, runtime.current_decision_id)
@@ -700,6 +704,7 @@ class DeterministicStoryDirector:
             min_length=definition.narrative_length.minimum,
             max_length=definition.narrative_length.maximum,
             decision_required=window is not None,
+            decision_id=window.decision_id if window is not None else None,
             decision_reason=window.reason if window is not None else None,
             suggested_actions=decision_payload[0],
             allowed_custom_action_constraints=decision_payload[1],

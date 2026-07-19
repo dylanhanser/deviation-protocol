@@ -14,18 +14,29 @@ from deviation_protocol.application.errors import (
     ConcurrentSessionCreateError,
     IdempotencyConflictError,
     InvalidCharacterDefinitionError,
+    InvalidScenarioDefinitionError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import PersistedSession, PersistedSnapshot
-from deviation_protocol.application.session_service import SessionService
+from deviation_protocol.application.session_service import (
+    SessionCreationResult,
+    SessionService,
+)
 from deviation_protocol.domain.models import GameSession
-from deviation_protocol.domain.state import GameState, NpcState
+from deviation_protocol.domain.state import DomainRuleViolation, GameState, NpcState
 from deviation_protocol.infrastructure.content_loader import JsonContentCatalogLoader
+from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 
 
 CONTENT_PACK = Path(__file__).parents[2] / "config" / "demo_content_pack.json"
+SCENARIO_PACK = (
+    Path(__file__).parents[2]
+    / "config"
+    / "scenarios"
+    / "death_certificate_v1.json"
+)
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=timezone.utc)
 
 
@@ -138,6 +149,203 @@ def service_and_store() -> tuple[SessionService, Store]:
 
 def principal(player_id: str = "player-1") -> RequestPrincipal:
     return RequestPrincipal(player_id=player_id, authentication_scheme="test")
+
+
+@pytest.fixture
+def scenario_service_and_store() -> tuple[SessionService, Store]:
+    scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    store = Store()
+    ids = iter((f"scenario-session-{index}" for index in range(1, 20)))
+    return (
+        SessionService(
+            uow_factory=lambda: Uow(store),  # type: ignore[arg-type]
+            catalog=scenario_catalog.content_catalog,
+            scenario_catalog=scenario_catalog,
+            clock=lambda: NOW,
+            session_id_generator=lambda: next(ids),
+            seed_generator=lambda: 42,
+        ),
+        store,
+    )
+
+
+@pytest.mark.asyncio
+async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    result = await service.create(
+        principal(),
+        client_request_id="create-death-certificate",
+        character_definition_id="character.death_certificate.investigator",
+        scenario_id="death_certificate",
+    )
+
+    assert isinstance(result, SessionCreationResult)
+    assert result.scenario_id == "death_certificate"
+    assert result.narrative_frame.decision_id is not None
+    assert result.narrative_frame.decision_id.startswith("decision.")
+    assert result.narrative_frame.decision_id != (
+        "death_certificate.decision.immediate_survival"
+    )
+    snapshot = store.snapshots[result.session_id]
+    state = GameState.from_snapshot(
+        snapshot.state,
+        catalog=service.catalog,
+        scenario_catalog=service.scenario_catalog,
+    )
+    assert snapshot.state["schema_version"] == 2
+    assert state.scenario_runtime is not None
+    assert state.scenario_runtime.scenario_id == "death_certificate"
+    assert state.scenario_runtime.scenario_content_version == (
+        "death-certificate-1.0.0"
+    )
+    assert set(state.npcs) == {
+        "scenario-npc-1",
+        "scenario-npc-2",
+        "scenario-npc-3",
+    }
+    projection = await service.get_visible_state(principal(), result.session_id)
+    assert [(item.npc_id, item.npc_definition_id) for item in projection.visible_npcs] == [
+        (
+            "scenario-npc-1",
+            "npc.death_certificate.triage_coordinator",
+        )
+    ]
+    serialized = result.model_dump_json()
+    for forbidden in (
+        "prediction_causes_outcome",
+        "underground_patient_alive",
+        "death_certificate.ending.",
+        "death_certificate.decision.",
+        "_issuer",
+        "sealed_payload",
+    ):
+        assert forbidden not in serialized
+
+
+@pytest.mark.asyncio
+async def test_scenario_creation_replay_returns_same_frame_and_conflicts_on_scenario(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, _ = scenario_service_and_store
+    kwargs = {
+        "client_request_id": "create-replay-frame",
+        "character_definition_id": "character.death_certificate.investigator",
+        "scenario_id": "death_certificate",
+    }
+    first = await service.create(principal(), **kwargs)
+    replay = await service.create(principal(), **kwargs)
+    assert first == replay
+
+    scenario_catalog = service.scenario_catalog
+    assert scenario_catalog is not None
+    payload = scenario_catalog.model_dump(mode="json")
+    alternate = deepcopy(payload["scenarios"][0])
+    alternate["scenario_id"] = "death_certificate_alternate"
+    payload["scenarios"].append(alternate)
+    service.scenario_catalog = type(scenario_catalog).model_validate(payload)
+    with pytest.raises(IdempotencyConflictError):
+        await service.create(
+            principal(),
+            client_request_id="create-replay-frame",
+            character_definition_id="character.death_certificate.investigator",
+            scenario_id="death_certificate_alternate",
+        )
+
+
+@pytest.mark.asyncio
+async def test_creation_replay_fails_explicitly_after_catalog_version_upgrade(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    kwargs = {
+        "client_request_id": "create-before-upgrade",
+        "character_definition_id": "character.death_certificate.investigator",
+        "scenario_id": "death_certificate",
+    }
+    created = await service.create(principal(), **kwargs)
+    before = deepcopy(store.snapshots[created.session_id])
+    assert service.scenario_catalog is not None
+    payload = service.scenario_catalog.model_dump(mode="json")
+    payload["content_version"] = "death-certificate-2.0.0"
+    payload["content_catalog"]["content_version"] = "death-certificate-2.0.0"
+    payload["scenarios"][0]["content_version"] = "death-certificate-2.0.0"
+    upgraded = type(service.scenario_catalog).model_validate(payload)
+    service.scenario_catalog = upgraded
+    service.catalog = upgraded.content_catalog
+
+    with pytest.raises(SnapshotContentVersionMismatchError):
+        await service.create(principal(), **kwargs)
+
+    assert store.snapshots[created.session_id] == before
+    assert len(store.sessions) == len(store.snapshots) == 1
+
+
+@pytest.mark.asyncio
+async def test_public_decision_ids_are_bound_to_the_created_session(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, _ = scenario_service_and_store
+    common = {
+        "character_definition_id": "character.death_certificate.investigator",
+        "scenario_id": "death_certificate",
+    }
+    first = await service.create(
+        principal(), client_request_id="create-decision-a", **common
+    )
+    second = await service.create(
+        principal(), client_request_id="create-decision-b", **common
+    )
+    assert isinstance(first, SessionCreationResult)
+    assert isinstance(second, SessionCreationResult)
+    assert first.narrative_frame.decision_id != second.narrative_frame.decision_id
+
+
+@pytest.mark.asyncio
+async def test_scenario_creation_rejects_player_npc_runtime_id_collision(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    with pytest.raises(DomainRuleViolation):
+        await service.create(
+            principal("scenario-npc-1"),
+            client_request_id="create-colliding-runtime-id",
+            character_definition_id="character.death_certificate.investigator",
+            scenario_id="death_certificate",
+        )
+    assert store.sessions == store.snapshots == {}
+
+
+@pytest.mark.asyncio
+async def test_unknown_scenario_is_stable_and_leaves_no_partial_rows(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    with pytest.raises(InvalidScenarioDefinitionError):
+        await service.create(
+            principal(),
+            client_request_id="create-missing-scenario",
+            character_definition_id="character.death_certificate.investigator",
+            scenario_id="missing_scenario",
+        )
+    assert store.sessions == store.snapshots == {}
+
+
+@pytest.mark.asyncio
+async def test_scenario_creation_commit_failure_rolls_back_runtime_snapshot(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    store.fail_commit = True
+    with pytest.raises(RuntimeError, match="commit failure"):
+        await service.create(
+            principal(),
+            client_request_id="create-scenario-failure",
+            character_definition_id="character.death_certificate.investigator",
+            scenario_id="death_certificate",
+        )
+    assert store.sessions == store.snapshots == {}
 
 
 @pytest.mark.asyncio

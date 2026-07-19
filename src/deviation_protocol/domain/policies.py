@@ -54,8 +54,26 @@ class DuplicateRequestPolicy(ActionPolicy):
 class InputContractPolicy(ActionPolicy):
     def evaluate(self, context: ActionContext) -> PolicyDecision:
         action = context.submission
+        if action.action_type is ActionType.CHOOSE:
+            if not action.decision_id:
+                return self.reject(
+                    "missing_required_field", "CHOOSE requires decision_id"
+                )
+            if not action.choice_id:
+                return self.reject(
+                    "missing_required_field", "CHOOSE requires choice_id"
+                )
+            if action.target_ids or action.tool_ids:
+                return self.reject(
+                    "unexpected_structured_field",
+                    "CHOOSE accepts only decision_id and choice_id",
+                )
+        elif action.decision_id is not None or action.choice_id is not None:
+            return self.reject(
+                "unexpected_structured_field",
+                "decision_id and choice_id are only valid for CHOOSE",
+            )
         requirements = {
-            ActionType.CHOOSE: ("choice_id", action.choice_id),
             ActionType.TALK: ("dialogue", action.dialogue),
             ActionType.CUSTOM: ("description", action.description),
             ActionType.EXPLORE: ("description", action.description),

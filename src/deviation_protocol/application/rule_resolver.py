@@ -120,7 +120,7 @@ class DeterministicRuleResolver:
         skill_learning_authority: tuple[SkillLearningAuthorizationSource, str]
         | None = None,
     ) -> ResolutionResult:
-        candidate = GameState.from_snapshot(state.to_snapshot(), catalog=catalog)
+        candidate = state.detached_copy(catalog)
         action = context.submission
         events: list[DomainEventDraft] = []
         facts: list[NarrativeFact] = []
@@ -520,6 +520,11 @@ class DeterministicRuleResolver:
             NarrativeFact(
                 "intent.dialogue",
                 action.dialogue,
+                NarrativeFactKind.VALIDATED_INTENT,
+            ),
+            NarrativeFact(
+                "intent.decision_id",
+                action.decision_id,
                 NarrativeFactKind.VALIDATED_INTENT,
             ),
             NarrativeFact(

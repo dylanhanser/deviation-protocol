@@ -10,6 +10,7 @@ from deviation_protocol.application.errors import (
     CandidateStateInvalidError,
     IdempotencyConflictError,
     InvalidCharacterDefinitionError,
+    InvalidScenarioDefinitionError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
     SnapshotInvalidError,
@@ -53,6 +54,16 @@ def install_exception_handlers(app: FastAPI) -> None:
             422,
             "INVALID_CHARACTER_DEFINITION",
             "Character definition is not available",
+        )
+
+    @app.exception_handler(InvalidScenarioDefinitionError)
+    async def invalid_scenario_handler(
+        _: Request, __: InvalidScenarioDefinitionError
+    ) -> JSONResponse:
+        return error_response(
+            422,
+            "INVALID_SCENARIO_DEFINITION",
+            "Scenario definition is not available",
         )
 
     @app.exception_handler(IdempotencyConflictError)

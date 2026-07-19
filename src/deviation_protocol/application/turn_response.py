@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from deviation_protocol.application.resolution import ResolutionStatus
 from deviation_protocol.domain.json_values import freeze_json_object
+from deviation_protocol.domain.narrative import NarrativeFrame
 
 
 StableId = Annotated[str, Field(strict=True, min_length=1, max_length=64)]
@@ -35,6 +36,7 @@ class TurnResponse(BaseModel):
     state_changed: StrictBool
     narrative_required: StrictBool
     narrative_pending: StrictBool
+    narrative_frame: NarrativeFrame | None = None
     local_query_result: dict[str, Any] | None = None
 
     @field_validator("feedback_parameters", "local_query_result")

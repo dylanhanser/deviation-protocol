@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 from sqlalchemy.exc import IntegrityError
@@ -10,6 +11,8 @@ from deviation_protocol.application.errors import (
     ConcurrentSessionCreateError,
     ConcurrentTurnRequestError,
 )
+from deviation_protocol.application.action_gateway import ActionRoute
+from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.infrastructure.orm_models import GameSnapshotRow
 from deviation_protocol.infrastructure.errors import OptimisticLockError
@@ -116,6 +119,8 @@ async def test_repository_allocates_next_session_event_sequence(
 
 class FakeSession:
     def __init__(self) -> None:
+        self.add = Mock()
+        self.flush = AsyncMock()
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
         self.close = AsyncMock()
@@ -157,19 +162,26 @@ async def test_unit_of_work_rolls_back_on_exception() -> None:
 @pytest.mark.asyncio
 async def test_unit_of_work_translates_only_the_idempotency_unique_constraint() -> None:
     session = FakeSession()
-    session.commit.side_effect = IntegrityError(
+    session.flush.side_effect = IntegrityError(
         "INSERT turn_requests",
         {},
-        Exception(
-            1062,
-            "Duplicate entry for key 'turn_requests.uq_turn_requests_session_client_request'",
-        ),
+        Exception(1062, "opaque duplicate"),
     )
     uow = SqlAlchemyUnitOfWork(lambda: session)  # type: ignore[arg-type]
 
     with pytest.raises(ConcurrentTurnRequestError):
         async with uow:
-            await uow.commit()
+            await uow.turn_requests.add(
+                ActionSubmission(
+                    session_id="session-1",
+                    turn_id="turn-1",
+                    client_request_id="request-1",
+                    action_type=ActionType.INSPECT_STATUS,
+                ),
+                "a" * 64,
+                ActionRoute.RESOLVE_LOCAL,
+                {},
+            )
 
     session.rollback.assert_awaited_once()
     session.close.assert_awaited_once()
@@ -197,20 +209,31 @@ async def test_unit_of_work_preserves_unrelated_integrity_errors() -> None:
 @pytest.mark.asyncio
 async def test_unit_of_work_translates_session_creation_unique_constraint() -> None:
     session = FakeSession()
-    session.commit.side_effect = IntegrityError(
+    session.flush.side_effect = IntegrityError(
         "INSERT game_sessions",
         {},
-        Exception(
-            1062,
-            "Duplicate entry for key "
-            "'game_sessions.uq_game_sessions_player_creation_request'",
-        ),
+        Exception(1062, "opaque duplicate"),
     )
     uow = SqlAlchemyUnitOfWork(lambda: session)  # type: ignore[arg-type]
 
     with pytest.raises(ConcurrentSessionCreateError):
         async with uow:
-            await uow.commit()
+            await uow.sessions.add_initial(
+                GameSession(
+                    session_id="session-1",
+                    player_id="player-1",
+                    scenario_id="scenario-1",
+                    scenario_version="1",
+                    phase="AWAITING_ACTION",
+                    turn_number=0,
+                    state_version=0,
+                    random_seed=42,
+                ),
+                character_definition_id="character.player.default",
+                creation_client_request_id="create-1",
+                state={},
+                created_at=datetime(2026, 7, 19, tzinfo=timezone.utc),
+            )
 
     session.rollback.assert_awaited_once()
     session.close.assert_awaited_once()

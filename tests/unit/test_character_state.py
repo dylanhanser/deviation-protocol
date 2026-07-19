@@ -566,6 +566,18 @@ def test_runtime_ids_cannot_collide_with_static_definition_ids(
             catalog, "item.mirror", instance_id="item.mirror"
         ),
     )
+
+
+def test_npc_runtime_id_cannot_collide_with_player_id(
+    catalog: ContentCatalog, state: GameState
+) -> None:
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.RUNTIME_ID_COLLISION,
+        lambda: state.spawn_npc(
+            catalog, "npc.demo.guard", state.player.player_id
+        ),
+    )
     assert_failure_without_mutation(
         state,
         DomainErrorCode.RUNTIME_ID_COLLISION,

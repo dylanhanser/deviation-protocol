@@ -156,4 +156,72 @@ JSON 内容包文件由 `infrastructure.content_loader` 以 UTF-8 读取并交�
 
 `NarrativeFrame` 是不可变结构化渲染合同，包含必须/可选呈现事实、运行时真实存在的可见实体、已发现线索、明确允许披露且已经发生的最近事件、按 NPC 分区的玩家安全知识交集、语气与长度、代码生成的建议动作、自定义动作约束、停止条件和公开时钟。它不含隐藏事实、NPC 秘密、隐藏时钟事件、未来结局、可变 `GameState` 引用、`TrustedResolutionContext`、系统授权或可执行表达式。frame ID 只由公开投影派生，隐藏状态变化不会形成 ID 侧信道。未来 `NarrativeProvider` 可以替换，但只能把框架渲染成文本，不能增加系统动作或改写权威状态。
 
-Phase 2.1 刻意不接入现有生产 `FirstPhaseTurnOrchestrator` 和 API；Phase 2.2 才会定义已验证叙事结果的事务边界、持久化事件封装和 Provider 接线。首个内容包及文档只包含原创结构化设计，参考文本没有进入仓库内容、测试或提示词。
+Phase 2.1 提供的领域能力现已由 Phase 2.2a 接入生产 `FirstPhaseTurnOrchestrator` 与 API；真实 Provider 接线仍留给后续阶段。首个内容包及文档只包含原创结构化设计，参考文本没有进入仓库内容、测试或提示词。
+
+## Phase 2.2a 事务接线与可信剧情边界
+
+### 依赖装配与会话创建
+
+默认应用只在 FastAPI lifespan 中加载只读 `ContentCatalog` 和 `ScenarioCatalog`、创建 engine/UoW 工厂，并在退出时释放数据库资源。模块导入不读文件、不建 engine、不连接数据库；测试可向 `create_app()` 注入微型目录。`ScenarioCatalog`、`StoryDirector` 是应用服务的构造依赖，不是全局可变单例；domain/application 仍不依赖 infrastructure、FastAPI 或 SQLAlchemy。
+
+玩家创建请求必须显式提供 `character_definition_id` 和服务器允许的 `scenario_id`，但不能提供 scenario 内容版本、初始 phase、事实、线索、时钟、运行时、Frame 或可信事件。角色由 `ContentCatalog` 验证，scenario 与其内容版本由 `ScenarioCatalog` 决定。创建事务为：
+
+```text
+RequestPrincipal + creation_client_request_id
+  -> validate character_definition_id in ContentCatalog
+  -> validate scenario_id in ScenarioCatalog
+  -> construct base GameState and declared runtime NPC instances
+  -> DeterministicStoryDirector.start_scenario
+  -> ScenarioRuntimeState + player-safe initial NarrativeFrame
+  -> stage game_sessions(state_version=0)
+  -> stage game_snapshots(schema_version=2, state_version=0)
+  -> one UoW commit
+```
+
+创建幂等身份是同一玩家范围内的创建键，并同时绑定角色与 scenario；完全一致时从已提交 v2 快照重建同一个确定性初始 Frame，任一绑定不同则返回 409。数据库现有唯一约束仍允许不同玩家复用相同创建键。旧的无 `scenario_runtime` 快照继续按兼容路径读取，不会补造运行时状态。
+
+### 回合事务
+
+回合入口保留原有 session 行锁、幂等命中检查、action signature 冲突检查、CAS 与单 UoW 边界。加载器先验证 session、最新 v2 快照及其匹配的两个目录，再从当前位置和实际运行时 NPC 计算可信可见/可交互集合。`ActionGateway` 和 `DeterministicRuleResolver` 总是先于剧情协调执行，玩家文本不能成为剧情事实来源。
+
+```text
+ActionSubmission
+  -> SELECT game_session ... FOR UPDATE
+  -> idempotency replay/conflict check
+  -> load and validate v2 GameState + both catalogs
+  -> mint TrustedResolutionContext
+  -> ActionGateway + DeterministicRuleResolver
+  -> scenario coordination on one detached candidate
+       -> read-only StoryDirector plan, or
+       -> trusted decision event + StoryDirector advance
+  -> candidate validation
+  -> CAS session version + snapshot + ordered events + response
+  -> one UoW commit
+```
+
+各路由的状态语义固定如下：
+
+- `REJECTED_LOCAL`：仅持久化稳定幂等响应及当前安全 Frame；不推进 phase、beat、clock、decision，不写新快照或成功事件，版本不变。
+- 本地查询：返回 resolver 的权威查询结果和只读 Frame；不调用 Director 的推进方法、不写快照，版本不变。
+- 本地机械突变：仅提交 resolver 已确认的机械候选。Phase 2.2a 尚无机械结果到剧情事实的明确映射，所以 runtime 保持不变，只从候选重新规划 Frame。
+- `NARRATIVE_REQUIRED`：无 Provider 时返回 required/pending 和当前 Frame；意图不是已发生结果，不写永久事实、线索、时钟或 NPC 响应，版本不变。
+- 声明式决策：`CHOOSE` 只接受当前 Frame 公布的 session/state-version/scenario 绑定 `decision_id` token 及其中一个 choice ID，不能混入文本、target、tool 或其他结构化结算字段。合法选择经应用策略验证和密封后，Director 可记录玩家确实选择了该项，并应用 scenario 明确定义的决定性转场/成本；它不能额外声称 NPC、环境或其他行动结果已经发生。
+- 已终局 runtime：拒绝后续普通剧情推进，仍可返回安全结算 Frame。
+
+机械状态与剧情状态需要同时改变时，先用 `GameState.detached_copy()` 建立不共享嵌套可变引用的单一候选；Director 同样返回独立候选。只有所有规则、目录验证、事件写入和 CAS 都成功才提交。session 版本一次成功回合只加一；resolver draft 在前、可信决策审计 draft 及 Director draft 在后，原顺序封装为连续 `sequence_no`。任一阶段或 commit 失败均由 UoW 回滚机械状态、剧情状态、事件、快照、版本和幂等记录。
+
+### 可信剧情事件桥梁
+
+`ScenarioDecisionResponsePolicy` 只能为“当前活动决策中公开允许的选择”构造不可由请求 JSON 重建的内部验证 capability。capability 绑定 session、turn、request、action signature、state version、完整状态指纹、scenario 内容版本及内部/公开决策 ID；`TrustedScenarioEventIssuer` 再用锁内权威状态检查这些绑定、来源和事件类型白名单，才密封 `player.decision.selected`。其负载由服务器从当前定义生成，而非复制玩家字段；事件 ID 由 session/turn/request/decision/choice 稳定派生。密封摘要绑定完整负载、source 和内部 decision ID，修改后真实性失效；Director 只允许事件解析其所绑定的当前决策，runtime 的 applied-event 集合使同一事件重放不能再次推进。
+
+来源白名单预留了 resolver 已确认机械结果和未来已验证 NarrativeResult，但 Phase 2.2a 对两者的事件类型集合均为空，因此没有通用签发入口。普通 `VerifiedScenarioEvent`、Pydantic 对象、`PlayerAction`、API JSON 和未来原始模型输出都拿不到 capability。比如“护士承认我活着”仍只是需要 Provider 处理的玩家意图，不会因为文本或建议选择而变成 NPC 已确认事实。
+
+### 安全 Frame 与后续 Provider
+
+`NarrativeFrame` 是唯一进入创建/行动响应的剧情投影，并增加当前公开 `decision_id` 以绑定决策窗口。Frame 只含已知事实、已发现线索、真实可见实体、公开时钟、公开建议动作及呈现约束；响应模型继续 `extra="forbid"`，不包含 action signature、完整 `GameState`/snapshot、Scenario 定义、隐藏事实、未来结局、密封信息、策略 trace、数据库异常或 `ANOMALY_EVALUATION_REQUIRED`。
+
+Phase 2.2b 的 `NarrativeProvider` 只能根据 Frame 提出候选叙事结果。独立服务器验证器必须核对结果与权威上下文后才能取得对应的密封 capability；Provider 本身不能写 Repository、调用 UoW 或直接修改事实、线索、时钟、NPC 和决策。Phase 2.2a 没有模型 SDK/API 调用、异常评估、文学正文生成、战斗或场景崩坏。
+
+### 持久化选择
+
+所有 scenario 标识、内容版本、phase、facts、clues、clocks 和 decisions 已包含在 v2 `game_snapshots.state_json.scenario_runtime`。ORM 及关系表没有变化，现有 `20260719_0001`、`20260719_0002` revision 足以支持本阶段，因此 Phase 2.2a 不新增或修改 Alembic migration。

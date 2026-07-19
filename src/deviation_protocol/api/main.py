@@ -24,16 +24,22 @@ from deviation_protocol.application.ports import TurnOrchestrator
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
+    SessionCreationResult,
     SessionMetadata,
     SessionService,
 )
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
-from deviation_protocol.infrastructure.content_loader import JsonContentCatalogLoader
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
+from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
-CONTENT_PACK = FilePath(__file__).parents[3] / "config" / "demo_content_pack.json"
+SCENARIO_PACK = (
+    FilePath(__file__).parents[3]
+    / "config"
+    / "scenarios"
+    / "death_certificate_v1.json"
+)
 SessionPathId = Annotated[
     str,
     Path(
@@ -46,7 +52,8 @@ SessionPathId = Annotated[
 
 def build_default_services() -> ApiServices:
     """Build runtime dependencies without opening a connection or running migrations."""
-    catalog = JsonContentCatalogLoader(CONTENT_PACK).load()
+    scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    catalog = scenario_catalog.content_catalog
     engine = create_engine()
     session_factory = create_session_factory(engine)
     uow_factory = lambda: SqlAlchemyUnitOfWork(session_factory)
@@ -54,9 +61,14 @@ def build_default_services() -> ApiServices:
         resolver=DeterministicRuleResolver(),
         uow_factory=uow_factory,
         catalog=catalog,
+        scenario_catalog=scenario_catalog,
     )
     return ApiServices(
-        session_service=SessionService(uow_factory=uow_factory, catalog=catalog),
+        session_service=SessionService(
+            uow_factory=uow_factory,
+            catalog=catalog,
+            scenario_catalog=scenario_catalog,
+        ),
         turn_orchestrator=orchestrator,
         engine=engine,
     )
@@ -77,18 +89,18 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Deviation Protocol",
-        version="0.1.4",
+        version="0.2.2a",
         lifespan=lifespan,
     )
     install_exception_handlers(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "phase": "1.4"}
+        return {"status": "ok", "phase": "2.2a"}
 
     @app.post(
         "/v1/sessions",
-        response_model=SessionMetadata,
+        response_model=SessionCreationResult,
         status_code=status.HTTP_201_CREATED,
         tags=["sessions"],
     )
@@ -96,12 +108,16 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         request: CreateSessionRequest,
         principal: RequestPrincipal = Depends(get_current_principal),
         service: SessionService = Depends(get_session_service),
-    ) -> SessionMetadata:
-        return await service.create(
+    ) -> SessionCreationResult:
+        result = await service.create(
             principal,
             client_request_id=request.client_request_id,
             character_definition_id=request.character_definition_id,
+            scenario_id=request.scenario_id,
         )
+        if not isinstance(result, SessionCreationResult):  # pragma: no cover
+            raise RuntimeError("scenario creation did not return its initial frame")
+        return result
 
     @app.get(
         "/v1/sessions/{session_id}",

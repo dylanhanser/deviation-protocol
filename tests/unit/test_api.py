@@ -4,6 +4,9 @@ import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
+from pathlib import Path
+import subprocess
+import sys
 from typing import Any
 
 import pytest
@@ -21,10 +24,13 @@ from deviation_protocol.application.resolution import ResolutionStatus
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
     PublicResource,
+    SessionCreationResult,
     SessionMetadata,
 )
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
+from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.scenario import FrameMode
 from deviation_protocol.domain.state import DomainErrorCode, DomainRuleViolation
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 
@@ -142,6 +148,25 @@ def metadata(session_id: str = "session-1") -> SessionMetadata:
     )
 
 
+def creation_result(session_id: str = "session-1") -> SessionCreationResult:
+    return SessionCreationResult(
+        **metadata(session_id).model_dump(),
+        scenario_id="scenario.test",
+        narrative_frame=NarrativeFrame(
+            frame_id="frame.test",
+            scenario_id="scenario.test",
+            phase_id="phase.test",
+            mode=FrameMode.FLOW,
+            current_location_id="location.test",
+            target_length=100,
+            min_length=50,
+            max_length=150,
+            decision_required=False,
+            stop_condition="CONTINUE",
+        ),
+    )
+
+
 class FakeSessionService:
     def __init__(self) -> None:
         self.calls: list[tuple[str, Any]] = []
@@ -153,13 +178,17 @@ class FakeSessionService:
         *,
         client_request_id: str,
         character_definition_id: str,
-    ) -> SessionMetadata:
+        scenario_id: str,
+    ) -> SessionCreationResult:
         self.calls.append(
-            ("create", (principal, client_request_id, character_definition_id))
+            (
+                "create",
+                (principal, client_request_id, character_definition_id, scenario_id),
+            )
         )
         if self.error:
             raise self.error
-        return metadata()
+        return creation_result()
 
     async def get_metadata(
         self, principal: RequestPrincipal, session_id: str
@@ -222,7 +251,7 @@ class FakeOrchestrator:
             if existing.action_signature != submission.action_signature():
                 raise IdempotencyConflictError(submission.session_id)
             return existing
-        narrative = submission.action_type is ActionType.EXPLORE
+        narrative = submission.action_type in {ActionType.EXPLORE, ActionType.CHOOSE}
         mutation = submission.action_type in {
             ActionType.EQUIP,
             ActionType.USE_ITEM,
@@ -300,6 +329,33 @@ def test_create_app_does_not_build_or_connect_dependencies(monkeypatch: pytest.M
     assert created.title == "Deviation Protocol"
 
 
+def test_importing_api_module_does_not_read_json_or_create_engine() -> None:
+    repository_root = Path(__file__).parents[2]
+    script = """
+from pathlib import Path
+import sqlalchemy.ext.asyncio
+
+original_open = Path.open
+def guarded_open(path, *args, **kwargs):
+    if path.suffix.lower() == '.json':
+        raise AssertionError('API import read a JSON content file')
+    return original_open(path, *args, **kwargs)
+
+Path.open = guarded_open
+sqlalchemy.ext.asyncio.create_async_engine = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError('API import created an engine'))
+import deviation_protocol.api.main
+"""
+    completed = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=repository_root,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        check=False,
+    )
+    assert completed.returncode == 0, completed.stderr
+
+
 def test_health_response_does_not_expose_runtime_configuration(
     api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
 ) -> None:
@@ -307,7 +363,7 @@ def test_health_response_does_not_expose_runtime_configuration(
     with client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "phase": "1.4"}
+    assert response.json() == {"status": "ok", "phase": "2.2a"}
 
 
 def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -349,11 +405,63 @@ def test_create_app_supports_dependency_override(
             json={
                 "client_request_id": "create-1",
                 "character_definition_id": "character.player.default",
+                "scenario_id": "scenario.test",
             },
         )
     assert response.status_code == 201
     used_principal = service.calls[0][1][0]
     assert used_principal.player_id == "player-1"
+    assert response.json()["scenario_id"] == "scenario.test"
+    assert response.json()["narrative_frame"]["frame_id"] == "frame.test"
+
+
+@pytest.mark.parametrize(
+    "forged_field",
+    [
+        "scenario_content_version",
+        "initial_phase",
+        "facts",
+        "clues",
+        "clock",
+        "scenario_runtime",
+        "narrative_frame",
+        "verified_scenario_event",
+        "trusted_authority",
+    ],
+)
+def test_create_body_rejects_all_internal_scenario_state(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+    forged_field: str,
+) -> None:
+    client, service, _ = api
+    with client:
+        response = client.post(
+            "/v1/sessions",
+            json={
+                "client_request_id": "create-forged-scenario",
+                "character_definition_id": "character.player.default",
+                "scenario_id": "scenario.test",
+                forged_field: "forged",
+            },
+        )
+    assert response.status_code == 422
+    assert service.calls == []
+
+
+def test_create_requires_explicit_scenario_id(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+) -> None:
+    client, service, _ = api
+    with client:
+        response = client.post(
+            "/v1/sessions",
+            json={
+                "client_request_id": "create-without-scenario",
+                "character_definition_id": "character.player.default",
+            },
+        )
+    assert response.status_code == 422
+    assert service.calls == []
 
 
 def test_query_and_headers_cannot_override_principal(
@@ -366,6 +474,7 @@ def test_query_and_headers_cannot_override_principal(
             json={
                 "client_request_id": "create-context",
                 "character_definition_id": "character.player.default",
+                "scenario_id": "scenario.test",
             },
             query_string=b"player_id=other-player",
             headers=(
@@ -388,6 +497,10 @@ def test_query_and_headers_cannot_override_principal(
         "facts",
         "trusted_resolution_context",
         "gateway_decision",
+        "narrative_frame",
+        "suggested_actions",
+        "allowed_choices",
+        "scenario_version",
     ],
 )
 def test_action_body_rejects_identity_and_internal_injection(
@@ -449,6 +562,7 @@ def test_create_body_cannot_choose_player_id(
             json={
                 "client_request_id": "create-1",
                 "character_definition_id": "character.player.default",
+                "scenario_id": "scenario.test",
                 "player_id": "other-player",
             },
         )
@@ -486,6 +600,10 @@ def test_openapi_excludes_trusted_and_persistence_only_fields(
         "narrativefact",
         "action_signature",
         "anomaly_evaluation_required",
+        "verifiedscenarioevent",
+        "trustedscenarioeventsource",
+        "scenariodecisionselected",
+        "player.decision.selected",
     ):
         assert forbidden not in rendered
 
@@ -553,6 +671,27 @@ def test_action_api_exposes_local_and_pending_results(
         assert payload["narrative_required"] is True
         assert payload["narrative_pending"] is True
         assert "narrative" not in payload
+
+
+def test_action_api_accepts_only_public_decision_and_choice_fields(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+) -> None:
+    client, _, orchestrator = api
+    with client:
+        response = client.post(
+            "/v1/sessions/session-1/actions",
+            json={
+                "turn_id": "turn-1",
+                "client_request_id": "decision-request",
+                "action_type": "CHOOSE",
+                "decision_id": "decision.public-token",
+                "choice_id": "choice.public-option",
+            },
+        )
+    assert response.status_code == 200
+    assert len(orchestrator.submissions) == 1
+    assert orchestrator.submissions[0].decision_id == "decision.public-token"
+    assert orchestrator.submissions[0].choice_id == "choice.public-option"
 
 
 def test_action_idempotent_replay_and_conflict_are_mapped(
@@ -643,6 +782,7 @@ def test_external_identifiers_are_bounded_and_reject_controls(
             json={
                 "client_request_id": bad_value,
                 "character_definition_id": "character.player.default",
+                "scenario_id": "scenario.test",
             },
         )
     assert response.status_code == 422

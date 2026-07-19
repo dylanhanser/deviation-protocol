@@ -322,6 +322,7 @@ def test_non_hospital_scenario_uses_same_loader_catalog_and_director_end_to_end(
                 event_type="route.chosen",
                 action_type="move",
                 new_location_id="alpine.ridge",
+                decision_id="alpine.decision.route",
                 resolves_current_decision=True,
             ),
         ),
@@ -368,6 +369,7 @@ def test_deserialized_or_modified_event_cannot_cross_verified_boundary() -> None
         ],
         "opened_location_ids": ["alpine.ridge"],
         "new_location_id": "alpine.ridge",
+        "decision_id": "alpine.decision.route",
         "resolves_current_decision": True,
     }
     deserialized = UntrustedVerifiedScenarioEvent.model_validate(forged_payload)
@@ -401,6 +403,37 @@ def test_deserialized_or_modified_event_cannot_cross_verified_boundary() -> None
             }
         )
 
+
+def test_sealed_event_cannot_resolve_a_different_decision() -> None:
+    catalog = mini_catalog()
+    definition = catalog.scenarios[0]
+    director = DeterministicStoryDirector()
+    started = director.start_scenario(state_for(catalog), definition)
+    decision = director.advance_after_verified_result(
+        started.candidate_state,
+        definition,
+        (
+            VerifiedScenarioEvent(
+                event_id="event.signal-for-decision-binding",
+                event_type="signal.verified",
+                action_type="investigate",
+                discovered_clue_ids=("alpine.clue.signal_trace",),
+            ),
+        ),
+    )
+    before = decision.candidate_state.to_snapshot()
+    wrong_decision = VerifiedScenarioEvent(
+        event_id="event.wrong-decision",
+        event_type="route.chosen",
+        action_type="move",
+        decision_id="alpine.decision.other",
+        resolves_current_decision=True,
+    )
+    with pytest.raises(StoryDirectorError, match="different decision"):
+        director.advance_after_verified_result(
+            decision.candidate_state, definition, (wrong_decision,)
+        )
+    assert decision.candidate_state.to_snapshot() == before
 
 def test_invalid_verified_result_rolls_back_original_completely() -> None:
     catalog = mini_catalog()
@@ -735,6 +768,7 @@ def test_multiple_eligible_transitions_use_explicit_priority_not_list_order() ->
                 event_type="route.chosen",
                 action_type="move",
                 new_location_id="alpine.ridge",
+                decision_id="alpine.decision.route",
                 resolves_current_decision=True,
             ),
         ),
@@ -777,6 +811,7 @@ def test_multiple_matching_endings_use_explicit_priority_not_list_order() -> Non
                 event_type="route.chosen",
                 action_type="move",
                 new_location_id="alpine.ridge",
+                decision_id="alpine.decision.route",
                 resolves_current_decision=True,
             ),
         ),
@@ -851,6 +886,7 @@ def test_resolved_one_time_window_does_not_reopen_in_same_phase() -> None:
                 event_id="event.route.response",
                 event_type="route.responded",
                 action_type="move",
+                decision_id="alpine.decision.route",
                 resolves_current_decision=True,
             ),
         ),
@@ -933,6 +969,7 @@ def test_deferred_fact_binds_once_and_clue_discovery_is_idempotent() -> None:
                 VerifiedScenarioEvent(
                     event_id="event.rebind",
                     event_type="route.chosen",
+                    decision_id="alpine.decision.route",
                     resolves_current_decision=True,
                     deferred_bindings=(FactValueUpdate(fact_id="alpine.fact.route", value="south"),),
                 ),
@@ -969,6 +1006,7 @@ def test_death_scenario_opens_once_then_uses_sparse_and_rapid_cadence() -> None:
                 event_id="event.survived",
                 event_type="survival.response.verified",
                 action_type="respond",
+                decision_id="death_certificate.decision.immediate_survival",
                 resolves_current_decision=True,
             ),
         ),
@@ -1115,6 +1153,7 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
                 event_id="event.survival",
                 event_type="survival.response.verified",
                 action_type="respond",
+                decision_id="death_certificate.decision.immediate_survival",
                 resolves_current_decision=True,
             ),
         ),
@@ -1132,6 +1171,7 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
                 event_id="event.early-route",
                 event_type="route.selected",
                 action_type="move",
+                decision_id="death_certificate.decision.early_strategy",
                 resolves_current_decision=True,
             ),
         ),
@@ -1176,6 +1216,7 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
                 discovered_clue_ids=("death_certificate.clue.patient_vitals",),
                 opened_location_ids=("death_certificate.observation_level",),
                 new_location_id="death_certificate.observation_level",
+                decision_id="death_certificate.decision.investigation_route_one",
                 resolves_current_decision=True,
             ),
             VerifiedScenarioEvent(
@@ -1206,12 +1247,16 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
     )
     visited.append(current.candidate_state.scenario_runtime.current_phase_id)
 
-    for index, (event_type, action_type) in enumerate(
+    for index, (event_type, action_type, decision_id) in enumerate(
         (
-            ("core.step.one", "commit"),
-            ("core.step.two", "talk"),
-            ("core.step.three", "commit"),
-            ("core.conflict.resolved", "commit"),
+            ("core.step.one", "commit", "death_certificate.decision.core_one"),
+            ("core.step.two", "talk", "death_certificate.decision.core_two"),
+            ("core.step.three", "commit", "death_certificate.decision.core_three"),
+            (
+                "core.conflict.resolved",
+                "commit",
+                "death_certificate.decision.core_four",
+            ),
         ),
         start=1,
     ):
@@ -1223,6 +1268,7 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
                     event_id=f"event.core.{index}",
                     event_type=event_type,
                     action_type=action_type,
+                    decision_id=decision_id,
                     resolves_current_decision=True,
                 ),
             ),
