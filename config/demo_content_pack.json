@@ -1,0 +1,113 @@
+{
+  "schema_version": 1,
+  "content_version": "demo-1",
+  "characters": [
+    {
+      "definition_id": "character.player.default",
+      "display_name": "测试调查员",
+      "base_attributes": [
+        {"key": "strength", "value": 5},
+        {"key": "focus", "value": 4}
+      ],
+      "resource_caps": [
+        {"key": "stamina", "value": 10}
+      ],
+      "equipment_slots": ["hand.main", "hand.off"],
+      "tags": ["player"]
+    },
+    {
+      "definition_id": "character.npc.guard",
+      "display_name": "测试守卫模板",
+      "base_attributes": [
+        {"key": "strength", "value": 4}
+      ],
+      "resource_caps": [
+        {"key": "stamina", "value": 8}
+      ],
+      "equipment_slots": ["hand.main"],
+      "tags": ["npc"]
+    }
+  ],
+  "npcs": [
+    {
+      "definition_id": "npc.demo.guard",
+      "character_definition_id": "character.npc.guard",
+      "display_name": "演示守卫",
+      "persona_summary": "用于验证稳定身份与运行时状态分离的测试 NPC。",
+      "tags": ["demo"]
+    }
+  ],
+  "items": [
+    {
+      "definition_id": "item.medkit",
+      "display_name": "测试医疗包",
+      "stack_limit": 10,
+      "tags": ["consumable"]
+    },
+    {
+      "definition_id": "item.training_sword",
+      "display_name": "训练剑",
+      "stack_limit": 1,
+      "max_durability": 100,
+      "tags": ["equipment", "weapon"]
+    },
+    {
+      "definition_id": "item.mirror",
+      "display_name": "小镜子",
+      "stack_limit": 1,
+      "tags": ["tool"]
+    }
+  ],
+  "equipment": [
+    {
+      "definition_id": "equipment.training_sword",
+      "item_definition_id": "item.training_sword",
+      "allowed_slots": ["hand.main", "hand.off"],
+      "attribute_requirements": [
+        {"attribute_id": "strength", "minimum": 3}
+      ],
+      "effect_definition_ids": ["effect.training_sword.attack"],
+      "max_enhancement_level": 3
+    }
+  ],
+  "skills": [
+    {
+      "definition_id": "skill.observation",
+      "display_name": "观察",
+      "max_level": 2,
+      "resource_costs": [
+        {"resource_id": "stamina", "amount": 1}
+      ],
+      "effect_definition_ids": ["effect.observation.focus"],
+      "tags": ["utility"]
+    },
+    {
+      "definition_id": "skill.precision",
+      "display_name": "精密观察",
+      "max_level": 3,
+      "prerequisites": [
+        {"skill_definition_id": "skill.observation", "minimum_level": 2}
+      ],
+      "resource_costs": [
+        {"resource_id": "stamina", "amount": 2}
+      ],
+      "effect_definition_ids": ["effect.observation.focus"],
+      "tags": ["utility"]
+    }
+  ],
+  "effects": [
+    {
+      "definition_id": "effect.training_sword.attack",
+      "effect_type": "ATTRIBUTE_MODIFIER",
+      "attribute_id": "attack",
+      "flat_delta": 2,
+      "multiplier_bps": 10000
+    },
+    {
+      "definition_id": "effect.observation.focus",
+      "effect_type": "RESOURCE_MODIFIER",
+      "resource_id": "stamina",
+      "delta": -1
+    }
+  ]
+}
