@@ -29,6 +29,33 @@ docs/                 # 架构说明
 
 依赖方向为 `api/infrastructure -> application -> domain`。领域层不导入 FastAPI、SQLAlchemy 或任何模型供应商 SDK。
 
+## Windows 开发环境与验证
+
+Windows 开发需要 PowerShell 7+（`pwsh`）。仓库 `.venv` 中的 Python 3.12.x 是唯一项目解释器；项目命令始终显式使用 `.\.venv\Scripts\python.exe`，不要改用系统或全局 Python。
+
+只读诊断会检查 PowerShell、项目解释器、pytest、Git、安全的工作树摘要、环境变量是否存在，以及离线 Alembic heads/history。它不读取 `.env`，不连接 MySQL，也不调用 DeepSeek：
+
+```powershell
+.\scripts\doctor.ps1
+.\scripts\doctor.ps1 -Strict
+```
+
+统一验证脚本提供四种模式：
+
+```powershell
+.\scripts\verify.ps1 -Mode Quick
+.\scripts\verify.ps1 -Mode Full
+.\scripts\verify.ps1 -Mode MySQL
+.\scripts\verify.ps1 -Mode Security
+```
+
+- `Quick`：编译检查、单元测试和 `git diff --check`。
+- `Full`：完整 pytest、编译检查、依赖一致性、离线 Alembic 元数据和 Git 差异检查；没有测试数据库变量时保留集成测试原有的 skip 行为。
+- `MySQL`：只有 `TEST_DATABASE_URL` 经安全解析为 `mysql+asyncmy` 且数据库名严格为 `deviation_protocol_test` 时才运行集成测试；不会借用 `DATABASE_URL`，也不会运行不具备该安全入口的在线 Alembic 命令。
+- `Security`：运行现有单元测试中的架构、配置、SQLite fallback、Provider 和敏感信息边界，并检查 Git 差异；不连接 MySQL 或 DeepSeek。
+
+live DeepSeek 测试默认关闭，必须由用户在独立命令中显式 opt-in。只要 `RUN_LIVE_DEEPSEEK_TEST` 为真值，以上四种普通验证都会在 pytest 启动前拒绝执行，避免意外网络请求和 Token 消耗。
+
 ## 运行环境与依赖
 
 项目目标为 Python 3.12，依赖通过 `pyproject.toml` 管理：
