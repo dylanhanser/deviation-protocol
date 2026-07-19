@@ -327,7 +327,7 @@ async def test_snapshot_state_version_mismatch_stops(catalog: ContentCatalog) ->
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("schema_version", [2, True, 1.0, "1", None])
+@pytest.mark.parametrize("schema_version", [3, True, 1.0, "1", None])
 async def test_snapshot_schema_version_mismatch_stops(
     catalog: ContentCatalog, schema_version: object
 ) -> None:

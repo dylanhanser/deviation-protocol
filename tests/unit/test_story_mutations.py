@@ -51,17 +51,42 @@ def test_dynamic_fact_can_be_created_with_cause(validator: StoryMutationValidato
         None,
         StoryMutation(
             "dynamic.player_built_radio",
-            {"frequency": 101.7},
+            {"frequency_khz": 101_700},
             causal_event_id="event-build-radio",
         ),
     )
-    assert created.kind is FactKind.MUTABLE
+    assert created.kind is FactKind.DYNAMIC
     assert created.key.startswith("dynamic.")
+
+
+def test_scenario_fact_values_reject_floats(
+    validator: StoryMutationValidator,
+) -> None:
+    with pytest.raises(TypeError, match="requires integers"):
+        validator.validate(
+            None,
+            StoryMutation(
+                "dynamic.player_built_radio",
+                {"frequency": 101.7},
+                causal_event_id="event-build-radio",
+            ),
+        )
 
 
 def test_dynamic_fact_without_cause_is_rejected(validator: StoryMutationValidator) -> None:
     with pytest.raises(StoryMutationError, match="causal_event_id"):
         validator.validate(None, StoryMutation("dynamic.shortcut", True))
+
+
+@pytest.mark.parametrize("key", ["dynamic.", "dynamic..empty", "dynamic.-bad"])
+def test_dynamic_fact_requires_stable_non_empty_suffix(
+    validator: StoryMutationValidator, key: str
+) -> None:
+    with pytest.raises(StoryMutationError, match="stable non-empty suffix"):
+        validator.validate(
+            None,
+            StoryMutation(key, True, causal_event_id="event-create"),
+        )
 
 
 def test_dynamic_namespace_cannot_overwrite_fixed_fact(

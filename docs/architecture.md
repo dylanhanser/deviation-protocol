@@ -54,7 +54,7 @@ FastAPI dependency -> RequestPrincipal
 ```text
 (principal.player_id, client_request_id, character_definition_id)
   -> validate character in current ContentCatalog
-  -> construct PlayerState + GameState(schema_version=1, content_version=catalog)
+  -> construct PlayerState + GameState(schema_version=2, content_version=catalog)
   -> stage game_sessions(state_version=0)
   -> stage game_snapshots(state_version=0)
   -> one commit
@@ -127,3 +127,33 @@ Phase 1.3 的版本和持久化规则是：
 装备槽位同时受装备定义和玩家角色定义约束。同一实例只保存一个 `equipped_slot`，槽位占用不另建第二份记录。零耐久装备不能新装备；已装备物品在耐久降到零时不会被隐式卸下，必须显式卸下后才能移除。
 
 JSON 内容包文件由 `infrastructure.content_loader` 以 UTF-8 读取并交给领域目录验证。领域层不知道文件路径，基础设施加载器也不改变运行时状态。Phase 1.1 继续复用现有 MySQL JSON 快照、Repository、UoW 和领域事件模型，不增加业务表。
+
+## Phase 2.1 通用剧情框架
+
+### 定义、目录、运行时与加载器
+
+`domain.scenario.ScenarioDefinition` 是不可变、数据驱动的副本规则集合；`ScenarioCatalog` 将它与现有 `ContentCatalog` 组合，以同一套 `CharacterDefinition`、`NpcDefinition` 和 `ItemDefinition` 完成职业标签、NPC 与剧情物品交叉引用。`infrastructure.scenario_loader.JsonScenarioCatalogLoader` 是唯一文件系统入口，领域层不读取 JSON。顶层目录版本、副本 schema 版本、内容版本与快照 schema 版本分别验证，未知规则判别值和额外字段明确失败。
+
+通用条件词汇是封闭的判别联合，包括 beat、事实值、线索组、整数时钟、已开放地点、决策数、已验证事件与访问次数。多个 Transition 表达替代路线；引擎按 `(priority, transition_id)` 稳定选择，Ending 同样按 `(priority, ending_id)` 选择，不依赖对象字典顺序。必要阶段必须结构可达，非终止阶段必须有出口；自动转场环只有声明 `max_uses` 或 `max_visits` 时才允许。没有表达式求值、代码执行或动态导入。内容包还受文件大小、节点数、集合大小、字符串长度、嵌套深度和整数上界限制，重复 JSON key 与非标准数值会明确失败。
+
+`domain.scenario_runtime.ScenarioRuntimeState` 是 `GameState.scenario_runtime` 的可选子状态，只保存 scenario/content ID、阶段与 beat、当前位置、线索与组、Deferred 绑定、Mutable 当前值、`dynamic.*` 事实、整数时钟、开放地点、当前/已完成决策、rapid 状态、结局、阶段访问数、转场使用数和有界已应用事件去重标记。NPC 关系与存在性仍只在 `NpcState`，物品仍只在 `InventoryState`，技能仍只在 `PlayerState.skills`，钱包与资源仍使用原聚合。
+
+快照 v2 增加可选 `scenario_runtime`。`migrate_snapshot_payload` 以深拷贝把 v1 纯迁移为 v2/`scenario_runtime=null`，不会改变输入；新快照写 v2。含剧情状态的 v2 快照必须同时用匹配的 `ContentCatalog` 与 `ScenarioCatalog` 校验。数据库模型和 JSON 列没有变化，因此 Phase 2.1 不需要 Alembic migration。
+
+### 事实、线索、知识与时钟
+
+现有 `facts.py` 扩展为四种稳定性：FIXED 只能发现不能改写；DEFERRED 只能从预先声明候选首次绑定；MUTABLE 只能按当前值、目标值和可信事件类型组成的显式转换改变；DYNAMIC 只能使用 `dynamic.*` 命名空间，并受数量、键长、JSON 值长度及因果事件约束。运行时保存当前值，不追加历史副本。
+
+事实可见性区分 HIDDEN、DISCOVERABLE、PLAYER_KNOWN 与 NPC_KNOWN 等价边界。线索引用其支持事实，只能由 `VerifiedScenarioEvent` 的允许来源事件发现；重复发现由集合去重。线索组使用 N 中满足 M 的阈值并产生稳定完成事件。职业标签只能开放替代线索或建议动作；加载器还要求所有通关线索组存在不依赖职业标签的满足集合。
+
+威胁时钟由 phase 的自动 beat 成本或 action time cost 以整数推进，达到上界时钳制且不会倒退。阈值只触发一次确定性事件。玩家可见性由时钟定义决定；渲染文本没有任何修改时钟的能力。所有变更先发生在候选聚合，失败不会留下部分时钟、线索或事实变化。
+
+### 决策节奏、StoryDirector 与 NarrativeFrame
+
+`DecisionCadencePolicy` 独立选择声明式 DecisionWindow。普通阶段用 `min_auto_beats` 与稀疏的 earliest/latest beat 保持连续叙事，避免门、单句对话等琐事停顿；核心阶段可声明 rapid 模式和紧邻窗口。每个窗口只有一个受限 reason，`NarrativeFrame` 只有一个可选决策槽。达到 `max_auto_beats` 仍无合法决策或转场会明确失败，阻止无限自动推进；当前决策未获得已验证玩家响应时也不能继续自动推进。
+
+`application.story_director.DeterministicStoryDirector` 的输入是 `GameState`、`ScenarioDefinition`、职业标签和零个或多个服务器密封的 `VerifiedScenarioEvent`。同形 JSON、普通模型实例和密封后改写的副本都不能进入推进路径；未来 RuleResolver/NarrativeResult 验证器可以在不改变事件公共数据形状的前提下接入内部密封步骤。相同输入产生相同候选状态、稳定派生 frame ID、阈值事件和 `NarrativeFrame`。Director 不访问时间、全局随机数、数据库、`NarrativeProvider` 或异常评估器，也不修改输入聚合。纯本地查询走只读路径，不增加 beat、时钟、决策次数或事件去重记录；重复已应用事件明确拒绝且不推进状态。
+
+`NarrativeFrame` 是不可变结构化渲染合同，包含必须/可选呈现事实、运行时真实存在的可见实体、已发现线索、明确允许披露且已经发生的最近事件、按 NPC 分区的玩家安全知识交集、语气与长度、代码生成的建议动作、自定义动作约束、停止条件和公开时钟。它不含隐藏事实、NPC 秘密、隐藏时钟事件、未来结局、可变 `GameState` 引用、`TrustedResolutionContext`、系统授权或可执行表达式。frame ID 只由公开投影派生，隐藏状态变化不会形成 ID 侧信道。未来 `NarrativeProvider` 可以替换，但只能把框架渲染成文本，不能增加系统动作或改写权威状态。
+
+Phase 2.1 刻意不接入现有生产 `FirstPhaseTurnOrchestrator` 和 API；Phase 2.2 才会定义已验证叙事结果的事务边界、持久化事件封装和 Provider 接线。首个内容包及文档只包含原创结构化设计，参考文本没有进入仓库内容、测试或提示词。

@@ -1,0 +1,822 @@
+{
+  "schema_version": 1,
+  "content_version": "death-certificate-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "death-certificate-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.death_certificate.investigator",
+        "display_name": "调查者",
+        "base_attributes": [],
+        "resource_caps": [{"key": "composure", "value": 6}],
+        "equipment_slots": [],
+        "tags": ["player"]
+      },
+      {
+        "definition_id": "character.profession.clinical",
+        "display_name": "临床背景调查者",
+        "base_attributes": [],
+        "resource_caps": [{"key": "composure", "value": 6}],
+        "equipment_slots": [],
+        "tags": ["player", "CLINICAL_LITERACY"]
+      },
+      {
+        "definition_id": "character.profession.systems",
+        "display_name": "系统分析调查者",
+        "base_attributes": [],
+        "resource_caps": [{"key": "composure", "value": 6}],
+        "equipment_slots": [],
+        "tags": ["player", "SYSTEMS_REASONING"]
+      },
+      {
+        "definition_id": "character.profession.documents",
+        "display_name": "文书调查者",
+        "base_attributes": [],
+        "resource_caps": [{"key": "composure", "value": 6}],
+        "equipment_slots": [],
+        "tags": ["player", "DOCUMENT_AUTHORITY", "EVIDENCE_CHAIN"]
+      },
+      {
+        "definition_id": "character.profession.response",
+        "display_name": "现场响应调查者",
+        "base_attributes": [],
+        "resource_caps": [{"key": "composure", "value": 6}],
+        "equipment_slots": [],
+        "tags": ["player", "PHYSICAL_RESPONSE", "DEESCALATION"]
+      },
+      {
+        "definition_id": "character.death_certificate.staff",
+        "display_name": "设施工作人员模板",
+        "base_attributes": [],
+        "resource_caps": [],
+        "equipment_slots": [],
+        "tags": ["npc"]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.death_certificate.triage_coordinator",
+        "character_definition_id": "character.death_certificate.staff",
+        "display_name": "分诊协调员",
+        "persona_summary": "遵循处置规程，同时会核对可验证的生命体征。",
+        "tags": ["staff"]
+      },
+      {
+        "definition_id": "npc.death_certificate.records_custodian",
+        "character_definition_id": "character.death_certificate.staff",
+        "display_name": "档案保管员",
+        "persona_summary": "只依据可追溯记录行动，拒绝未经验证的结论。",
+        "tags": ["staff", "records"]
+      },
+      {
+        "definition_id": "npc.death_certificate.underground_patient",
+        "character_definition_id": "character.death_certificate.staff",
+        "display_name": "地下观察对象",
+        "persona_summary": "身体状况不稳定，掌握有限且局部的观察信息。",
+        "tags": ["patient"]
+      }
+    ],
+    "items": [
+      {
+        "definition_id": "item.death_certificate.signed_record",
+        "display_name": "已签发记录",
+        "stack_limit": 1,
+        "tags": ["story", "document"]
+      },
+      {
+        "definition_id": "item.death_certificate.audit_token",
+        "display_name": "审计令牌",
+        "stack_limit": 1,
+        "tags": ["story", "evidence"]
+      }
+    ],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "death_certificate",
+      "schema_version": 1,
+      "content_version": "death-certificate-1.0.0",
+      "title": "死亡证明已签发",
+      "summary": "一份提前生效的记录推动处置规程，调查者需要以证据阻止记录制造它所声称的结果。",
+      "initial_phase_id": "death_certificate.arrival_locked",
+      "initial_location_id": "death_certificate.intake_room",
+      "locations": [
+        {
+          "location_id": "death_certificate.intake_room",
+          "title": "封闭接收室",
+          "summary": "用于初次分诊与身份核验的封闭空间。",
+          "initially_open": true,
+          "visible_entity_ids": ["npc.death_certificate.triage_coordinator"]
+        },
+        {
+          "location_id": "death_certificate.service_corridor",
+          "title": "服务走廊",
+          "summary": "连接处置区与档案区的内部通路。",
+          "initially_open": true,
+          "visible_entity_ids": ["npc.death_certificate.triage_coordinator"]
+        },
+        {
+          "location_id": "death_certificate.records_room",
+          "title": "档案室",
+          "summary": "保留签发记录、审计日志和时间戳。",
+          "initially_open": false,
+          "visible_entity_ids": ["npc.death_certificate.records_custodian"]
+        },
+        {
+          "location_id": "death_certificate.observation_level",
+          "title": "地下观察层",
+          "summary": "隔离观察对象并保存生命监测数据。",
+          "initially_open": false,
+          "visible_entity_ids": ["npc.death_certificate.underground_patient"]
+        },
+        {
+          "location_id": "death_certificate.control_room",
+          "title": "规程控制室",
+          "summary": "处置规程与预测记录在此交汇。",
+          "initially_open": false,
+          "visible_entity_ids": [
+            "npc.death_certificate.triage_coordinator",
+            "npc.death_certificate.records_custodian"
+          ]
+        }
+      ],
+      "npc_references": [
+        {
+          "npc_definition_id": "npc.death_certificate.triage_coordinator",
+          "known_fact_ids": [
+            "death_certificate.fact.record_marks_player_dead",
+            "death_certificate.fact.disposal_protocol_active"
+          ]
+        },
+        {
+          "npc_definition_id": "npc.death_certificate.records_custodian",
+          "known_fact_ids": [
+            "death_certificate.fact.record_predates_diagnosis",
+            "death_certificate.fact.record_signature_valid"
+          ]
+        },
+        {
+          "npc_definition_id": "npc.death_certificate.underground_patient",
+          "known_fact_ids": ["death_certificate.fact.underground_patient_alive"]
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "death_certificate.fact.player_conscious",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.record_marks_player_dead",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.opening_body_bag_state",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": {
+            "container_type": "BODY_BAG",
+            "player_position": "INSIDE",
+            "zipper_motion": "CLOSING"
+          }
+        },
+        {
+          "fact_id": "death_certificate.fact.opening_time_conflict",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": {
+            "awareness_time": {
+              "hour": 2,
+              "minute": 18,
+              "minutes_after_midnight": 138,
+              "semantics": "HISTORICAL_OPENING_TIME"
+            },
+            "recorded_death_time": {
+              "hour": 2,
+              "minute": 31,
+              "minutes_after_midnight": 151,
+              "semantics": "ISSUED_CERTIFICATE_DEATH_TIME"
+            },
+            "difference_minutes": 13,
+            "deadline_clock_id": "predicted_death_deadline",
+            "deadline_clock_start_value": 0,
+            "deadline_clock_due_value": 13,
+            "deadline_clock_unit": "ELAPSED_MINUTES_SINCE_AWARENESS"
+          }
+        },
+        {
+          "fact_id": "death_certificate.fact.death_certificate_issued",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.comfort_disposition_imminent",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": {
+            "planned_procedure_types": ["INJECTION", "COMFORT_DISPOSITION"],
+            "procedure_selection": "ANY_LISTED_PROCEDURE",
+            "status": "IMMINENT"
+          }
+        },
+        {
+          "fact_id": "death_certificate.fact.initial_survival_objective",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": {
+            "objective_type": "NPC_ACKNOWLEDGES_PLAYER_ALIVE",
+            "acknowledgement_mode": "EXPLICIT",
+            "minimum_acknowledging_npcs": 1,
+            "npc_scope": "RUNTIME_NPC",
+            "deadline_relation": "BEFORE",
+            "deadline_time": {
+              "hour": 2,
+              "minute": 31,
+              "minutes_after_midnight": 151
+            },
+            "deadline_clock_id": "predicted_death_deadline",
+            "deadline_clock_value": 13
+          }
+        },
+        {
+          "fact_id": "death_certificate.fact.player_is_alive",
+          "kind": "FIXED",
+          "visibility": "DISCOVERABLE",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.record_predates_diagnosis",
+          "kind": "FIXED",
+          "visibility": "DISCOVERABLE",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.record_signature_valid",
+          "kind": "FIXED",
+          "visibility": "DISCOVERABLE",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.prediction_causes_outcome",
+          "kind": "FIXED",
+          "visibility": "DISCOVERABLE",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.underground_patient_alive",
+          "kind": "FIXED",
+          "visibility": "DISCOVERABLE",
+          "value": true
+        },
+        {
+          "fact_id": "death_certificate.fact.audit_route",
+          "kind": "DEFERRED",
+          "visibility": "DISCOVERABLE",
+          "deferred_candidates": ["records_terminal", "paper_archive", "custodian_token"]
+        },
+        {
+          "fact_id": "death_certificate.fact.disposal_protocol_active",
+          "kind": "MUTABLE",
+          "visibility": "PLAYER_KNOWN",
+          "value": true,
+          "mutable_transitions": [
+            {
+              "from_value": true,
+              "to_value": false,
+              "event_type": "protocol.suspended"
+            }
+          ]
+        },
+        {
+          "fact_id": "death_certificate.fact.security_posture",
+          "kind": "MUTABLE",
+          "visibility": "DISCOVERABLE",
+          "value": "routine",
+          "mutable_transitions": [
+            {
+              "from_value": "routine",
+              "to_value": "alert",
+              "event_type": "security.escalated"
+            },
+            {
+              "from_value": "alert",
+              "to_value": "contained",
+              "event_type": "security.deescalated"
+            }
+          ]
+        }
+      ],
+      "clues": [
+        {
+          "clue_id": "death_certificate.clue.vital_response",
+          "supports_fact_ids": ["death_certificate.fact.player_is_alive"],
+          "source_event_types": ["vitals.verified"],
+          "allowed_phase_ids": [
+            "death_certificate.arrival_locked",
+            "death_certificate.life_disputed"
+          ],
+          "visible_summary": "可复核的自主生命反应。"
+        },
+        {
+          "clue_id": "death_certificate.clue.coherent_response",
+          "supports_fact_ids": ["death_certificate.fact.player_is_alive"],
+          "source_event_types": ["response.verified"],
+          "allowed_phase_ids": ["death_certificate.life_disputed"],
+          "visible_summary": "连续且可重复的意识反应。"
+        },
+        {
+          "clue_id": "death_certificate.clue.clinical_contradiction",
+          "supports_fact_ids": ["death_certificate.fact.player_is_alive"],
+          "source_event_types": ["clinical.reviewed"],
+          "allowed_phase_ids": ["death_certificate.life_disputed"],
+          "required_any_profession_tags": ["CLINICAL_LITERACY"],
+          "visible_summary": "记录结论与临床指标冲突。"
+        },
+        {
+          "clue_id": "death_certificate.clue.record_timestamp",
+          "supports_fact_ids": ["death_certificate.fact.record_predates_diagnosis"],
+          "source_event_types": ["record.timestamp_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "签发时间早于诊断时间。"
+        },
+        {
+          "clue_id": "death_certificate.clue.audit_sequence",
+          "supports_fact_ids": ["death_certificate.fact.record_predates_diagnosis"],
+          "source_event_types": ["record.audit_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "审计序列确认时间顺序。"
+        },
+        {
+          "clue_id": "death_certificate.clue.system_ordering",
+          "supports_fact_ids": ["death_certificate.fact.record_predates_diagnosis"],
+          "source_event_types": ["record.system_analyzed"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "required_any_profession_tags": ["SYSTEMS_REASONING"],
+          "visible_summary": "系统依赖关系排除了回填解释。"
+        },
+        {
+          "clue_id": "death_certificate.clue.protocol_feedback",
+          "supports_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
+          "source_event_types": ["protocol.feedback_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "记录触发的措施正在制造预测结果。"
+        },
+        {
+          "clue_id": "death_certificate.clue.comparison_case",
+          "supports_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
+          "source_event_types": ["case.compared"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "对照案例显示同一因果次序。"
+        },
+        {
+          "clue_id": "death_certificate.clue.evidence_chain",
+          "supports_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
+          "source_event_types": ["evidence.chain_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "required_any_profession_tags": ["EVIDENCE_CHAIN"],
+          "visible_summary": "证据链连接签发、处置与恶化。"
+        },
+        {
+          "clue_id": "death_certificate.clue.patient_vitals",
+          "supports_fact_ids": ["death_certificate.fact.underground_patient_alive"],
+          "source_event_types": ["patient.vitals_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "地下观察对象仍有稳定生命指标。"
+        },
+        {
+          "clue_id": "death_certificate.clue.monitor_history",
+          "supports_fact_ids": ["death_certificate.fact.underground_patient_alive"],
+          "source_event_types": ["patient.history_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "visible_summary": "连续监测记录排除了瞬时误读。"
+        },
+        {
+          "clue_id": "death_certificate.clue.deescalated_contact",
+          "supports_fact_ids": ["death_certificate.fact.underground_patient_alive"],
+          "source_event_types": ["patient.contact_verified"],
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "required_any_profession_tags": ["DEESCALATION"],
+          "visible_summary": "低刺激沟通取得可验证回应。"
+        }
+      ],
+      "clue_groups": [
+        {
+          "clue_group_id": "player_is_alive",
+          "clue_ids": [
+            "death_certificate.clue.vital_response",
+            "death_certificate.clue.coherent_response",
+            "death_certificate.clue.clinical_contradiction"
+          ],
+          "required_count": 2,
+          "completion_event_type": "clue_group.player_alive.completed"
+        },
+        {
+          "clue_group_id": "death_record_predates_diagnosis",
+          "clue_ids": [
+            "death_certificate.clue.record_timestamp",
+            "death_certificate.clue.audit_sequence",
+            "death_certificate.clue.system_ordering"
+          ],
+          "required_count": 2,
+          "completion_event_type": "clue_group.record_order.completed"
+        },
+        {
+          "clue_group_id": "prediction_causes_outcome",
+          "clue_ids": [
+            "death_certificate.clue.protocol_feedback",
+            "death_certificate.clue.comparison_case",
+            "death_certificate.clue.evidence_chain"
+          ],
+          "required_count": 2,
+          "completion_event_type": "clue_group.causation.completed"
+        },
+        {
+          "clue_group_id": "underground_patient_alive",
+          "clue_ids": [
+            "death_certificate.clue.patient_vitals",
+            "death_certificate.clue.monitor_history",
+            "death_certificate.clue.deescalated_contact"
+          ],
+          "required_count": 2,
+          "completion_event_type": "clue_group.patient_alive.completed"
+        }
+      ],
+      "threat_clocks": [
+        {
+          "clock_id": "disposal_protocol",
+          "minimum": 0,
+          "maximum": 6,
+          "initial": 0,
+          "player_visible": true,
+          "thresholds": [
+            {"threshold": 3, "event_type": "disposal.protocol.accelerated"},
+            {"threshold": 6, "event_type": "disposal.protocol.completed"}
+          ]
+        },
+        {
+          "clock_id": "predicted_death_deadline",
+          "minimum": 0,
+          "maximum": 13,
+          "initial": 0,
+          "player_visible": true,
+          "thresholds": [
+            {"threshold": 8, "event_type": "deadline.critical"},
+            {"threshold": 13, "event_type": "deadline.reached"}
+          ]
+        },
+        {
+          "clock_id": "security_alert",
+          "minimum": 0,
+          "maximum": 5,
+          "initial": 0,
+          "player_visible": false,
+          "thresholds": [
+            {"threshold": 3, "event_type": "security.alert.high"},
+            {"threshold": 5, "event_type": "security.lockdown"}
+          ]
+        },
+        {
+          "clock_id": "underground_patient_stability",
+          "minimum": 0,
+          "maximum": 6,
+          "initial": 0,
+          "player_visible": false,
+          "thresholds": [
+            {"threshold": 4, "event_type": "patient.stability.critical"},
+            {"threshold": 6, "event_type": "patient.stability.failed"}
+          ]
+        }
+      ],
+      "decision_windows": [
+        {
+          "decision_id": "death_certificate.decision.immediate_survival",
+          "reason": "TIME_CRITICAL",
+          "earliest_beat": 0,
+          "latest_beat": 0,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.move_fingers_rhythmically", "action_type": "physical_response", "label_hint": "有规律地移动仍可控制的手指"},
+            {"action_id": "death_certificate.action.interfere_pulse_oximeter", "action_type": "physical_response", "label_hint": "干扰指夹式血氧传感器"},
+            {"action_id": "death_certificate.action.adjust_breathing_signal", "action_type": "respond", "label_hint": "调整呼吸制造可识别生命信号"},
+            {"action_id": "death_certificate.action.observe_quietly", "action_type": "observe", "label_hint": "保持安静并获取现场信息"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["respond", "physical_response", "observe"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.early_strategy",
+          "reason": "ROUTE_DIVERGENCE",
+          "earliest_beat": 3,
+          "latest_beat": 4,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.prove_vitals", "action_type": "investigate", "label_hint": "要求复核生命指标"},
+            {"action_id": "death_certificate.action.seek_records", "action_type": "move", "label_hint": "转向签发记录来源"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["investigate", "move", "talk"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.investigation_route_one",
+          "reason": "ROUTE_DIVERGENCE",
+          "earliest_beat": 2,
+          "latest_beat": 3,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.inspect_archive", "action_type": "investigate", "label_hint": "核对档案时间与签发链"},
+            {"action_id": "death_certificate.action.trace_protocol", "action_type": "investigate", "label_hint": "追踪处置规程的触发来源"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["investigate", "talk", "move"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.investigation_route_two",
+          "reason": "RESOURCE_COMMITMENT",
+          "earliest_beat": 5,
+          "latest_beat": 6,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.open_observation", "action_type": "investigate", "label_hint": "进入地下观察层核验对象"},
+            {"action_id": "death_certificate.action.secure_audit", "action_type": "investigate", "label_hint": "保存可追溯审计证据"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["investigate", "talk", "move"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.investigation_route_three",
+          "reason": "CORE_REVELATION",
+          "earliest_beat": 8,
+          "latest_beat": 9,
+          "conditions": [{"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "prediction_causes_outcome"}],
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.present_causation", "action_type": "present_evidence", "label_hint": "提交因果链"},
+            {"action_id": "death_certificate.action.test_feedback", "action_type": "investigate", "label_hint": "验证记录与处置的反馈关系"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["present_evidence", "investigate", "talk"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.core_one",
+          "reason": "TIME_CRITICAL",
+          "earliest_beat": 0,
+          "latest_beat": 0,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.pause_protocol", "action_type": "commit", "label_hint": "争取暂停处置规程"},
+            {"action_id": "death_certificate.action.protect_patient", "action_type": "commit", "label_hint": "优先稳定观察对象"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["commit", "talk", "physical_response"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.core_two",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 1,
+          "latest_beat": 1,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.ask_coordinator", "action_type": "talk", "label_hint": "要求协调员承担复核责任"},
+            {"action_id": "death_certificate.action.ask_custodian", "action_type": "talk", "label_hint": "要求保管员冻结记录链"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["talk", "present_evidence"], "max_description_length": 500, "must_target_visible_entity": true}
+        },
+        {
+          "decision_id": "death_certificate.decision.core_three",
+          "reason": "MORAL_CONFLICT",
+          "earliest_beat": 2,
+          "latest_beat": 2,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.public_override", "action_type": "commit", "label_hint": "公开推翻错误记录"},
+            {"action_id": "death_certificate.action.controlled_audit", "action_type": "commit", "label_hint": "以受控审计保留制度证据"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["commit", "present_evidence"], "max_description_length": 500, "must_target_visible_entity": false}
+        },
+        {
+          "decision_id": "death_certificate.decision.core_four",
+          "reason": "IRREVERSIBLE_CONSEQUENCE",
+          "earliest_beat": 3,
+          "latest_beat": 3,
+          "suggested_actions": [
+            {"action_id": "death_certificate.action.final_suspend", "action_type": "commit", "label_hint": "执行最终暂停"},
+            {"action_id": "death_certificate.action.final_disclose", "action_type": "commit", "label_hint": "执行最终披露"}
+          ],
+          "custom_action_constraints": {"allowed_action_types": ["commit"], "max_description_length": 500, "must_target_visible_entity": false}
+        }
+      ],
+      "phases": [
+        {
+          "phase_id": "death_certificate.arrival_locked",
+          "title": "封闭抵达",
+          "must_render_fact_ids": [
+            "death_certificate.fact.player_conscious",
+            "death_certificate.fact.record_marks_player_dead",
+            "death_certificate.fact.opening_body_bag_state",
+            "death_certificate.fact.opening_time_conflict",
+            "death_certificate.fact.death_certificate_issued",
+            "death_certificate.fact.comfort_disposition_imminent",
+            "death_certificate.fact.initial_survival_objective"
+          ],
+          "required_event_types": ["arrival.presented"],
+          "allowed_clue_ids": ["death_certificate.clue.vital_response"],
+          "visible_location_ids": ["death_certificate.intake_room"],
+          "objective_ids": ["obtain_npc_alive_acknowledgement.before_recorded_death_time"],
+          "allowed_action_types": ["respond", "physical_response", "observe"],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "decision_window_ids": ["death_certificate.decision.immediate_survival"],
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.arrival_to_dispute",
+              "target_phase_id": "death_certificate.life_disputed",
+              "trigger": "DECISION",
+              "conditions": [{"rule_type": "DECISIONS_AT_LEAST", "value": 1}],
+              "priority": 10
+            }
+          ],
+          "action_time_costs": [{"action_type": "physical_response", "clock_advances": [{"clock_id": "security_alert", "amount": 1}]}],
+          "rapid_decision_allowed": false,
+          "tone_hints": ["immediate", "constrained"]
+        },
+        {
+          "phase_id": "death_certificate.life_disputed",
+          "title": "生命争议",
+          "must_render_fact_ids": ["death_certificate.fact.record_marks_player_dead"],
+          "required_event_types": ["dispute.opened"],
+          "allowed_clue_ids": ["death_certificate.clue.vital_response", "death_certificate.clue.coherent_response", "death_certificate.clue.clinical_contradiction"],
+          "visible_location_ids": ["death_certificate.intake_room", "death_certificate.service_corridor"],
+          "objective_ids": ["establish.life", "locate.record_source"],
+          "allowed_action_types": ["observe", "talk", "investigate", "move"],
+          "min_auto_beats": 3,
+          "max_auto_beats": 4,
+          "decision_window_ids": ["death_certificate.decision.early_strategy"],
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.dispute_to_escape",
+              "target_phase_id": "death_certificate.disposal_escape",
+              "trigger": "DECISION",
+              "conditions": [{"rule_type": "DECISIONS_AT_LEAST", "value": 2}],
+              "priority": 10
+            }
+          ],
+          "auto_beat_clock_advances": [{"clock_id": "disposal_protocol", "amount": 1}],
+          "action_time_costs": [{"action_type": "investigate", "clock_advances": [{"clock_id": "disposal_protocol", "amount": 1}]}],
+          "rapid_decision_allowed": false,
+          "tone_hints": ["procedural", "skeptical"]
+        },
+        {
+          "phase_id": "death_certificate.disposal_escape",
+          "title": "处置脱离",
+          "must_render_fact_ids": ["death_certificate.fact.disposal_protocol_active"],
+          "required_event_types": ["escape.route_opened"],
+          "allowed_clue_ids": [],
+          "visible_location_ids": ["death_certificate.service_corridor"],
+          "objective_ids": ["leave.disposal_route"],
+          "allowed_action_types": ["move", "observe"],
+          "min_auto_beats": 2,
+          "max_auto_beats": 2,
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.escape_to_investigation",
+              "target_phase_id": "death_certificate.investigation",
+              "trigger": "AUTOMATIC",
+              "conditions": [{"rule_type": "PHASE_BEAT_AT_LEAST", "value": 2}],
+              "priority": 10
+            }
+          ],
+          "auto_beat_clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}],
+          "rapid_decision_allowed": false,
+          "tone_hints": ["continuous", "urgent"]
+        },
+        {
+          "phase_id": "death_certificate.investigation",
+          "title": "交叉调查",
+          "must_render_fact_ids": [],
+          "required_event_types": ["investigation.opened"],
+          "allowed_clue_ids": [
+            "death_certificate.clue.record_timestamp", "death_certificate.clue.audit_sequence", "death_certificate.clue.system_ordering",
+            "death_certificate.clue.protocol_feedback", "death_certificate.clue.comparison_case", "death_certificate.clue.evidence_chain",
+            "death_certificate.clue.patient_vitals", "death_certificate.clue.monitor_history", "death_certificate.clue.deescalated_contact"
+          ],
+          "visible_location_ids": ["death_certificate.service_corridor", "death_certificate.records_room", "death_certificate.observation_level"],
+          "objective_ids": ["verify.record_order", "verify.causal_chain", "verify.patient"],
+          "allowed_action_types": ["observe", "talk", "investigate", "move", "present_evidence"],
+          "min_auto_beats": 2,
+          "max_auto_beats": 9,
+          "decision_window_ids": ["death_certificate.decision.investigation_route_one", "death_certificate.decision.investigation_route_two", "death_certificate.decision.investigation_route_three"],
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.investigation_to_truth",
+              "target_phase_id": "death_certificate.self_fulfilling_truth",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "death_record_predates_diagnosis"},
+                {"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "prediction_causes_outcome"},
+                {"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "underground_patient_alive"}
+              ],
+              "priority": 10
+            }
+          ],
+          "auto_beat_clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}],
+          "action_time_costs": [
+            {"action_type": "investigate", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}, {"clock_id": "underground_patient_stability", "amount": 1}]},
+            {"action_type": "move", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]}
+          ],
+          "rapid_decision_allowed": false,
+          "tone_hints": ["investigative", "low-frequency-decisions"]
+        },
+        {
+          "phase_id": "death_certificate.self_fulfilling_truth",
+          "title": "自证真相",
+          "must_render_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
+          "required_event_types": ["causal_chain.presented"],
+          "allowed_clue_ids": [],
+          "visible_location_ids": ["death_certificate.records_room", "death_certificate.observation_level"],
+          "objective_ids": ["connect.prediction.to.outcome"],
+          "allowed_action_types": ["observe", "present_evidence", "talk"],
+          "min_auto_beats": 2,
+          "max_auto_beats": 2,
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.truth_to_core",
+              "target_phase_id": "death_certificate.core_conflict",
+              "trigger": "AUTOMATIC",
+              "conditions": [{"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "prediction_causes_outcome"}],
+              "priority": 10
+            }
+          ],
+          "auto_beat_clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}],
+          "rapid_decision_allowed": false,
+          "tone_hints": ["revelatory", "evidence-led"]
+        },
+        {
+          "phase_id": "death_certificate.core_conflict",
+          "title": "核心冲突",
+          "must_render_fact_ids": ["death_certificate.fact.prediction_causes_outcome", "death_certificate.fact.disposal_protocol_active"],
+          "required_event_types": ["core.conflict.opened"],
+          "allowed_clue_ids": [],
+          "visible_location_ids": ["death_certificate.control_room"],
+          "objective_ids": ["stop.feedback_loop", "choose.evidence_disposition"],
+          "allowed_action_types": ["commit", "talk", "present_evidence", "physical_response"],
+          "min_auto_beats": 0,
+          "max_auto_beats": 4,
+          "decision_window_ids": ["death_certificate.decision.core_one", "death_certificate.decision.core_two", "death_certificate.decision.core_three", "death_certificate.decision.core_four"],
+          "transitions": [
+            {
+              "transition_id": "death_certificate.transition.core_to_resolution",
+              "target_phase_id": "death_certificate.resolution",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [{"rule_type": "EVENT_OCCURRED", "event_type": "core.conflict.resolved"}],
+              "priority": 10
+            }
+          ],
+          "action_time_costs": [{"action_type": "commit", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]}],
+          "rapid_decision_allowed": true,
+          "tone_hints": ["rapid", "consequential"]
+        },
+        {
+          "phase_id": "death_certificate.resolution",
+          "title": "结算",
+          "must_render_fact_ids": [],
+          "required_event_types": ["resolution.presented"],
+          "allowed_clue_ids": [],
+          "visible_location_ids": ["death_certificate.control_room"],
+          "objective_ids": ["settle.outcome"],
+          "allowed_action_types": ["observe"],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true,
+          "rapid_decision_allowed": false,
+          "tone_hints": ["settlement"]
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "death_certificate.ending.protocol_broken",
+          "status": "RESOLVED",
+          "priority": 20,
+          "conditions": [
+            {"rule_type": "FACT_EQUALS", "fact_id": "death_certificate.fact.disposal_protocol_active", "value": false}
+          ]
+        },
+        {
+          "ending_id": "death_certificate.ending.deadline_reached",
+          "status": "FAILED",
+          "priority": 10,
+          "conditions": [
+            {"rule_type": "CLOCK_AT_LEAST", "clock_id": "predicted_death_deadline", "value": 13}
+          ]
+        },
+        {
+          "ending_id": "death_certificate.ending.record_challenged",
+          "status": "RESOLVED",
+          "priority": 30,
+          "conditions": [
+            {"rule_type": "EVENT_OCCURRED", "event_type": "core.conflict.resolved"}
+          ]
+        }
+      ],
+      "available_profession_tags": ["CLINICAL_LITERACY", "SYSTEMS_REASONING", "DOCUMENT_AUTHORITY", "EVIDENCE_CHAIN", "PHYSICAL_RESPONSE", "DEESCALATION"],
+      "story_item_definition_ids": ["item.death_certificate.signed_record", "item.death_certificate.audit_token"],
+      "dynamic_fact_limit": 20,
+      "dynamic_fact_key_max_length": 96,
+      "dynamic_fact_value_max_length": 500,
+      "narrative_length": {"target": 650, "minimum": 350, "maximum": 900}
+    }
+  ]
+}

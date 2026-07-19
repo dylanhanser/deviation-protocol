@@ -186,7 +186,7 @@ class FirstPhaseTurnOrchestrator:
         session_id: str,
     ) -> GameState:
         schema_version = payload.get("schema_version")
-        if type(schema_version) is not int or schema_version != 1:
+        if type(schema_version) is not int or schema_version not in (1, 2):
             raise SnapshotSchemaVersionMismatchError(session_id)
         if payload.get("content_version") != self.catalog.content_version:
             raise SnapshotContentVersionMismatchError(session_id)

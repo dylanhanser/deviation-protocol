@@ -16,6 +16,10 @@ from deviation_protocol.application.resolution import ResolutionResult, Resoluti
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
 from deviation_protocol.application.turn_response import TurnResponse
+from deviation_protocol.application.story_director import (
+    DeterministicStoryDirector,
+    StoryDirectorResult,
+)
 
 __all__ = [
     "ActionGateway",
@@ -23,6 +27,7 @@ __all__ = [
     "AuthoritativeActionContextFactory",
     "DeterministicEffectExecutor",
     "DeterministicRuleResolver",
+    "DeterministicStoryDirector",
     "EffectSourceType",
     "GatewayResult",
     "IdempotencyConflictError",
@@ -33,4 +38,5 @@ __all__ = [
     "SkillLearningAuthorizationSource",
     "TrustedResolutionContext",
     "TurnResponse",
+    "StoryDirectorResult",
 ]

@@ -89,6 +89,42 @@ async def seed_snapshot(
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_mysql_v1_snapshot_loads_through_pure_migration_while_v2_is_current(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    mysql_session_id: str,
+) -> None:
+    catalog, state = catalog_and_state()
+    v1 = state.to_snapshot()
+    v1["schema_version"] = 1
+    v1.pop("scenario_runtime")
+    async with mysql_session_factory.begin() as session:
+        session.add(
+            GameSnapshotRow(
+                session_id=mysql_session_id,
+                state_version=0,
+                state_json=v1,
+            )
+        )
+    service = FirstPhaseTurnOrchestrator(
+        DeterministicRuleResolver(),
+        lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        catalog,
+    )
+    response = await service.handle(
+        ActionSubmission(
+            session_id=mysql_session_id,
+            turn_id="turn-v1-snapshot",
+            client_request_id=f"it-v1-{uuid4().hex}",
+            action_type=ActionType.INSPECT_STATUS,
+        )
+    )
+    assert response.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
+    assert GameState.from_snapshot(v1, catalog=catalog).schema_version == 2
+    assert state.to_snapshot()["schema_version"] == 2
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_snapshot_event_and_version_commit_atomically(
     mysql_session_factory: async_sessionmaker[AsyncSession],
     mysql_session_id: str,

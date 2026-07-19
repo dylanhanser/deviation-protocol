@@ -168,3 +168,15 @@ API 错误统一为：
 ```
 
 请求校验为 422，ownership/not-found 为 404，幂等与乐观锁冲突为 409，内容或快照不兼容为 409，未预期异常为不含 SQL、路径或堆栈的 500。
+
+## Phase 2.1 数据驱动剧情运行时
+
+Phase 2.1 新增与具体题材无关的 `ScenarioDefinition`、`ScenarioRuntimeState`、`DecisionCadencePolicy`、`NarrativeFrame` 和 `DeterministicStoryDirector`。引擎只解释经过白名单验证的 Scenario、Phase、Fact、Clue、ThreatClock、DecisionWindow 与 Transition；不按副本、阶段、NPC 或线索 ID 写分支，也不支持 `eval`、脚本表达式或动态导入。JSON 读取由 `infrastructure.scenario_loader` 负责，领域模型负责严格字段、版本、引用、可达性、出口、线索阈值、职业替代路径、时钟边界和有界自动循环校验。
+
+静态 `ScenarioDefinition` 保存内容与规则；快照中的 `ScenarioRuntimeState` 只保存剧情推进状态。NPC 关系、背包、技能、钱包和资源继续由原有权威状态保存，不在副本运行时重复。快照 schema 已显式升级到 v2，并提供无副作用的 v1→v2 迁移；副本 `content_version` 与快照 `schema_version` 是互相独立的兼容轴，MySQL 仍使用现有 JSON 字段。
+
+`DeterministicStoryDirector` 只接收定义、状态、职业标签和经服务器内部边界密封的结构化事件；普通可反序列化 `VerifiedScenarioEvent` 只有数据形状，没有推进剧情的权限，密封后再改写负载同样会失效。Director 先在深拷贝候选上应用事实、线索、时钟、转场与结局，再输出候选状态和严格 `NarrativeFrame`。它不读取系统时间、不使用随机数或 UUID、不访问数据库、不调用模型，也不生成文学文本。`NarrativeFrame` 只含玩家当前可知事实；可见 NPC 必须同时存在于 `GameState.npcs` 并被当前位置引用，NPC 分区只携带该 NPC 权限范围与玩家当前知识的安全交集。建议动作由代码从内容包生成。未来可替换的 `NarrativeProvider` 只能渲染该框架，不能修改固定事实、时钟或权威状态。
+
+决策窗口由独立策略控制。开局可声明一次立即生存决策，前期以较大的 beat 间隔保持低频，调查阶段只在声明的关键窗口停下，核心冲突可进入 rapid 模式缩短间隔。普通移动、开门、读取必要信息或本地查询不会自行制造决策；本地查询也不推进 beat 或时钟。每帧的数据结构最多容纳一个决策，阶段最大自动 beat 和严格失败路径共同防止无限自动推进或永不决策。
+
+首个正式结构化内容包位于 `config/scenarios/death_certificate_v1.json`，规格见 `docs/scenarios/death_certificate_v1.md`。仓库只包含原创的结构化设计，没有参考小说原文或改写文本。Phase 2.1 不把剧情运行时接入生产 `TurnOrchestrator` 或 API；该编排与 `NarrativeProvider` 接线留给 Phase 2.2。

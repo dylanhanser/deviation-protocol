@@ -259,7 +259,7 @@ class SessionService:
         session = persisted.session
         if snapshot_version != session.state_version:
             raise SnapshotStateVersionMismatchError(session.session_id)
-        if type(payload.get("schema_version")) is not int or payload.get("schema_version") != 1:
+        if type(payload.get("schema_version")) is not int or payload.get("schema_version") not in (1, 2):
             raise SnapshotSchemaVersionMismatchError(session.session_id)
         if payload.get("content_version") != self.catalog.content_version:
             raise SnapshotContentVersionMismatchError(session.session_id)

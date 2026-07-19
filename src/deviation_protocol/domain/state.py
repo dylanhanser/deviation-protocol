@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Annotated, Any, Mapping, cast
@@ -24,6 +25,8 @@ from deviation_protocol.domain.content import (
     NpcDefinition,
     SkillRequirement,
 )
+from deviation_protocol.domain.scenario import ScenarioCatalog
+from deviation_protocol.domain.scenario_runtime import ScenarioRuntimeState
 
 
 NonNegativeInt = Annotated[int, Field(strict=True, ge=0)]
@@ -210,16 +213,17 @@ class NpcState(RuntimeModel):
 class GameState(RuntimeModel):
     """Authoritative snapshot aggregate for frequently changing gameplay state."""
 
-    schema_version: Annotated[int, Field(strict=True)] = 1
+    schema_version: Annotated[int, Field(strict=True)] = 2
     content_version: DefinitionId
     player: PlayerState
     npcs: dict[DefinitionId, NpcState] = Field(default_factory=dict)
+    scenario_runtime: ScenarioRuntimeState | None = None
 
     @field_validator("schema_version")
     @classmethod
     def require_supported_schema_version(cls, value: int) -> int:
-        if value != 1:
-            raise ValueError("unsupported snapshot schema_version; expected 1")
+        if value != 2:
+            raise ValueError("unsupported snapshot schema_version; expected 2")
         return value
 
     @model_validator(mode="after")
@@ -244,10 +248,34 @@ class GameState(RuntimeModel):
         payload: Mapping[str, Any],
         *,
         catalog: ContentCatalog | None = None,
+        scenario_catalog: ScenarioCatalog | None = None,
     ) -> GameState:
-        state = cls.model_validate(payload)
+        try:
+            migrated = migrate_snapshot_payload(payload)
+        except ValueError:
+            # Preserve the established Pydantic validation contract at this public
+            # boundary while keeping the migration helper itself strict.
+            cls.model_validate(deepcopy(dict(payload)))
+            raise  # pragma: no cover - model_validate above always rejects here
+        state = cls.model_validate(migrated)
         if catalog is not None:
             state.validate_against(catalog)
+        if scenario_catalog is not None:
+            if state.content_version != scenario_catalog.content_version:
+                raise ValueError(
+                    "snapshot content version does not match scenario catalog"
+                )
+            if catalog is not None and catalog != scenario_catalog.content_catalog:
+                raise ValueError("content and scenario catalogs do not match")
+            if catalog is None:
+                state.validate_against(scenario_catalog.content_catalog)
+        if state.scenario_runtime is not None:
+            if scenario_catalog is None:
+                raise ValueError("scenario catalog is required for a scenario runtime snapshot")
+            definition = scenario_catalog.scenario(state.scenario_runtime.scenario_id)
+            if definition is None:
+                raise ValueError("snapshot references an unknown scenario")
+            state.scenario_runtime.validate_against(definition)
         return state
 
     def validate_against(self, catalog: ContentCatalog) -> None:
@@ -993,6 +1021,23 @@ def _is_non_negative_int(value: int) -> bool:
 
 def _is_positive_int(value: int) -> bool:
     return not isinstance(value, bool) and isinstance(value, int) and value > 0
+
+
+def migrate_snapshot_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Purely upgrade supported historical snapshot shapes to the current schema."""
+    copied = deepcopy(dict(payload))
+    version = copied.get("schema_version")
+    if type(version) is not int:
+        raise ValueError("snapshot schema_version must be a strict integer")
+    if version == 1:
+        if "scenario_runtime" in copied:
+            raise ValueError("v1 snapshot cannot contain scenario_runtime")
+        copied["schema_version"] = 2
+        copied["scenario_runtime"] = None
+        return copied
+    if version == 2:
+        return copied
+    raise ValueError(f"unsupported snapshot schema_version: {version}")
 
 
 def _canonical_json(value: Any) -> Any:
