@@ -26,7 +26,7 @@ docs/                 # 架构说明
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 ```
 
 数据库驱动选择 `asyncmy`，原因是项目从空仓库创建，适合直接使用 SQLAlchemy 2.x `AsyncSession`；它是原生 asyncio MySQL 驱动，避免在线程池中包装同步连接。系统只接受 `mysql+asyncmy://` URL，不支持也不会回退到 SQLite。
@@ -58,14 +58,14 @@ DATABASE_URL=mysql+asyncmy://game_user:replace-with-a-secret@127.0.0.1:3306/devi
 
 ```powershell
 $env:DATABASE_URL = "mysql+asyncmy://game_user:secret@127.0.0.1:3306/deviation_protocol?charset=utf8mb4"
-alembic upgrade head
+.\.venv\Scripts\python.exe -m alembic upgrade head
 ```
 
 没有数据库时仍可离线检查首份迁移生成的 MySQL SQL：
 
 ```powershell
 Remove-Item Env:DATABASE_URL -ErrorAction SilentlyContinue
-alembic upgrade head --sql
+.\.venv\Scripts\python.exe -m alembic upgrade head --sql
 ```
 
 迁移创建的所有业务表均显式使用 InnoDB/utf8mb4，结构化状态和事件负载使用 MySQL 原生 JSON。Alembic 自身的版本表继承数据库默认引擎与字符集。
@@ -73,9 +73,9 @@ alembic upgrade head --sql
 ## 测试与启动
 
 ```powershell
-pytest
-python -m compileall -q src tests alembic
-uvicorn deviation_protocol.api.main:app --app-dir src --reload
+.\.venv\Scripts\python.exe -m pytest
+.\.venv\Scripts\python.exe -m compileall -q src tests alembic
+.\.venv\Scripts\python.exe -m uvicorn deviation_protocol.api.main:app --app-dir src --reload
 ```
 
 健康检查为 `GET /health`，它只证明进程可服务，不会隐式打开数据库连接。
@@ -84,7 +84,7 @@ MySQL 集成测试仅在显式设置 `TEST_DATABASE_URL` 后运行：
 
 ```powershell
 $env:TEST_DATABASE_URL = "mysql+asyncmy://game_test_user:secret@127.0.0.1:3306/deviation_protocol_test?charset=utf8mb4"
-pytest -m integration
+.\.venv\Scripts\python.exe -m pytest -m integration
 ```
 
 未设置时测试会明确显示 `skip`。测试套件绝不会创建 SQLite 数据库或把 SQLite 当作替代品。
@@ -125,3 +125,46 @@ Phase 1.3 已将确定性组件接入真实事务编排：`FirstPhaseTurnOrchest
 更多责任边界见 [`docs/architecture.md`](docs/architecture.md)。
 
 Phase 1.1 的演示内容包位于 `config/demo_content_pack.json`。它只用于验证角色、NPC、装备、消耗品、技能和结构化效果的加载，不包含正式剧情。静态内容由基础设施层加载后交给纯领域 `ContentCatalog` 验证；运行时 `GameState` 则以带版本的 JSON 形状继续保存到现有快照中。
+
+## Phase 1.4 会话 API
+
+FastAPI 现在通过 app factory 公开版本化会话边界，并保留不连接数据库的健康检查：
+
+```text
+GET  /health
+POST /v1/sessions
+GET  /v1/sessions/{session_id}
+GET  /v1/sessions/{session_id}/state
+POST /v1/sessions/{session_id}/actions
+```
+
+Windows 开发环境按仓库约束启动：
+
+```powershell
+$env:DATABASE_URL = "mysql+asyncmy://game_user:secret@127.0.0.1:3306/deviation_protocol?charset=utf8mb4"
+.\.venv\Scripts\python.exe -m alembic upgrade head
+.\.venv\Scripts\python.exe -m uvicorn deviation_protocol.api.main:app --app-dir src --reload
+```
+
+`create_app()` 在模块导入时不会创建 engine、连接数据库或运行迁移。默认运行依赖在 FastAPI lifespan 启动时装配，并在关闭时释放 engine；测试可以注入完整 `ApiServices`，也可以覆盖 principal dependency。
+
+当前 `get_current_principal` 明确使用固定的 `demo-dev-only` 身份 `demo-player`。它只是尚未接入 JWT/OAuth 时的开发占位，客户端请求正文不能选择 `player_id`。生产部署前必须替换该 dependency。所有会话查询与行动都会用可信 principal 检查 ownership；不存在与无权访问统一返回安全的 `SESSION_NOT_FOUND` 404。
+
+创建请求只接受 `client_request_id` 与 `character_definition_id`。角色必须来自当前 `ContentCatalog`，初始 `GameState`、session 和 version-zero snapshot 在同一 UoW 中提交。数据库唯一约束 `(player_id, creation_client_request_id)` 是并发幂等防线；重放相同创建返回同一 session，不会把 `session_id` 当作客户端幂等键。每个 session 将当前 catalog 版本固定为 `content_version`。
+
+会话元数据接口只返回 phase、版本、时间戳和安全角色概要，不返回快照。`/state` 使用独立的 `PlayerVisibleStateProjection` 新建玩家公开属性、资源、钱包、库存、装备和技能数据；它不会调用 `GameState.model_dump()` 作为响应。当前尚无可信场景可见性来源，因此 `visible_npcs` 默认为空，而不是暴露快照中的全部 NPC；任务状态目前也是安全空占位。
+
+行动请求正文不含 `session_id` 或 `player_id`，并拒绝未知字段、可信上下文、gateway decision、授权、catalog 与 narrative facts。endpoint 在 ownership 检查后调用现有 `FirstPhaseTurnOrchestrator`。公共响应不会暴露持久化使用的 `action_signature` 或尚未支持的异常评估状态。本地查询、拒绝和状态变更保持结构化结果；`NARRATIVE_REQUIRED` 明确返回 required/pending 标志。本阶段仍未接入 `NarrativeProvider`、大模型、正式剧情、战斗、`DeviationEvaluator` 或前端，也不会伪造叙事文本。
+
+API 错误统一为：
+
+```json
+{
+  "error": {
+    "error_code": "STABLE_ERROR_CODE",
+    "message": "Safe public message"
+  }
+}
+```
+
+请求校验为 422，ownership/not-found 为 404，幂等与乐观锁冲突为 409，内容或快照不兼容为 409，未预期异常为不含 SQL、路径或堆栈的 500。

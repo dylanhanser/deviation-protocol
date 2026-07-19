@@ -34,6 +34,40 @@ ActionSubmission
 
 `ContentCatalog` 是编排器的构造依赖；application 不读取 JSON 文件。会话和最新快照必须同时存在，且 `game_snapshots.state_version` 必须等于 `game_sessions.state_version`。快照结构版本固定走 `GameState` 支持的 schema，内容版本必须与注入 catalog 一致，玩家身份还必须与会话一致。任何缺失、损坏或版本错误都会停止事务，不允许用默认空状态覆盖。
 
+## Phase 1.4 API、身份与会话生命周期
+
+API 仍遵守 `api/infrastructure -> application -> domain`。FastAPI 类型和 HTTP 状态只存在于 `api`；`RequestPrincipal`、`SessionService`、安全 DTO 和 `PlayerVisibleStateProjection` 位于 application，不依赖 FastAPI。`create_app()` 接受可替换的 `ApiServices`，默认依赖只在 lifespan 中装配，导入模块不连接数据库也不运行 migration。
+
+```text
+FastAPI dependency -> RequestPrincipal
+  -> SessionService
+       -> UnitOfWork
+            -> owned session query (session_id + player_id)
+            -> versioned snapshot
+  -> FirstPhaseTurnOrchestrator (actions only)
+```
+
+当前 principal provider 名为 `demo-dev-only`，固定为 `demo-player`，清楚表明它不是生产认证。测试和未来认证适配器通过 dependency override 提供可信 principal。请求模型中没有 `player_id`；行动正文也没有 `session_id`，路径是 session identity 的唯一外部来源。会话 ownership 来自 principal 与已加载 session，API 对不存在和无权访问统一采用 404，避免枚举其他玩家会话。
+
+会话创建事务的输入是创建幂等键和 catalog 角色定义 ID：
+
+```text
+(principal.player_id, client_request_id, character_definition_id)
+  -> validate character in current ContentCatalog
+  -> construct PlayerState + GameState(schema_version=1, content_version=catalog)
+  -> stage game_sessions(state_version=0)
+  -> stage game_snapshots(state_version=0)
+  -> one commit
+```
+
+`game_sessions.creation_client_request_id` 与 `character_definition_id` 由独立 revision `20260719_0002` 添加。唯一约束 `(player_id, creation_client_request_id)` 处理跨连接竞争；application 在唯一约束失利并 rollback 后重新读取 winner。相同键与相同角色重放 winner，不同角色是 `IDEMPOTENCY_CONFLICT`。旧数据的两个新字段保持 nullable，不会用 session ID 回填并混淆两种身份；所有 Phase 1.4 API 新建行都写入非空值。
+
+`GET /v1/sessions/{id}` 从关系字段和 catalog 生成安全元数据，不返回 snapshot JSON、random seed 或内部对象。`GET /state` 先重新验证 snapshot schema/content/player/version，再从 `GameState` 构造新的只读 DTO tuple。投影仅包含玩家公开属性、资源、钱包、库存、装备、技能、phase、state version 和任务占位。权威快照中的 NPC 不等同于“玩家可见 NPC”；在持久化的可信场景可见性来源出现前，`visible_npcs` 必须为空。
+
+行动 endpoint 只将严格 HTTP 请求转换为已有 `ActionSubmission`，在 ownership 通过后调用 `FirstPhaseTurnOrchestrator`，不复制 gateway、resolver、context minting 或 UoW 事务。turn 幂等仍由 `(session_id, client_request_id)` 唯一约束与 action signature 共同保证，但公共响应不暴露该持久化完整性字段，也不公开尚未支持的异常评估状态。`REJECTED_LOCAL` 是稳定业务响应，`NARRATIVE_REQUIRED` 只报告 pending/required；Phase 1.4 没有接入 `NarrativeProvider`、LLM、剧情、战斗、`DeviationEvaluator` 或前端。
+
+统一异常映射将请求校验映射到 422，安全 not-found 映射到 404，创建/行动幂等冲突和乐观锁映射到 409，snapshot/content/schema 不兼容映射到 409，领域规则异常映射到稳定 4xx。兜底 500 只返回固定错误码与公共消息，数据库异常文本、URL、路径和堆栈不会进入响应。
+
 `AuthoritativeActionContextFactory` 校验传入视图确实来自同一 `GameState` 与 `ContentCatalog`，然后分别投影 `item_instance_id -> item_definition_id`、`item_instance_id -> equipment_definition_id`、`skill_definition_id -> level` 和 `npc_id -> npc_definition_id`。场景可见性仍由 application 层显式传入，因为当前 `GameState` 不建模场景；缺省可见/可交互集合为空，玩家文本不会自动把 target/tool 加入权威集合。静态 definition ID 不能冒充物品、环境工具或 NPC 的 runtime ID。每次状态改变后必须重新构造视图和上下文。普通 `ActionContext` 是不可变投影但不是结算授权；只有工厂签发且绑定当前 state/catalog 摘要的 `TrustedResolutionContext` 能进入 resolver。
 
 `ActionGateway` 是行动资格和路由边界。它拒绝陈旧回合、重复请求、错误字段组合、不可见目标、非本人持有的实例、未知技能引用、胡言乱语、越权叙述、NPC 控制、系统奖励命令和多主行动。`RuleResolver.resolve` 不接受调用方传入 route 或 `GatewayResult`，而是从密封上下文内部调用真实 gateway 后执行更具体的领域规则；因此手工构造 `RESOLVE_LOCAL` 或异常 route 不能进入结算。网关拒绝不会成为叙事或异常候选。

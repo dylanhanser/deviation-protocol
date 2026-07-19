@@ -6,7 +6,10 @@ from unittest.mock import AsyncMock
 import pytest
 from sqlalchemy.exc import IntegrityError
 
-from deviation_protocol.application.errors import ConcurrentTurnRequestError
+from deviation_protocol.application.errors import (
+    ConcurrentSessionCreateError,
+    ConcurrentTurnRequestError,
+)
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.infrastructure.orm_models import GameSnapshotRow
 from deviation_protocol.infrastructure.errors import OptimisticLockError
@@ -189,3 +192,25 @@ async def test_unit_of_work_preserves_unrelated_integrity_errors() -> None:
 
     assert raised.value is integrity_error
     session.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unit_of_work_translates_session_creation_unique_constraint() -> None:
+    session = FakeSession()
+    session.commit.side_effect = IntegrityError(
+        "INSERT game_sessions",
+        {},
+        Exception(
+            1062,
+            "Duplicate entry for key "
+            "'game_sessions.uq_game_sessions_player_creation_request'",
+        ),
+    )
+    uow = SqlAlchemyUnitOfWork(lambda: session)  # type: ignore[arg-type]
+
+    with pytest.raises(ConcurrentSessionCreateError):
+        async with uow:
+            await uow.commit()
+
+    session.rollback.assert_awaited_once()
+    session.close.assert_awaited_once()

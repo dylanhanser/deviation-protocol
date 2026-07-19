@@ -31,6 +31,11 @@ TABLE_OPTIONS = {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4"}
 class GameSessionRow(Base):
     __tablename__ = "game_sessions"
     __table_args__ = (
+        UniqueConstraint(
+            "player_id",
+            "creation_client_request_id",
+            name="uq_game_sessions_player_creation_request",
+        ),
         Index("ix_game_sessions_player_id", "player_id"),
         Index("ix_game_sessions_scenario", "scenario_id", "scenario_version"),
         TABLE_OPTIONS,
@@ -38,6 +43,8 @@ class GameSessionRow(Base):
 
     session_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     player_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    creation_client_request_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    character_definition_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
     scenario_id: Mapped[str] = mapped_column(String(128), nullable=False)
     scenario_version: Mapped[str] = mapped_column(String(32), nullable=False)
     phase: Mapped[str] = mapped_column(String(32), nullable=False)

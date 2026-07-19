@@ -5,7 +5,10 @@ from types import TracebackType
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
-from deviation_protocol.application.errors import ConcurrentTurnRequestError
+from deviation_protocol.application.errors import (
+    ConcurrentSessionCreateError,
+    ConcurrentTurnRequestError,
+)
 from deviation_protocol.application.ports import UnitOfWork
 from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyGameSessionRepository,
@@ -51,6 +54,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         except IntegrityError as exc:
             if _is_turn_request_idempotency_conflict(exc):
                 raise ConcurrentTurnRequestError from exc
+            if _is_session_creation_idempotency_conflict(exc):
+                raise ConcurrentSessionCreateError from exc
             raise
         self.sessions.confirm_pending_versions()
         self._committed = True
@@ -72,4 +77,14 @@ def _is_turn_request_idempotency_conflict(error: IntegrityError) -> bool:
     return (
         str(error_code) == "1062"
         and "uq_turn_requests_session_client_request" in str(original)
+    )
+
+
+def _is_session_creation_idempotency_conflict(error: IntegrityError) -> bool:
+    original = error.orig
+    arguments = getattr(original, "args", ())
+    error_code = arguments[0] if arguments else None
+    return (
+        str(error_code) == "1062"
+        and "uq_game_sessions_player_creation_request" in str(original)
     )

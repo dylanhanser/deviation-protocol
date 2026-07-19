@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
@@ -9,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.ports import (
     GameSessionRepository,
+    PersistedSession,
     PersistedSnapshot,
     PersistedTurnRequest,
     TurnRequestRepository,
@@ -31,6 +33,79 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
         self._session = session
         self._pending_session_versions: list[tuple[GameSession, int]] = []
 
+    @staticmethod
+    def _persisted(row: GameSessionRow) -> PersistedSession:
+        return PersistedSession(
+            session=GameSession(
+                session_id=row.session_id,
+                player_id=row.player_id,
+                scenario_id=row.scenario_id,
+                scenario_version=row.scenario_version,
+                phase=row.phase,
+                turn_number=row.turn_number,
+                state_version=row.state_version,
+                random_seed=row.random_seed,
+            ),
+            character_definition_id=row.character_definition_id,
+            creation_client_request_id=row.creation_client_request_id,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_owned(self, session_id: str, player_id: str) -> PersistedSession | None:
+        row = await self._session.scalar(
+            select(GameSessionRow).where(
+                GameSessionRow.session_id == session_id,
+                GameSessionRow.player_id == player_id,
+            )
+        )
+        return self._persisted(row) if row is not None else None
+
+    async def get_by_creation_request(
+        self, player_id: str, client_request_id: str
+    ) -> PersistedSession | None:
+        row = await self._session.scalar(
+            select(GameSessionRow).where(
+                GameSessionRow.player_id == player_id,
+                GameSessionRow.creation_client_request_id == client_request_id,
+            )
+        )
+        return self._persisted(row) if row is not None else None
+
+    async def add_initial(
+        self,
+        session: GameSession,
+        *,
+        character_definition_id: str,
+        creation_client_request_id: str,
+        state: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
+        self._session.add(
+            GameSessionRow(
+                session_id=session.session_id,
+                player_id=session.player_id,
+                creation_client_request_id=creation_client_request_id,
+                character_definition_id=character_definition_id,
+                scenario_id=session.scenario_id,
+                scenario_version=session.scenario_version,
+                phase=session.phase,
+                turn_number=session.turn_number,
+                state_version=session.state_version,
+                random_seed=session.random_seed,
+                created_at=created_at,
+                updated_at=created_at,
+            )
+        )
+        self._session.add(
+            GameSnapshotRow(
+                session_id=session.session_id,
+                state_version=session.state_version,
+                state_json=dict(state),
+                updated_at=created_at,
+            )
+        )
+
     async def lock_for_turn(self, session_id: str) -> bool:
         result = await self._session.execute(
             select(GameSessionRow.session_id)
@@ -43,16 +118,7 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
         row = await self._session.get(GameSessionRow, session_id)
         if row is None:
             return None
-        return GameSession(
-            session_id=row.session_id,
-            player_id=row.player_id,
-            scenario_id=row.scenario_id,
-            scenario_version=row.scenario_version,
-            phase=row.phase,
-            turn_number=row.turn_number,
-            state_version=row.state_version,
-            random_seed=row.random_seed,
-        )
+        return self._persisted(row).session
 
     async def get_latest_snapshot(self, session_id: str) -> PersistedSnapshot | None:
         row = await self._session.get(GameSnapshotRow, session_id)

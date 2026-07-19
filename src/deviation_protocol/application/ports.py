@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import datetime
 from types import TracebackType
 from typing import Any, Mapping, Protocol, Sequence
 
@@ -36,6 +37,15 @@ class PersistedTurnRequest:
     response: Mapping[str, Any] | None
 
 
+@dataclass(frozen=True, slots=True)
+class PersistedSession:
+    session: GameSession
+    character_definition_id: str | None
+    creation_client_request_id: str | None
+    created_at: datetime
+    updated_at: datetime
+
+
 class RuleResolver(Protocol):
     async def resolve(
         self,
@@ -62,6 +72,30 @@ class NarrativeProvider(Protocol):
 
 
 class GameSessionRepository(ABC):
+    @abstractmethod
+    async def get_owned(self, session_id: str, player_id: str) -> PersistedSession | None:
+        """Load safe session metadata using ownership as part of the query."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_by_creation_request(
+        self, player_id: str, client_request_id: str
+    ) -> PersistedSession | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_initial(
+        self,
+        session: GameSession,
+        *,
+        character_definition_id: str,
+        creation_client_request_id: str,
+        state: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
+        """Stage a session and its version-zero snapshot in one UoW."""
+        raise NotImplementedError
+
     @abstractmethod
     async def lock_for_turn(self, session_id: str) -> bool:
         """Serialize turn handling for one existing session within the UoW transaction."""

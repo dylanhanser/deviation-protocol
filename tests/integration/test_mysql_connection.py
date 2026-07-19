@@ -75,7 +75,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             ).all()
         )
 
-    assert revision == "20260719_0001"
+    assert revision == "20260719_0002"
     table_details = {row[0]: (row[1], row[2]) for row in tables}
     expected_tables = {
         "alembic_version",
@@ -101,6 +101,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
     assert {
         ("domain_events", "uq_domain_events_session_sequence"),
         ("turn_requests", "uq_turn_requests_session_client_request"),
+        ("game_sessions", "uq_game_sessions_player_creation_request"),
         ("game_sessions", "ix_game_sessions_scenario"),
         ("turn_requests", "ix_turn_requests_signature"),
     } <= indexes

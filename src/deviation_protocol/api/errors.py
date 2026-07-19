@@ -1,0 +1,96 @@
+from __future__ import annotations
+
+import logging
+
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+
+from deviation_protocol.application.errors import (
+    CandidateStateInvalidError,
+    IdempotencyConflictError,
+    InvalidCharacterDefinitionError,
+    SessionNotFoundError,
+    SnapshotContentVersionMismatchError,
+    SnapshotInvalidError,
+    SnapshotNotFoundError,
+    SnapshotSchemaVersionMismatchError,
+    SnapshotSessionMismatchError,
+    SnapshotStateVersionMismatchError,
+    StoredTurnResponseInvalidError,
+    UnsupportedResolutionError,
+)
+from deviation_protocol.domain.state import DomainRuleViolation
+from deviation_protocol.infrastructure.errors import OptimisticLockError
+
+
+logger = logging.getLogger(__name__)
+
+
+def error_response(status_code: int, error_code: str, message: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=status_code,
+        content={"error": {"error_code": error_code, "message": message}},
+    )
+
+
+def install_exception_handlers(app: FastAPI) -> None:
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_handler(
+        _: Request, __: RequestValidationError
+    ) -> JSONResponse:
+        return error_response(422, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+
+    @app.exception_handler(SessionNotFoundError)
+    async def not_found_handler(_: Request, __: SessionNotFoundError) -> JSONResponse:
+        return error_response(404, "SESSION_NOT_FOUND", "Session was not found")
+
+    @app.exception_handler(InvalidCharacterDefinitionError)
+    async def invalid_character_handler(
+        _: Request, __: InvalidCharacterDefinitionError
+    ) -> JSONResponse:
+        return error_response(
+            422,
+            "INVALID_CHARACTER_DEFINITION",
+            "Character definition is not available",
+        )
+
+    @app.exception_handler(IdempotencyConflictError)
+    async def idempotency_handler(_: Request, __: IdempotencyConflictError) -> JSONResponse:
+        return error_response(409, "IDEMPOTENCY_CONFLICT", "Idempotency key was reused")
+
+    @app.exception_handler(OptimisticLockError)
+    async def optimistic_lock_handler(_: Request, __: OptimisticLockError) -> JSONResponse:
+        return error_response(409, "OPTIMISTIC_LOCK_CONFLICT", "State changed concurrently")
+
+    incompatible_errors = (
+        SnapshotContentVersionMismatchError,
+        SnapshotSchemaVersionMismatchError,
+        SnapshotStateVersionMismatchError,
+        SnapshotInvalidError,
+        SnapshotNotFoundError,
+        SnapshotSessionMismatchError,
+        CandidateStateInvalidError,
+        StoredTurnResponseInvalidError,
+        UnsupportedResolutionError,
+    )
+
+    async def incompatible_handler(request: Request, exc: Exception) -> JSONResponse:
+        del request
+        code = getattr(exc, "code", "SESSION_STATE_INCOMPATIBLE")
+        return error_response(409, code, "Session state is unavailable or incompatible")
+
+    for error_type in incompatible_errors:
+        app.add_exception_handler(error_type, incompatible_handler)
+
+    @app.exception_handler(DomainRuleViolation)
+    async def domain_handler(_: Request, exc: DomainRuleViolation) -> JSONResponse:
+        return error_response(400, exc.code.value.upper(), "Action violates a domain rule")
+
+    @app.exception_handler(Exception)
+    async def unknown_handler(request: Request, exc: Exception) -> JSONResponse:
+        del request
+        # Never copy exception text or a traceback into logs at this public edge;
+        # database URLs, SQL parameters and local paths can be present there.
+        logger.error("Unhandled API error type=%s", type(exc).__name__)
+        return error_response(500, "INTERNAL_SERVER_ERROR", "Internal server error")

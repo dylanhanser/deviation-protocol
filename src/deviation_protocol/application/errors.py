@@ -57,3 +57,15 @@ class UnsupportedResolutionError(TurnApplicationError):
 
 class ConcurrentTurnRequestError(RuntimeError):
     """Internal signal that the database idempotency constraint won a race."""
+
+
+class ConcurrentSessionCreateError(RuntimeError):
+    """Internal signal that the session creation uniqueness constraint won a race."""
+
+
+class InvalidCharacterDefinitionError(ValueError):
+    code = "INVALID_CHARACTER_DEFINITION"
+
+    def __init__(self, character_definition_id: str) -> None:
+        self.character_definition_id = character_definition_id
+        super().__init__(self.code)
