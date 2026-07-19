@@ -20,6 +20,10 @@ DisplayName: TypeAlias = Annotated[str, Field(strict=True, min_length=1, max_len
 NonNegativeInt: TypeAlias = Annotated[int, Field(strict=True, ge=0)]
 PositiveInt: TypeAlias = Annotated[int, Field(strict=True, ge=1)]
 BasisPoints: TypeAlias = Annotated[int, Field(strict=True, ge=0, le=1_000_000)]
+SignedModifierInt: TypeAlias = Annotated[
+    int,
+    Field(strict=True, ge=-(2**63), le=2**63 - 1),
+]
 
 
 class ContentDefinitionError(ValueError):
@@ -101,15 +105,27 @@ class AttributeModifierEffectDefinition(DefinitionModel):
     definition_id: DefinitionId
     effect_type: Literal["ATTRIBUTE_MODIFIER"]
     attribute_id: DefinitionId
-    flat_delta: Annotated[int, Field(strict=True)] = 0
+    flat_delta: SignedModifierInt = 0
     multiplier_bps: BasisPoints = 10_000
+
+    @model_validator(mode="after")
+    def reject_noop_modifier(self) -> AttributeModifierEffectDefinition:
+        if self.flat_delta == 0 and self.multiplier_bps == 10_000:
+            raise ValueError("attribute modifier must change the attribute")
+        return self
 
 
 class ResourceModifierEffectDefinition(DefinitionModel):
     definition_id: DefinitionId
     effect_type: Literal["RESOURCE_MODIFIER"]
     resource_id: DefinitionId
-    delta: Annotated[int, Field(strict=True)]
+    delta: SignedModifierInt
+
+    @model_validator(mode="after")
+    def reject_noop_modifier(self) -> ResourceModifierEffectDefinition:
+        if self.delta == 0:
+            raise ValueError("resource modifier delta cannot be zero")
+        return self
 
 
 EffectDefinition: TypeAlias = Annotated[
@@ -269,7 +285,16 @@ class ContentCatalog(BaseModel):
                         f"skill {skill.definition_id!r} requires impossible skill level"
                     )
             for effect_id in skill.effect_definition_ids:
-                _require_reference(effect_id, effects, f"skill {skill.definition_id!r} effect")
+                referenced_effect = _require_reference(
+                    effect_id,
+                    effects,
+                    f"skill {skill.definition_id!r} effect",
+                )
+                if isinstance(referenced_effect, AttributeModifierEffectDefinition):
+                    raise ContentDefinitionError(
+                        f"skill {skill.definition_id!r} cannot permanently modify "
+                        "base attributes"
+                    )
         _reject_skill_cycles(skills)
         return self
 
@@ -296,6 +321,24 @@ class ContentCatalog(BaseModel):
 
     def skill(self, definition_id: str) -> SkillDefinition | None:
         return next((item for item in self.skills if item.definition_id == definition_id), None)
+
+    def effect(self, definition_id: str) -> EffectDefinition | None:
+        return next((item for item in self.effects if item.definition_id == definition_id), None)
+
+    @property
+    def definition_ids(self) -> frozenset[str]:
+        return frozenset(
+            definition.definition_id
+            for definitions in (
+                self.characters,
+                self.npcs,
+                self.items,
+                self.equipment,
+                self.skills,
+                self.effects,
+            )
+            for definition in definitions
+        )
 
 
 class ContentCatalogLoader(Protocol):

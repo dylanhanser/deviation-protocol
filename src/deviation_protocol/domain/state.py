@@ -29,16 +29,23 @@ from deviation_protocol.domain.content import (
 NonNegativeInt = Annotated[int, Field(strict=True, ge=0)]
 PositiveInt = Annotated[int, Field(strict=True, ge=1)]
 RelationshipBasisPoints = Annotated[int, Field(strict=True, ge=-10_000, le=10_000)]
+MAX_ATTRIBUTE_VALUE = 2**63 - 1
+AttributeValue = Annotated[int, Field(strict=True, ge=0, le=MAX_ATTRIBUTE_VALUE)]
 
 
 class DomainErrorCode(StrEnum):
     INVALID_IDENTIFIER = "invalid_identifier"
     INVALID_AMOUNT = "invalid_amount"
+    INVALID_ATTRIBUTE_MODIFIER = "invalid_attribute_modifier"
+    UNKNOWN_ATTRIBUTE = "unknown_attribute"
+    RUNTIME_ID_COLLISION = "runtime_id_collision"
     UNKNOWN_ITEM_DEFINITION = "unknown_item_definition"
     UNKNOWN_ITEM_INSTANCE = "unknown_item_instance"
     DUPLICATE_ITEM_INSTANCE = "duplicate_item_instance"
     STACK_LIMIT_EXCEEDED = "stack_limit_exceeded"
     ITEM_EQUIPPED = "item_equipped"
+    ITEM_NOT_CONSUMABLE = "item_not_consumable"
+    INSUFFICIENT_ITEM_CHARGES = "insufficient_item_charges"
     NOT_EQUIPMENT = "not_equipment"
     NOT_EQUIPPED = "not_equipped"
     SLOT_NOT_ALLOWED = "slot_not_allowed"
@@ -52,6 +59,7 @@ class DomainErrorCode(StrEnum):
     SKILL_NOT_LEARNED = "skill_not_learned"
     SKILL_PREREQUISITE_NOT_MET = "skill_prerequisite_not_met"
     SKILL_MAX_LEVEL = "skill_max_level"
+    SKILL_ON_COOLDOWN = "skill_on_cooldown"
     UNKNOWN_NPC_DEFINITION = "unknown_npc_definition"
     DUPLICATE_NPC = "duplicate_npc"
     INSUFFICIENT_FUNDS = "insufficient_funds"
@@ -148,7 +156,7 @@ class SkillState(RuntimeModel):
 class PlayerState(RuntimeModel):
     player_id: DefinitionId
     character_definition_id: DefinitionId
-    attributes: dict[DefinitionId, NonNegativeInt] = Field(default_factory=dict)
+    attributes: dict[DefinitionId, AttributeValue] = Field(default_factory=dict)
     resources: dict[DefinitionId, ResourceState] = Field(default_factory=dict)
     inventory: InventoryState = Field(default_factory=InventoryState)
     wallet: WalletState = Field(default_factory=WalletState)
@@ -257,6 +265,10 @@ class GameState(RuntimeModel):
 
         occupied_slots: set[str] = set()
         for instance in self.player.inventory.items.values():
+            if instance.instance_id in catalog.definition_ids:
+                self._invalid_snapshot(
+                    f"item runtime ID {instance.instance_id!r} collides with a static definition"
+                )
             item_definition = catalog.item(instance.definition_id)
             if item_definition is None:
                 self._invalid_snapshot(
@@ -322,6 +334,10 @@ class GameState(RuntimeModel):
                 self._invalid_snapshot(f"skill {definition_id!r} exceeds max level")
 
         for npc in self.npcs.values():
+            if npc.npc_id in catalog.definition_ids:
+                self._invalid_snapshot(
+                    f"NPC runtime ID {npc.npc_id!r} collides with a static definition"
+                )
             if catalog.npc(npc.definition_id) is None:
                 self._invalid_snapshot(
                     f"NPC {npc.npc_id!r} has unknown definition {npc.definition_id!r}"
@@ -345,6 +361,11 @@ class GameState(RuntimeModel):
         inventory = self.player.inventory.items
         if instance_id is not None:
             _require_definition_id(instance_id, "instance_id")
+            if instance_id in catalog.definition_ids:
+                raise DomainRuleViolation(
+                    DomainErrorCode.RUNTIME_ID_COLLISION,
+                    f"item runtime ID {instance_id!r} collides with a static definition",
+                )
             if instance_id in inventory:
                 raise DomainRuleViolation(
                     DomainErrorCode.DUPLICATE_ITEM_INSTANCE,
@@ -377,7 +398,7 @@ class GameState(RuntimeModel):
                 if remaining == 0:
                     break
 
-        reserved_ids = set(inventory)
+        reserved_ids = set(inventory) | set(catalog.definition_ids)
         while remaining > 0:
             stack_quantity = min(definition.stack_limit, remaining)
             new_instance_id = _unique_instance_id(reserved_ids)
@@ -424,6 +445,45 @@ class GameState(RuntimeModel):
             del self.player.inventory.items[instance_id]
         else:
             instance.quantity -= quantity
+
+    def consume_item(
+        self, catalog: ContentCatalog, instance_id: str
+    ) -> tuple[str, int, int | None]:
+        """Consume one locally usable unit or charge after validating all guards."""
+        instance = self._require_item_instance(instance_id)
+        definition = catalog.item(instance.definition_id)
+        if definition is None:
+            raise DomainRuleViolation(
+                DomainErrorCode.UNKNOWN_ITEM_DEFINITION,
+                f"unknown item definition {instance.definition_id!r}",
+            )
+        if "consumable" not in definition.tags:
+            raise DomainRuleViolation(
+                DomainErrorCode.ITEM_NOT_CONSUMABLE,
+                f"item instance {instance_id!r} is not a consumable",
+            )
+        if instance.equipment is not None and instance.equipment.equipped_slot is not None:
+            raise DomainRuleViolation(
+                DomainErrorCode.ITEM_EQUIPPED,
+                f"item instance {instance_id!r} must be unequipped before consumption",
+            )
+        if instance.charges is not None and instance.charges == 0:
+            raise DomainRuleViolation(
+                DomainErrorCode.INSUFFICIENT_ITEM_CHARGES,
+                f"item instance {instance_id!r} has no remaining charges",
+            )
+
+        if instance.charges is not None:
+            next_charges = instance.charges - 1
+            if next_charges == 0:
+                del self.player.inventory.items[instance_id]
+                return definition.definition_id, 0, 0
+            instance.charges = next_charges
+            return definition.definition_id, instance.quantity, next_charges
+
+        next_quantity = instance.quantity - 1
+        self.remove_item(instance_id, 1)
+        return definition.definition_id, next_quantity, None
 
     def equip(self, catalog: ContentCatalog, instance_id: str, slot: str) -> None:
         instance = self._require_item_instance(instance_id)
@@ -577,6 +637,11 @@ class GameState(RuntimeModel):
                 f"unknown NPC definition {npc_definition_id!r}",
             )
         _require_definition_id(npc_id, "npc_id")
+        if npc_id in catalog.definition_ids:
+            raise DomainRuleViolation(
+                DomainErrorCode.RUNTIME_ID_COLLISION,
+                f"NPC runtime ID {npc_id!r} collides with a static definition",
+            )
         if npc_id in self.npcs:
             raise DomainRuleViolation(
                 DomainErrorCode.DUPLICATE_NPC,
@@ -610,6 +675,55 @@ class GameState(RuntimeModel):
             )
         self._check_skill_prerequisites(definition.prerequisites)
         state.level += 1
+
+    def record_skill_use(self, skill_definition_id: str) -> int:
+        state = self.player.skills.get(skill_definition_id)
+        if state is None:
+            raise DomainRuleViolation(
+                DomainErrorCode.SKILL_NOT_LEARNED,
+                f"skill {skill_definition_id!r} has not been learned",
+            )
+        if state.cooldown_remaining > 0:
+            raise DomainRuleViolation(
+                DomainErrorCode.SKILL_ON_COOLDOWN,
+                f"skill {skill_definition_id!r} has cooldown remaining",
+            )
+        state.uses += 1
+        return state.uses
+
+    def apply_attribute_modifier(
+        self,
+        attribute_id: str,
+        *,
+        flat_delta: int = 0,
+        multiplier_bps: int = 10_000,
+    ) -> tuple[int, int]:
+        _require_definition_id(attribute_id, "attribute_id")
+        if (
+            isinstance(flat_delta, bool)
+            or not isinstance(flat_delta, int)
+            or isinstance(multiplier_bps, bool)
+            or not isinstance(multiplier_bps, int)
+            or not 0 <= multiplier_bps <= 1_000_000
+        ):
+            raise DomainRuleViolation(
+                DomainErrorCode.INVALID_ATTRIBUTE_MODIFIER,
+                "attribute modifier must use bounded integer values",
+            )
+        if attribute_id not in self.player.attributes:
+            raise DomainRuleViolation(
+                DomainErrorCode.UNKNOWN_ATTRIBUTE,
+                f"unknown player attribute {attribute_id!r}",
+            )
+        before = self.player.attributes[attribute_id]
+        after = (before * multiplier_bps) // 10_000 + flat_delta
+        if not 0 <= after <= MAX_ATTRIBUTE_VALUE:
+            raise DomainRuleViolation(
+                DomainErrorCode.INVALID_ATTRIBUTE_MODIFIER,
+                f"attribute {attribute_id!r} is outside the supported integer range",
+            )
+        self.player.attributes[attribute_id] = after
+        return before, after
 
     def credit_currency(self, currency_id: str, amount: int) -> None:
         self.player.wallet.credit(currency_id, amount)
@@ -701,25 +815,35 @@ class AuthoritativeStateView:
     """Detached, immutable capability projection for application adapters."""
 
     _item_instance_ids: frozenset[str]
+    _item_definitions: tuple[tuple[str, str], ...]
     _item_quantities: tuple[tuple[str, int], ...]
     _equipment_instance_ids: frozenset[str]
+    _equipment_definitions: tuple[tuple[str, str], ...]
     _equipped_instance_ids: frozenset[str]
     _skills: tuple[tuple[str, int], ...]
     _npc_ids: frozenset[str]
+    _npc_definitions: tuple[tuple[str, str], ...]
     _resources: tuple[tuple[str, int], ...]
     _currencies: tuple[tuple[str, int], ...]
 
     def __init__(self, state: GameState, catalog: ContentCatalog) -> None:
         state = GameState.from_snapshot(state.to_snapshot(), catalog=catalog)
         quantities: dict[str, int] = {}
+        item_definitions: list[tuple[str, str]] = []
         equipment_instance_ids: set[str] = set()
+        equipment_definitions: list[tuple[str, str]] = []
         equipped_instance_ids: set[str] = set()
         for instance in state.player.inventory.items.values():
+            item_definitions.append((instance.instance_id, instance.definition_id))
             quantities[instance.definition_id] = (
                 quantities.get(instance.definition_id, 0) + instance.quantity
             )
-            if catalog.equipment_for_item(instance.definition_id) is not None:
+            equipment_definition = catalog.equipment_for_item(instance.definition_id)
+            if equipment_definition is not None:
                 equipment_instance_ids.add(instance.instance_id)
+                equipment_definitions.append(
+                    (instance.instance_id, equipment_definition.definition_id)
+                )
             if (
                 instance.equipment is not None
                 and instance.equipment.equipped_slot is not None
@@ -731,9 +855,13 @@ class AuthoritativeStateView:
             "_item_instance_ids",
             frozenset(state.player.inventory.items),
         )
+        object.__setattr__(self, "_item_definitions", tuple(sorted(item_definitions)))
         object.__setattr__(self, "_item_quantities", tuple(sorted(quantities.items())))
         object.__setattr__(
             self, "_equipment_instance_ids", frozenset(equipment_instance_ids)
+        )
+        object.__setattr__(
+            self, "_equipment_definitions", tuple(sorted(equipment_definitions))
         )
         object.__setattr__(
             self, "_equipped_instance_ids", frozenset(equipped_instance_ids)
@@ -744,6 +872,11 @@ class AuthoritativeStateView:
             tuple(sorted((key, value.level) for key, value in state.player.skills.items())),
         )
         object.__setattr__(self, "_npc_ids", frozenset(state.npcs))
+        object.__setattr__(
+            self,
+            "_npc_definitions",
+            tuple(sorted((key, value.definition_id) for key, value in state.npcs.items())),
+        )
         object.__setattr__(
             self,
             "_resources",
@@ -804,6 +937,34 @@ class AuthoritativeStateView:
     @property
     def inventory_item_instance_ids(self) -> frozenset[str]:
         return self._item_instance_ids
+
+    @property
+    def item_definition_by_instance(self) -> tuple[tuple[str, str], ...]:
+        return self._item_definitions
+
+    @property
+    def equipment_definition_by_instance(self) -> tuple[tuple[str, str], ...]:
+        return self._equipment_definitions
+
+    @property
+    def learned_skill_levels(self) -> tuple[tuple[str, int], ...]:
+        return self._skills
+
+    @property
+    def npc_definition_by_id(self) -> tuple[tuple[str, str], ...]:
+        return self._npc_definitions
+
+    @property
+    def resource_ids(self) -> frozenset[str]:
+        return frozenset(key for key, _ in self._resources)
+
+    @property
+    def currency_ids(self) -> frozenset[str]:
+        return frozenset(key for key, _ in self._currencies)
+
+    @property
+    def npc_ids(self) -> frozenset[str]:
+        return self._npc_ids
 
 
 def _require_positive_amount(amount: int) -> None:

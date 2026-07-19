@@ -5,7 +5,9 @@
     "InputContractPolicy",
     "EntityReferencePolicy",
     "InventoryOwnershipPolicy",
+    "SkillReferencePolicy",
     "FeasibilityPolicy",
+    "SystemAuthorityPolicy",
     "PlayerAgencyPolicy",
     "MultipleActionPolicy",
     "LocalActionPolicy"
@@ -16,7 +18,9 @@
     "InputContractPolicy": true,
     "EntityReferencePolicy": true,
     "InventoryOwnershipPolicy": true,
+    "SkillReferencePolicy": true,
     "FeasibilityPolicy": true,
+    "SystemAuthorityPolicy": true,
     "PlayerAgencyPolicy": true,
     "MultipleActionPolicy": true,
     "LocalActionPolicy": true
@@ -41,6 +45,13 @@
       "(?:瞬间移动|穿墙而过|读取思想|修改游戏代码)"
     ]
   },
+  "system_authority": {
+    "forbidden_patterns": [
+      "(?:给我|为我|替我|玩家).{0,12}(?:增加|添加|生成|发放|修改).{0,20}(?:物品|装备|金币|货币|资源|属性|技能)",
+      "(?:强制|直接).{0,12}(?:学习|升级|修改|生成|获得).{0,20}(?:技能|属性|NPC|装备|物品|货币|资源)",
+      "\\b(?:grant|spawn|credit|set)_(?:item|skill|currency|resource|attribute|npc)\\b"
+    ]
+  },
   "multiple_action": {
     "sequence_patterns": [
       ".{1,80}(?:然后|接着|随后).{1,80}",
@@ -49,5 +60,19 @@
       "\\bfirst\\b.{1,100}\\b(?:then|after that)\\b"
     ]
   },
-  "local_action_types": ["INSPECT_STATUS", "INSPECT_INVENTORY", "INSPECT_QUESTS"]
+  "local_action_types": [
+    "INSPECT_STATUS",
+    "INSPECT_INVENTORY",
+    "INSPECT_EQUIPMENT",
+    "INSPECT_SKILLS",
+    "INSPECT_RESOURCES",
+    "INSPECT_CURRENCIES",
+    "INSPECT_QUESTS",
+    "EQUIP",
+    "UNEQUIP",
+    "USE_ITEM",
+    "LEARN_SKILL",
+    "UPGRADE_SKILL",
+    "USE_SKILL"
+  ]
 }

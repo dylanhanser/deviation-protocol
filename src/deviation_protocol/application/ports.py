@@ -5,10 +5,14 @@ from dataclasses import dataclass
 from types import TracebackType
 from typing import Any, Mapping, Protocol, Sequence
 
+from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
+from deviation_protocol.application.resolution import ResolutionResult
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission
+from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.models import GameSession
+from deviation_protocol.domain.state import GameState
 
 
 @dataclass(frozen=True, slots=True)
@@ -19,7 +23,12 @@ class RuleResolution:
 
 
 class RuleResolver(Protocol):
-    async def resolve(self, context: ActionContext) -> RuleResolution: ...
+    async def resolve(
+        self,
+        trusted_context: TrustedResolutionContext,
+        state: GameState,
+        catalog: ContentCatalog,
+    ) -> ResolutionResult: ...
 
 
 class AnomalyEvaluator(Protocol):

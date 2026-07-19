@@ -95,6 +95,45 @@ def test_unknown_effect_type_is_rejected(tmp_path: Path) -> None:
         write_and_load(tmp_path, payload)
 
 
+@pytest.mark.parametrize(
+    ("effect_index", "updates"),
+    [
+        (0, {"flat_delta": 0, "multiplier_bps": 10_000}),
+        (1, {"delta": 0}),
+    ],
+)
+def test_noop_effect_definitions_are_rejected(
+    tmp_path: Path, effect_index: int, updates: dict[str, int]
+) -> None:
+    payload = load_payload()
+    effects = payload["effects"]
+    assert isinstance(effects, list)
+    effects[effect_index].update(updates)
+
+    with pytest.raises(ContentPackLoadError, match="must change|cannot be zero"):
+        write_and_load(tmp_path, payload)
+
+
+def test_effect_integer_magnitude_is_bounded(tmp_path: Path) -> None:
+    payload = load_payload()
+    effects = payload["effects"]
+    assert isinstance(effects, list)
+    effects[0]["flat_delta"] = 2**63
+
+    with pytest.raises(ContentPackLoadError, match="less than or equal"):
+        write_and_load(tmp_path, payload)
+
+
+def test_skill_cannot_reference_permanent_attribute_modifier(tmp_path: Path) -> None:
+    payload = load_payload()
+    skills = payload["skills"]
+    assert isinstance(skills, list)
+    skills[0]["effect_definition_ids"] = ["effect.training_sword.attack"]
+
+    with pytest.raises(ContentPackLoadError, match="cannot permanently modify"):
+        write_and_load(tmp_path, payload)
+
+
 @pytest.mark.parametrize("cycle", ["self", "indirect"])
 def test_skill_prerequisite_cycles_are_rejected(
     tmp_path: Path, cycle: str

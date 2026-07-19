@@ -556,6 +556,34 @@ def test_invalid_runtime_identifiers_are_rejected_without_mutation(
     )
 
 
+def test_runtime_ids_cannot_collide_with_static_definition_ids(
+    catalog: ContentCatalog, state: GameState
+) -> None:
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.RUNTIME_ID_COLLISION,
+        lambda: state.grant_item(
+            catalog, "item.mirror", instance_id="item.mirror"
+        ),
+    )
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.RUNTIME_ID_COLLISION,
+        lambda: state.grant_item(
+            catalog,
+            "item.mirror",
+            instance_id="equipment.training_sword",
+        ),
+    )
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.RUNTIME_ID_COLLISION,
+        lambda: state.spawn_npc(
+            catalog, "npc.demo.guard", "npc.demo.guard"
+        ),
+    )
+
+
 def test_currency_and_resource_mutations_obey_boundaries(state: GameState) -> None:
     state.credit_currency("credits", 10)
     state.debit_currency("credits", 4)
@@ -655,6 +683,63 @@ def test_action_context_projection_uses_instance_ids_not_definition_ids(
 
     assert result.route is ActionRoute.REJECT_LOCAL
     assert result.policy_trace[-1].reason_code == "unavailable_tool"
+
+
+def test_domain_consumable_mutation_and_failures_are_atomic(
+    catalog: ContentCatalog, state: GameState
+) -> None:
+    medkit = state.grant_item(
+        catalog, "item.medkit", 2, instance_id="item-medkit"
+    )[0]
+    definition_id, quantity, charges = state.consume_item(catalog, medkit)
+    assert (definition_id, quantity, charges) == ("item.medkit", 1, None)
+
+    mirror = state.grant_item(catalog, "item.mirror", instance_id="item-mirror")[0]
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.ITEM_NOT_CONSUMABLE,
+        lambda: state.consume_item(catalog, mirror),
+    )
+
+
+def test_domain_attribute_modifier_validates_before_mutation(state: GameState) -> None:
+    before, after = state.apply_attribute_modifier(
+        "focus", flat_delta=1, multiplier_bps=20_000
+    )
+    assert (before, after) == (4, 9)
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.INVALID_ATTRIBUTE_MODIFIER,
+        lambda: state.apply_attribute_modifier("focus", flat_delta=-100),
+    )
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.INVALID_ATTRIBUTE_MODIFIER,
+        lambda: state.apply_attribute_modifier("focus", flat_delta=2**63),
+    )
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.UNKNOWN_ATTRIBUTE,
+        lambda: state.apply_attribute_modifier("invented", flat_delta=1),
+    )
+
+
+def test_domain_skill_use_counter_obeys_learning_and_cooldown(
+    catalog: ContentCatalog, state: GameState
+) -> None:
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.SKILL_NOT_LEARNED,
+        lambda: state.record_skill_use("skill.observation"),
+    )
+    state.learn_skill(catalog, "skill.observation")
+    assert state.record_skill_use("skill.observation") == 1
+    state.player.skills["skill.observation"].cooldown_remaining = 1
+    assert_failure_without_mutation(
+        state,
+        DomainErrorCode.SKILL_ON_COOLDOWN,
+        lambda: state.record_skill_use("skill.observation"),
+    )
 
 
 def test_legacy_model_imports_keep_their_original_constructor_semantics() -> None:

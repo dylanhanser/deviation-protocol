@@ -2,7 +2,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import StrEnum
+import re
 from typing import Any
+
+from deviation_protocol.domain.json_values import freeze_json_value
 
 
 class FactKind(StrEnum):
@@ -11,12 +14,41 @@ class FactKind(StrEnum):
     MUTABLE = "MUTABLE"
 
 
+class NarrativeFactKind(StrEnum):
+    VALIDATED_INTENT = "VALIDATED_INTENT"
+    AUTHORITATIVE_CONTEXT = "AUTHORITATIVE_CONTEXT"
+    RESOLVED_STATE = "RESOLVED_STATE"
+    QUERY_RESULT = "QUERY_RESULT"
+
+
 @dataclass(frozen=True, slots=True)
 class StoryFact:
     key: str
     kind: FactKind
     value: Any = None
     causal_event_id: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class NarrativeFact:
+    """An immutable fact a later narrative renderer must preserve.
+
+    Unlike StoryFact this is not a mutation of scenario truth. It describes an
+    already validated intent or an already committed candidate-state change.
+    """
+
+    key: str
+    value: Any
+    kind: NarrativeFactKind = NarrativeFactKind.RESOLVED_STATE
+
+    def __post_init__(self) -> None:
+        if not re.fullmatch(r"[A-Za-z][A-Za-z0-9_.:-]{0,255}", self.key):
+            raise ValueError("narrative fact key must be a stable non-empty identifier")
+        object.__setattr__(
+            self,
+            "value",
+            freeze_json_value(self.value, path=f"narrative fact {self.key!r}"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
