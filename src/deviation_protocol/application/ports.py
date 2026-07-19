@@ -8,6 +8,7 @@ from typing import Any, Mapping, Protocol, Sequence
 
 from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
+from deviation_protocol.application.narrative_models import NarrativeProvider
 from deviation_protocol.application.resolution import ResolutionResult
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission
@@ -65,10 +66,6 @@ class StoryDirector(Protocol):
     async def build_prompt_context(
         self, context: ActionContext, events: Sequence[DomainEvent]
     ) -> Mapping[str, Any]: ...
-
-
-class NarrativeProvider(Protocol):
-    async def generate(self, narrative_context: Mapping[str, Any]) -> str: ...
 
 
 class GameSessionRepository(ABC):

@@ -220,8 +220,36 @@ ActionSubmission
 
 `NarrativeFrame` 是唯一进入创建/行动响应的剧情投影，并增加当前公开 `decision_id` 以绑定决策窗口。Frame 只含已知事实、已发现线索、真实可见实体、公开时钟、公开建议动作及呈现约束；响应模型继续 `extra="forbid"`，不包含 action signature、完整 `GameState`/snapshot、Scenario 定义、隐藏事实、未来结局、密封信息、策略 trace、数据库异常或 `ANOMALY_EVALUATION_REQUIRED`。
 
-Phase 2.2b 的 `NarrativeProvider` 只能根据 Frame 提出候选叙事结果。独立服务器验证器必须核对结果与权威上下文后才能取得对应的密封 capability；Provider 本身不能写 Repository、调用 UoW 或直接修改事实、线索、时钟、NPC 和决策。Phase 2.2a 没有模型 SDK/API 调用、异常评估、文学正文生成、战斗或场景崩坏。
+Phase 2.2b 的 `NarrativeProvider` 只能根据 Frame 提出候选叙事结果。独立服务器验证器必须核对结果与权威公开上下文；Phase 2.2b-1 即使验证通过也不会取得密封 capability。Provider 本身不能写 Repository、调用 UoW 或直接修改事实、线索、时钟、NPC 和决策。Phase 2.2a 生产路径没有模型 SDK/API 调用、异常评估、文学正文生成、战斗或场景崩坏。
 
 ### 持久化选择
 
 所有 scenario 标识、内容版本、phase、facts、clues、clocks 和 decisions 已包含在 v2 `game_snapshots.state_json.scenario_runtime`。ORM 及关系表没有变化，现有 `20260719_0001`、`20260719_0002` revision 足以支持本阶段，因此 Phase 2.2a 不新增或修改 Alembic migration。
+
+## Phase 2.2b-1 供应商无关叙事边界
+
+本阶段新增的链路是独立模型适配与验证能力，不接入生产事务编排：
+
+```text
+safe NarrativeFrame copy
+  + normalized validated player intent
+  + bounded public context
+  + versioned style profile
+  -> NarrativeRequest
+  -> PromptBuilder
+  -> NarrativeProvider Protocol
+  -> DeepSeekNarrativeProvider
+  -> UntrustedNarrativeProposal
+  -> NarrativeProposalValidator + authoritative public allowlists
+  -> ValidatedNarrativeProposal (still non-authoritative)
+```
+
+application/domain 不导入 `httpx`、DeepSeek SDK、环境设置或供应商配置。`NarrativeRequest` 重新验证并深拷贝 `NarrativeFrame`，且把 `ActionSubmission` 投影为不含 session、turn、client request、signature、gateway route、trace 或 capability 的 `NarrativePlayerIntent`。PromptBuilder 使用可替换的版本化 style profile，玩家输入只序列化进明确的不可信数据段；通用提示词不含任何首副本 ID、医院专属文本或参考作品原文。
+
+`NarrativeProposalPayload` 是 `extra="forbid"` 的判别式严格 JSON。封闭 outcome 类型只表达非权威候选；模型没有事件、事实/线索写入、clock/phase/beat delta、grant、资源、属性、技能、state version、decision、capability、seal 或 anomaly 字段。Provider metadata 与官方实际返回的 token/cache usage 由适配器补充，模型无权声明。
+
+验证器只读取当前请求 Frame 与应用调用方提供的权威公开 allowlist。它校验实体存在且已向模型公开、NPC speaker 是当前可见运行时 NPC、物品是玩家拥有并在当前意图中公开的实例、正文长度匹配 Frame，并拒绝隐藏标识、内部 ID、seal/capability 形态、float、NaN、Infinity 和非 JSON 对象。验证失败只抛稳定错误，不保存或返回原始模型输出。验证器不导入、持有或调用 `TrustedScenarioEventIssuer`，`ValidatedNarrativeProposal` 也没有真实性 capability，因此不能进入 `StoryDirector` 或创建 `VerifiedScenarioEvent`。
+
+DeepSeek adapter 只在 infrastructure，配置限制为官方 HTTPS host、`deepseek-v4-flash`/`deepseek-v4-pro`、显式 timeout、有界 max tokens 和最多三次 retry。请求固定 non-stream、JSON object、thinking disabled，并禁用所有工具/Beta/Web 能力。400/401/402/422 不重试；429、500、503、连接与 timeout 使用可注入的有界退避；空 content 或 JSON 解析失败最多额外尝试一次；`finish_reason=length` 直接作为截断失败。client 延迟创建并支持异步关闭，日志和 DTO 不包含 key、Authorization、完整 prompt 或原始响应。
+
+生产 `FirstPhaseTurnOrchestrator` 与 API 没有任何改动，MySQL 事务内不会调用模型，`NARRATIVE_REQUIRED` 仍是 pending。Phase 2.2c 才会实现不持锁的两阶段生产编排。详细配置、数据合同与 smoke 规则见 [`docs/narrative_provider.md`](narrative_provider.md)。

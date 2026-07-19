@@ -13,6 +13,21 @@ from deviation_protocol.application.effect_executor import (
 )
 from deviation_protocol.application.errors import IdempotencyConflictError
 from deviation_protocol.application.resolution import ResolutionResult, ResolutionStatus
+from deviation_protocol.application.narrative_models import (
+    NarrativePlayerIntent,
+    NarrativeProposalPayload,
+    NarrativeProvider,
+    NarrativeProviderMetadata,
+    NarrativeRequest,
+    NarrativeUsage,
+    UntrustedNarrativeProposal,
+    ValidatedNarrativeProposal,
+)
+from deviation_protocol.application.narrative_prompt import (
+    NarrativeStyleProfile,
+    PromptBuilder,
+)
+from deviation_protocol.application.narrative_validation import NarrativeProposalValidator
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
 from deviation_protocol.application.turn_response import TurnResponse
@@ -31,6 +46,15 @@ __all__ = [
     "EffectSourceType",
     "GatewayResult",
     "IdempotencyConflictError",
+    "NarrativePlayerIntent",
+    "NarrativeProposalPayload",
+    "NarrativeProposalValidator",
+    "NarrativeProvider",
+    "NarrativeProviderMetadata",
+    "NarrativeRequest",
+    "NarrativeStyleProfile",
+    "NarrativeUsage",
+    "PromptBuilder",
     "FirstPhaseTurnOrchestrator",
     "ResolutionResult",
     "ResolutionStatus",
@@ -38,5 +62,7 @@ __all__ = [
     "SkillLearningAuthorizationSource",
     "TrustedResolutionContext",
     "TurnResponse",
+    "UntrustedNarrativeProposal",
+    "ValidatedNarrativeProposal",
     "StoryDirectorResult",
 ]

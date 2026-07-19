@@ -1,6 +1,6 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-当前实现到 Phase 2.2a：本地行动闸门、确定性规则结算、通用剧情运行时、`StoryDirector`、确定性 `TurnOrchestrator`、MySQL 事件/快照事务、异步 Unit of Work，以及玩家安全 FastAPI 会话边界。本阶段不连接任何真实大模型，也不生成文学正文。
+当前实现到 Phase 2.2b-1：在 Phase 2.2a 的确定性事务边界之外，新增供应商无关 `NarrativeProvider` 端口、版本化 PromptBuilder、DeepSeek V4 适配器、严格的不可信候选模型与独立验证器。生产 `TurnOrchestrator` 和玩家 API 仍未接入模型；`NARRATIVE_REQUIRED` 继续返回 pending。
 
 ## 结构
 
@@ -211,4 +211,26 @@ principal + creation key + character_definition_id + scenario_id
 
 公共行动响应不含 `action_signature`、快照、完整 `GameState`、Scenario 定义、隐藏事实、未来结局、密封信息或异常评估状态。`NarrativeFrame` 继续由 Director 从玩家已知事实、当前位置与真实 NPC 的安全交集构建；`/state` 的 `visible_npcs` 也使用同一类权威交集，而不是暴露全部 NPC。
 
-Phase 2.2b 的 `NarrativeProvider` 只能提出候选叙事结果；候选必须先经过独立服务器验证才能获得密封能力，Provider 永远不能直接修改 `GameState`、事实、线索、时钟或决策。本仓库当前仍无模型 SDK/API 调用、`DeviationEvaluator`、异常评估、场景崩坏、战斗系统或长篇文学正文生成。
+Phase 2.2b 的 `NarrativeProvider` 只能提出候选叙事结果；Phase 2.2b-1 的独立验证也不会签发密封能力，Provider 永远不能直接修改 `GameState`、事实、线索、时钟或决策。生产路径当前仍无模型 API 调用，也没有 `DeviationEvaluator`、异常评估、场景崩坏、战斗系统或长篇文学正文生成；新增适配器只由离线测试和显式 opt-in smoke 使用。
+
+## Phase 2.2b-1 NarrativeProvider 与 DeepSeek V4
+
+供应商无关模型位于 application：`NarrativeRequest` 只包含不可变安全 `NarrativeFrame` 副本、去除 session/turn/request 标识的规范化玩家意图、玩家可见职业标签、有界近期叙事、有界公开摘要、语言、版本化风格 ID 与 prompt schema 版本。它不包含 `GameState`、snapshot、`ScenarioDefinition`、隐藏事实、未来结局、策略 trace、action signature、capability、seal、数据库对象、API key 或供应商配置。
+
+DeepSeek 依赖只存在于 infrastructure。当前默认模型是 `deepseek-v4-flash`，服务器可信配置可选择 `deepseek-v4-pro`；`deepseek-chat` 与 `deepseek-reasoner` 明确不允许。适配器固定使用官方 `https://api.deepseek.com/chat/completions`、`stream=false`、`response_format={"type":"json_object"}` 和 `thinking={"type":"disabled"}`，不提供工具、Web 搜索、Beta endpoint 或动态函数调用。完整边界见 [`docs/narrative_provider.md`](docs/narrative_provider.md)。
+
+可选本地配置只从进程环境注入；模块导入不会读取 key、创建 client 或访问网络。`.env.example` 只提供空 key 和非敏感默认值：
+
+```powershell
+$env:DEEPSEEK_API_KEY = "<set-locally-without-committing>"
+$env:DEEPSEEK_MODEL = "deepseek-v4-flash"
+```
+
+普通测试始终使用 Fake Transport；仅设置 key 仍不会调用 API。只有同时显式设置 opt-in 开关后，才运行独立的一次性安全烟雾测试：
+
+```powershell
+$env:RUN_LIVE_DEEPSEEK_TEST = "1"
+.\.venv\Scripts\python.exe -m pytest tests\live\test_deepseek_live.py -m live -s
+```
+
+live 测试不连接 MySQL、不输出 key/请求头/完整 prompt/原始响应，且将传输重试固定为 0。模型返回的 JSON 始终先成为 `UntrustedNarrativeProposal`；`ValidatedNarrativeProposal` 只说明结构、引用、长度和权限范围通过检查，不能创建 `VerifiedScenarioEvent`、取得 `TrustedScenarioEventIssuer` 或修改任何状态。Phase 2.2c 才会设计不持 MySQL 锁调用外部模型的两阶段生产编排。

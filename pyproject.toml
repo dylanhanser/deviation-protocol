@@ -13,6 +13,7 @@ dependencies = [
     "asyncmy>=0.2.10,<1.0",
     "cryptography>=44,<47",
     "fastapi>=0.115,<1.0",
+    "httpx>=0.28,<1.0",
     "pydantic>=2.10,<3.0",
     "pydantic-settings>=2.7,<3.0",
     "sqlalchemy[asyncio]>=2.0.36,<3.0",
@@ -35,4 +36,5 @@ testpaths = ["tests"]
 pythonpath = ["src"]
 markers = [
     "integration: requires TEST_DATABASE_URL pointing at a disposable MySQL 8 database",
+    "live: explicit opt-in test that may call the DeepSeek API",
 ]
