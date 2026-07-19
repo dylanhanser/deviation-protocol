@@ -1,0 +1,53 @@
+{
+  "policy_order": [
+    "TurnStatePolicy",
+    "DuplicateRequestPolicy",
+    "InputContractPolicy",
+    "EntityReferencePolicy",
+    "InventoryOwnershipPolicy",
+    "FeasibilityPolicy",
+    "PlayerAgencyPolicy",
+    "MultipleActionPolicy",
+    "LocalActionPolicy"
+  ],
+  "enabled": {
+    "TurnStatePolicy": true,
+    "DuplicateRequestPolicy": true,
+    "InputContractPolicy": true,
+    "EntityReferencePolicy": true,
+    "InventoryOwnershipPolicy": true,
+    "FeasibilityPolicy": true,
+    "PlayerAgencyPolicy": true,
+    "MultipleActionPolicy": true,
+    "LocalActionPolicy": true
+  },
+  "player_agency": {
+    "success_patterns": [
+      "(?:我|玩家).{0,12}(?:成功|已经|已然|顺利)(?:地)?(?:完成|做到|打开|击败|杀死|获得|抵达|说服)",
+      "(?:行动|攻击|说服|解锁|治疗)(?:已经|必然|肯定)?成功",
+      "\\bI (?:successfully|already)\\b"
+    ],
+    "npc_control_patterns": [
+      "(?:让|命令|决定).{0,16}(?:NPC|他|她|他们).{0,12}(?:同意|相信|服从|死亡|离开|攻击)",
+      "(?:NPC|他|她|他们).{0,12}(?:必然|立刻|马上|只能)(?:同意|相信|服从|死亡|离开|攻击)",
+      "\\b(?:NPC|he|she|they) (?:must|will definitely)\\b"
+    ]
+  },
+  "feasibility": {
+    "invalid_patterns": [
+      "^(?:[啊哈嗯呃哦]{6,}|[^\\w\\u4e00-\\u9fff]{3,})$",
+      "^(?:asdf|qwer|zxcv|hjkl){2,}$",
+      "(?:凭空变出|无中生有|直接生成).{0,30}(?:物品|武器|钥匙|道具)",
+      "(?:瞬间移动|穿墙而过|读取思想|修改游戏代码)"
+    ]
+  },
+  "multiple_action": {
+    "sequence_patterns": [
+      ".{1,80}(?:然后|接着|随后).{1,80}",
+      "(?:然后|接着|随后|之后|再).{1,60}(?:然后|接着|随后|之后|再)",
+      "(?:先).{1,60}(?:再|然后|接着)",
+      "\\bfirst\\b.{1,100}\\b(?:then|after that)\\b"
+    ]
+  },
+  "local_action_types": ["INSPECT_STATUS", "INSPECT_INVENTORY", "INSPECT_QUESTS"]
+}
