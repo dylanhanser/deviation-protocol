@@ -38,6 +38,7 @@ MAX_SCENARIO_STRING_LENGTH = 4_000
 MAX_SCENARIO_COUNTER = 1_000_000
 MAX_AUTO_BEATS = 10_000
 MAX_NARRATIVE_LENGTH = 10_000
+SUPPORTED_SCENARIO_SCHEMA_VERSION = 1
 StrictBool = Annotated[bool, Field(strict=True)]
 
 
@@ -502,8 +503,11 @@ class ScenarioDefinition(ScenarioDefinitionModel):
     @field_validator("schema_version")
     @classmethod
     def supported_schema(cls, value: int) -> int:
-        if value != 1:
-            raise ValueError("unsupported scenario schema_version; expected 1")
+        if value != SUPPORTED_SCENARIO_SCHEMA_VERSION:
+            raise ValueError(
+                "unsupported scenario schema_version; expected "
+                f"{SUPPORTED_SCENARIO_SCHEMA_VERSION}"
+            )
         return value
 
     @model_validator(mode="after")
@@ -884,8 +888,11 @@ class ScenarioCatalog(ScenarioDefinitionModel):
     @field_validator("schema_version")
     @classmethod
     def supported_schema(cls, value: int) -> int:
-        if value != 1:
-            raise ValueError("unsupported scenario catalog schema_version; expected 1")
+        if value != SUPPORTED_SCENARIO_SCHEMA_VERSION:
+            raise ValueError(
+                "unsupported scenario catalog schema_version; expected "
+                f"{SUPPORTED_SCENARIO_SCHEMA_VERSION}"
+            )
         return value
 
     @model_validator(mode="after")

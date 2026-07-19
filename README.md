@@ -64,6 +64,8 @@ live DeepSeek 测试默认关闭，必须由用户在独立命令中显式 opt-i
 
 它提供 `validate`、`analyze`、`preview` 和稳定 `--json` 输出，不连接数据库或调用模型。完整用法与静态分析边界见 [`docs/scenario_workbench.md`](docs/scenario_workbench.md)。
 
+隔离草案可用 `scenario new --scenario-id <id> --title <title> --premise <note> --output-dir .\scenario-drafts` 创建；Windows 上它以全新目录发布且从不覆盖现有内容。缺少标准库原子 no-replace 目录发布语义的平台会拒绝实际写入，而不是降级为可能覆盖空目录的 rename。
+
 ## 运行环境与依赖
 
 项目目标为 Python 3.12，依赖通过 `pyproject.toml` 管理：

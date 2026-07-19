@@ -1,6 +1,6 @@
-# Scenario Workbench 第一阶段
+# Scenario Workbench
 
-Scenario Workbench 是完全本地、只读、确定性的副本内容检查工具。它复用正式 `JsonScenarioCatalogLoader`、`ScenarioCatalog`、`ContentCatalog`、`GameState` 和 `DeterministicStoryDirector`；不读取 `.env`，不连接数据库，不调用 NarrativeProvider，也不发送网络请求。
+Scenario Workbench 是完全本地、确定性的副本内容工具。第一阶段的检查命令保持只读；第二阶段增加安全、确定性且不覆盖现有内容的 `scenario new` 草案脚手架。所有命令复用正式 `JsonScenarioCatalogLoader`、`ScenarioCatalog`、`ContentCatalog`、`GameState` 和 `DeterministicStoryDirector`；不读取 `.env`，不连接数据库，不调用 NarrativeProvider，也不发送网络请求。
 
 ## 命令
 
@@ -31,6 +31,71 @@ Scenario Workbench 是完全本地、只读、确定性的副本内容检查工�
 - `2`：内容已成功加载，但静态分析发现阻断级问题。
 
 错误输出使用稳定错误码，不包含 traceback、绝对本地路径、环境变量值、密钥或数据库 URL。
+
+## new：创建隔离草案
+
+`new` 只构造通用 DRAFT 结构，不创作正式剧情。推荐把输出放在 `scenario-drafts` 等非正式目录：
+
+```powershell
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario new `
+    --scenario-id abandoned_station_v1 `
+    --title "废弃车站" `
+    --premise "玩家在封闭车站中寻找离开的条件" `
+    --output-dir .\scenario-drafts
+```
+
+可选参数为 `--content-version`、`--schema-version 1`、`--dry-run` 和 `--json`。未提供 content version 时，CLI 每次都通过正式 `JsonContentCatalogLoader` 从当前 `config/demo_content_pack.json` 读取版本，不维护散落默认字符串；显式版本必须与该正式目录相同。当前只支持严格整数的 Scenario schema 1；未知版本及布尔、浮点或字符串类型直接拒绝。没有 `--force`、`--overwrite` 或自动合并。
+
+生成布局是一个全新的 scenario 专属目录：
+
+```text
+<output-dir>/
+  <scenario-id>/
+    scenario.json
+    design.md
+```
+
+`scenario.json` 是正式 loader 可读的最小 ScenarioCatalog 草案：包含显式 DRAFT 状态、一个通用初始地点、开局/调查/核心冲突/结算四个占位 phase、三条最小合法 transition 和一个占位 ending。它不包含 NPC、装备、技能、线索、可信事件、outcome rule/token、capability、seal 或脚本表达式。用户提供的 premise 只进入带有 `unverified` 标记的草案摘要，不成为世界事实。内嵌 ContentCatalog 故意为空；需要 preview 时用匹配版本的外部 content pack 和真实可玩角色替换它。
+
+`design.md` 标记为 DRAFT，记录 `scenario-scaffold-v1` 模板版本、scenario ID、title、未验证 premise、人工待填写清单及后续命令。title 与 premise 先做 NFC 和有界空白规范化、拒绝控制字符，再作为缩进代码块中的数据写入，不能创建 Markdown fence、heading 或 HTML comment 结构。相同规范化参数会产生字节级相同的 JSON、Markdown、文件摘要和 digest；组合 digest 使用有域标签的文件名/内容长度前缀编码，不依赖可歧义拼接。内容中不加入时间、随机数、UUID、绝对路径或机器信息。
+
+### dry-run
+
+`--dry-run` 输出将生成的相对文件列表、结构/内容摘要、每个文件的 SHA-256 和组合 digest，但不创建 output directory、临时目录或文件：
+
+```powershell
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario new `
+    --scenario-id abandoned_station_v1 `
+    --title "废弃车站" `
+    --premise "玩家在封闭车站中寻找离开的条件" `
+    --output-dir .\scenario-drafts `
+    --dry-run --json
+```
+
+### 不覆盖与目录级原子发布
+
+scenario ID 先通过 ASCII 安全 ID、路径穿越、绝对路径/驱动器/UNC、ADS 冒号、控制字符、结尾点号/空格、长度和 Windows 保留设备名（含扩展名）检查。解析后的最终目录和 staging 目录必须是 output directory 的直接子项；output directory 的任何已有路径组件为 symlink/junction/reparse point、已有 scenario 目录（包括空目录）、任一已有目标文件或已有 staging 目录都会使整个命令拒绝。`config/scenarios` 及其任何内部路径在 dry-run 和实际写入中都被代码拒绝，正式提升只能人工复制并审查。
+
+两个文件先在内存中构造并通过正式 `ScenarioCatalog` 与 analyzer；随后写入 output directory 同卷、以 scenario ID 摘要命名且排他创建的本次专属 staging 目录，再从 staging `scenario.json` 通过正式 `JsonScenarioCatalogLoader`、catalog 与 analyzer，并核对精确字节、每文件 SHA-256 和组合 digest。全部成功后，Windows 上使用 `os.rename` 一次发布整个目录；Windows 的该调用在目标已存在时失败，因此检查后的并发目标创建也不会被覆盖，两个并发 `new` 最多一个成功。实现不使用 `os.replace`、`Path.replace` 或合并逻辑。
+
+Python 标准库在 POSIX 上的目录 `rename` 可以替换已有空目录，且没有可移植的原子 no-replace 选项。本阶段因此只在 Windows 启用实际目录发布；其他平台返回稳定的 platform-unsupported 错误并保留目标，而不是虚假宣称跨平台原子 no-replace。Windows 最终目录只会以包含两个完整文件的形态出现，不宣称两个独立文件具有跨文件系统事务原子性。
+
+第二个文件写入、验证或发布失败时不会留下本工具创建的 final directory。清理只触及记录了创建身份且身份仍匹配的本次 staging 目录、两个固定文件名，以及身份仍匹配且仍为空的本次新建父目录；不使用 glob、递归删除或父目录树清扫。已有 staging 被视为来历不明并保持不动。若进程崩溃，staging 可能残留，下一次运行会拒绝并要求人工检查，而不会自动认领或删除。
+
+这些检查针对误操作、正常并发和可观测的 staging 身份替换。仅靠 Python 路径 API 无法消除同权限恶意本地进程在身份检查与后续 open/rename/rmdir 之间的所有 TOCTOU；本工具不声称抵御能持续篡改同一目录的本地攻击者，也不为此引入原生扩展、后台锁服务或第三方依赖。
+
+### 后续 validate / analyze / preview
+
+```powershell
+$scenario = ".\scenario-drafts\abandoned_station_v1\scenario.json"
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario validate $scenario
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario analyze $scenario
+.\.venv\Scripts\python.exe -m deviation_protocol.tools.scenario preview $scenario `
+    --content-pack .\config\demo_content_pack.json `
+    --character-id character.player.default
+```
+
+preview 的 content pack 必须使用同一正式 content version。Workbench 不会生成剧情、NPC、装备、技能或 Python 测试代码，也不会修改 `config/scenarios`、正式 scenario 索引、ContentCatalog、Git 或输入 content pack。作者必须人工完成剧情、规则、隐藏信息与内容审查，重新运行 validate/analyze/preview 和项目测试，然后才可以手动把完成内容复制到正式目录并显式维护对应索引与测试；脚手架不会自动提升草案。
 
 ## validate
 
@@ -72,4 +137,4 @@ preview 使用固定的本地 synthetic session/player 标识，并在报告中�
 
 ## 不包含的能力
 
-第一阶段不包含 `scenario new`、内容生成器、自动修复、文件改写、GUI、HTML 报告、后台服务、数据库读取、模型质量评价、Provider/DeepSeek 调用、战斗、异常、完整路径穷举、随机模拟或 Token 计费请求。
+Workbench 不包含文学内容生成器、自动修复、正式文件改写、覆盖/强制发布、GUI、HTML 报告、后台服务、数据库读取、模型质量评价、Provider/DeepSeek 调用、战斗、异常、完整路径穷举、随机模拟或 Token 计费请求。
