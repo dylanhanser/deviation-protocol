@@ -11,8 +11,11 @@ from deviation_protocol.application.effect_executor import (
     DeterministicEffectExecutor,
     EffectSourceType,
 )
+from deviation_protocol.application.errors import IdempotencyConflictError
 from deviation_protocol.application.resolution import ResolutionResult, ResolutionStatus
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
+from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
+from deviation_protocol.application.turn_response import TurnResponse
 
 __all__ = [
     "ActionGateway",
@@ -22,9 +25,12 @@ __all__ = [
     "DeterministicRuleResolver",
     "EffectSourceType",
     "GatewayResult",
+    "IdempotencyConflictError",
+    "FirstPhaseTurnOrchestrator",
     "ResolutionResult",
     "ResolutionStatus",
     "SkillLearningAuthorization",
     "SkillLearningAuthorizationSource",
     "TrustedResolutionContext",
+    "TurnResponse",
 ]

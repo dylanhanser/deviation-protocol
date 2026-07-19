@@ -3,12 +3,16 @@ from __future__ import annotations
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
-from sqlalchemy import select, update
-from sqlalchemy.dialects.mysql import insert as mysql_insert
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from deviation_protocol.application.action_gateway import ActionRoute
-from deviation_protocol.application.ports import GameSessionRepository, TurnRequestRepository
+from deviation_protocol.application.ports import (
+    GameSessionRepository,
+    PersistedSnapshot,
+    PersistedTurnRequest,
+    TurnRequestRepository,
+)
 from deviation_protocol.domain.actions import ActionSubmission
 from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.models import GameSession
@@ -25,6 +29,7 @@ from deviation_protocol.infrastructure.orm_models import (
 class SqlAlchemyGameSessionRepository(GameSessionRepository):
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
+        self._pending_session_versions: list[tuple[GameSession, int]] = []
 
     async def lock_for_turn(self, session_id: str) -> bool:
         result = await self._session.execute(
@@ -48,6 +53,23 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
             state_version=row.state_version,
             random_seed=row.random_seed,
         )
+
+    async def get_latest_snapshot(self, session_id: str) -> PersistedSnapshot | None:
+        row = await self._session.get(GameSnapshotRow, session_id)
+        if row is None:
+            return None
+        return PersistedSnapshot(
+            state_version=row.state_version,
+            state=dict(row.state_json),
+        )
+
+    async def next_event_sequence_no(self, session_id: str) -> int:
+        latest = await self._session.scalar(
+            select(func.max(DomainEventRow.sequence_no)).where(
+                DomainEventRow.session_id == session_id
+            )
+        )
+        return int(latest or 0) + 1
 
     async def save_snapshot_and_events(
         self,
@@ -75,19 +97,36 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
                 f"session {session.session_id!r} state_version changed concurrently"
             )
 
-        snapshot = mysql_insert(GameSnapshotRow).values(
-            session_id=session.session_id,
-            state_version=next_version,
-            state_json=dict(state),
-            updated_at=utc_now(),
-        )
-        await self._session.execute(
-            snapshot.on_duplicate_key_update(
+        snapshot_result = await self._session.execute(
+            update(GameSnapshotRow)
+            .where(
+                GameSnapshotRow.session_id == session.session_id,
+                GameSnapshotRow.state_version == expected_state_version,
+            )
+            .values(
                 state_version=next_version,
                 state_json=dict(state),
                 updated_at=utc_now(),
             )
         )
+        if snapshot_result.rowcount != 1:
+            persisted_snapshot_version = await self._session.scalar(
+                select(GameSnapshotRow.state_version).where(
+                    GameSnapshotRow.session_id == session.session_id
+                )
+            )
+            if persisted_snapshot_version is not None:
+                raise OptimisticLockError(
+                    f"session {session.session_id!r} snapshot version changed concurrently"
+                )
+            self._session.add(
+                GameSnapshotRow(
+                    session_id=session.session_id,
+                    state_version=next_version,
+                    state_json=dict(state),
+                    updated_at=utc_now(),
+                )
+            )
         self._session.add_all(
             [
                 DomainEventRow(
@@ -96,13 +135,22 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
                     turn_id=event.turn_id,
                     sequence_no=event.sequence_no,
                     event_type=event.event_type,
-                    payload_json=event.payload,
+                    payload_json=dict(event.payload),
                     occurred_at=event.occurred_at,
                 )
                 for event in events
             ]
         )
+        self._pending_session_versions.append((session, session.state_version))
         session.state_version = next_version
+
+    def confirm_pending_versions(self) -> None:
+        self._pending_session_versions.clear()
+
+    def restore_pending_versions(self) -> None:
+        for session, previous_version in reversed(self._pending_session_versions):
+            session.state_version = previous_version
+        self._pending_session_versions.clear()
 
 
 class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
@@ -111,7 +159,7 @@ class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
 
     async def get_by_client_request_id(
         self, session_id: str, client_request_id: str
-    ) -> Mapping[str, Any] | None:
+    ) -> PersistedTurnRequest | None:
         row = await self._session.scalar(
             select(TurnRequestRow).where(
                 TurnRequestRow.session_id == session_id,
@@ -120,20 +168,20 @@ class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
         )
         if row is None:
             return None
-        if row.response_json is not None:
-            return row.response_json
-        return {
-            "route": row.route,
-            "action_signature": row.action_signature,
-            "error": row.error_text,
-        }
+        return PersistedTurnRequest(
+            turn_id=row.turn_id,
+            action_signature=row.action_signature,
+            response=(
+                dict(row.response_json) if row.response_json is not None else None
+            ),
+        )
 
     async def add(
         self,
         submission: ActionSubmission,
         action_signature: str,
         route: ActionRoute,
-        response: Mapping[str, Any] | None = None,
+        response: Mapping[str, Any],
     ) -> None:
         self._session.add(
             TurnRequestRow(
@@ -144,7 +192,7 @@ class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
                 action_signature=action_signature,
                 route=route.value,
                 request_json=submission.model_dump(mode="json"),
-                response_json=dict(response) if response is not None else None,
+                response_json=dict(response),
                 error_text=None,
             )
         )

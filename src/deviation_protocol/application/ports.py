@@ -8,6 +8,7 @@ from typing import Any, Mapping, Protocol, Sequence
 from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.resolution import ResolutionResult
+from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent
@@ -20,6 +21,19 @@ class RuleResolution:
     accepted: bool
     events: tuple[DomainEvent, ...] = ()
     reason: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PersistedSnapshot:
+    state_version: int
+    state: Mapping[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class PersistedTurnRequest:
+    turn_id: str
+    action_signature: str
+    response: Mapping[str, Any] | None
 
 
 class RuleResolver(Protocol):
@@ -58,6 +72,14 @@ class GameSessionRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def get_latest_snapshot(self, session_id: str) -> PersistedSnapshot | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def next_event_sequence_no(self, session_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
     async def save_snapshot_and_events(
         self,
         session: GameSession,
@@ -72,7 +94,7 @@ class TurnRequestRepository(ABC):
     @abstractmethod
     async def get_by_client_request_id(
         self, session_id: str, client_request_id: str
-    ) -> Mapping[str, Any] | None:
+    ) -> PersistedTurnRequest | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -81,7 +103,7 @@ class TurnRequestRepository(ABC):
         submission: ActionSubmission,
         action_signature: str,
         route: ActionRoute,
-        response: Mapping[str, Any] | None = None,
+        response: Mapping[str, Any],
     ) -> None:
         raise NotImplementedError
 
@@ -117,6 +139,6 @@ class UnitOfWorkFactory(Protocol):
 
 
 class TurnOrchestrator(Protocol):
-    """Stable boundary for the full turn pipeline implemented in a later phase."""
+    """Stable boundary for deterministic, transactional turn processing."""
 
-    async def handle(self, submission: ActionSubmission) -> Mapping[str, Any]: ...
+    async def handle(self, submission: ActionSubmission) -> TurnResponse: ...

@@ -5,12 +5,17 @@ from collections.abc import AsyncIterator
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import delete
+from sqlalchemy import delete, func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
-from deviation_protocol.infrastructure.orm_models import GameSessionRow
+from deviation_protocol.infrastructure.orm_models import (
+    DomainEventRow,
+    GameSessionRow,
+    GameSnapshotRow,
+    TurnRequestRow,
+)
 
 
 def validated_test_database_url() -> str:
@@ -66,3 +71,19 @@ async def mysql_session_id(
             await session.execute(
                 delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
             )
+        async with mysql_session_factory() as session:
+            residual_counts = []
+            for row_type in (
+                GameSessionRow,
+                GameSnapshotRow,
+                DomainEventRow,
+                TurnRequestRow,
+            ):
+                residual_counts.append(
+                    await session.scalar(
+                        select(func.count())
+                        .select_from(row_type)
+                        .where(row_type.session_id == session_id)
+                    )
+                )
+        assert residual_counts == [0, 0, 0, 0]

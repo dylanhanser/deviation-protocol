@@ -15,6 +15,25 @@ PlayerAction
   -> 候选 GameState + DomainEventDraft + NarrativeFact + PlayerFeedback
 ```
 
+Phase 1.3 在该纯结算链路外增加事务编排：
+
+```text
+ActionSubmission
+  -> UnitOfWork
+       -> SELECT game_session ... FOR UPDATE
+       -> 按 client_request_id 返回已存响应（命中时立即结束）
+       -> 加载 session + 最新 snapshot
+  -> 校验 snapshot state/schema/content version
+  -> ContentCatalog 完整验证并反序列化 GameState
+  -> AuthoritativeActionContextFactory.create_trusted（每次新建、默认空授权）
+  -> DeterministicRuleResolver
+  -> ResolutionResult
+  -> TurnResponse + 可选 snapshot/events/session version
+  -> 同一 UnitOfWork 单次 commit
+```
+
+`ContentCatalog` 是编排器的构造依赖；application 不读取 JSON 文件。会话和最新快照必须同时存在，且 `game_snapshots.state_version` 必须等于 `game_sessions.state_version`。快照结构版本固定走 `GameState` 支持的 schema，内容版本必须与注入 catalog 一致，玩家身份还必须与会话一致。任何缺失、损坏或版本错误都会停止事务，不允许用默认空状态覆盖。
+
 `AuthoritativeActionContextFactory` 校验传入视图确实来自同一 `GameState` 与 `ContentCatalog`，然后分别投影 `item_instance_id -> item_definition_id`、`item_instance_id -> equipment_definition_id`、`skill_definition_id -> level` 和 `npc_id -> npc_definition_id`。场景可见性仍由 application 层显式传入，因为当前 `GameState` 不建模场景；缺省可见/可交互集合为空，玩家文本不会自动把 target/tool 加入权威集合。静态 definition ID 不能冒充物品、环境工具或 NPC 的 runtime ID。每次状态改变后必须重新构造视图和上下文。普通 `ActionContext` 是不可变投影但不是结算授权；只有工厂签发且绑定当前 state/catalog 摘要的 `TrustedResolutionContext` 能进入 resolver。
 
 `ActionGateway` 是行动资格和路由边界。它拒绝陈旧回合、重复请求、错误字段组合、不可见目标、非本人持有的实例、未知技能引用、胡言乱语、越权叙述、NPC 控制、系统奖励命令和多主行动。`RuleResolver.resolve` 不接受调用方传入 route 或 `GatewayResult`，而是从密封上下文内部调用真实 gateway 后执行更具体的领域规则；因此手工构造 `RESOLVE_LOCAL` 或异常 route 不能进入结算。网关拒绝不会成为叙事或异常候选。
@@ -43,7 +62,21 @@ PlayerAction
 
 会话快照代表频繁变化的聚合状态，使用 MySQL JSON 保存；会话身份、阶段、回合号和 `state_version` 保留为关系列。领域事件提供审计与重建线索。Repository 在同一个 `AsyncSession` 中先执行带版本条件的会话更新，再写快照和事件，最终由 Unit of Work 统一提交。
 
-第一阶段的回合处理在查询幂等记录前以 `SELECT ... FOR UPDATE` 锁定对应会话行，使同一会话的回合串行化；`turn_requests(session_id, client_request_id)` 唯一约束继续作为最终数据库防线。这样并发重试会在首个事务提交后读取已保存响应，不会再次进入业务处理。
+第一阶段的回合处理在查询幂等记录前以 `SELECT ... FOR UPDATE` 锁定对应会话行，使同一会话的回合串行化；`turn_requests(session_id, client_request_id)` 唯一约束继续作为最终数据库防线。命中记录后必须同时校验已存 `turn_id`、`action_signature` 与响应中的会话/请求/签名绑定：同一动作才重放，不同动作或不同 turn 复用该键会抛出 `IdempotencyConflictError`。正常并发重试会在首个事务提交后读取已保存响应，不会再次进入业务处理；若唯一约束仍捕获到绕过锁检查的竞态，失败事务先完整回滚，再在新锁定事务中读取 winner，且不再次调用 resolver。
+
+Phase 1.3 的版本和持久化规则是：
+
+- `REJECTED_LOCAL` 保存严格响应；不写快照/事件，状态版本不变。
+- 无状态变化的 `RESOLVED_LOCAL` 是纯本地查询；只保存响应和查询结果，不调用叙事提供者，状态版本不变。
+- 有候选状态的 `RESOLVED_LOCAL` 再次完成 snapshot/catalog 验证后，以当前 `state_version` 做乐观锁更新，恰好增加一次版本；对应版本快照、全部事件与响应在同一事务提交。
+- `NARRATIVE_REQUIRED` 保存明确的 required/pending 响应；不预写永久状态或行动成功事件，状态版本不变。
+- 默认流程不接受 `ANOMALY_EVALUATION_REQUIRED`；`DeviationEvaluator` 尚未接入。
+
+事件封装属于可信应用层而非 resolver。编排器通过可注入 Clock/ID generator 增加 `event_id` 和 UTC `occurred_at`，在会话行锁内从当前最大值分配连续 `sequence_no`，保留 `DomainEventDraft` 的原顺序，并把冻结负载深复制成普通 MySQL JSON 值。现有事件表以 `(session_id, turn_id)` 关联 `turn_requests`；同一 turn response 的 `resulting_state_version` 提供等价的状态版本关联，因此 Phase 1.3 不需要迁移。失败、拒绝和查询不产生成功事件。
+
+`TurnResponse` 是唯一可持久化返回模型。它不暴露完整 `GameState`、`TrustedResolutionContext`、技能学习 capability、数据库异常或不可序列化对象。重复请求在锁内读取 `response_json` 后必须重新通过该模型验证，并与 turn request 的会话、请求和签名元数据交叉校验，返回值与首次结果等价。`action_signature` 不参与幂等键查找，但参与命中后的冲突判断；语义相同但 `client_request_id` 不同的请求仍是两个顺序处理的 turn request。
+
+会话乐观更新、带预期版本条件的 snapshot update/insert、event insert 和 turn response insert 共用同一个 `AsyncSession`。快照行已存在但版本与会话预期不符时明确抛出 `OptimisticLockError`，不能用较旧候选覆盖。Repository 不得 commit；编排器只调用一次 UoW commit。任一写入或 commit 失败由 UoW 完整 rollback，除已确认由相同幂等键 winner 产生的唯一约束竞态外，数据库异常不会被转换成成功响应。
 
 剧情事实的责任边界由 `StoryMutationValidator` 固化。FIXED 不可写，DEFERRED 首次绑定后不可写，MUTABLE 和 `dynamic.*` 都需要真实 `causal_event_id`。
 
@@ -55,7 +88,7 @@ PlayerAction
 
 原有 `domain.models.Player`、`NPC` 和 `Inventory` 保留原构造语义，仅作为 Phase 1 兼容 DTO，不参与 `GameState` 或 Phase 1.1 规则。权威运行时模型是 `PlayerState`、`NpcState` 和 `InventoryState`；原有 `GameSession` 持久化聚合与 `Scene` 保持不变。
 
-`AuthoritativeStateView` 为 `RuleResolver` 和行动上下文适配器提供脱离可变聚合的不可变投影。物品输入按 `item_instance_id` 检查，技能按 `skill_definition_id` 检查，NPC 按当前会话中的运行时 `npc_id` 检查；玩家叙述文本不是状态来源。状态改变后需要重新创建投影。Phase 1.2 已由 `AuthoritativeActionContextFactory` 自动完成投影和一致性校验；resolver 使用 `create_trusted` 的结果，普通 gateway-only 场景可使用 `create`。`FirstPhaseTurnOrchestrator` 尚未扩展为完整结算编排器，本阶段没有加入数据库快照/内容包加载和 draft event 封装流程。
+`AuthoritativeStateView` 为 `RuleResolver` 和行动上下文适配器提供脱离可变聚合的不可变投影。物品输入按 `item_instance_id` 检查，技能按 `skill_definition_id` 检查，NPC 按当前会话中的运行时 `npc_id` 检查；玩家叙述文本不是状态来源。状态改变后需要重新创建投影。Phase 1.2 已由 `AuthoritativeActionContextFactory` 自动完成投影和一致性校验；resolver 使用 `create_trusted` 的结果，普通 gateway-only 场景可使用 `create`。Phase 1.3 的 `FirstPhaseTurnOrchestrator` 已负责数据库快照加载、catalog 验证、可信上下文签发、draft event 封装、幂等响应与原子提交。当前没有可信的持久化场景/奖励/事实来源，因此它传入空可见 NPC 集合、空环境工具集合和空技能学习授权；未来扩展必须来自应用端口，不能来自玩家请求。
 
 装备槽位同时受装备定义和玩家角色定义约束。同一实例只保存一个 `equipped_slot`，槽位占用不另建第二份记录。零耐久装备不能新装备；已装备物品在耐久降到零时不会被隐式卸下，必须显式卸下后才能移除。
 
