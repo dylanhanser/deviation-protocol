@@ -18,6 +18,7 @@ from deviation_protocol.domain.json_values import (
     freeze_bounded_json_value,
     json_values_equal,
 )
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeRuleDefinition
 
 
 MAX_SCENARIOS_PER_CATALOG = 32
@@ -490,6 +491,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
     dynamic_fact_key_max_length: Annotated[int, Field(strict=True, ge=9, le=128)] = 96
     dynamic_fact_value_max_length: Annotated[int, Field(strict=True, ge=1, le=4000)] = 500
     narrative_length: NarrativeLengthDefinition
+    narrative_outcome_rules: tuple[NarrativeOutcomeRuleDefinition, ...] = ()
 
     @model_validator(mode="before")
     @classmethod
@@ -519,6 +521,9 @@ class ScenarioDefinition(ScenarioDefinitionModel):
         clocks = _unique_map(self.threat_clocks, "clock_id", "clock")
         windows = _unique_map(self.decision_windows, "decision_id", "decision")
         _unique_map(self.endings, "ending_id", "ending")
+        outcome_rules = _unique_map(
+            self.narrative_outcome_rules, "rule_id", "narrative outcome rule"
+        )
         _reject_duplicates(
             (item.npc_definition_id for item in self.npc_references), "scenario NPC reference"
         )
@@ -538,6 +543,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
             *clocks,
             *windows,
             *(item.ending_id for item in self.endings),
+            *outcome_rules,
             *(
                 transition.transition_id
                 for phase in self.phases
@@ -649,6 +655,71 @@ class ScenarioDefinition(ScenarioDefinitionModel):
         for ending in self.endings:
             self._validate_conditions(ending.conditions, phases, facts, groups, clocks, locations)
 
+        npc_definition_ids = {item.npc_definition_id for item in self.npc_references}
+        decision_phase_ids = {
+            decision_id: {
+                phase.phase_id
+                for phase in self.phases
+                if decision_id in phase.decision_window_ids
+            }
+            for decision_id in windows
+        }
+        mutex_priorities: set[tuple[str, int]] = set()
+        for rule in self.narrative_outcome_rules:
+            _require_all(rule.allowed_phase_ids, phases, f"outcome rule {rule.rule_id!r} phase")
+            _require_all(
+                rule.required_visible_npc_definition_ids,
+                npc_definition_ids,
+                f"outcome rule {rule.rule_id!r} NPC",
+            )
+            _require_all(rule.required_clue_ids, clues, f"outcome rule {rule.rule_id!r} clue")
+            _require_all(
+                rule.required_current_decision_ids,
+                windows,
+                f"outcome rule {rule.rule_id!r} decision",
+            )
+            for decision_id in rule.required_current_decision_ids:
+                if not set(rule.allowed_phase_ids) & decision_phase_ids[decision_id]:
+                    raise ContentDefinitionError(
+                        f"outcome rule {rule.rule_id!r} decision is unreachable"
+                    )
+            for requirement in rule.required_fact_values:
+                _require_all((requirement.fact_id,), facts, f"outcome rule {rule.rule_id!r} fact")
+            for effect in rule.effects:
+                _require_all(
+                    effect.discovered_clue_ids,
+                    clues,
+                    f"outcome rule {rule.rule_id!r} effect clue",
+                )
+                for fact_update in effect.deferred_bindings:
+                    fact = facts.get(fact_update.fact_id)
+                    if fact is None or fact.kind is not FactKind.DEFERRED:
+                        raise ContentDefinitionError("narrative deferred effect references invalid fact")
+                    if not any(
+                        json_values_equal(fact_update.value, candidate)
+                        for candidate in fact.deferred_candidates
+                    ):
+                        raise ContentDefinitionError("narrative deferred effect uses invalid value")
+                for fact_update in effect.mutable_fact_updates:
+                    fact = facts.get(fact_update.fact_id)
+                    if fact is None or fact.kind is not FactKind.MUTABLE:
+                        raise ContentDefinitionError("narrative mutable effect references invalid fact")
+                    allowed = {canonical_json_key(item.to_value) for item in fact.mutable_transitions}
+                    if canonical_json_key(fact_update.value) not in allowed:
+                        raise ContentDefinitionError("narrative mutable effect uses invalid value")
+                for phase_id in rule.allowed_phase_ids:
+                    phase = phases[phase_id]
+                    if effect.action_type not in phase.allowed_action_types:
+                        raise ContentDefinitionError(
+                            f"outcome rule {rule.rule_id!r} uses disallowed action cost"
+                        )
+            key = (rule.mutex_group, rule.priority)
+            if key in mutex_priorities:
+                raise ContentDefinitionError(
+                    "narrative outcome mutex group has ambiguous equal priorities"
+                )
+            mutex_priorities.add(key)
+
         reachable = {self.initial_phase_id}
         changed = True
         while changed:
@@ -676,6 +747,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
             ("clock", len(self.threat_clocks), MAX_CLOCKS_PER_SCENARIO),
             ("decision", len(self.decision_windows), MAX_DECISIONS_PER_SCENARIO),
             ("ending", len(self.endings), MAX_ENDINGS_PER_SCENARIO),
+            ("narrative outcome rule", len(self.narrative_outcome_rules), 128),
         )
         for label, count, maximum in limits:
             if count > maximum:

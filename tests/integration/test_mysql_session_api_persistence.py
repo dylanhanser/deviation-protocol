@@ -21,6 +21,7 @@ from deviation_protocol.infrastructure.orm_models import (
     GameSessionRow,
     GameSnapshotRow,
     TurnRequestRow,
+    NarrativeJobRow,
 )
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -207,6 +208,7 @@ async def test_real_mysql_scenario_create_and_concurrent_decision_are_one_transa
             GameSnapshotRow,
             DomainEventRow,
             TurnRequestRow,
+            NarrativeJobRow,
         ):
             residual.append(
                 await database.scalar(
@@ -215,4 +217,4 @@ async def test_real_mysql_scenario_create_and_concurrent_decision_are_one_transa
                     .where(row_type.session_id == session_id)
                 )
             )
-    assert residual == [0, 0, 0, 0]
+    assert residual == [0, 0, 0, 0, 0]

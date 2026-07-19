@@ -82,6 +82,9 @@ class PromptBuilder(NarrativeBoundaryModel):
             ),
             "public_story_summary": request.public_story_summary,
             "safe_narrative_frame": request.frame.model_dump(mode="json"),
+            "allowed_outcome_candidates": [
+                item.model_dump(mode="json") for item in request.outcome_candidates
+            ],
         }
         input_data = {
             "server_public_context": safe_context,
@@ -159,11 +162,10 @@ def _system_prompt(profile: NarrativeStyleProfile) -> str:
   "narrative_text":"简体中文原创正文",
   "referenced_entity_ids":["仅限输入中公开的实体或已发现线索 ID"],
   "npc_utterances":[{{"speaker_entity_id":"当前可见运行时 NPC ID","text":"台词"}}],
-  "untrusted_outcome_proposals":[
-    {{"proposal_type":"ACTION_ATTEMPT_NOTED","summary":"非权威候选"}},
-    {{"proposal_type":"PERCEPTIBLE_CHANGE","summary":"非权威候选","referenced_entity_ids":[]}},
-    {{"proposal_type":"NPC_REACTION","npc_entity_id":"当前可见运行时 NPC ID","summary":"非权威候选"}}
-  ],
-  "continuity_notes":["有界、非权威的连续性备注"]
+  "selected_outcome":{{"outcome_token":"choose one allowed opaque token verbatim","result":"SUCCESS|AMBIGUOUS|FAILURE|NO_EFFECT","referenced_entity_ids":[]}},
+  "continuity_notes":["bounded non-authoritative continuity note"]
 }}
-候选结果永远不表示事实已经发生。只输出 JSON。"""
+The selected outcome is only a proposal. Never output a rule ID, fact/clue ID,
+event payload, clock/beat delta, state update, or any additional field. Return JSON only.
+Do not output any legacy outcome proposal object.
+"""

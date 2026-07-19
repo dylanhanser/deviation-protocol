@@ -8,8 +8,6 @@ from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
     NarrativePublicReferences,
     NarrativeRequest,
-    NpcReactionProposal,
-    PerceptibleOutcomeProposal,
     UntrustedNarrativeProposal,
     ValidatedNarrativeProposal,
 )
@@ -127,22 +125,28 @@ class NarrativeProposalValidator:
             ):
                 raise NarrativeProposalRejectedError()
 
-        for outcome in proposal.untrusted_outcome_proposals:
-            if isinstance(outcome, NpcReactionProposal):
-                if (
-                    outcome.npc_entity_id not in visible_npcs
-                    or outcome.npc_entity_id not in referenced
-                ):
-                    raise NarrativeProposalRejectedError()
-            elif isinstance(outcome, PerceptibleOutcomeProposal):
-                outcome_ids = set(outcome.referenced_entity_ids)
-                if not outcome_ids <= allowed or not outcome_ids <= referenced:
-                    raise NarrativeProposalRejectedError()
+        selected = proposal.selected_outcome
+        if selected is not None:
+            candidate = next(
+                (
+                    item
+                    for item in request.outcome_candidates
+                    if item.outcome_token == selected.outcome_token
+                ),
+                None,
+            )
+            if (
+                candidate is None
+                or selected.result not in candidate.allowed_results
+                or not set(selected.referenced_entity_ids)
+                <= set(candidate.allowed_entity_ids)
+                or not set(selected.referenced_entity_ids) <= referenced
+            ):
+                raise NarrativeProposalRejectedError()
 
         strings = [
             proposal.narrative_text,
             *(item.text for item in proposal.npc_utterances),
-            *(item.summary for item in proposal.untrusted_outcome_proposals),
             *proposal.continuity_notes,
         ]
         forbidden = tuple(

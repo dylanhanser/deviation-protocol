@@ -51,7 +51,10 @@ class DeepSeekSettings(BaseModel):
         float, Field(strict=True, gt=0.0, le=120.0)
     ] = 30.0
     max_tokens: Annotated[int, Field(strict=True, ge=64, le=4_096)] = 1_200
-    max_retries: Annotated[int, Field(strict=True, ge=0, le=2)] = 2
+    # The conservative production default is one transport attempt.  An
+    # interrupted/read-timed-out request may already have reached the provider,
+    # so an automatic retry can duplicate provider work or billing.
+    max_retries: Annotated[int, Field(strict=True, ge=0, le=2)] = 0
     backoff_base_seconds: Annotated[
         float, Field(strict=True, ge=0.0, le=10.0)
     ] = 0.25
@@ -93,7 +96,7 @@ class DeepSeekSettings(BaseModel):
         try:
             timeout = float(source.get("DEEPSEEK_TIMEOUT_SECONDS", "30"))
             max_tokens = int(source.get("DEEPSEEK_MAX_TOKENS", "1200"))
-            max_retries = int(source.get("DEEPSEEK_MAX_RETRIES", "2"))
+            max_retries = int(source.get("DEEPSEEK_MAX_RETRIES", "0"))
         except (TypeError, ValueError) as exc:
             raise ValueError("DeepSeek numeric configuration is invalid") from None
         return cls(

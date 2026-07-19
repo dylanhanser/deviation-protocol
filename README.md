@@ -1,6 +1,16 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-当前实现到 Phase 2.2b-1：在 Phase 2.2a 的确定性事务边界之外，新增供应商无关 `NarrativeProvider` 端口、版本化 PromptBuilder、DeepSeek V4 适配器、严格的不可信候选模型与独立验证器。生产 `TurnOrchestrator` 和玩家 API 仍未接入模型；`NARRATIVE_REQUIRED` 继续返回 pending。
+当前实现到 Phase 2.2c：生产 action API 已接入耐久的 prepare / provider / finalize 三阶段协调器。外部 DeepSeek 调用发生在所有 UoW、`AsyncSession` 与 MySQL 行锁退出之后；模型只选择本回合 opaque outcome token，最终状态仍由服务器声明式规则、`NarrativeOutcomePolicy`、专用 issuer 与 `StoryDirector` 决定。
+
+## Phase 2.2c production narrative coordination
+
+`narrative_jobs` is created by the independent `20260719_0003` migration with InnoDB/utf8mb4, MySQL JSON, session/client-request uniqueness, cascading session deletion, and session/status plus status/lease indexes. Its normal lifecycle is `PREPARED -> IN_PROGRESS -> PROPOSAL_VALIDATED -> COMMITTED`; safe terminal states include `FAILED_RETRYABLE`, `FAILED_TERMINAL`, `STALE`, and `OUTCOME_UNKNOWN`. Jobs persist only the bounded player-safe request, request/state fingerprints, scenario version, provider/model names, lease metadata, a validated-but-unaccepted proposal subset, stable error codes, and—only for COMMITTED jobs—accepted text. The proposal subset includes candidate prose for crash recovery. It is internal, non-authoritative, and never a player response or recent-context source. Terminal jobs may retain it until their job/session row is deleted. Jobs never persist credentials, Authorization headers, the full system prompt, raw provider envelopes, or chain-of-thought.
+
+The transaction boundaries are strict: Phase A locks the session, checks idempotency and authoritative catalogs/state/gateway/rules, computes a safe frame/request, persists PREPARED, commits, and exits the UoW. Phase B claims the job in a short transaction and exits every database context before calling the provider; validation is persisted immediately in another short transaction. Phase C locks session then job, rechecks version/fingerprint/action/scenario/lease, recomputes outcome tokens, and invokes the policy/issuer/StoryDirector chain. Accepted narrative text, snapshot, events, turn response, COMMITTED job, and session version commit atomically. Rejection, stale/CAS failure, or database failure never exposes the internally retained candidate prose.
+
+The model sees opaque per-turn outcome tokens and safe descriptions, never internal rule IDs or effect templates. `NarrativeOutcomePolicy` recomputes eligibility against locked authority; `NarrativeEventIssuer` can emit `VALIDATED_NARRATIVE_OUTCOME` only from server-defined templates. The opening content has only three minimal data-driven permissions: purposeful life signalling (success/ambiguous/failure), quiet observation (no NPC life confirmation), and constrained custom no-effect. Player text ordering a nurse to acknowledge life cannot select success. Prose consistency is a conservative structural and data-defined term check, not a general semantic verifier; prose and dialogue never establish facts, and only the sealed server event is authoritative.
+
+An active duplicate returns HTTP 202 without another provider call; another same-session mutation returns stable 409 while local read-only queries remain available. An expired PROPOSAL_VALIDATED job receives a new finalize-only fenced lease and resumes without invoking the provider. An expired IN_PROGRESS job becomes `OUTCOME_UNKNOWN`: the database cannot distinguish a crash before send from a sent request whose result or charge was lost, so it is never automatically resent. Job-level provider invocation is capped at one. DeepSeek defaults to zero transport retries (one HTTP attempt); an operator may explicitly opt into at most two retries (three attempts total), which can duplicate provider work or billing after an ambiguous timeout or disconnect. Exactly-once provider billing is not guaranteed by this system. A future worker may reuse the job ports, but Phase 2.2c contains no worker, queue, or distributed task system. `DeviationEvaluator`, anomaly effects, combat, and the frontend remain unimplemented.
 
 ## 结构
 
@@ -120,7 +130,7 @@ Phase 1.3 已将确定性组件接入真实事务编排：`FirstPhaseTurnOrchest
 - Repository 以 `WHERE state_version = expected` 更新会话，并以同一预期版本条件更新已有快照；任一 `rowcount=0` 或已存快照版本不匹配都抛出 `OptimisticLockError`，不会覆盖较新快照。更新、快照、事件和 turn response 共享同一个 `AsyncSession`，由 Unit of Work 只提交一次；Repository 自身不提交。
 - 事件元数据由编排器使用可注入 Clock 和 ID generator 生成。编排器在会话行锁保护下读取当前最大 `sequence_no`，保证同会话连续、稳定并保留 draft 顺序；事件沿用 `(session_id, turn_id)` 与 turn request/response 关联，响应中的 `resulting_state_version` 是该 turn 的状态版本关联。
 - 异常候选路由和独立 `AnomalyEvaluator` 端口已经预留，但第一阶段不做主观异常判断。
-- `RuleResolver` 不写数据库、不提交 Unit of Work、不处理 `client_request_id` 幂等，也不负责最终文学输出。`NarrativeProvider` 和 `DeviationEvaluator` 均尚未接入；默认流程拒绝 `ANOMALY_EVALUATION_REQUIRED`。
+- `RuleResolver` 不写数据库、不提交 Unit of Work、不处理 `client_request_id` 幂等，也不负责最终文学输出。现行 Phase 2.2c 由编排器在 resolver 之后接入 `NarrativeProvider`；`DeviationEvaluator` 仍未接入，默认流程拒绝 `ANOMALY_EVALUATION_REQUIRED`。
 
 更多责任边界见 [`docs/architecture.md`](docs/architecture.md)。
 
@@ -154,7 +164,7 @@ $env:DATABASE_URL = "mysql+asyncmy://game_user:secret@127.0.0.1:3306/deviation_p
 
 会话元数据接口只返回 phase、版本、时间戳和安全角色概要，不返回快照。`/state` 使用独立的 `PlayerVisibleStateProjection` 新建玩家公开属性、资源、钱包、库存、装备和技能数据；它不会调用 `GameState.model_dump()` 作为响应。当前尚无可信场景可见性来源，因此 `visible_npcs` 默认为空，而不是暴露快照中的全部 NPC；任务状态目前也是安全空占位。
 
-行动请求正文不含 `session_id` 或 `player_id`，并拒绝未知字段、可信上下文、gateway decision、授权、catalog 与 narrative facts。endpoint 在 ownership 检查后调用现有 `FirstPhaseTurnOrchestrator`。公共响应不会暴露持久化使用的 `action_signature` 或尚未支持的异常评估状态。本地查询、拒绝和状态变更保持结构化结果；`NARRATIVE_REQUIRED` 明确返回 required/pending 标志。本阶段仍未接入 `NarrativeProvider`、大模型、正式剧情、战斗、`DeviationEvaluator` 或前端，也不会伪造叙事文本。
+行动请求正文不含 `session_id` 或 `player_id`，并拒绝 outcome token、job/lease、Provider、proposal、可信事件和其他未知字段。endpoint 在 ownership 检查后调用 `DurableNarrativeTurnOrchestrator`。公共响应不暴露 `action_signature`、内部 token 绑定、job/lease、raw proposal、prompt 或 Provider 配置；pending 返回 202，成功或幂等重放返回 200。本地 query/reject/mechanical/确定性 CHOOSE 与终局不调用 Provider。当前仍没有战斗、`DeviationEvaluator`、异常效果或前端。
 
 API 错误统一为：
 
@@ -179,7 +189,7 @@ Phase 2.1 新增与具体题材无关的 `ScenarioDefinition`、`ScenarioRuntime
 
 决策窗口由独立策略控制。开局可声明一次立即生存决策，前期以较大的 beat 间隔保持低频，调查阶段只在声明的关键窗口停下，核心冲突可进入 rapid 模式缩短间隔。普通移动、开门、读取必要信息或本地查询不会自行制造决策；本地查询也不推进 beat 或时钟。每帧的数据结构最多容纳一个决策，阶段最大自动 beat 和严格失败路径共同防止无限自动推进或永不决策。
 
-首个正式结构化内容包位于 `config/scenarios/death_certificate_v1.json`，规格见 `docs/scenarios/death_certificate_v1.md`。仓库只包含原创的结构化设计，没有参考小说原文或改写文本。Phase 2.1 的领域能力现已由下述 Phase 2.2a 事务接线投入生产路径；真实 `NarrativeProvider` 仍未接入。
+首个正式结构化内容包位于 `config/scenarios/death_certificate_v1.json`，规格见 `docs/scenarios/death_certificate_v1.md`。仓库只包含原创的结构化设计，没有参考小说原文或改写文本。Phase 2.2c 只为现有开局增加三类最小声明式 outcome 规则，没有扩写完整后续剧情。
 
 ## Phase 2.2a 场景事务接线
 
@@ -205,13 +215,13 @@ principal + creation key + character_definition_id + scenario_id
 - 当前声明式决策：`CHOOSE` 必须同时提交当前 Frame 公开的 `decision_id` 与其中一个 choice ID，且不能混入文本、target、tool 或其他结构化结算字段。公开 `decision_id` 是绑定 session、state version、scenario 内容版本与内部决策定义的确定性 token，不是可跨会话复用的 catalog ID。服务器策略验证 choice 后签发密封的 `player.decision.selected`，Director 才能记录该选择并执行内容包明确定义的决策转场/时间成本；选择本身不会声称 NPC 承认、线索发现或行动成功。
 - 终局：普通叙事推进返回 `SCENARIO_ENDED`，安全结算 Frame 仍可读取。
 
-可信剧情桥梁由应用层 `ScenarioDecisionResponsePolicy` 与不可重建的 `TrustedScenarioEventIssuer` capability 组成。capability 绑定 session、turn、request、action signature、state version、完整状态指纹、scenario 内容版本和当前决策；issuer 会以锁内权威状态再次交叉校验。来源与事件类型使用封闭白名单，密封事件还绑定 source 与内部 decision ID；当前只有“服务器验证过的活动决策响应”拥有非空白名单。玩家 JSON、`PlayerAction`、普通 `VerifiedScenarioEvent`、未来模型输出或密封后修改的副本都不能通过真实性检查。RuleResolver 机械映射和 Phase 2.2b 的 NarrativeResult 验证入口已保留为无权限来源，本阶段不会签发任何结果事件。特别地，玩家输入“护士承认我活着”只会保持 pending，绝不会完成真实 NPC 承认目标。
+可信剧情桥梁包含既有的决策响应 policy/issuer，以及 Phase 2.2c 独立的 `NarrativeOutcomePolicy`/`NarrativeEventIssuer`。两条 capability 都不可由玩家或 Provider 构造，并绑定 session、turn、request、action signature、state version、完整状态指纹和 scenario 内容版本；叙事 capability 还绑定 job、lease、内部 outcome rule 与 proposal digest。玩家 JSON、`PlayerAction`、普通 `VerifiedScenarioEvent`、模型自由文本或密封后修改的副本都不能通过真实性检查。特别地，玩家输入“护士承认我活着”只能匹配服务器声明的安全无效果规则，绝不会自行取得 NPC 承认权限。
 
 成功决策在同一个深度隔离候选上形成剧情状态与稳定 `DomainEventDraft`，候选快照、连续事件、session 版本和幂等响应共用一个 `AsyncSession` 并只 commit 一次；任一步失败全部 rollback，一次成功回合 `state_version` 只增加一次。旧的 v1/v2 无 `scenario_runtime` 快照仍走兼容读取路径，不会补造场景副本。
 
 公共行动响应不含 `action_signature`、快照、完整 `GameState`、Scenario 定义、隐藏事实、未来结局、密封信息或异常评估状态。`NarrativeFrame` 继续由 Director 从玩家已知事实、当前位置与真实 NPC 的安全交集构建；`/state` 的 `visible_npcs` 也使用同一类权威交集，而不是暴露全部 NPC。
 
-Phase 2.2b 的 `NarrativeProvider` 只能提出候选叙事结果；Phase 2.2b-1 的独立验证也不会签发密封能力，Provider 永远不能直接修改 `GameState`、事实、线索、时钟或决策。生产路径当前仍无模型 API 调用，也没有 `DeviationEvaluator`、异常评估、场景崩坏、战斗系统或长篇文学正文生成；新增适配器只由离线测试和显式 opt-in smoke 使用。
+Phase 2.2c 的 `NarrativeProvider` 仍只能提出候选叙事结果；只有锁内重新计算 token 集合并通过 policy 后，专用 issuer 才能从服务器模板签发可信事件。Provider 永远不能直接修改 `GameState`、事实、线索、时钟或决策。生产路径已可调用注入的模型，但仍没有 `DeviationEvaluator`、异常效果、场景崩坏、战斗系统或前端；默认测试只使用 Fake Provider，真实调用仍由显式 live 开关控制。
 
 ## Phase 2.2b-1 NarrativeProvider 与 DeepSeek V4
 
@@ -233,4 +243,4 @@ $env:RUN_LIVE_DEEPSEEK_TEST = "1"
 .\.venv\Scripts\python.exe -m pytest tests\live\test_deepseek_live.py -m live -s
 ```
 
-live 测试不连接 MySQL、不输出 key/请求头/完整 prompt/原始响应，且将传输重试固定为 0。模型返回的 JSON 始终先成为 `UntrustedNarrativeProposal`；`ValidatedNarrativeProposal` 只说明结构、引用、长度和权限范围通过检查，不能创建 `VerifiedScenarioEvent`、取得 `TrustedScenarioEventIssuer` 或修改任何状态。Phase 2.2c 才会设计不持 MySQL 锁调用外部模型的两阶段生产编排。
+live 测试不连接 MySQL、不输出 key/请求头/完整 prompt/原始响应，且将传输重试固定为 0。模型返回的 JSON 始终先成为 `UntrustedNarrativeProposal`；`ValidatedNarrativeProposal` 只说明结构、引用、长度和公开范围通过检查。生产中的权威结果必须继续通过 Phase 2.2c 的锁内重算、policy、issuer 与 StoryDirector 信任链。

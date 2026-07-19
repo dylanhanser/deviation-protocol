@@ -15,6 +15,7 @@ class ResolutionStatus(StrEnum):
     RESOLVED_LOCAL = "RESOLVED_LOCAL"
     REJECTED_LOCAL = "REJECTED_LOCAL"
     NARRATIVE_REQUIRED = "NARRATIVE_REQUIRED"
+    NARRATIVE_COMMITTED = "NARRATIVE_COMMITTED"
     ANOMALY_EVALUATION_REQUIRED = "ANOMALY_EVALUATION_REQUIRED"
 
 
@@ -51,6 +52,8 @@ class ResolutionResult:
             raise ValueError("result_code must be a stable uppercase identifier")
         object.__setattr__(self, "events", tuple(self.events))
         object.__setattr__(self, "facts", tuple(self.facts))
+        if self.status is ResolutionStatus.NARRATIVE_COMMITTED:
+            raise ValueError("NARRATIVE_COMMITTED is a response-only status")
         if self.state_changed != (self.updated_state is not None):
             raise ValueError("state_changed must match the presence of updated_state")
         if self.success != (self.status is ResolutionStatus.RESOLVED_LOCAL):

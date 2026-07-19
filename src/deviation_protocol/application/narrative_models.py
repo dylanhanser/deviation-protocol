@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 
 
 PROMPT_SCHEMA_VERSION = "narrative-prompt-v1"
@@ -119,6 +120,9 @@ class NarrativeRequest(NarrativeBoundaryModel):
     ] = ""
     language: Literal["zh-CN"] = "zh-CN"
     style_profile_id: StableNarrativeId
+    outcome_candidates: Annotated[
+        tuple["NarrativeOutcomeCandidate", ...], Field(max_length=16)
+    ] = ()
     prompt_schema_version: Literal["narrative-prompt-v1"] = PROMPT_SCHEMA_VERSION
 
     @field_validator("frame", mode="before")
@@ -156,6 +160,9 @@ class NarrativeRequest(NarrativeBoundaryModel):
             "player_visible_character_tags",
             tuple(sorted(self.player_visible_character_tags)),
         )
+        tokens = tuple(item.outcome_token for item in self.outcome_candidates)
+        if len(tokens) != len(set(tokens)):
+            raise ValueError("narrative request repeats an outcome token")
         public_context = (
             *self.recent_narrative_fragments,
             self.public_story_summary,
@@ -201,29 +208,43 @@ class NpcUtterance(NarrativeBoundaryModel):
     text: Annotated[str, Field(strict=True, min_length=1, max_length=500)]
 
 
-class PerceptibleOutcomeProposal(NarrativeBoundaryModel):
-    proposal_type: Literal["PERCEPTIBLE_CHANGE"]
-    summary: Annotated[str, Field(strict=True, min_length=1, max_length=400)]
-    referenced_entity_ids: Annotated[
-        tuple[StableNarrativeId, ...], Field(max_length=16)
+class NarrativeOutcomeCandidate(NarrativeBoundaryModel):
+    """Opaque, turn-bound choice exposed without its internal outcome rule ID."""
+
+    outcome_token: Annotated[
+        str, Field(strict=True, pattern=r"^outcome\.[0-9a-f]{48}$")
+    ]
+    safe_description: Annotated[str, Field(strict=True, min_length=1, max_length=300)]
+    allowed_results: Annotated[
+        tuple[NarrativeOutcomeResult, ...], Field(min_length=1, max_length=4)
+    ]
+    allowed_entity_ids: Annotated[
+        tuple[StableNarrativeId, ...], Field(max_length=32)
     ] = ()
 
-
-class NpcReactionProposal(NarrativeBoundaryModel):
-    proposal_type: Literal["NPC_REACTION"]
-    npc_entity_id: StableNarrativeId
-    summary: Annotated[str, Field(strict=True, min_length=1, max_length=400)]
-
-
-class ActionAttemptProposal(NarrativeBoundaryModel):
-    proposal_type: Literal["ACTION_ATTEMPT_NOTED"]
-    summary: Annotated[str, Field(strict=True, min_length=1, max_length=400)]
+    @model_validator(mode="after")
+    def validate_candidate(self) -> NarrativeOutcomeCandidate:
+        if len(self.allowed_results) != len(set(self.allowed_results)):
+            raise ValueError("outcome candidate repeats a result")
+        if len(self.allowed_entity_ids) != len(set(self.allowed_entity_ids)):
+            raise ValueError("outcome candidate repeats an entity")
+        return self
 
 
-UntrustedOutcomeProposal: TypeAlias = Annotated[
-    PerceptibleOutcomeProposal | NpcReactionProposal | ActionAttemptProposal,
-    Field(discriminator="proposal_type"),
-]
+class SelectedNarrativeOutcome(NarrativeBoundaryModel):
+    outcome_token: Annotated[
+        str, Field(strict=True, pattern=r"^outcome\.[0-9a-f]{48}$")
+    ]
+    result: NarrativeOutcomeResult
+    referenced_entity_ids: Annotated[
+        tuple[StableNarrativeId, ...], Field(max_length=32)
+    ] = ()
+
+    @model_validator(mode="after")
+    def validate_references(self) -> SelectedNarrativeOutcome:
+        if len(self.referenced_entity_ids) != len(set(self.referenced_entity_ids)):
+            raise ValueError("selected outcome repeats an entity reference")
+        return self
 
 
 class NarrativeProposalPayload(NarrativeBoundaryModel):
@@ -235,9 +256,7 @@ class NarrativeProposalPayload(NarrativeBoundaryModel):
         tuple[StableNarrativeId, ...], Field(max_length=128)
     ] = ()
     npc_utterances: Annotated[tuple[NpcUtterance, ...], Field(max_length=16)] = ()
-    untrusted_outcome_proposals: Annotated[
-        tuple[UntrustedOutcomeProposal, ...], Field(max_length=16)
-    ] = ()
+    selected_outcome: SelectedNarrativeOutcome | None = None
     continuity_notes: Annotated[
         tuple[Annotated[str, Field(strict=True, min_length=1, max_length=240)], ...],
         Field(max_length=8),

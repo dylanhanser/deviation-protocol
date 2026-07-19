@@ -629,7 +629,11 @@
               "priority": 10
             }
           ],
-          "action_time_costs": [{"action_type": "physical_response", "clock_advances": [{"clock_id": "security_alert", "amount": 1}]}],
+          "action_time_costs": [
+            {"action_type": "physical_response", "clock_advances": [{"clock_id": "security_alert", "amount": 1}]},
+            {"action_type": "respond", "clock_advances": [{"clock_id": "security_alert", "amount": 1}]},
+            {"action_type": "observe", "clock_advances": [{"clock_id": "security_alert", "amount": 1}]}
+          ],
           "rapid_decision_allowed": false,
           "tone_hints": ["immediate", "constrained"]
         },
@@ -816,6 +820,99 @@
       "dynamic_fact_limit": 20,
       "dynamic_fact_key_max_length": 96,
       "dynamic_fact_value_max_length": 500,
+      "narrative_outcome_rules": [
+        {
+          "rule_id": "death_certificate.outcome.purposeful_life_signal",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.arrival_locked"],
+          "intent": {
+            "action_types": ["CUSTOM"],
+            "required_any_terms": ["移动", "手指", "呼吸", "信号", "规律", "move", "finger", "breath", "signal"],
+            "forbidden_terms": ["承认", "确认我活着", "acknowledge", "declare me alive"],
+            "requires_target": false
+          },
+          "required_visible_npc_definition_ids": ["npc.death_certificate.triage_coordinator"],
+          "required_fact_values": [{"fact_id": "death_certificate.fact.player_conscious", "value": true}],
+          "required_current_decision_ids": ["death_certificate.decision.immediate_survival"],
+          "once": true,
+          "safe_description": "尝试用仍可控制的动作发出生命信号；可能成功、含混或失败。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "vitals.verified",
+              "action_type": "physical_response",
+              "discovered_clue_ids": ["death_certificate.clue.vital_response"],
+              "resolves_current_decision": true,
+              "requires_visible_npc_utterance": true,
+              "required_visible_npc_utterance_any_terms": ["有意识", "还活着", "生命体征"],
+              "forbidden_prose_terms": ["没有意识", "无法确认", "不能确认", "无生命体征", "未发现生命体征"]
+            },
+            {
+              "result": "AMBIGUOUS",
+              "event_type": "vitals.signal.ambiguous",
+              "action_type": "physical_response",
+              "resolves_current_decision": true,
+              "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "宣告成功"]
+            },
+            {
+              "result": "FAILURE",
+              "event_type": "vitals.signal.failed",
+              "action_type": "physical_response",
+              "resolves_current_decision": true,
+              "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "宣告成功"]
+            }
+          ],
+          "priority": 300,
+          "mutex_group": "death_certificate.outcome.opening_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.quiet_observation",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.arrival_locked"],
+          "intent": {"action_types": ["OBSERVE"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "required_current_decision_ids": ["death_certificate.decision.immediate_survival"],
+          "once": true,
+          "safe_description": "保持安静并观察当前公开环境；不会促使 NPC 确认你的生命状态。",
+          "effects": [
+            {
+              "result": "AMBIGUOUS",
+              "event_type": "observation.completed",
+              "action_type": "observe",
+              "resolves_current_decision": true,
+              "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认"]
+            },
+            {
+              "result": "NO_EFFECT",
+              "event_type": "observation.no_effect",
+              "action_type": "observe",
+              "resolves_current_decision": true,
+              "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认"]
+            }
+          ],
+          "priority": 200,
+          "mutex_group": "death_certificate.outcome.opening_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.constrained_custom_no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.arrival_locked"],
+          "intent": {"action_types": ["CUSTOM"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "required_current_decision_ids": ["death_certificate.decision.immediate_survival"],
+          "once": false,
+          "safe_description": "该自定义尝试没有得到服务器规则授权的永久结果。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "custom.no_effect",
+              "action_type": "respond",
+              "resolves_current_decision": true,
+              "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认", "获得线索"]
+            }
+          ],
+          "priority": 100,
+          "mutex_group": "death_certificate.outcome.opening_action"
+        }
+      ],
       "narrative_length": {"target": 650, "minimum": 350, "maximum": 900}
     }
   ]

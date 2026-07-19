@@ -22,6 +22,7 @@ class TrustedScenarioEventSource(StrEnum):
     VALIDATED_DECISION_RESPONSE = "VALIDATED_DECISION_RESPONSE"
     VERIFIED_RULE_RESULT = "VERIFIED_RULE_RESULT"
     VERIFIED_NARRATIVE_RESULT = "VERIFIED_NARRATIVE_RESULT"
+    VALIDATED_NARRATIVE_OUTCOME = "VALIDATED_NARRATIVE_OUTCOME"
 
 
 _EVENT_TYPE_WHITELIST: dict[TrustedScenarioEventSource, frozenset[str]] = {
@@ -33,6 +34,9 @@ _EVENT_TYPE_WHITELIST: dict[TrustedScenarioEventSource, frozenset[str]] = {
     # future verification boundaries without granting either one authority now.
     TrustedScenarioEventSource.VERIFIED_RULE_RESULT: frozenset(),
     TrustedScenarioEventSource.VERIFIED_NARRATIVE_RESULT: frozenset(),
+    # NarrativeEventIssuer owns this source and derives payloads only from
+    # catalog-validated templates; this legacy issuer cannot mint it.
+    TrustedScenarioEventSource.VALIDATED_NARRATIVE_OUTCOME: frozenset(),
 }
 _DECISION_VALIDATION_ISSUER = object()
 

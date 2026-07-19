@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path as FilePath
 from typing import Annotated
 
-from fastapi import Depends, FastAPI, Path, status
+from fastapi import Depends, FastAPI, Path, Response, status
 
 from deviation_protocol.api.dependencies import (
     ApiServices,
@@ -29,6 +29,17 @@ from deviation_protocol.application.session_service import (
     SessionService,
 )
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
+from deviation_protocol.application.narrative_turn_orchestrator import (
+    DurableNarrativeTurnOrchestrator,
+)
+from deviation_protocol.application.narrative_prompt import (
+    PromptBuilder,
+    default_style_profile,
+)
+from deviation_protocol.infrastructure.deepseek_narrative import (
+    DeepSeekNarrativeProvider,
+    DeepSeekSettings,
+)
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -57,11 +68,30 @@ def build_default_services() -> ApiServices:
     engine = create_engine()
     session_factory = create_session_factory(engine)
     uow_factory = lambda: SqlAlchemyUnitOfWork(session_factory)
-    orchestrator = FirstPhaseTurnOrchestrator(
+    try:
+        deepseek_settings = DeepSeekSettings.from_environment()
+    except ValueError:
+        deepseek_settings = None
+    provider = (
+        DeepSeekNarrativeProvider(
+            deepseek_settings,
+            PromptBuilder(profiles=(default_style_profile(),)),
+        )
+        if deepseek_settings is not None
+        else None
+    )
+    orchestrator = DurableNarrativeTurnOrchestrator(
         resolver=DeterministicRuleResolver(),
         uow_factory=uow_factory,
         catalog=catalog,
         scenario_catalog=scenario_catalog,
+        narrative_provider=provider,
+        provider_name="deepseek",
+        model_name=(
+            deepseek_settings.model
+            if deepseek_settings is not None
+            else "deepseek-v4-flash"
+        ),
     )
     return ApiServices(
         session_service=SessionService(
@@ -71,6 +101,7 @@ def build_default_services() -> ApiServices:
         ),
         turn_orchestrator=orchestrator,
         engine=engine,
+        narrative_provider=provider,
     )
 
 
@@ -86,17 +117,19 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         finally:
             if owns_services and runtime.engine is not None:
                 await runtime.engine.dispose()
+            if owns_services and runtime.narrative_provider is not None:
+                await runtime.narrative_provider.aclose()
 
     app = FastAPI(
         title="Deviation Protocol",
-        version="0.2.2a",
+        version="0.2.2c",
         lifespan=lifespan,
     )
     install_exception_handlers(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "phase": "2.2a"}
+        return {"status": "ok", "phase": "2.2c"}
 
     @app.post(
         "/v1/sessions",
@@ -151,12 +184,15 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     async def submit_action(
         session_id: SessionPathId,
         request: ActionRequest,
+        http_response: Response,
         principal: RequestPrincipal = Depends(get_current_principal),
         service: SessionService = Depends(get_session_service),
         orchestrator: TurnOrchestrator = Depends(get_turn_orchestrator),
     ) -> ActionResponse:
         await service.require_owner(principal, session_id)
         response = await orchestrator.handle(request.to_submission(session_id))
+        if response.narrative_pending:
+            http_response.status_code = status.HTTP_202_ACCEPTED
         return ActionResponse.from_turn_response(response)
 
     return app

@@ -363,7 +363,7 @@ def test_health_response_does_not_expose_runtime_configuration(
     with client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "phase": "2.2a"}
+    assert response.json() == {"status": "ok", "phase": "2.2c"}
 
 
 def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -377,11 +377,20 @@ def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -
         async def dispose(self) -> None:
             self.dispose_calls += 1
 
+    class Provider:
+        def __init__(self) -> None:
+            self.close_calls = 0
+
+        async def aclose(self) -> None:
+            self.close_calls += 1
+
     engine = Engine()
+    provider = Provider()
     services = ApiServices(
         session_service=service,  # type: ignore[arg-type]
         turn_orchestrator=orchestrator,
         engine=engine,  # type: ignore[arg-type]
+        narrative_provider=provider,  # type: ignore[arg-type]
     )
     monkeypatch.setattr(main, "build_default_services", lambda: services)
     app = main.create_app()
@@ -390,9 +399,11 @@ def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -
         async with app.router.lifespan_context(app):
             assert app.state.api_services is services
             assert engine.dispose_calls == 0
+            assert provider.close_calls == 0
 
     asyncio.run(drive_lifespan())
     assert engine.dispose_calls == 1
+    assert provider.close_calls == 1
 
 
 def test_create_app_supports_dependency_override(
@@ -501,6 +512,13 @@ def test_query_and_headers_cannot_override_principal(
         "suggested_actions",
         "allowed_choices",
         "scenario_version",
+        "outcome_token",
+        "job_id",
+        "lease_token",
+        "provider",
+        "model",
+        "narrative_proposal",
+        "validated_narrative_outcome",
     ],
 )
 def test_action_body_rejects_identity_and_internal_injection(
@@ -604,6 +622,11 @@ def test_openapi_excludes_trusted_and_persistence_only_fields(
         "trustedscenarioeventsource",
         "scenariodecisionselected",
         "player.decision.selected",
+        "narrativejob",
+        "lease_token",
+        "outcome_token",
+        "deepseek_api_key",
+        "provider_metadata",
     ):
         assert forbidden not in rendered
 
@@ -662,7 +685,9 @@ def test_action_api_exposes_local_and_pending_results(
     }
     with client:
         response = client.post("/v1/sessions/session-1/actions", json=body)
-    assert response.status_code == 200
+    assert response.status_code == (
+        202 if expected_kind == "NARRATIVE_REQUIRED" else 200
+    )
     payload = response.json()
     assert "action_signature" not in payload
     assert payload["resolution_kind"] == expected_kind
@@ -688,7 +713,7 @@ def test_action_api_accepts_only_public_decision_and_choice_fields(
                 "choice_id": "choice.public-option",
             },
         )
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert len(orchestrator.submissions) == 1
     assert orchestrator.submissions[0].decision_id == "decision.public-token"
     assert orchestrator.submissions[0].choice_id == "choice.public-option"

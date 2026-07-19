@@ -339,6 +339,7 @@ class FirstPhaseTurnOrchestrator:
             narrative_required=is_narrative,
             narrative_pending=is_narrative,
             narrative_frame=narrative_frame,
+            narrative_status=("PENDING" if is_narrative else None),
             local_query_result=(
                 _writable_json_copy(resolution.feedback.parameters) if is_query else None
             ),

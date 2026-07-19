@@ -37,6 +37,10 @@ class TurnResponse(BaseModel):
     narrative_required: StrictBool
     narrative_pending: StrictBool
     narrative_frame: NarrativeFrame | None = None
+    narrative_text: Annotated[str, Field(strict=True, min_length=1, max_length=10_000)] | None = None
+    narrative_status: Annotated[
+        str, Field(strict=True, pattern=r"^(PENDING|COMMITTED)$")
+    ] | None = None
     local_query_result: dict[str, Any] | None = None
 
     @field_validator("feedback_parameters", "local_query_result")
@@ -50,13 +54,34 @@ class TurnResponse(BaseModel):
 
     @model_validator(mode="after")
     def validate_resolution_shape(self) -> TurnResponse:
-        is_narrative = self.resolution_kind is ResolutionStatus.NARRATIVE_REQUIRED
+        is_narrative = self.resolution_kind in {
+            ResolutionStatus.NARRATIVE_REQUIRED,
+            ResolutionStatus.NARRATIVE_COMMITTED,
+        }
         if self.resolution_kind is ResolutionStatus.ANOMALY_EVALUATION_REQUIRED:
             raise ValueError("anomaly evaluation is not supported by the turn response")
-        if self.narrative_required != is_narrative or self.narrative_pending != is_narrative:
+        expected_pending = self.resolution_kind is ResolutionStatus.NARRATIVE_REQUIRED
+        if expected_pending and self.narrative_status is None:
+            # Backward-compatible construction for in-process deterministic
+            # adapters; persisted/API output always includes the explicit state.
+            object.__setattr__(self, "narrative_status", "PENDING")
+        if self.narrative_required != is_narrative or self.narrative_pending != expected_pending:
             raise ValueError("narrative flags must match resolution_kind")
-        if self.state_changed and self.resolution_kind is not ResolutionStatus.RESOLVED_LOCAL:
-            raise ValueError("only RESOLVED_LOCAL may report a state change")
+        if self.state_changed and self.resolution_kind not in {
+            ResolutionStatus.RESOLVED_LOCAL,
+            ResolutionStatus.NARRATIVE_COMMITTED,
+        }:
+            raise ValueError("only a committed resolution may report a state change")
+        if is_narrative:
+            expected_status = "PENDING" if expected_pending else "COMMITTED"
+            if self.narrative_status != expected_status:
+                raise ValueError("narrative status does not match resolution kind")
+            if (self.narrative_text is not None) != (
+                self.resolution_kind is ResolutionStatus.NARRATIVE_COMMITTED
+            ):
+                raise ValueError("narrative text is visible only after commit")
+        elif self.narrative_text is not None or self.narrative_status is not None:
+            raise ValueError("non-narrative response cannot carry narrative output")
         if self.local_query_result is not None and (
             self.resolution_kind is not ResolutionStatus.RESOLVED_LOCAL
             or self.state_changed

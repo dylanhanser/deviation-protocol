@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import TurnOrchestrator
 from deviation_protocol.application.session_service import SessionService
+from deviation_protocol.application.narrative_models import NarrativeProvider
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +17,7 @@ class ApiServices:
     session_service: SessionService
     turn_orchestrator: TurnOrchestrator
     engine: AsyncEngine | None = None
+    narrative_provider: NarrativeProvider | None = None
 
 
 def get_demo_dev_principal() -> RequestPrincipal:

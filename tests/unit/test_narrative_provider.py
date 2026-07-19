@@ -13,9 +13,9 @@ import httpx
 from pydantic import ValidationError
 
 from deviation_protocol.application.narrative_models import (
-    ActionAttemptProposal,
     MAX_NARRATIVE_USAGE_TOKENS,
     NarrativePlayerIntent,
+    NarrativeOutcomeCandidate,
     NarrativeProposalPayload,
     NarrativeProposalRejectedError,
     NarrativeProviderAuthenticationError,
@@ -30,9 +30,8 @@ from deviation_protocol.application.narrative_models import (
     NarrativePublicReferences,
     NarrativeRequest,
     NarrativeUsage,
-    NpcReactionProposal,
     NpcUtterance,
-    PerceptibleOutcomeProposal,
+    SelectedNarrativeOutcome,
     UntrustedNarrativeProposal,
     ValidatedNarrativeProposal,
 )
@@ -45,6 +44,7 @@ from deviation_protocol.application.scenario_event_bridge import TrustedScenario
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame, NpcKnowledgeFrame, RenderableFact
 from deviation_protocol.domain.scenario import FrameMode
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.infrastructure.deepseek_narrative import (
     DeepSeekHttpResponse,
     DeepSeekNarrativeProvider,
@@ -115,6 +115,14 @@ def _request(
         recent_narrative_fragments=("你听见一阵短促而清晰的脚步声。",),
         public_story_summary="你正在处理眼前可感知的冲突。",
         style_profile_id="original-zh-second-person-v1",
+        outcome_candidates=(
+            NarrativeOutcomeCandidate(
+                outcome_token="outcome." + "a" * 48,
+                safe_description="Observe the currently public scene without permanent effects.",
+                allowed_results=(NarrativeOutcomeResult.NO_EFFECT,),
+                allowed_entity_ids=(VISIBLE_NPC,),
+            ),
+        ),
     )
 
 
@@ -139,11 +147,10 @@ def _payload(**updates: Any) -> NarrativeProposalPayload:
         "narrative_text": _narrative_text(),
         "referenced_entity_ids": (VISIBLE_NPC,),
         "npc_utterances": (),
-        "untrusted_outcome_proposals": (
-            ActionAttemptProposal(
-                proposal_type="ACTION_ATTEMPT_NOTED",
-                summary="玩家的观察尝试被叙事候选记录。",
-            ),
+        "selected_outcome": SelectedNarrativeOutcome(
+            outcome_token="outcome." + "a" * 48,
+            result=NarrativeOutcomeResult.NO_EFFECT,
+            referenced_entity_ids=(VISIBLE_NPC,),
         ),
         "continuity_notes": ("保持当前公开位置不变。",),
     }
@@ -189,6 +196,7 @@ def test_request_contains_only_safe_bounded_provider_fields() -> None:
         "public_story_summary",
         "language",
         "style_profile_id",
+        "outcome_candidates",
         "prompt_schema_version",
     }
     for absent in (
@@ -436,9 +444,7 @@ def test_strict_output_rejects_authority_and_extra_fields(
 
 def test_strict_output_rejects_unknown_outcome_type_and_wrong_types() -> None:
     data = _payload().model_dump(mode="json")
-    data["untrusted_outcome_proposals"] = [
-        {"proposal_type": "GRANT_ITEM", "summary": "no"}
-    ]
+    data["selected_outcome"]["result"] = "GRANT_ITEM"
     with pytest.raises(ValidationError):
         NarrativeProposalPayload.model_validate(data)
 
@@ -455,14 +461,14 @@ def test_strict_output_rejects_unknown_outcome_type_and_wrong_types() -> None:
             ),
         ),
         (
-            "untrusted_outcome_proposals",
-            tuple(
-                {
-                    "proposal_type": "ACTION_ATTEMPT_NOTED",
-                    "summary": f"候选{index}",
-                }
-                for index in range(17)
-            ),
+            "selected_outcome",
+            {
+                "outcome_token": "outcome." + "a" * 48,
+                "result": "NO_EFFECT",
+                "referenced_entity_ids": tuple(
+                    f"entity.{index}" for index in range(33)
+                ),
+            },
         ),
         ("continuity_notes", tuple(f"备注{index}" for index in range(9))),
         ("referenced_entity_ids", tuple(f"entity.{index}" for index in range(129))),
@@ -497,17 +503,10 @@ def test_output_rejects_floats_nonfinite_custom_and_exception_values(
 def test_validator_accepts_closed_non_authoritative_candidate_and_detaches_it() -> None:
     original = _untrusted(
         npc_utterances=(NpcUtterance(speaker_entity_id=VISIBLE_NPC, text="我看见你了。"),),
-        untrusted_outcome_proposals=(
-            NpcReactionProposal(
-                proposal_type="NPC_REACTION",
-                npc_entity_id=VISIBLE_NPC,
-                summary="对方作出可见回应的候选描述。",
-            ),
-            PerceptibleOutcomeProposal(
-                proposal_type="PERCEPTIBLE_CHANGE",
-                summary="眼前出现轻微且可感知的变化候选。",
-                referenced_entity_ids=(VISIBLE_NPC,),
-            ),
+        selected_outcome=SelectedNarrativeOutcome(
+            outcome_token="outcome." + "a" * 48,
+            result=NarrativeOutcomeResult.NO_EFFECT,
+            referenced_entity_ids=(VISIBLE_NPC,),
         ),
     )
     validated = NarrativeProposalValidator().validate(
@@ -587,7 +586,7 @@ def test_validator_allows_only_discovered_public_clue_references() -> None:
     )
 
     validated = NarrativeProposalValidator().validate(
-        _untrusted(referenced_entity_ids=(clue_id,)),
+        _untrusted(referenced_entity_ids=(clue_id,), selected_outcome=None),
         request=request,
         public_references=references,
     )
@@ -777,6 +776,21 @@ def _settings(**updates: Any) -> DeepSeekSettings:
     }
     data.update(updates)
     return DeepSeekSettings(**data)
+
+
+def test_missing_process_key_is_a_safe_optional_runtime_configuration() -> None:
+    with pytest.raises(ValueError, match="not configured"):
+        DeepSeekSettings.from_environment({})
+
+
+def test_retry_is_opt_in_for_direct_and_environment_configuration() -> None:
+    direct = DeepSeekSettings(api_key="test-only")
+    from_environment = DeepSeekSettings.from_environment(
+        {"DEEPSEEK_API_KEY": "test-only"}
+    )
+
+    assert direct.max_retries == 0
+    assert from_environment.max_retries == 0
 
 
 @pytest.mark.asyncio

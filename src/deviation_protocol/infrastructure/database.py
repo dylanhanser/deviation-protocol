@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import (
 
 
 class DatabaseSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    # Runtime configuration comes only from the process environment or an
+    # explicit injected URL. Import/build paths never load a repository .env.
+    model_config = SettingsConfigDict(extra="ignore")
 
     database_url: str
 

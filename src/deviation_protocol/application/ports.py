@@ -9,6 +9,7 @@ from typing import Any, Mapping, Protocol, Sequence
 from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.narrative_models import NarrativeProvider
+from deviation_protocol.application.narrative_jobs import NarrativeJob, NarrativeJobStatus
 from deviation_protocol.application.resolution import ResolutionResult
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission
@@ -139,9 +140,45 @@ class TurnRequestRepository(ABC):
         raise NotImplementedError
 
 
+class NarrativeJobRepository(ABC):
+    @abstractmethod
+    async def get_by_client_request_id(
+        self, session_id: str, client_request_id: str, *, for_update: bool = False
+    ) -> NarrativeJob | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get(self, job_id: str, *, for_update: bool = False) -> NarrativeJob | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_active_for_session(self, session_id: str) -> NarrativeJob | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(self, job: NarrativeJob) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def replace(
+        self,
+        job: NarrativeJob,
+        *,
+        expected_status: NarrativeJobStatus,
+        expected_lease_token: str | None = None,
+        expected_lease_owner: str | None = None,
+    ) -> bool:
+        """CAS one lifecycle transition, including the current fencing lease."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def recent_committed_texts(self, session_id: str, *, limit: int) -> tuple[str, ...]:
+        raise NotImplementedError
+
 class UnitOfWork(ABC):
     sessions: GameSessionRepository
     turn_requests: TurnRequestRepository
+    narrative_jobs: NarrativeJobRepository
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":

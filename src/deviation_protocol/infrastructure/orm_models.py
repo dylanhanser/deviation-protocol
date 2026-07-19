@@ -115,3 +115,49 @@ class TurnRequestRow(Base):
     response_json: Mapped[dict[str, Any] | None] = mapped_column(mysql.JSON, nullable=True)
     error_text: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now, nullable=False)
+
+
+class NarrativeJobRow(Base):
+    __tablename__ = "narrative_jobs"
+    __table_args__ = (
+        UniqueConstraint(
+            "session_id", "client_request_id",
+            name="uq_narrative_jobs_session_client_request",
+        ),
+        Index("ix_narrative_jobs_session_status", "session_id", "status"),
+        Index("ix_narrative_jobs_status_lease", "status", "lease_expires_at"),
+        Index("ix_narrative_jobs_session_turn", "session_id", "turn_id"),
+        TABLE_OPTIONS,
+    )
+
+    job_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    session_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("game_sessions.session_id", ondelete="CASCADE"), nullable=False
+    )
+    turn_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    client_request_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    action_signature: Mapped[str] = mapped_column(String(64), nullable=False)
+    prepared_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    state_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    scenario_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    scenario_content_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    request_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    narrative_request_json: Mapped[dict[str, Any]] = mapped_column(mysql.JSON, nullable=False)
+    prompt_schema_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    style_profile_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    provider_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(128), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    attempt_count: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=0, server_default="0"
+    )
+    lease_token: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_owner: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    lease_expires_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    validated_proposal_json: Mapped[dict[str, Any] | None] = mapped_column(mysql.JSON, nullable=True)
+    validated_proposal_digest: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    outcome_rule_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    accepted_narrative_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)

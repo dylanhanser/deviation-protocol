@@ -87,6 +87,7 @@ class ActionResponse(BaseModel):
         "RESOLVED_LOCAL",
         "REJECTED_LOCAL",
         "NARRATIVE_REQUIRED",
+        "NARRATIVE_COMMITTED",
     ]
     result_code: str
     feedback_code: str
@@ -96,6 +97,8 @@ class ActionResponse(BaseModel):
     narrative_required: bool
     narrative_pending: bool
     narrative_frame: NarrativeFrame | None = None
+    narrative_text: str | None = Field(default=None, min_length=1, max_length=10_000)
+    narrative_status: Literal["PENDING", "COMMITTED"] | None = None
     local_query_result: dict[str, Any] | None = None
 
     @classmethod

@@ -20,7 +20,13 @@ from deviation_protocol.application.errors import (
     SnapshotStateVersionMismatchError,
     StoredTurnResponseInvalidError,
     UnsupportedResolutionError,
+    NarrativeJobActiveError,
+    NarrativeJobStaleError,
+    NarrativeOutcomeUnknownError,
+    NarrativeOutcomeUnavailableError,
+    NarrativeProviderNotConfiguredError,
 )
+from deviation_protocol.application.narrative_models import NarrativeBoundaryError
 from deviation_protocol.domain.state import DomainRuleViolation
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 
@@ -73,6 +79,44 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(OptimisticLockError)
     async def optimistic_lock_handler(_: Request, __: OptimisticLockError) -> JSONResponse:
         return error_response(409, "OPTIMISTIC_LOCK_CONFLICT", "State changed concurrently")
+
+    @app.exception_handler(NarrativeJobActiveError)
+    async def narrative_active_handler(
+        _: Request, __: NarrativeJobActiveError
+    ) -> JSONResponse:
+        return error_response(409, "NARRATIVE_JOB_ACTIVE", "A narrative turn is active")
+
+    narrative_conflicts = (
+        NarrativeJobStaleError,
+        NarrativeOutcomeUnknownError,
+        NarrativeOutcomeUnavailableError,
+    )
+
+    async def narrative_conflict_handler(_: Request, exc: Exception) -> JSONResponse:
+        return error_response(
+            409,
+            getattr(exc, "code", "NARRATIVE_CONFLICT"),
+            "Narrative turn cannot be committed",
+        )
+
+    for error_type in narrative_conflicts:
+        app.add_exception_handler(error_type, narrative_conflict_handler)
+
+    @app.exception_handler(NarrativeProviderNotConfiguredError)
+    async def provider_not_configured_handler(
+        _: Request, __: NarrativeProviderNotConfiguredError
+    ) -> JSONResponse:
+        return error_response(
+            503,
+            "NARRATIVE_PROVIDER_NOT_CONFIGURED",
+            "Narrative provider is not configured",
+        )
+
+    @app.exception_handler(NarrativeBoundaryError)
+    async def narrative_boundary_handler(
+        _: Request, exc: NarrativeBoundaryError
+    ) -> JSONResponse:
+        return error_response(503, exc.code, "Narrative processing failed")
 
     incompatible_errors = (
         SnapshotContentVersionMismatchError,

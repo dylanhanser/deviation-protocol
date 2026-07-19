@@ -7,6 +7,7 @@ from deviation_protocol.infrastructure.database import DatabaseSettings, create_
 
 
 def test_database_settings_reject_sqlite_without_fallback() -> None:
+    assert DatabaseSettings.model_config.get("env_file") is None
     with pytest.raises(ValidationError, match="mysql\\+asyncmy"):
         DatabaseSettings(database_url="sqlite+aiosqlite:///local.db")
 

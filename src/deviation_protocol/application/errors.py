@@ -55,6 +55,26 @@ class UnsupportedResolutionError(TurnApplicationError):
     code = "UNSUPPORTED_RESOLUTION"
 
 
+class NarrativeJobActiveError(TurnApplicationError):
+    code = "NARRATIVE_JOB_ACTIVE"
+
+
+class NarrativeJobStaleError(TurnApplicationError):
+    code = "NARRATIVE_JOB_STALE"
+
+
+class NarrativeOutcomeUnknownError(TurnApplicationError):
+    code = "NARRATIVE_OUTCOME_UNKNOWN"
+
+
+class NarrativeOutcomeUnavailableError(TurnApplicationError):
+    code = "NARRATIVE_OUTCOME_UNAVAILABLE"
+
+
+class NarrativeProviderNotConfiguredError(TurnApplicationError):
+    code = "NARRATIVE_PROVIDER_NOT_CONFIGURED"
+
+
 class ConcurrentTurnRequestError(RuntimeError):
     """Internal signal that the database idempotency constraint won a race."""
 

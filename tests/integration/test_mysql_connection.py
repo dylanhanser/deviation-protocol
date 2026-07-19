@@ -74,8 +74,33 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
                 )
             ).all()
         )
+        narrative_columns = {
+            row[0]: row[1:]
+            for row in (
+                await connection.execute(
+                    text(
+                        "SELECT COLUMN_NAME, DATA_TYPE, IS_NULLABLE, COLUMN_DEFAULT, "
+                        "CHARACTER_MAXIMUM_LENGTH "
+                        "FROM information_schema.COLUMNS "
+                        "WHERE TABLE_SCHEMA = DATABASE() "
+                        "AND TABLE_NAME = 'narrative_jobs'"
+                    )
+                )
+            ).all()
+        }
+        narrative_index_rows = (
+            await connection.execute(
+                text(
+                    "SELECT INDEX_NAME, SEQ_IN_INDEX, COLUMN_NAME, NON_UNIQUE "
+                    "FROM information_schema.STATISTICS "
+                    "WHERE TABLE_SCHEMA = DATABASE() "
+                    "AND TABLE_NAME = 'narrative_jobs' "
+                    "ORDER BY INDEX_NAME, SEQ_IN_INDEX"
+                )
+            )
+        ).all()
 
-    assert revision == "20260719_0002"
+    assert revision == "20260719_0003"
     table_details = {row[0]: (row[1], row[2]) for row in tables}
     expected_tables = {
         "alembic_version",
@@ -83,6 +108,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         "game_sessions",
         "game_snapshots",
         "turn_requests",
+        "narrative_jobs",
     }
     assert set(table_details) == expected_tables
     assert all(engine == "InnoDB" for engine, _ in table_details.values())
@@ -92,11 +118,14 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         ("game_snapshots", "state_json"),
         ("turn_requests", "request_json"),
         ("turn_requests", "response_json"),
+        ("narrative_jobs", "narrative_request_json"),
+        ("narrative_jobs", "validated_proposal_json"),
     }
     assert foreign_keys == {
         ("domain_events", "game_sessions", "CASCADE"),
         ("game_snapshots", "game_sessions", "CASCADE"),
         ("turn_requests", "game_sessions", "CASCADE"),
+        ("narrative_jobs", "game_sessions", "CASCADE"),
     }
     assert {
         ("domain_events", "uq_domain_events_session_sequence"),
@@ -104,4 +133,50 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         ("game_sessions", "uq_game_sessions_player_creation_request"),
         ("game_sessions", "ix_game_sessions_scenario"),
         ("turn_requests", "ix_turn_requests_signature"),
+        ("narrative_jobs", "uq_narrative_jobs_session_client_request"),
+        ("narrative_jobs", "ix_narrative_jobs_session_status"),
+        ("narrative_jobs", "ix_narrative_jobs_status_lease"),
+        ("narrative_jobs", "ix_narrative_jobs_session_turn"),
     } <= indexes
+    assert len(narrative_columns) == 27
+    assert narrative_columns["job_id"] == ("varchar", "NO", None, 64)
+    assert narrative_columns["session_id"] == ("varchar", "NO", None, 64)
+    assert narrative_columns["narrative_request_json"] == (
+        "json",
+        "NO",
+        None,
+        None,
+    )
+    assert narrative_columns["validated_proposal_json"] == (
+        "json",
+        "YES",
+        None,
+        None,
+    )
+    assert narrative_columns["attempt_count"] == ("int", "NO", "0", None)
+    assert narrative_columns["lease_expires_at"][:2] == ("datetime", "YES")
+    assert narrative_columns["accepted_narrative_text"][:2] == ("text", "YES")
+    grouped_indexes: dict[str, tuple[tuple[str, int], ...]] = {}
+    for index_name in {row[0] for row in narrative_index_rows}:
+        grouped_indexes[index_name] = tuple(
+            (row[2], row[3]) for row in narrative_index_rows if row[0] == index_name
+        )
+    assert grouped_indexes == {
+        "PRIMARY": (("job_id", 0),),
+        "uq_narrative_jobs_session_client_request": (
+            ("session_id", 0),
+            ("client_request_id", 0),
+        ),
+        "ix_narrative_jobs_session_status": (
+            ("session_id", 1),
+            ("status", 1),
+        ),
+        "ix_narrative_jobs_status_lease": (
+            ("status", 1),
+            ("lease_expires_at", 1),
+        ),
+        "ix_narrative_jobs_session_turn": (
+            ("session_id", 1),
+            ("turn_id", 1),
+        ),
+    }

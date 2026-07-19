@@ -15,6 +15,7 @@ from deviation_protocol.infrastructure.orm_models import (
     GameSessionRow,
     GameSnapshotRow,
     TurnRequestRow,
+    NarrativeJobRow,
 )
 
 
@@ -78,6 +79,7 @@ async def mysql_session_id(
                 GameSnapshotRow,
                 DomainEventRow,
                 TurnRequestRow,
+                NarrativeJobRow,
             ):
                 residual_counts.append(
                     await session.scalar(
@@ -86,4 +88,4 @@ async def mysql_session_id(
                         .where(row_type.session_id == session_id)
                     )
                 )
-        assert residual_counts == [0, 0, 0, 0]
+        assert residual_counts == [0, 0, 0, 0, 0]

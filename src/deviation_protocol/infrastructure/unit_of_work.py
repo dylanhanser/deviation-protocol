@@ -8,6 +8,7 @@ from deviation_protocol.application.ports import UnitOfWork
 from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyGameSessionRepository,
     SqlAlchemyTurnRequestRepository,
+    SqlAlchemyNarrativeJobRepository,
 )
 
 
@@ -21,6 +22,7 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self._session = self._session_factory()
         self.sessions = SqlAlchemyGameSessionRepository(self._session)
         self.turn_requests = SqlAlchemyTurnRequestRepository(self._session)
+        self.narrative_jobs = SqlAlchemyNarrativeJobRepository(self._session)
         self._committed = False
         return self
 

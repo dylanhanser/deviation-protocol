@@ -9,6 +9,7 @@ from deviation_protocol.application.narrative_models import (
     NarrativePlayerIntent,
     NarrativePublicReferences,
     NarrativeRequest,
+    NarrativeOutcomeCandidate,
 )
 from deviation_protocol.application.narrative_prompt import (
     PromptBuilder,
@@ -18,6 +19,7 @@ from deviation_protocol.application.narrative_validation import NarrativeProposa
 from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame, NpcKnowledgeFrame, RenderableFact
 from deviation_protocol.domain.scenario import FrameMode
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.infrastructure.deepseek_narrative import (
     DeepSeekNarrativeProvider,
     DeepSeekSettings,
@@ -87,6 +89,14 @@ async def test_one_safe_deepseek_v4_flash_narrative_smoke() -> None:
         ),
         public_story_summary="你刚刚恢复清醒，只能确认眼前公开可见的环境。",
         style_profile_id="original-zh-second-person-v1",
+        outcome_candidates=(
+            NarrativeOutcomeCandidate(
+                outcome_token="outcome." + "a" * 48,
+                safe_description="只描述当前公开环境中的一次观察，不产生永久状态变化。",
+                allowed_results=(NarrativeOutcomeResult.NO_EFFECT,),
+                allowed_entity_ids=(visible_npc,),
+            ),
+        ),
     )
     references = NarrativePublicReferences(
         allowed_public_entity_ids=frozenset({visible_npc, location}),

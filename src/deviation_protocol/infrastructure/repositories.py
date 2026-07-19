@@ -19,6 +19,12 @@ from deviation_protocol.application.ports import (
     PersistedSnapshot,
     PersistedTurnRequest,
     TurnRequestRepository,
+    NarrativeJobRepository,
+)
+from deviation_protocol.application.narrative_jobs import (
+    ACTIVE_NARRATIVE_JOB_STATUSES,
+    NarrativeJob,
+    NarrativeJobStatus,
 )
 from deviation_protocol.domain.actions import ActionSubmission
 from deviation_protocol.domain.events import DomainEvent
@@ -29,6 +35,7 @@ from deviation_protocol.infrastructure.orm_models import (
     GameSessionRow,
     GameSnapshotRow,
     TurnRequestRow,
+    NarrativeJobRow,
     utc_now,
 )
 
@@ -277,6 +284,170 @@ class SqlAlchemyTurnRequestRepository(TurnRequestRepository):
             if _is_mysql_duplicate_key(exc):
                 raise ConcurrentTurnRequestError from exc
             raise
+
+
+class SqlAlchemyNarrativeJobRepository(NarrativeJobRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    @staticmethod
+    def _persisted(row: NarrativeJobRow) -> NarrativeJob:
+        return NarrativeJob(
+            job_id=row.job_id,
+            session_id=row.session_id,
+            turn_id=row.turn_id,
+            client_request_id=row.client_request_id,
+            action_signature=row.action_signature,
+            prepared_state_version=row.prepared_state_version,
+            state_fingerprint=row.state_fingerprint,
+            scenario_id=row.scenario_id,
+            scenario_content_version=row.scenario_content_version,
+            request_fingerprint=row.request_fingerprint,
+            narrative_request=dict(row.narrative_request_json),
+            prompt_schema_version=row.prompt_schema_version,
+            style_profile_version=row.style_profile_version,
+            provider_name=row.provider_name,
+            model_name=row.model_name,
+            status=NarrativeJobStatus(row.status),
+            attempt_count=row.attempt_count,
+            lease_token=row.lease_token,
+            lease_owner=row.lease_owner,
+            lease_expires_at=row.lease_expires_at,
+            validated_proposal=(
+                dict(row.validated_proposal_json)
+                if row.validated_proposal_json is not None
+                else None
+            ),
+            validated_proposal_digest=row.validated_proposal_digest,
+            outcome_rule_id=row.outcome_rule_id,
+            accepted_narrative_text=row.accepted_narrative_text,
+            error_code=row.error_code,
+            created_at=row.created_at,
+            updated_at=row.updated_at,
+        )
+
+    async def get_by_client_request_id(
+        self, session_id: str, client_request_id: str, *, for_update: bool = False
+    ) -> NarrativeJob | None:
+        statement = select(NarrativeJobRow).where(
+            NarrativeJobRow.session_id == session_id,
+            NarrativeJobRow.client_request_id == client_request_id,
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        row = await self._session.scalar(statement)
+        return self._persisted(row) if row is not None else None
+
+    async def get(self, job_id: str, *, for_update: bool = False) -> NarrativeJob | None:
+        statement = select(NarrativeJobRow).where(NarrativeJobRow.job_id == job_id)
+        if for_update:
+            statement = statement.with_for_update()
+        row = await self._session.scalar(statement)
+        return self._persisted(row) if row is not None else None
+
+    async def get_active_for_session(self, session_id: str) -> NarrativeJob | None:
+        row = await self._session.scalar(
+            select(NarrativeJobRow)
+            .where(
+                NarrativeJobRow.session_id == session_id,
+                NarrativeJobRow.status.in_(
+                    tuple(item.value for item in ACTIVE_NARRATIVE_JOB_STATUSES)
+                ),
+            )
+            .order_by(NarrativeJobRow.created_at)
+            .limit(1)
+        )
+        return self._persisted(row) if row is not None else None
+
+    async def add(self, job: NarrativeJob) -> None:
+        row = NarrativeJobRow(
+            job_id=job.job_id,
+            session_id=job.session_id,
+            turn_id=job.turn_id,
+            client_request_id=job.client_request_id,
+            action_signature=job.action_signature,
+            prepared_state_version=job.prepared_state_version,
+            state_fingerprint=job.state_fingerprint,
+            scenario_id=job.scenario_id,
+            scenario_content_version=job.scenario_content_version,
+            request_fingerprint=job.request_fingerprint,
+            narrative_request_json=dict(job.narrative_request),
+            prompt_schema_version=job.prompt_schema_version,
+            style_profile_version=job.style_profile_version,
+            provider_name=job.provider_name,
+            model_name=job.model_name,
+            status=job.status.value,
+            attempt_count=job.attempt_count,
+            lease_token=job.lease_token,
+            lease_owner=job.lease_owner,
+            lease_expires_at=job.lease_expires_at,
+            validated_proposal_json=job.validated_proposal,
+            validated_proposal_digest=job.validated_proposal_digest,
+            outcome_rule_id=job.outcome_rule_id,
+            accepted_narrative_text=job.accepted_narrative_text,
+            error_code=job.error_code,
+            created_at=job.created_at,
+            updated_at=job.updated_at,
+        )
+        self._session.add(row)
+        try:
+            await self._session.flush((row,))
+        except IntegrityError as exc:
+            if _is_mysql_duplicate_key(exc):
+                raise ConcurrentTurnRequestError from exc
+            raise
+
+    async def replace(
+        self,
+        job: NarrativeJob,
+        *,
+        expected_status: NarrativeJobStatus,
+        expected_lease_token: str | None = None,
+        expected_lease_owner: str | None = None,
+    ) -> bool:
+        result = await self._session.execute(
+            update(NarrativeJobRow)
+            .where(
+                NarrativeJobRow.job_id == job.job_id,
+                NarrativeJobRow.status == expected_status.value,
+                NarrativeJobRow.lease_token == expected_lease_token,
+                NarrativeJobRow.lease_owner == expected_lease_owner,
+            )
+            .values(
+                status=job.status.value,
+                attempt_count=job.attempt_count,
+                lease_token=job.lease_token,
+                lease_owner=job.lease_owner,
+                lease_expires_at=job.lease_expires_at,
+                validated_proposal_json=job.validated_proposal,
+                validated_proposal_digest=job.validated_proposal_digest,
+                outcome_rule_id=job.outcome_rule_id,
+                accepted_narrative_text=job.accepted_narrative_text,
+                error_code=job.error_code,
+                updated_at=job.updated_at,
+            )
+        )
+        return result.rowcount == 1
+
+    async def recent_committed_texts(
+        self, session_id: str, *, limit: int
+    ) -> tuple[str, ...]:
+        rows = (
+            await self._session.scalars(
+                select(NarrativeJobRow.accepted_narrative_text)
+                .where(
+                    NarrativeJobRow.session_id == session_id,
+                    NarrativeJobRow.status == NarrativeJobStatus.COMMITTED.value,
+                    NarrativeJobRow.accepted_narrative_text.is_not(None),
+                )
+                .order_by(
+                    NarrativeJobRow.updated_at.desc(),
+                    NarrativeJobRow.job_id.desc(),
+                )
+                .limit(limit)
+            )
+        ).all()
+        return tuple(reversed(tuple(item for item in rows if item is not None)))
 
 
 def _is_mysql_duplicate_key(error: IntegrityError) -> bool:
