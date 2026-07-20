@@ -2,7 +2,8 @@
 
 [CmdletBinding()]
 param(
-    [switch]$Strict
+    [switch]$Strict,
+    [switch]$RequireOffline
 )
 
 Set-StrictMode -Version Latest
@@ -42,6 +43,20 @@ function Test-LiveDeepSeekEnabled {
         [EnvironmentVariableTarget]::Process
     )
     return $null -ne $value -and $value.Trim().ToLowerInvariant() -in @("1", "true", "yes", "on")
+}
+
+function Test-ProcessEnvironmentVariablePresent {
+    param(
+        [Parameter(Mandatory)]
+        [string]$VariableName
+    )
+
+    $value = [Environment]::GetEnvironmentVariable(
+        $VariableName,
+        [EnvironmentVariableTarget]::Process
+    )
+
+    return $null -ne $value
 }
 
 function Get-SafeDatabaseInfo {
@@ -92,10 +107,13 @@ except Exception:
 
 function Write-DatabaseVariableStatus {
     param(
-        [Parameter(Mandatory)]
-        [ValidateSet("TEST_DATABASE_URL", "DATABASE_URL")]
-        [string]$VariableName
-    )
+    [Parameter(Mandatory)]
+    [ValidateSet("TEST_DATABASE_URL", "DATABASE_URL")]
+    [string]$VariableName,
+
+    [Parameter()]
+    [switch]$PresenceOnly
+)
 
     $value = [Environment]::GetEnvironmentVariable(
         $VariableName,
@@ -107,6 +125,9 @@ function Write-DatabaseVariableStatus {
     }
 
     Write-Host "  ${VariableName}: present"
+    if ($PresenceOnly) {
+        return
+    }
     if (-not (Test-Path -LiteralPath $pythonPath -PathType Leaf)) {
         Write-Host "    URL details: unavailable (.venv interpreter missing)"
         return
@@ -198,11 +219,64 @@ else {
 }
 
 Write-Host "[Environment]"
-Write-DatabaseVariableStatus -VariableName "TEST_DATABASE_URL"
-Write-DatabaseVariableStatus -VariableName "DATABASE_URL"
-$deepSeekKey = [Environment]::GetEnvironmentVariable("DEEPSEEK_API_KEY", [EnvironmentVariableTarget]::Process)
-Write-Host "  DEEPSEEK_API_KEY: $(if ($null -eq $deepSeekKey) { 'missing' } else { 'present' })"
-Write-Host "  RUN_LIVE_DEEPSEEK_TEST: $(if (Test-LiveDeepSeekEnabled) { 'enabled' } else { 'disabled' })"
+
+Write-DatabaseVariableStatus `
+    -VariableName "TEST_DATABASE_URL" `
+    -PresenceOnly:$RequireOffline
+
+Write-DatabaseVariableStatus `
+    -VariableName "DATABASE_URL" `
+    -PresenceOnly:$RequireOffline
+
+$deepSeekKeyPresent = Test-ProcessEnvironmentVariablePresent `
+    -VariableName "DEEPSEEK_API_KEY"
+
+$liveVariablePresent = Test-ProcessEnvironmentVariablePresent `
+    -VariableName "RUN_LIVE_DEEPSEEK_TEST"
+
+$liveVariableStatus = if (-not $liveVariablePresent) {
+    "missing"
+}
+elseif (Test-LiveDeepSeekEnabled) {
+    "present (enabled)"
+}
+else {
+    "present (disabled)"
+}
+
+Write-Host "  DEEPSEEK_API_KEY: $(if ($deepSeekKeyPresent) { 'present' } else { 'missing' })"
+Write-Host "  RUN_LIVE_DEEPSEEK_TEST: $liveVariableStatus"
+
+$offlineVariableNames = @(
+    "TEST_DATABASE_URL",
+    "DATABASE_URL",
+    "DEEPSEEK_API_KEY",
+    "RUN_LIVE_DEEPSEEK_TEST"
+)
+
+$offlineViolations = @(
+    foreach ($offlineVariableName in $offlineVariableNames) {
+        if (Test-ProcessEnvironmentVariablePresent -VariableName $offlineVariableName) {
+            $offlineVariableName
+        }
+    }
+)
+
+if ($RequireOffline) {
+    if ($offlineViolations.Count -eq 0) {
+        Write-Host "  offline requirement: satisfied"
+    }
+    else {
+        Write-Host "  offline requirement: failed"
+    }
+}
+
+if ($RequireOffline -and $offlineViolations.Count -gt 0) {
+    [Console]::Error.WriteLine(
+        "Offline diagnostics failed: prohibited process environment variables are present: $($offlineViolations -join ', ')."
+    )
+    exit 1
+}
 
 Write-Host "[Alembic offline metadata]"
 if ($pythonReady) {

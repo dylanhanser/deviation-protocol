@@ -66,6 +66,15 @@ live DeepSeek 测试默认关闭，必须由用户在独立命令中显式 opt-i
 
 隔离草案可用 `scenario new --scenario-id <id> --title <title> --premise <note> --output-dir .\scenario-drafts` 创建；Windows 上它以全新目录发布且从不覆盖现有内容。缺少标准库原子 no-replace 目录发布语义的平台会拒绝实际写入，而不是降级为可能覆盖空目录的 rename。
 
+### Engineering guidance
+
+Before changing persistence, trusted authority, narrative orchestration, scenario tooling, or verification workflows, read:
+
+- [Engineering guardrails](docs/engineering/guardrails.md)
+- [Codex workflow](docs/engineering/codex_workflow.md)
+
+The guardrails document records reusable rules derived from confirmed failures. The workflow document defines implementation, independent review, environment, verification, and Git handoff procedures.
+
 ## 运行环境与依赖
 
 项目目标为 Python 3.12，依赖通过 `pyproject.toml` 管理：

@@ -3,8 +3,11 @@
 [CmdletBinding()]
 param(
     [Parameter()]
-    [ValidateSet("Quick", "Full", "MySQL", "Security")]
-    [string]$Mode = "Quick"
+    [ValidateSet("Quick", "Full", "MySQL", "Security", "Offline")]
+    [string]$Mode = "Quick",
+
+    [Parameter(DontShow)]
+    [switch]$OfflineChild
 )
 
 Set-StrictMode -Version Latest
@@ -17,6 +20,7 @@ $OutputEncoding = $utf8NoBom
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot ".."))
 $pythonPath = Join-Path $repositoryRoot ".venv\Scripts\python.exe"
+$doctorPath = Join-Path $repositoryRoot "scripts\doctor.ps1"
 
 function Invoke-NativeCommand {
     param(
@@ -30,18 +34,35 @@ function Invoke-NativeCommand {
     )
 
     Write-Host "==> $Stage"
-    $output = @(& $FilePath @Arguments 2>&1)
-    $exitCode = $LASTEXITCODE
+    if ($CaptureOutput) {
+        $output = @(& $FilePath @Arguments 2>&1)
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -ne 0) {
+            throw "$Stage failed (exit code $exitCode)."
+        }
+        return $output
+    }
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $FilePath
+    $startInfo.UseShellExecute = $false
+    foreach ($argument in $Arguments) {
+        [void]$startInfo.ArgumentList.Add($argument)
+    }
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "$Stage failed to start."
+    }
+    try {
+        $process.WaitForExit()
+        $exitCode = [int]$process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
     if ($exitCode -ne 0) {
         throw "$Stage failed (exit code $exitCode)."
-    }
-    if (-not $CaptureOutput) {
-        foreach ($line in $output) {
-            Write-Host $line
-        }
-    }
-    if ($CaptureOutput) {
-        return $output
     }
 }
 
@@ -51,6 +72,98 @@ function Test-LiveDeepSeekEnabled {
         [EnvironmentVariableTarget]::Process
     )
     return $null -ne $value -and $value.Trim().ToLowerInvariant() -in @("1", "true", "yes", "on")
+}
+
+function Test-ProcessEnvironmentVariablePresent {
+    param(
+        [Parameter(Mandatory)]
+        [string]$VariableName
+    )
+
+    $value = [Environment]::GetEnvironmentVariable(
+        $VariableName,
+        [EnvironmentVariableTarget]::Process
+    )
+
+    return $null -ne $value
+}
+
+function Get-OfflineVariableNames {
+    return @(
+        "TEST_DATABASE_URL",
+        "DATABASE_URL",
+        "DEEPSEEK_API_KEY",
+        "RUN_LIVE_DEEPSEEK_TEST"
+    )
+}
+
+function Assert-OfflineEnvironment {
+    $violations = @(
+        foreach ($variableName in Get-OfflineVariableNames) {
+            if (Test-ProcessEnvironmentVariablePresent -VariableName $variableName) {
+                $variableName
+            }
+        }
+    )
+
+    if ($violations.Count -gt 0) {
+        throw "Offline child inherited prohibited environment variables: $($violations -join ', ')."
+    }
+
+    Write-Host "Offline child environment: database, Provider, and live-test variables are absent."
+}
+
+function Get-PowerShellExecutablePath {
+    $executableName = if ($IsWindows) {
+        "pwsh.exe"
+    }
+    else {
+        "pwsh"
+    }
+
+    $pwshPath = Join-Path $PSHOME $executableName
+
+    if (-not (Test-Path -LiteralPath $pwshPath -PathType Leaf)) {
+        throw "Unable to locate the current PowerShell 7 executable."
+    }
+
+    return $pwshPath
+}
+
+function Invoke-OfflineChildProcess {
+    $pwshPath = Get-PowerShellExecutablePath
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $pwshPath
+    $startInfo.UseShellExecute = $false
+    $startInfo.WorkingDirectory = $repositoryRoot
+
+    [void]$startInfo.ArgumentList.Add("-NoLogo")
+    [void]$startInfo.ArgumentList.Add("-NoProfile")
+    [void]$startInfo.ArgumentList.Add("-File")
+    [void]$startInfo.ArgumentList.Add($PSCommandPath)
+    [void]$startInfo.ArgumentList.Add("-Mode")
+    [void]$startInfo.ArgumentList.Add("Offline")
+    [void]$startInfo.ArgumentList.Add("-OfflineChild")
+
+    foreach ($variableName in Get-OfflineVariableNames) {
+        [void]$startInfo.Environment.Remove($variableName)
+    }
+
+    Write-Host "==> Starting isolated Offline verification child process"
+
+    $process = [System.Diagnostics.Process]::Start($startInfo)
+    if ($null -eq $process) {
+        throw "Failed to start the Offline verification child process."
+    }
+
+    try {
+        $process.WaitForExit()
+        return [int]$process.ExitCode
+    }
+    finally {
+        $process.Dispose()
+    }
 }
 
 function Get-SafeTestDatabaseInfo {
@@ -166,8 +279,28 @@ function Invoke-GitDiffCheck {
 
 try {
     Write-Host "Deviation Protocol verification mode: $Mode"
+
+    if ($OfflineChild -and $Mode -ne "Offline") {
+        throw "-OfflineChild is valid only with -Mode Offline."
+    }
+
+    if ($Mode -eq "Offline" -and -not $OfflineChild) {
+        $offlineExitCode = Invoke-OfflineChildProcess
+
+        if ($offlineExitCode -ne 0) {
+            throw "Offline verification child failed (exit code $offlineExitCode)."
+        }
+
+        Write-Host "Verification completed successfully: Offline"
+        exit 0
+    }
+
     if (Test-LiveDeepSeekEnabled) {
         throw "RUN_LIVE_DEEPSEEK_TEST is enabled; ordinary verification refuses to run."
+    }
+
+    if ($Mode -eq "Offline") {
+        Assert-OfflineEnvironment
     }
 
     $gitPath = Assert-Environment
@@ -211,6 +344,36 @@ try {
                 Write-Host "Dedicated dependency-direction lint: unavailable (no stable repository check exists)."
                 Write-Host "Dedicated dynamic-execution lint: unavailable (no stable repository check exists)."
                 Invoke-GitDiffCheck -GitPath $gitPath
+            }
+            "Offline" {
+                Assert-OfflineEnvironment
+
+                $pwshPath = Get-PowerShellExecutablePath
+
+                Invoke-NativeCommand `
+                    -Stage "offline doctor diagnostics" `
+                    -FilePath $pwshPath `
+                    -Arguments @(
+                        "-NoLogo",
+                        "-NoProfile",
+                        "-File",
+                        $doctorPath,
+                        "-Strict",
+                        "-RequireOffline"
+                    )
+
+                Invoke-NativeCommand `
+                    -Stage "full offline pytest" `
+                    -FilePath $pythonPath `
+                    -Arguments @("-m", "pytest")
+
+                Invoke-CompileAll
+                Invoke-PipCheck
+                Invoke-AlembicMetadataChecks
+                Invoke-GitDiffCheck -GitPath $gitPath
+
+                Write-Host "Offline verification ran without database, Provider, or live-test environment variables."
+                Write-Host "MySQL integration and live Provider tests used their existing skip guards."
             }
         }
     }

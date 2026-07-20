@@ -15,18 +15,30 @@
 
 - Never read, commit, or print secrets from `.env`.
 - Keep `RUN_LIVE_DEEPSEEK_TEST` disabled for normal development, testing, review, CI, and Codex runs. A real model call requires explicit user opt-in.
+- For tasks explicitly marked offline or no-database, run `.\scripts\verify.ps1 -Mode Offline`; it launches a sanitized child process and runs strict offline diagnostics there. If Offline mode is unavailable, stop and report it instead of running Full or MySQL verification.
+- Use `.\scripts\doctor.ps1 -Strict -RequireOffline` only when intentionally verifying that the current process environment is already clean.
 - Use MySQL 8 with SQLAlchemy `AsyncSession` and `asyncmy`; never add a SQLite fallback.
 - When database models change, check the matching Alembic migration.
 
 ## Architecture and game authority
 
+- Read `docs/engineering/guardrails.md` before changing persistence, trusted authority, narrative orchestration, scenario tooling, or verification workflows.
 - Keep dependencies directed toward the domain. `domain` must not depend on `infrastructure`.
 - Implement player-action constraints as independent policy classes.
 - Never allow model output to rewrite fixed story facts.
+- Treat user-provided fiction as style-only reference material; never copy its plot, names, prose, equipment, skills, or distinctive setting elements into production content.
+- Ordinary creative player actions must remain normal narrative actions. They must not produce anomaly candidates unless a future trusted deviation evaluator explicitly authorizes that route.
 - Add tests for every state mutation.
 
-## Verification
+## Verification and issue recording
 
 - After changes, run the full tests, `compileall`, and relevant Alembic checks.
+- Add a regression test for every confirmed defect.
+- When a confirmed defect establishes or changes a reusable engineering or safety rule, update `docs/engineering/guardrails.md` in the same change.
+- When a confirmed failure concerns Codex sessions, environment setup, review procedure, or Git handoff, update `docs/engineering/codex_workflow.md`.
+- Do not add speculative, unconfirmed, or purely one-off observations to the guardrail documents.
+- Every final implementation or review report must include a `Guardrail impact` section listing added or updated guardrail IDs, or explicitly stating `None`.
 
-See `docs/architecture.md` for the detailed design boundaries.
+See `docs/architecture.md` for detailed design boundaries.
+
+See `docs/engineering/codex_workflow.md` for implementation, review, environment, and Git handoff workflow.
