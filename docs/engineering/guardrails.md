@@ -106,6 +106,36 @@ Enforcement:
 - Repository, UoW, idempotency, rollback, and real MySQL tests
 - Alembic consistency checks
 
+## DB-002: Ending candidates require post-event memory validation
+
+Observed failure:
+
+- StoryDirector correctly produced an ended runtime and its ending event.
+- Full candidate validation ran before that event was persisted and before its
+  declarative completion rule could update `ScenarioMemoryRecord`.
+- The valid ending was therefore rejected because memory still said STARTED,
+  making public completion unreachable.
+
+Rule:
+
+- Pre-persistence validation may defer only the ending/memory invariant, and
+  only when the same resolution contains an event matched by a catalog-declared
+  `COMPLETE_SCENARIO` rule for the exact ending.
+- Structural, content, runtime, and player bindings still validate before event
+  persistence.
+- Persist and flush the authoritative event before applying memory rules.
+- Run full snapshot/catalog/memory validation after memory application and
+  before saving the snapshot and response.
+- Ending event, completed memory, snapshot, response, job, and version commit
+  atomically; any failure rolls back all of them. Narrative actions use the
+  normal Provider job. A deterministic local ending choice uses a distinct
+  attempt-zero local-template job whose text comes only from trusted content.
+
+Enforcement:
+
+- Public ASGI success and deadline-ending playtests
+- Real MySQL ending, rollback, duplicate-request, and cleanup tests
+
 ## AUTH-001: Player and model input never create authority
 
 Observed failure:
@@ -114,6 +144,8 @@ Observed failure:
   events, decision authority, or narrative outcomes.
 - A memory-rule boundary once read `sequence_no` to sort receipt-like input
   before proving that each object was an authentic repository-issued receipt.
+- Free-text phrase matching proved too weak to authorize hidden clues, and an
+  opaque event ID was once confused with the rule identity needed by `once`.
 
 Rule:
 
@@ -131,6 +163,9 @@ Authority must be issued by a trusted server-side policy and rebound to the
 current session, turn, action, state version, state fingerprint, and scenario.
 Opaque capabilities and persisted-event receipts must be authenticated before
 their bound fields are read, compared, sorted, or used to select a rule.
+Hidden clue authority requires structural server state such as a bound public
+decision, authoritative current location, and mechanical action type. Outcome
+rule identity comes from persisted evidence, never from a public event ID.
 
 Enforcement:
 
@@ -166,6 +201,8 @@ Observed failure:
 - Internal-model `dump(exclude=...)` projections could publish future fields by
   default, and an unreachable retry state was advertised publicly.
 - View snapshot-integrity failures exposed multiple internal classifications.
+- Value-level response scans found that key allowlists alone were insufficient
+  to prove internal identifiers absent from nested text and views.
 
 Rule:
 
@@ -177,6 +214,8 @@ Public DTOs derived from internal models enumerate every allowed field; they do
 not use dump/exclude projection. Public enums advertise only production-reachable
 protocol behavior. Aggregate view endpoints map known snapshot-integrity
 failures to one stable public code without catching unrelated failures.
+Tests scan both keys and serialized public values across mutation, query,
+rejection, request-status, and ended-session responses.
 
 Missing and unauthorized sessions use the same safe response.
 
@@ -237,6 +276,8 @@ Observed failure:
 
 - Prompt injection could enter through player text, history, or summaries.
 - Provider output had duplicate-key, type, size, reference, and ownership gaps.
+- Provider prose could contradict a fixed server acknowledgement even though it
+  could not mutate state.
 
 Rule:
 
@@ -245,6 +286,9 @@ Rule:
 - Strictly validate JSON, sizes, types, IDs, ownership, and visibility.
 - Valid model output is still not a world fact.
 - Model prose never rewrites fixed facts.
+- When an outcome carries fixed semantic meaning, accepted public prose comes
+  from a fixed server template; Provider prose remains an internal candidate.
+- Runtime-NPC evidence rejects every unknown instance ID, including extra IDs.
 
 Enforcement:
 

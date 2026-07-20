@@ -714,6 +714,13 @@ def test_validator_rejects_explicit_item_instance_without_ownership() -> None:
         "decision.secret_override",
         "ANOMALY_EVALUATION_REQUIRED",
         "npc.runtime.unknown",
+        "future ending ending.secret_success",
+        "rule_id=death_certificate.outcome.hidden",
+        "outcome_token=outcome." + "b" * 48,
+        "job_id=job.internal",
+        "lease_token=lease.internal",
+        "receipt=receipt.internal",
+        "provider_name=deepseek model_name=hidden",
         "a" * 64,
     ],
 )

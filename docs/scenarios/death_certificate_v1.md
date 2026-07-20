@@ -1,5 +1,7 @@
 # 《死亡证明已签发》v1 结构化副本规格
 
+当前生产 content version 为 `death-certificate-1.1.0`。版本 1.1 补齐公共 API 的完整可达 outcome 路径，不改变核心真相或七阶段结构。
+
 ## 内容与版权边界
 
 本规格及 `config/scenarios/death_certificate_v1.json` 是原创副本设计，只描述机器可读的事实、规则和短标签。它不包含参考小说原文、人物、世界观、剧情、怪物、装备、技能、专有名词、系统提示、备注或笑话，也不提供最终文学叙事。未来叙事提供者只能根据安全 `NarrativeFrame` 渲染原创文本。
@@ -31,7 +33,7 @@
 1. `death_certificate.arrival_locked`：开场唯一一次立即生存决策。
 2. `death_certificate.life_disputed`：至少三个连续 beat 后才开放一次早期策略决策。
 3. `death_certificate.disposal_escape`：沿已建立的脱离路线自动推进，不因普通移动停顿。
-4. `death_certificate.investigation`：以 beat 2、5、8 附近的三个窗口实现低频调查决策；达到证据目标可提前转场。
+4. `death_certificate.investigation`：以 beat 1、4、8 附近的三个窗口实现低频调查决策；达到证据目标可提前转场。
 5. `death_certificate.self_fulfilling_truth`：用已完成线索组呈现因果关系并连续推进。
 6. `death_certificate.core_conflict`：进入 rapid 模式，最多四个相邻的关键决策窗口。
 7. `death_certificate.resolution`：结构化结算，不强制额外选择。
@@ -42,6 +44,8 @@
 
 四个线索组分别是 `player_is_alive`、`death_record_predates_diagnosis`、`prediction_causes_outcome` 与 `underground_patient_alive`。每组为三条线索中满足两条，其中至少两条不要求职业标签；职业只能提供替代路径，不会成为通关硬门槛。
 
+生产模板为后三组各提供两条无职业门槛的必要线索。首个公开调查 choice 以固定服务器事件开放并进入 records room；当前位置内的机械 `EXPLORE`/`OBSERVE` 随后依次产生 `record_timestamp` 与 `protocol_feedback`、`audit_sequence` 与 `comparison_case`、`patient_vitals` 与 `monitor_history`。审计结果进入 observation level，患者结果开放 control room。授权不依赖隐藏口令、精确句式或文本语义；玩家直接说出隐藏答案不会生成线索，no-effect fallback 也不会开放地点。所有公开 outcome 正文来自固定服务器模板。
+
 可用标签为 `CLINICAL_LITERACY`、`SYSTEMS_REASONING`、`DOCUMENT_AUTHORITY`、`EVIDENCE_CHAIN`、`PHYSICAL_RESPONSE` 与 `DEESCALATION`。它们只影响额外信息、线索路线或合法建议动作，不决定玩家性格、不赠送物品或技能、也不保证成功。
 
 玩家只会在公开事实或支持线索已发现后看到真相。分诊协调员、档案保管员和地下观察对象各自只有明确列出的事实知识；`NarrativeFrame` 只为 `GameState.npcs` 中真实存在且当前位置可见的运行时 NPC 建立分区，并只携带其权限范围与玩家当前知识的安全交集，不能把 NPC 秘密或一个 NPC 的知识提供给另一个 NPC。
@@ -50,4 +54,6 @@
 
 `disposal_protocol`、`predicted_death_deadline`、`security_alert` 和 `underground_patient_stability` 都是有界整数时钟。只有自动 beat 或阶段声明的行动成本推进它们，阈值产生稳定事件；文本声明时间流逝没有状态权限。公开程度由各时钟定义控制。`predicted_death_deadline` 从 0 开始、在 13 达到截止阈值，每一单位表示自 02:18 起消耗的一分钟预算；02:18 与02:31本身仍是不可修改的历史记录事实。
 
-结局由声明条件评估，包括暂停处置规程、核心冲突完成或截止时钟达到上限。内容包只定义结构化结局 ID 和状态，不包含结局文学文本。
+核心冲突连续开放四个 rapid decision windows。每个选择仍必须使用当前 public Frame 的绑定 token 与 choice ID；最终正式行动由服务器目录固定生成 `core.conflict.resolved`，`final_suspend` 同时按已声明 mutable transition 将 `disposal_protocol_active` 置为 false。玩家 choice 或正文不能自带世界效果。
+
+结局由声明条件评估，包括服务器记录的具体 runtime NPC 存活承认证据、`player_is_alive` 与三个调查线索组、暂停/公开处置规程、核心冲突完成或截止时钟达到上限。公共成功路径可进入 `protocol_broken` 或 `record_challenged` RESOLVED ending；公开耗时行动把 deadline 从 0 推进到 13 时，阈值事件进入 `deadline_reached` FAILED ending。三者都由可信持久化事件触发精确匹配的 `COMPLETE_SCENARIO` memory rule，ScenarioMemoryRecord、ending、event、snapshot、response、job 和 version 原子提交。成功 ending 的最后一步是本地确定性 CHOOSE：固定结算正文来自服务器 decision template，并写入 attempt=0 的 `local-server-template-v1` COMMITTED job；不调用 Provider。

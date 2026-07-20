@@ -29,6 +29,9 @@ from deviation_protocol.application.errors import (
 )
 from deviation_protocol.application.narrative_jobs import (
     ACTIVE_NARRATIVE_JOB_STATUSES,
+    LOCAL_TEMPLATE_MODEL_NAME,
+    LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+    LOCAL_TEMPLATE_PROVIDER_NAME,
     NarrativeJob,
     NarrativeJobStatus,
 )
@@ -308,6 +311,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     uow,
                     submission,
                     game_session,
+                    state,
                     resolution,
                     frame,
                     definition,
@@ -375,6 +379,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
         uow: Any,
         submission: ActionSubmission,
         game_session: Any,
+        original_state: GameState,
         resolution: ResolutionResult,
         frame: NarrativeFrame | None,
         definition: ScenarioDefinition | None,
@@ -394,6 +399,50 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
         response = self._build_response(
             submission, resolution, resulting_version, frame
         )
+        server_narrative_text = resolution.feedback.parameters.get(
+            "_server_narrative_text"
+        )
+        if server_narrative_text is not None:
+            if not isinstance(server_narrative_text, str) or definition is None:
+                raise CandidateStateInvalidError(submission.session_id)
+            now = self._now()
+            local_request = {
+                "source": "SERVER_DECISION_TEMPLATE",
+                "action_type": submission.action_type.value,
+                "choice_id": submission.choice_id,
+                "resulting_frame_id": frame.frame_id if frame is not None else None,
+            }
+            local_proposal = {
+                "source": "SERVER_DECISION_TEMPLATE",
+                "narrative_text": server_narrative_text,
+            }
+            await uow.narrative_jobs.add(
+                NarrativeJob(
+                    job_id=self._generated_id(self.job_id_generator, "job"),
+                    session_id=submission.session_id,
+                    turn_id=submission.turn_id,
+                    client_request_id=submission.client_request_id,
+                    action_signature=submission.action_signature(),
+                    prepared_state_version=expected_version,
+                    state_fingerprint=state_fingerprint(original_state),
+                    scenario_id=definition.scenario_id,
+                    scenario_content_version=definition.content_version,
+                    request_fingerprint=self._json_digest(local_request),
+                    narrative_request=local_request,
+                    prompt_schema_version=LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+                    style_profile_version=self.style_profile_version,
+                    provider_name=LOCAL_TEMPLATE_PROVIDER_NAME,
+                    model_name=LOCAL_TEMPLATE_MODEL_NAME,
+                    status=NarrativeJobStatus.COMMITTED,
+                    attempt_count=0,
+                    validated_proposal=local_proposal,
+                    validated_proposal_digest=self._json_digest(local_proposal),
+                    outcome_rule_id="local.server_decision_template",
+                    accepted_narrative_text=server_narrative_text,
+                    created_at=now,
+                    updated_at=now,
+                )
+            )
         await uow.turn_requests.add(
             submission,
             response.action_signature,
@@ -614,6 +663,18 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 definition=definition,
                 proposal=proposal,
             )
+            selected_outcome = proposal.proposal.selected_outcome
+            assert selected_outcome is not None
+            effect = authorized.rule.effect(selected_outcome.result)
+            accepted_narrative_text = proposal.proposal.narrative_text
+            if effect.fixed_public_narrative_text is not None:
+                accepted_narrative_text = effect.fixed_public_narrative_text
+            elif effect.player_alive_acknowledgement_public_text is not None:
+                accepted_narrative_text = (
+                    accepted_narrative_text
+                    + "\n\n"
+                    + effect.player_alive_acknowledgement_public_text
+                )
             character = self.catalog.character(state.player.character_definition_id)
             if character is None:
                 raise CandidateStateInvalidError(submission.session_id)
@@ -645,6 +706,12 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     "scenario_event_id": sealed.event_id,
                     "scenario_event_type": sealed.event_type,
                     "npc_definition_ids": authorized.npc_definition_ids,
+                    "player_alive_acknowledgement_npc_definition_ids": (
+                        effect.player_alive_acknowledgement_npc_definition_ids
+                    ),
+                    "player_alive_acknowledgement_npc_ids": (
+                        sealed.player_alive_acknowledgement_npc_ids
+                    ),
                 },
             )
             result = ResolutionResult(
@@ -688,7 +755,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 narrative_required=True,
                 narrative_pending=False,
                 narrative_frame=final_frame,
-                narrative_text=proposal.proposal.narrative_text,
+                narrative_text=accepted_narrative_text,
                 narrative_status="COMMITTED",
             )
             await uow.turn_requests.add(
@@ -708,7 +775,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     "lease_owner": None,
                     "lease_expires_at": None,
                     "outcome_rule_id": authorized.rule.rule_id,
-                    "accepted_narrative_text": proposal.proposal.narrative_text,
+                    "accepted_narrative_text": accepted_narrative_text,
                     "updated_at": commit_now,
                 },
             )
@@ -861,6 +928,9 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 (request.player_intent.item_instance_id,)
                 if request.player_intent.item_instance_id is not None
                 else ()
+            ),
+            forbidden_identifiers=frozenset(
+                item.outcome_token for item in request.outcome_candidates
             ),
         )
 

@@ -36,7 +36,7 @@ def test_death_certificate_pack_loads_as_strict_versioned_scenario() -> None:
     catalog = JsonScenarioCatalogLoader(PACK).load()
     definition = catalog.scenario("death_certificate")
     assert definition is not None
-    assert definition.content_version == "death-certificate-1.0.0"
+    assert definition.content_version == "death-certificate-1.1.0"
     assert tuple(item.phase_id for item in definition.phases) == (
         "death_certificate.arrival_locked",
         "death_certificate.life_disputed",
@@ -68,10 +68,57 @@ def test_death_certificate_pack_loads_as_strict_versioned_scenario() -> None:
         for fact_id in reference.known_fact_ids
     }
     assert "death_certificate.fact.prediction_causes_outcome" not in npc_fact_ids
-    assert len(definition.memory_rules) == 14
+    assert len(definition.memory_rules) == 19
     assert tuple(rule.rule_id for rule in definition.memory_rules) == tuple(
         sorted(rule.rule_id for rule in definition.memory_rules)
     )
+    assert all(
+        effect.fixed_public_narrative_text is not None
+        for rule in definition.narrative_outcome_rules
+        for effect in rule.effects
+    )
+
+
+def test_decision_server_effect_must_use_a_declared_transition_event(
+    tmp_path: Path,
+) -> None:
+    data = payload()
+    windows = scenario(data)["decision_windows"]
+    assert isinstance(windows, list)
+    final_window = next(
+        item
+        for item in windows
+        if item["decision_id"] == "death_certificate.decision.core_four"
+    )
+    final_window["suggested_actions"][0]["server_event_type"] = (
+        "untrusted.arbitrary.event"
+    )
+
+    with pytest.raises(ScenarioPackLoadError):
+        load_changed(tmp_path, data)
+
+
+@pytest.mark.parametrize("mutation", ["unknown_location", "invisible_destination"])
+def test_narrative_location_effects_are_catalog_bounded(
+    tmp_path: Path, mutation: str
+) -> None:
+    data = payload()
+    rules = scenario(data)["narrative_outcome_rules"]
+    assert isinstance(rules, list)
+    records = next(
+        item
+        for item in rules
+        if item["rule_id"]
+        == "death_certificate.outcome.investigation_records_route"
+    )
+    effect = records["effects"][0]
+    if mutation == "unknown_location":
+        effect["opened_location_ids"] = ["death_certificate.missing"]
+    else:
+        effect["new_location_id"] = "death_certificate.intake_room"
+
+    with pytest.raises(ScenarioPackLoadError):
+        load_changed(tmp_path, data)
 
 
 @pytest.mark.parametrize(

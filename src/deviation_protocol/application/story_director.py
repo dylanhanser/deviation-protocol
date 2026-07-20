@@ -35,6 +35,7 @@ from deviation_protocol.domain.scenario import (
 )
 from deviation_protocol.domain.scenario_rules import DeclarativeConditionEvaluator
 from deviation_protocol.domain.scenario_runtime import (
+    DecisionOutcomeEvidence,
     MAX_APPLIED_SCENARIO_EVENTS,
     MAX_DECISIONS_MADE,
     NarrativeOutcomeEvidence,
@@ -185,6 +186,25 @@ class DeterministicStoryDirector:
             resolved_decision |= self._apply_verified_event(
                 runtime, definition, event, tags
             )
+            if (
+                event.decision_id is not None
+                and event.source == "VALIDATED_DECISION_RESPONSE"
+            ):
+                decision_evidence = DecisionOutcomeEvidence(
+                    decision_id=event.decision_id,
+                    scenario_event_type=event.event_type,
+                )
+                decision_evidence_by_key = {
+                    item.stable_key(): item
+                    for item in runtime.decision_outcome_evidence
+                }
+                decision_evidence_by_key.setdefault(
+                    decision_evidence.stable_key(), decision_evidence
+                )
+                runtime.decision_outcome_evidence = tuple(
+                    decision_evidence_by_key[key]
+                    for key in sorted(decision_evidence_by_key)
+                )
             if event.narrative_outcome_rule_id is not None:
                 assert event.narrative_outcome_result is not None
                 evidence = NarrativeOutcomeEvidence(
@@ -192,6 +212,12 @@ class DeterministicStoryDirector:
                     outcome_result=event.narrative_outcome_result,
                     scenario_event_type=event.event_type,
                     npc_definition_ids=event.narrative_outcome_npc_definition_ids,
+                    player_alive_acknowledgement_npc_definition_ids=(
+                        event.player_alive_acknowledgement_npc_definition_ids
+                    ),
+                    player_alive_acknowledgement_npc_ids=(
+                        event.player_alive_acknowledgement_npc_ids
+                    ),
                 )
                 evidence_by_key = {
                     item.stable_key(): item

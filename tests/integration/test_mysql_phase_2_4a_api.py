@@ -27,7 +27,6 @@ from deviation_protocol.application.narrative_turn_orchestrator import (
 )
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.session_service import SessionService
-from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.infrastructure.orm_models import (
     DomainEventRow,
     GameSessionRow,
@@ -55,25 +54,43 @@ class ScriptedOpeningProvider:
     async def generate(self, request: NarrativeRequest) -> UntrustedNarrativeProposal:
         self.calls += 1
         candidate = request.outcome_candidates[0]
-        speaker = candidate.allowed_entity_ids[0]
+        description = candidate.safe_description
+        speaker = (
+            candidate.allowed_entity_ids[0]
+            if candidate.allowed_entity_ids
+            and (
+                "临床复核" in description
+                or "生命信号" in description
+            )
+            else None
+        )
+        if "记录链" in description:
+            scene = "你查阅记录与档案，逐项核对签发时间和记录顺序。"
+        elif "审计顺序" in description:
+            scene = "你检查审计日志与规程顺序，追踪处置反馈的时间链。"
+        elif "地下观察对象" in description:
+            scene = "你观察地下患者的生命体征，并复核连续监测记录。"
+        elif "临床复核" in description:
+            scene = "设备记录了可重复反应，现场开始复核生命体征。"
+        elif candidate.allowed_results[0].value == "NO_EFFECT":
+            scene = "这次尝试没有形成可验证的新结果，现场状态保持不变。"
+        else:
+            scene = "你让仍能控制的手指反复敲出节奏，设备显示了可复核的生命信号。"
         return UntrustedNarrativeProposal(
             proposal=NarrativeProposalPayload(
                 schema_version="narrative-proposal-v1",
-                narrative_text=(
-                    "你让仍能控制的手指反复敲出节奏，监护设备的变化终于引起分诊协调员注意。"
-                    * 12
-                ),
-                referenced_entity_ids=(speaker,),
-                npc_utterances=(
+                narrative_text=scene * 20,
+                referenced_entity_ids=((speaker,) if speaker is not None else ()),
+                npc_utterances=((
                     NpcUtterance(
                         speaker_entity_id=speaker,
-                        text="我看到你的反应了，你有意识。",
+                        text="我拒绝承认任何结论，只记录设备变化。",
                     ),
-                ),
+                ) if speaker is not None else ()),
                 selected_outcome=SelectedNarrativeOutcome(
                     outcome_token=candidate.outcome_token,
-                    result=NarrativeOutcomeResult.SUCCESS,
-                    referenced_entity_ids=(speaker,),
+                    result=candidate.allowed_results[0],
+                    referenced_entity_ids=((speaker,) if speaker is not None else ()),
                 ),
             ),
             provider_metadata=NarrativeProviderMetadata(

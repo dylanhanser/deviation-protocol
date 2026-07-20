@@ -354,6 +354,24 @@ class GameState(RuntimeModel):
             if definition is None:
                 raise ValueError("snapshot references an unknown scenario")
             state.scenario_runtime.validate_against(definition)
+            for evidence in state.scenario_runtime.narrative_outcome_evidence:
+                if any(
+                    npc_id not in state.npcs
+                    for npc_id in evidence.player_alive_acknowledgement_npc_ids
+                ):
+                    raise ValueError(
+                        "player-alive acknowledgement identifies an unknown runtime NPC"
+                    )
+                acknowledged = {
+                    state.npcs[npc_id].definition_id
+                    for npc_id in evidence.player_alive_acknowledgement_npc_ids
+                }
+                if acknowledged != set(
+                    evidence.player_alive_acknowledgement_npc_definition_ids
+                ):
+                    raise ValueError(
+                        "player-alive acknowledgement does not identify matching runtime NPCs"
+                    )
         if _memory_has_records(state.player_memory):
             if scenario_catalog is None:
                 raise ValueError("scenario catalog is required for a player-memory snapshot")
@@ -460,7 +478,13 @@ class GameState(RuntimeModel):
                 rule.source_event_type
                 is MemoryRuleSourceEventType.SCENARIO_DECISION_SELECTED
             ):
-                return bool(scenario_runtime.decisions_made)
+                if not rule.required_scenario_event_types:
+                    return bool(scenario_runtime.decisions_made)
+                return any(
+                    evidence.scenario_event_type
+                    in rule.required_scenario_event_types
+                    for evidence in scenario_runtime.decision_outcome_evidence
+                )
             if (
                 rule.source_event_type
                 is MemoryRuleSourceEventType.SCENARIO_RUNTIME_EVENT_GENERATED

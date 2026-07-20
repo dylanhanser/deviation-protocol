@@ -145,6 +145,10 @@ def _production_success_memory():
             npc_definition_ids=(
                 "npc.death_certificate.triage_coordinator",
             ),
+            player_alive_acknowledgement_npc_definition_ids=(
+                "npc.death_certificate.triage_coordinator",
+            ),
+            player_alive_acknowledgement_npc_ids=("runtime-npc-1",),
         ),
     )
     learned = DeclarativePlayerMemoryRuleEngine().apply(
@@ -166,6 +170,9 @@ def _production_success_memory():
                     "outcome_result": "SUCCESS",
                     "scenario_event_type": "vitals.verified",
                     "npc_definition_ids": (
+                        "npc.death_certificate.triage_coordinator",
+                    ),
+                    "player_alive_acknowledgement_npc_definition_ids": (
                         "npc.death_certificate.triage_coordinator",
                     ),
                 },
@@ -1192,9 +1199,13 @@ def test_initial_public_memory_and_authoritatively_learned_npc_fact_pass() -> No
             "outcome_rule_id": "death_certificate.outcome.purposeful_life_signal",
             "outcome_result": "SUCCESS",
             "scenario_event_type": "vitals.verified",
-            "npc_definition_ids": [
-                "npc.death_certificate.triage_coordinator"
-            ],
+                "npc_definition_ids": [
+                    "npc.death_certificate.triage_coordinator"
+                ],
+                "player_alive_acknowledgement_npc_definition_ids": [
+                    "npc.death_certificate.triage_coordinator"
+                ],
+                "player_alive_acknowledgement_npc_ids": ["runtime-npc-1"],
         },
     )
 
@@ -1402,8 +1413,26 @@ def test_success_only_npc_memory_rejects_other_once_rule_results(
     evidence = payload["scenario_runtime"]["narrative_outcome_evidence"][0]
     evidence["outcome_result"] = result
     evidence["scenario_event_type"] = event_type
+    evidence["player_alive_acknowledgement_npc_definition_ids"] = []
+    evidence["player_alive_acknowledgement_npc_ids"] = []
 
     with pytest.raises(DomainRuleViolation, match="was not encountered"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_player_alive_acknowledgement_rejects_unknown_runtime_npc_id() -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    evidence = payload["scenario_runtime"]["narrative_outcome_evidence"][0]
+    evidence["player_alive_acknowledgement_npc_ids"].append(
+        "zz-missing-runtime-npc"
+    )
+
+    with pytest.raises(ValueError, match="unknown runtime NPC"):
         GameState.from_snapshot(
             payload,
             catalog=catalog.content_catalog,
@@ -1797,6 +1826,7 @@ def test_trusted_decision_event_can_complete_scenario_but_not_invent_world_succe
             "rule_version": "1.0.0",
             "source_event_type": "ScenarioDecisionSelected",
             "operation": "COMPLETE_SCENARIO",
+            "required_scenario_event_types": ["beacon.disabled"],
             "requires_scenario_completed": True,
             "allowed_ending_ids": ["alpine.ending.arrived"],
         },
@@ -1821,7 +1851,7 @@ def test_trusted_decision_event_can_complete_scenario_but_not_invent_world_succe
             ),
         ),
     )
-    completed = engine.apply(
+    unrelated = engine.apply(
         state=started,
         definition=definition,
         session_id=SESSION_ID,
@@ -1832,7 +1862,31 @@ def test_trusted_decision_event_can_complete_scenario_but_not_invent_world_succe
                 event_type="ScenarioDecisionSelected",
                 sequence=2,
                 turn_id="turn-choice",
-                payload={"choice_id": "alpine.choice.wait"},
+                payload={
+                    "choice_id": "alpine.choice.wait",
+                    "scenario_event_type": "unrelated.world.event",
+                },
+            ),
+        ),
+    )
+    assert unrelated.player_memory.scenario_records[0].status is (
+        ScenarioMemoryStatus.STARTED
+    )
+    completed = engine.apply(
+        state=unrelated,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-choice-verified",
+        state_version=STATE_VERSION,
+        receipts=(
+            _receipt(
+                event_type="ScenarioDecisionSelected",
+                sequence=3,
+                turn_id="turn-choice-verified",
+                payload={
+                    "choice_id": "alpine.choice.wait",
+                    "scenario_event_type": "beacon.disabled",
+                },
             ),
         ),
     )

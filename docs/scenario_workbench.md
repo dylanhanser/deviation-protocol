@@ -2,7 +2,7 @@
 
 Scenario Workbench 是完全本地、确定性的副本内容工具。第一阶段的检查命令保持只读；第二阶段增加安全、确定性且不覆盖现有内容的 `scenario new` 草案脚手架。所有命令复用正式 `JsonScenarioCatalogLoader`、`ScenarioCatalog`、`ContentCatalog`、`GameState` 和 `DeterministicStoryDirector`；不读取 `.env`，不连接数据库，不调用 NarrativeProvider，也不发送网络请求。
 
-Workbench 的 preview/analyze 或直接 StoryDirector 测试只能证明内容和领域推进在本地可计算，不能证明玩家能从公共 API 到达同一状态。生产可达性声明必须由经过 ownership、ActionGateway、事务编排、Repository 和严格 HTTP schema 的公共入口测试覆盖。Phase 2.4a 的公共 playtest 只证明 `death_certificate` 从创建到 `life_disputed` 首个后续决策可达；Workbench 的七阶段结构可达分析不代表七阶段已经完整可玩。
+Workbench 的 preview/analyze 或直接 StoryDirector 测试只能证明内容和领域推进在本地可计算，不能证明玩家能从公共 API 到达同一状态。生产可达性声明必须由经过 ownership、ActionGateway、事务编排、Repository 和严格 HTTP schema 的公共入口测试覆盖。Phase 2.4b 另有完整公共 ASGI happy/deadline playtest；Workbench 负责补充证明目录有效、七阶段无结构不可达节点、必要线索存在声明式生产来源和 cadence 保持 sparse/rapid 边界。
 
 ## 命令
 
@@ -101,7 +101,9 @@ preview 的 content pack 必须使用同一正式 content version。Workbench �
 
 ## validate
 
-`validate` 直接通过现有严格 loader 和 `ScenarioCatalog`，不会在 CLI 中维护第二套验证器。它覆盖现有模型已经实施的 JSON/重复 key、schema/content version、额外字段、ID 与交叉引用、必要阶段可达性、自动循环上界、事实变化、decision cadence、outcome effect 边界、声明式 memory rules，以及文件大小、嵌套、集合和字符串限制。正式目录验证成功后还会运行有界静态分析；若存在阻断级诊断，输出验证摘要并退出 `2`，不会以成功退出码掩盖 analyzer 的错误。
+`validate` 直接通过现有严格 loader 和 `ScenarioCatalog`，不会在 CLI 中维护第二套验证器。它覆盖现有模型已经实施的 JSON/重复 key、schema/content version、额外字段、ID 与交叉引用、必要阶段可达性、自动循环上界、事实变化、decision cadence、outcome clue/location effect 边界、decision 固定 server event/fact effect、声明式 memory rules，以及文件大小、嵌套、集合和字符串限制。正式目录验证成功后还会运行有界静态分析；若存在阻断级诊断，输出验证摘要并退出 `2`，不会以成功退出码掩盖 analyzer 的错误。
+
+Analyzer 的 `declared_source` 统计按单条 clue 计数。`death_certificate` 每个 required clue group 的阈值为三取二，因此正式生产路径只要求每组至少两条无职业门槛 clue 有 outcome producer；剩余可选 clue 的 `CLUE_NO_DECLARED_DISCOVERY_PRODUCER` warning 不等同于 required path 不可达。静态 analyzer 同样不会把 decision 或 auto-beat event 误报成 Narrative outcome producer；这些效果由目录校验和公共 playtest 覆盖。
 
 ### 声明式 memory rules
 

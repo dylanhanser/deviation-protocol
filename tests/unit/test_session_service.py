@@ -254,7 +254,7 @@ async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
     assert state.scenario_runtime is not None
     assert state.scenario_runtime.scenario_id == "death_certificate"
     assert state.scenario_runtime.scenario_content_version == (
-        "death-certificate-1.0.0"
+        "death-certificate-1.1.0"
     )
     assert set(state.npcs) == {
         "scenario-npc-1",
@@ -291,7 +291,7 @@ async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
         allow_nan=False,
     ).encode("utf-8")
     assert hashlib.sha256(stable_json(snapshot.state)).hexdigest() == (
-        "376f55d10a474da9b96141b479f085cf07333c8d0c19fc3a3be06374bf95d2f5"
+        "90c67ba155dc5613fed1fc2df78b85012fe1606e5b25d22d2eb2db4861446441"
     )
     assert len(store.events) == 1
     assert store.events[0].event_type == "ScenarioStarted"
@@ -299,15 +299,15 @@ async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
     assert len(state.player_memory.known_public_facts) == 7
     assert len(state.player_memory.significant_experiences) == 1
     assert result.narrative_frame.decision_id == (
-        "decision.758c3b9771b465e887dedbdd889c41b6"
+        "decision.6403b6c1ecc381356e375b4b717ba593"
     )
-    assert result.narrative_frame.frame_id == "frame.a574b515114fbc5bd5a077d1"
+    assert result.narrative_frame.frame_id == "frame.e48125f7ff8626d234613a03"
     assert hashlib.sha256(
         stable_json(result.narrative_frame.model_dump(mode="json"))
-    ).hexdigest() == "b87ede1103fce1af130b56bede83f760b87a842b34057683162c8eced79e3d48"
+    ).hexdigest() == "61bb717d26729aae8ef15a2ca073d286ff0e658887ee77ad619515aa36ce7a97"
     assert hashlib.sha256(
         stable_json(result.model_dump(mode="json"))
-    ).hexdigest() == "16c1b4f844175b21f80b9af1c1e1c17628ef84883268fa9baf41c28562760ae8"
+    ).hexdigest() == "9325ad2a205d916e649f9a199f43432c2e9c630ff0b434a462861c9af56890c1"
     projection = await service.get_visible_state(principal(), result.session_id)
     assert [(item.npc_id, item.npc_definition_id) for item in projection.visible_npcs] == [
         (

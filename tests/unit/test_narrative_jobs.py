@@ -6,6 +6,9 @@ import pytest
 from pydantic import ValidationError
 
 from deviation_protocol.application.narrative_jobs import (
+    LOCAL_TEMPLATE_MODEL_NAME,
+    LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+    LOCAL_TEMPLATE_PROVIDER_NAME,
     MAX_NARRATIVE_JOB_JSON_BYTES,
     NarrativeJob,
     NarrativeJobStatus,
@@ -90,3 +93,35 @@ def test_committed_job_requires_complete_candidate_rule_and_accepted_text() -> N
     )
     assert committed.accepted_narrative_text == "accepted"
 
+
+def test_local_template_job_is_committed_without_a_provider_attempt() -> None:
+    payload = {
+        "source": "SERVER_DECISION_TEMPLATE",
+        "narrative_text": "固定服务器结算正文",
+    }
+    local = _job(
+        prompt_schema_version=LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+        provider_name=LOCAL_TEMPLATE_PROVIDER_NAME,
+        model_name=LOCAL_TEMPLATE_MODEL_NAME,
+        status=NarrativeJobStatus.COMMITTED,
+        attempt_count=0,
+        validated_proposal=payload,
+        validated_proposal_digest="d" * 64,
+        outcome_rule_id="local.server_decision_template",
+        accepted_narrative_text="固定服务器结算正文",
+    )
+    assert local.status is NarrativeJobStatus.COMMITTED
+    assert local.attempt_count == 0
+
+    with pytest.raises(ValidationError, match="local template narrative job"):
+        _job(
+            prompt_schema_version=LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+            provider_name=LOCAL_TEMPLATE_PROVIDER_NAME,
+            model_name=LOCAL_TEMPLATE_MODEL_NAME,
+            status=NarrativeJobStatus.COMMITTED,
+            attempt_count=1,
+            validated_proposal=payload,
+            validated_proposal_digest="d" * 64,
+            outcome_rule_id="local.server_decision_template",
+            accepted_narrative_text="固定服务器结算正文",
+        )

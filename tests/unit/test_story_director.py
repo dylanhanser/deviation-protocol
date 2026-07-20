@@ -13,6 +13,7 @@ from deviation_protocol.application.story_director import (
 )
 from deviation_protocol.domain.actions import ActionSubmission
 from deviation_protocol.domain.facts import FactKind, StoryFact, StoryMutation, StoryMutationError, StoryMutationValidator
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.domain.scenario import FrameMode, ScenarioCatalog
 from deviation_protocol.domain.scenario_runtime import (
     FactValueUpdate,
@@ -1136,13 +1137,16 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
     character = catalog.content_catalog.character("character.death_certificate.investigator")
     assert character is not None
     director = DeterministicStoryDirector()
-    current = director.start_scenario(
-        GameState(
-            content_version=catalog.content_version,
-            player=PlayerState.from_definition("player-1", character),
-        ),
-        definition,
+    initial_state = GameState(
+        content_version=catalog.content_version,
+        player=PlayerState.from_definition("player-1", character),
     )
+    initial_state.spawn_npc(
+        catalog.content_catalog,
+        "npc.death_certificate.triage_coordinator",
+        "runtime-triage-coordinator",
+    )
+    current = director.start_scenario(initial_state, definition)
     visited = [current.candidate_state.scenario_runtime.current_phase_id]
 
     current = director.advance_after_verified_result(
@@ -1159,7 +1163,36 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
         ),
     )
     visited.append(current.candidate_state.scenario_runtime.current_phase_id)
-    for _ in range(3):
+    current = director.advance_after_verified_result(
+        current.candidate_state,
+        definition,
+        (
+            VerifiedScenarioEvent(
+                event_id="event.clinical-review",
+                event_type="clinical.reviewed",
+                source="VALIDATED_NARRATIVE_OUTCOME",
+                action_type="investigate",
+                discovered_clue_ids=(
+                    "death_certificate.clue.vital_response",
+                    "death_certificate.clue.coherent_response",
+                ),
+                narrative_outcome_rule_id=(
+                    "death_certificate.outcome.life_disputed_clinical_recheck"
+                ),
+                narrative_outcome_result=NarrativeOutcomeResult.SUCCESS,
+                narrative_outcome_npc_definition_ids=(
+                    "npc.death_certificate.triage_coordinator",
+                ),
+                    player_alive_acknowledgement_npc_definition_ids=(
+                        "npc.death_certificate.triage_coordinator",
+                    ),
+                    player_alive_acknowledgement_npc_ids=tuple(
+                        sorted(current.candidate_state.npcs)
+                    ),
+                ),
+        ),
+    )
+    for _ in range(2):
         current = director.advance_after_verified_result(
             current.candidate_state, definition
         )
@@ -1196,12 +1229,14 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
             ),
         ),
         (
-            VerifiedScenarioEvent(
-                event_id="event.protocol-feedback",
-                event_type="protocol.feedback_verified",
-                action_type="investigate",
-                discovered_clue_ids=("death_certificate.clue.protocol_feedback",),
-            ),
+                VerifiedScenarioEvent(
+                    event_id="event.protocol-feedback",
+                    event_type="protocol.feedback_verified",
+                    action_type="investigate",
+                    discovered_clue_ids=("death_certificate.clue.protocol_feedback",),
+                    decision_id="death_certificate.decision.investigation_route_one",
+                    resolves_current_decision=True,
+                ),
             VerifiedScenarioEvent(
                 event_id="event.case-comparison",
                 event_type="case.compared",
@@ -1213,12 +1248,10 @@ def test_death_scenario_all_seven_phases_are_reachable_through_generic_runtime()
                 event_id="event.patient-vitals",
                 event_type="patient.vitals_verified",
                 action_type="investigate",
-                discovered_clue_ids=("death_certificate.clue.patient_vitals",),
-                opened_location_ids=("death_certificate.observation_level",),
-                new_location_id="death_certificate.observation_level",
-                decision_id="death_certificate.decision.investigation_route_one",
-                resolves_current_decision=True,
-            ),
+                    discovered_clue_ids=("death_certificate.clue.patient_vitals",),
+                    opened_location_ids=("death_certificate.observation_level",),
+                    new_location_id="death_certificate.observation_level",
+                ),
             VerifiedScenarioEvent(
                 event_id="event.patient-history",
                 event_type="patient.history_verified",

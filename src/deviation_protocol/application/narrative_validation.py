@@ -18,6 +18,22 @@ _INTERNAL_TEXT_MARKERS = (
     "state_version",
     "client_request_id",
     "turn_id",
+    "rule_id",
+    "rule id",
+    "outcome_token",
+    "outcome token",
+    "job_id",
+    "job id",
+    "lease_token",
+    "lease token",
+    "receipt",
+    "provider_name",
+    "provider name",
+    "model_name",
+    "model name",
+    "narrative_job",
+    "narrative job",
+    "future ending",
     "trustedscenarioeventissuer",
     "trusted_scenario_event_issuer",
     "verifiedscenarioevent",
@@ -46,7 +62,8 @@ _INTERNAL_TEXT_MARKERS = (
 )
 _INTERNAL_ID_PATTERN = re.compile(
     r"\b(?:frame|scenario|phase|decision|fact|clue|event|seal|capability|npc|"
-    r"location|item|skill|clock|resource|currency|attribute|choice)\."
+    r"location|item|skill|clock|resource|currency|attribute|choice|ending|"
+    r"outcome|rule|job|lease|provider|model|receipt)\."
     r"[A-Za-z0-9_.:-]+",
     re.IGNORECASE,
 )

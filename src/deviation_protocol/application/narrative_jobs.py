@@ -11,6 +11,9 @@ from deviation_protocol.domain.json_values import FrozenJsonDict, freeze_bounded
 
 
 MAX_NARRATIVE_JOB_JSON_BYTES = 128_000
+LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION = "local-server-template-v1"
+LOCAL_TEMPLATE_PROVIDER_NAME = "local-server"
+LOCAL_TEMPLATE_MODEL_NAME = "fixed-decision-template"
 
 
 class NarrativeJobStatus(StrEnum):
@@ -99,6 +102,31 @@ class NarrativeJob(BaseModel):
 
     @model_validator(mode="after")
     def validate_lifecycle_shape(self) -> NarrativeJob:
+        local_template = (
+            self.prompt_schema_version == LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION
+        )
+        if local_template:
+            if (
+                self.provider_name != LOCAL_TEMPLATE_PROVIDER_NAME
+                or self.model_name != LOCAL_TEMPLATE_MODEL_NAME
+                or self.status is not NarrativeJobStatus.COMMITTED
+                or self.attempt_count != 0
+                or any(
+                    value is not None
+                    for value in (
+                        self.lease_token,
+                        self.lease_owner,
+                        self.lease_expires_at,
+                        self.error_code,
+                    )
+                )
+                or self.validated_proposal is None
+                or self.validated_proposal_digest is None
+                or self.outcome_rule_id != "local.server_decision_template"
+                or self.accepted_narrative_text is None
+            ):
+                raise ValueError("local template narrative job is incomplete")
+            return self
         leased = self.status in {
             NarrativeJobStatus.IN_PROGRESS,
             NarrativeJobStatus.PROPOSAL_VALIDATED,

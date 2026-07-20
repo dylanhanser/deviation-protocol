@@ -55,6 +55,9 @@ def allowed_narrative_outcomes(
     if runtime is None:
         return ()
     runtime.validate_against(definition)
+    applied_outcome_rule_ids = {
+        item.outcome_rule_id for item in runtime.narrative_outcome_evidence
+    }
     visible_npcs_by_definition: dict[str, list[str]] = {}
     visible_ids = set(frame.visible_entities)
     for npc_id, npc in state.npcs.items():
@@ -74,12 +77,25 @@ def allowed_narrative_outcomes(
             term in text for term in rule.intent.required_any_terms
         ):
             continue
+        if rule.intent.required_action_terms and not any(
+            term in text for term in rule.intent.required_action_terms
+        ):
+            continue
         if any(term in text for term in rule.intent.forbidden_terms):
             continue
         if rule.intent.requires_target and not submission.target_ids:
             continue
         if rule.required_current_decision_ids and (
             runtime.current_decision_id not in rule.required_current_decision_ids
+        ):
+            continue
+        if rule.required_current_location_ids and (
+            runtime.current_location_id not in rule.required_current_location_ids
+        ):
+            continue
+        if runtime.current_decision_id is not None and (
+            runtime.current_decision_id not in rule.required_current_decision_ids
+            or any(not effect.resolves_current_decision for effect in rule.effects)
         ):
             continue
         if not set(rule.required_clue_ids) <= set(runtime.discovered_clue_ids):
@@ -99,7 +115,7 @@ def allowed_narrative_outcomes(
             continue
         for definition_id in rule.required_visible_npc_definition_ids:
             required_runtime_npcs.extend(visible_npcs_by_definition[definition_id])
-        if rule.once and rule.rule_id in runtime.applied_event_ids:
+        if rule.once and rule.rule_id in applied_outcome_rule_ids:
             continue
         eligible.append((rule, tuple(sorted(required_runtime_npcs))))
 
@@ -221,21 +237,10 @@ class NarrativeOutcomePolicy:
         ).casefold()
         if any(term in prose for term in effect.forbidden_prose_terms):
             raise ValueError("narrative prose contradicts the structured outcome")
-        visible_speakers = set(matched.candidate.allowed_entity_ids)
-        visible_utterances = tuple(
-            item.text.casefold()
-            for item in proposal.proposal.npc_utterances
-            if item.speaker_entity_id in visible_speakers
-        )
-        if effect.requires_visible_npc_utterance:
-            if not visible_utterances:
-                raise ValueError("authorized outcome requires a visible NPC utterance")
-            if effect.required_visible_npc_utterance_any_terms and not any(
-                term in utterance
-                for term in effect.required_visible_npc_utterance_any_terms
-                for utterance in visible_utterances
-            ):
-                raise ValueError("visible NPC utterance does not support the outcome")
+        if effect.required_prose_any_terms and not any(
+            term in prose for term in effect.required_prose_any_terms
+        ):
+            raise ValueError("narrative prose does not render the authorized outcome")
 
         npc_definition_ids = _authorized_memory_npc_definition_ids(
             definition=definition,
@@ -311,11 +316,31 @@ class NarrativeEventIssuer:
         if result is None or result.result.value != authorized.result_name:
             raise ValueError("narrative result changed after authorization")
         effect = authorized.rule.effect(result.result)
-        event_id = (
-            authorized.rule.rule_id
-            if authorized.rule.once
-            else "narrative." + hashlib.sha256(job_id.encode("utf-8")).hexdigest()[:32]
+        acknowledgement_definitions = set(
+            effect.player_alive_acknowledgement_npc_definition_ids
         )
+        acknowledgement_runtime_ids = tuple(
+            sorted(
+                npc_id
+                for npc_id, npc in state.npcs.items()
+                if npc.definition_id in acknowledgement_definitions
+            )
+        )
+        if acknowledgement_definitions and {
+            state.npcs[npc_id].definition_id
+            for npc_id in acknowledgement_runtime_ids
+        } != acknowledgement_definitions:
+            raise ValueError(
+                "player-alive acknowledgement lacks a concrete runtime NPC"
+            )
+        event_id_seed = (
+            authorized.rule.rule_id + "\0" + definition.content_version
+            if authorized.rule.once
+            else job_id
+        )
+        event_id = "narrative." + hashlib.sha256(
+            event_id_seed.encode("utf-8")
+        ).hexdigest()[:32]
         return _seal_verified_scenario_event(
             VerifiedScenarioEvent(
                 event_id=event_id,
@@ -334,11 +359,19 @@ class NarrativeEventIssuer:
                     FactValueUpdate(fact_id=item.fact_id, value=item.value)
                     for item in effect.mutable_fact_updates
                 ),
+                opened_location_ids=effect.opened_location_ids,
+                new_location_id=effect.new_location_id,
                 resolves_current_decision=effect.resolves_current_decision,
                 expose_in_frame=effect.expose_in_frame,
                 narrative_outcome_rule_id=authorized.rule.rule_id,
                 narrative_outcome_result=result.result,
                 narrative_outcome_npc_definition_ids=authorized.npc_definition_ids,
+                player_alive_acknowledgement_npc_definition_ids=(
+                    effect.player_alive_acknowledgement_npc_definition_ids
+                ),
+                player_alive_acknowledgement_npc_ids=(
+                    acknowledgement_runtime_ids
+                ),
             )
         )
 

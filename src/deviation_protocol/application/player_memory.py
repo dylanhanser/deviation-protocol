@@ -774,6 +774,14 @@ def _memory_rule_matches(
         return False
     if (
         rule.source_event_type
+        is MemoryRuleSourceEventType.SCENARIO_DECISION_SELECTED
+        and rule.required_scenario_event_types
+        and payload.get("scenario_event_type")
+        not in rule.required_scenario_event_types
+    ):
+        return False
+    if (
+        rule.source_event_type
         is MemoryRuleSourceEventType.NARRATIVE_OUTCOME_ACCEPTED
     ):
         if rule.required_narrative_outcome_rule_ids and payload.get(

@@ -56,6 +56,7 @@ from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent, DomainEventDraft
 from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.memory_rules import MemoryRuleOperation
 from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.state import (
     DomainErrorCode,
@@ -223,10 +224,11 @@ class FirstPhaseTurnOrchestrator:
         expected_version: int,
     ) -> GameState:
         # Reject malformed candidates before issuing any database capability.
-        self._validated_candidate_snapshot(
+        self._preflight_candidate_snapshot(
             resolution,
             submission.session_id,
             expected_player_id=game_session.player_id,
+            definition=definition,
         )
         assert resolution.updated_state is not None
         first_sequence_no = await uow.sessions.next_event_sequence_no(
@@ -326,6 +328,96 @@ class FirstPhaseTurnOrchestrator:
         except (DomainRuleViolation, ValidationError, TypeError, ValueError):
             raise CandidateStateInvalidError(session_id) from None
 
+    def _preflight_candidate_snapshot(
+        self,
+        resolution: ResolutionResult,
+        session_id: str,
+        *,
+        expected_player_id: str,
+        definition: ScenarioDefinition | None,
+    ) -> dict[str, Any]:
+        try:
+            return self._validated_candidate_snapshot(
+                resolution,
+                session_id,
+                expected_player_id=expected_player_id,
+            )
+        except CandidateStateInvalidError:
+            candidate = resolution.updated_state
+            runtime = candidate.scenario_runtime if candidate is not None else None
+            completion_is_pending = (
+                candidate is not None
+                and definition is not None
+                and runtime is not None
+                and runtime.ending_status is not EndingStatus.ACTIVE
+                and runtime.ending_id is not None
+                and any(
+                    rule.operation is MemoryRuleOperation.COMPLETE_SCENARIO
+                    and runtime.ending_id in rule.allowed_ending_ids
+                    and any(
+                        event.event_type == rule.source_event_type.value
+                        and (
+                            not rule.required_scenario_event_types
+                            or event.payload.get("scenario_event_type")
+                            in rule.required_scenario_event_types
+                        )
+                        and (
+                            not rule.required_outcome_results
+                            or event.payload.get("outcome_result")
+                            in {
+                                result.value
+                                for result in rule.required_outcome_results
+                            }
+                        )
+                        and (
+                            not rule.required_narrative_outcome_rule_ids
+                            or event.payload.get("outcome_rule_id")
+                            in rule.required_narrative_outcome_rule_ids
+                        )
+                        for event in resolution.events
+                    )
+                    for rule in definition.memory_rules
+                )
+            )
+            if not completion_is_pending or candidate.player.player_id != expected_player_id:
+                raise
+            try:
+                snapshot = candidate.to_snapshot()
+                records = snapshot["player_memory"]["scenario_records"]
+                record = next(
+                    (
+                        item
+                        for item in records
+                        if item["scenario_id"] == runtime.scenario_id
+                    ),
+                    None,
+                )
+                if (
+                    record is None
+                    or record["status"] != "STARTED"
+                    or record["ending_id"] is not None
+                ):
+                    raise ValueError(
+                        "ending preflight may defer only an uncompleted scenario record"
+                    )
+                record["status"] = "COMPLETED"
+                record["ending_id"] = runtime.ending_id
+                record["milestone_refs"] = sorted(
+                    {
+                        *record["milestone_refs"],
+                        "COMPLETED",
+                        "ENDING_CONFIRMED",
+                    }
+                )
+                GameState.from_snapshot(
+                    snapshot,
+                    catalog=self.catalog,
+                    scenario_catalog=self.scenario_catalog,
+                )
+                return candidate.to_snapshot()
+            except (DomainRuleViolation, ValidationError, TypeError, ValueError):
+                raise CandidateStateInvalidError(session_id) from None
+
     def _envelope_events(
         self,
         resolution: ResolutionResult,
@@ -374,6 +466,9 @@ class FirstPhaseTurnOrchestrator:
         )
         is_narrative = resolution.status is ResolutionStatus.NARRATIVE_REQUIRED
         feedback_parameters = _writable_json_copy(resolution.feedback.parameters)
+        server_narrative_text = feedback_parameters.pop(
+            "_server_narrative_text", None
+        )
         return TurnResponse(
             session_id=submission.session_id,
             client_request_id=submission.client_request_id,
@@ -387,6 +482,7 @@ class FirstPhaseTurnOrchestrator:
             narrative_required=is_narrative,
             narrative_pending=is_narrative,
             narrative_frame=narrative_frame,
+            narrative_text=server_narrative_text,
             narrative_status=("PENDING" if is_narrative else None),
             local_query_result=(
                 _writable_json_copy(resolution.feedback.parameters) if is_query else None
@@ -626,6 +722,15 @@ class FirstPhaseTurnOrchestrator:
                         {
                             "decision_id": validated.decision_id,
                             "selected_action_id": validated.selected_action.action_id,
+                            **(
+                                {
+                                    "_server_narrative_text": (
+                                        issued.server_narrative_text
+                                    )
+                                }
+                                if issued.server_narrative_text is not None
+                                else {}
+                            ),
                         },
                     ),
                 ),

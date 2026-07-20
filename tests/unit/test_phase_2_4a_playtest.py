@@ -32,6 +32,10 @@ from deviation_protocol.application.narrative_models import (
 from deviation_protocol.application.narrative_turn_orchestrator import (
     DurableNarrativeTurnOrchestrator,
 )
+from deviation_protocol.application.narrative_prompt import (
+    PromptBuilder,
+    default_style_profile,
+)
 from deviation_protocol.application.ports import (
     PersistedSession,
     PersistedSnapshot,
@@ -103,6 +107,7 @@ class MemoryStore:
         self.events: list[DomainEvent] = []
         self.session_locks: dict[str, asyncio.Lock] = {}
         self.commit_lock = asyncio.Lock()
+        self.active_uows = 0
 
 
 class MemorySessionRepository:
@@ -335,11 +340,13 @@ class MemoryUnitOfWork:
         self.committed = False
 
     async def __aenter__(self) -> MemoryUnitOfWork:
+        self.store.active_uows += 1
         return self
 
     async def __aexit__(self, *args: object) -> None:
         if self.lock is not None:
             self.lock.release()
+        self.store.active_uows -= 1
 
     async def commit(self) -> None:
         async with self.store.commit_lock:
@@ -392,35 +399,56 @@ class MemoryUnitOfWork:
 
 
 class BlockingScriptedProvider:
-    def __init__(self) -> None:
+    def __init__(self, store: MemoryStore) -> None:
+        self.store = store
         self.calls = 0
+        self.requests: list[NarrativeRequest] = []
+        self.prompt_budgets: list[tuple[int, int]] = []
         self.entered = asyncio.Event()
         self.release = asyncio.Event()
+        self.prompt_builder = PromptBuilder(profiles=(default_style_profile(),))
 
     async def generate(self, request: NarrativeRequest) -> UntrustedNarrativeProposal:
+        assert self.store.active_uows == 0
+        assert not any(lock.locked() for lock in self.store.session_locks.values())
         self.calls += 1
+        self.requests.append(request)
+        prompt = self.prompt_builder.build(request)
+        combined = prompt.system + prompt.user
+        self.prompt_budgets.append((len(combined), len(combined.encode("utf-8"))))
         self.entered.set()
         await self.release.wait()
         candidate = request.outcome_candidates[0]
-        speaker = candidate.allowed_entity_ids[0]
+        speaker = candidate.allowed_entity_ids[0] if candidate.allowed_entity_ids else None
+        result = candidate.allowed_results[0]
+        description = candidate.safe_description
+        if "记录链" in description:
+            scene = "你查阅记录与档案，逐项核对签发时间和记录顺序。"
+        elif "审计顺序" in description:
+            scene = "你检查审计日志与规程顺序，追踪处置反馈的时间链。"
+        elif "地下观察对象" in description:
+            scene = "你观察地下患者的生命体征，并复核连续监测记录。"
+        elif "临床复核" in description:
+            scene = "设备记录了可重复反应，现场开始复核生命体征。"
+        elif result is NarrativeOutcomeResult.NO_EFFECT:
+            scene = "这次尝试没有形成可验证的新结果，现场状态保持不变。"
+        else:
+            scene = "你让仍能控制的手指反复敲出节奏，设备显示了可复核的生命信号。"
         return UntrustedNarrativeProposal(
             proposal=NarrativeProposalPayload(
                 schema_version="narrative-proposal-v1",
-                narrative_text=(
-                    "你让仍能控制的手指反复敲出节奏，设备的变化让分诊协调员停下处置并重新核对。"
-                    * 12
-                ),
-                referenced_entity_ids=(speaker,),
-                npc_utterances=(
+                narrative_text=scene * 20,
+                referenced_entity_ids=((speaker,) if speaker is not None else ()),
+                npc_utterances=((
                     NpcUtterance(
                         speaker_entity_id=speaker,
-                        text="我看到你的反应了，你有意识。",
+                        text="我拒绝承认任何结论，只记录设备变化。",
                     ),
-                ),
+                ) if speaker is not None else ()),
                 selected_outcome=SelectedNarrativeOutcome(
                     outcome_token=candidate.outcome_token,
-                    result=NarrativeOutcomeResult.SUCCESS,
-                    referenced_entity_ids=(speaker,),
+                    result=result,
+                    referenced_entity_ids=((speaker,) if speaker is not None else ()),
                 ),
             ),
             provider_metadata=NarrativeProviderMetadata(
@@ -490,7 +518,7 @@ async def asgi_request(
 def build_playtest() -> tuple[FastAPI, MemoryStore, BlockingScriptedProvider]:
     scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
     store = MemoryStore()
-    provider = BlockingScriptedProvider()
+    provider = BlockingScriptedProvider(store)
     uow_factory = lambda: MemoryUnitOfWork(store)
     service = SessionService(
         uow_factory=uow_factory,
@@ -502,6 +530,12 @@ def build_playtest() -> tuple[FastAPI, MemoryStore, BlockingScriptedProvider]:
         event_id_generator=lambda: "playtest-start-event",
     )
     event_number = iter(range(1, 30))
+    job_number = iter(range(1, 30))
+
+    def next_job_id() -> str:
+        number = next(job_number)
+        return "playtest-job" if number == 1 else f"playtest-job-{number}"
+
     orchestrator = DurableNarrativeTurnOrchestrator(
         resolver=DeterministicRuleResolver(),
         uow_factory=uow_factory,
@@ -512,7 +546,7 @@ def build_playtest() -> tuple[FastAPI, MemoryStore, BlockingScriptedProvider]:
         model_name="offline-script",
         clock=lambda: NOW,
         lease_duration=timedelta(minutes=2),
-        job_id_generator=lambda: "playtest-job",
+        job_id_generator=next_job_id,
         lease_token_generator=lambda: "a" * 32,
         worker_id_generator=lambda: "playtest-worker",
         event_id_generator=lambda: f"playtest-event-{next(event_number)}",

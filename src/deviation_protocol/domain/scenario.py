@@ -18,7 +18,10 @@ from deviation_protocol.domain.json_values import (
     freeze_bounded_json_value,
     json_values_equal,
 )
-from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeRuleDefinition
+from deviation_protocol.domain.narrative_outcome import (
+    NarrativeFactEffect,
+    NarrativeOutcomeRuleDefinition,
+)
 from deviation_protocol.domain.memory_rules import (
     MemoryRuleDefinition,
     MemoryRuleOperation,
@@ -140,6 +143,11 @@ class PhaseVisitAtLeastCondition(ScenarioDefinitionModel):
     value: Annotated[int, Field(strict=True, ge=1, le=MAX_SCENARIO_COUNTER)]
 
 
+class NpcAliveAcknowledgedCondition(ScenarioDefinitionModel):
+    rule_type: Literal["NPC_ALIVE_ACKNOWLEDGED"]
+    minimum_count: Annotated[int, Field(strict=True, ge=1, le=MAX_NPCS_PER_SCENARIO)] = 1
+
+
 ConditionDefinition: TypeAlias = Annotated[
     AlwaysCondition
     | PhaseBeatAtLeastCondition
@@ -150,7 +158,8 @@ ConditionDefinition: TypeAlias = Annotated[
     | LocationOpenedCondition
     | DecisionsAtLeastCondition
     | EventOccurredCondition
-    | PhaseVisitAtLeastCondition,
+    | PhaseVisitAtLeastCondition
+    | NpcAliveAcknowledgedCondition,
     Field(discriminator="rule_type"),
 ]
 
@@ -321,6 +330,30 @@ class SuggestedActionDefinition(ScenarioDefinitionModel):
     label_hint: Annotated[str, Field(strict=True, min_length=1, max_length=160)]
     target_ids: tuple[DefinitionId, ...] = ()
     required_any_profession_tags: tuple[DefinitionId, ...] = ()
+    server_event_type: DefinitionId | None = None
+    mutable_fact_updates: tuple[NarrativeFactEffect, ...] = ()
+    opened_location_ids: tuple[DefinitionId, ...] = ()
+    new_location_id: DefinitionId | None = None
+    server_narrative_text: Annotated[
+        str, Field(strict=True, min_length=1, max_length=1000)
+    ] | None = None
+
+    @model_validator(mode="after")
+    def validate_server_effect(self) -> SuggestedActionDefinition:
+        fact_ids = tuple(item.fact_id for item in self.mutable_fact_updates)
+        _reject_duplicates(fact_ids, f"action {self.action_id!r} mutable fact")
+        _reject_duplicates(
+            self.opened_location_ids, f"action {self.action_id!r} opened location"
+        )
+        if (
+            self.mutable_fact_updates
+            or self.opened_location_ids
+            or self.new_location_id is not None
+        ) and self.server_event_type is None:
+            raise ValueError("decision world updates require a server event type")
+        if self.server_narrative_text is not None and self.server_event_type is None:
+            raise ValueError("decision server narrative requires a server event type")
+        return self
 
 
 class CustomActionConstraints(ScenarioDefinitionModel):
@@ -595,6 +628,11 @@ class ScenarioDefinition(ScenarioDefinitionModel):
         _reject_duplicates(
             (transition.transition_id for _, transition in all_transitions), "scenario transition"
         )
+        mutable_transition_event_types = {
+            transition.event_type
+            for fact in self.facts
+            for transition in fact.mutable_transitions
+        }
         for clue in self.clues:
             _require_all(clue.supports_fact_ids, facts, f"clue {clue.clue_id!r} fact")
             _require_all(clue.allowed_phase_ids, phases, f"clue {clue.clue_id!r} phase")
@@ -624,6 +662,14 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                             f"decision {window.decision_id!r} can never satisfy its decision count"
                         )
             for action in window.suggested_actions:
+                if (
+                    action.mutable_fact_updates
+                    and action.server_event_type is not None
+                    and action.server_event_type not in mutable_transition_event_types
+                ):
+                    raise ContentDefinitionError(
+                        "decision effect event is not declared by a scenario transition"
+                    )
                 _require_all(
                     action.required_any_profession_tags,
                     set(self.available_profession_tags),
@@ -636,6 +682,20 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                     | set(self.story_item_definition_ids),
                     f"action {action.action_id!r} target",
                 )
+                for update in action.mutable_fact_updates:
+                    fact = facts.get(update.fact_id)
+                    if fact is None or fact.kind is not FactKind.MUTABLE:
+                        raise ContentDefinitionError(
+                            "decision effect references an invalid mutable fact"
+                        )
+                    if not any(
+                        transition.event_type == action.server_event_type
+                        and json_values_equal(transition.to_value, update.value)
+                        for transition in fact.mutable_transitions
+                    ):
+                        raise ContentDefinitionError(
+                            "decision effect is not an allowed mutable transition"
+                        )
         for phase in self.phases:
             for decision_id in phase.decision_window_ids:
                 window = windows[decision_id]
@@ -660,6 +720,21 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                         raise ContentDefinitionError(
                             f"decision {decision_id!r} uses an action disallowed by phase"
                         )
+                    _require_all(
+                        action.opened_location_ids,
+                        locations,
+                        f"decision action {action.action_id!r} opened location",
+                    )
+                    if action.new_location_id is not None:
+                        _require_all(
+                            (action.new_location_id,),
+                            locations,
+                            f"decision action {action.action_id!r} destination",
+                        )
+                        if action.new_location_id not in phase.visible_location_ids:
+                            raise ContentDefinitionError(
+                                f"decision action {action.action_id!r} destination is not visible"
+                            )
                 _require_all(
                     window.custom_action_constraints.allowed_action_types,
                     set(phase.allowed_action_types),
@@ -691,6 +766,19 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                 windows,
                 f"outcome rule {rule.rule_id!r} decision",
             )
+            _require_all(
+                rule.required_current_location_ids,
+                locations,
+                f"outcome rule {rule.rule_id!r} current location",
+            )
+            for location_id in rule.required_current_location_ids:
+                if not all(
+                    location_id in phases[phase_id].visible_location_ids
+                    for phase_id in rule.allowed_phase_ids
+                ):
+                    raise ContentDefinitionError(
+                        f"outcome rule {rule.rule_id!r} current location is not visible"
+                    )
             for decision_id in rule.required_current_decision_ids:
                 if not set(rule.allowed_phase_ids) & decision_phase_ids[decision_id]:
                     raise ContentDefinitionError(
@@ -700,10 +788,33 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                 _require_all((requirement.fact_id,), facts, f"outcome rule {rule.rule_id!r} fact")
             for effect in rule.effects:
                 _require_all(
+                    effect.player_alive_acknowledgement_npc_definition_ids,
+                    set(rule.required_visible_npc_definition_ids),
+                    f"outcome rule {rule.rule_id!r} acknowledging NPC",
+                )
+                _require_all(
                     effect.discovered_clue_ids,
                     clues,
                     f"outcome rule {rule.rule_id!r} effect clue",
                 )
+                _require_all(
+                    effect.opened_location_ids,
+                    locations,
+                    f"outcome rule {rule.rule_id!r} effect location",
+                )
+                if effect.new_location_id is not None:
+                    _require_all(
+                        (effect.new_location_id,),
+                        locations,
+                        f"outcome rule {rule.rule_id!r} destination",
+                    )
+                    if not all(
+                        effect.new_location_id in phases[phase_id].visible_location_ids
+                        for phase_id in rule.allowed_phase_ids
+                    ):
+                        raise ContentDefinitionError(
+                            "narrative outcome destination is not visible in every allowed phase"
+                        )
                 for fact_update in effect.deferred_bindings:
                     fact = facts.get(fact_update.fact_id)
                     if fact is None or fact.kind is not FactKind.DEFERRED:

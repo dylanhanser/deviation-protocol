@@ -383,7 +383,7 @@ def test_health_response_does_not_expose_runtime_configuration(
     with client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "phase": "2.4a"}
+    assert response.json() == {"status": "ok", "phase": "2.4b"}
 
 
 def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:

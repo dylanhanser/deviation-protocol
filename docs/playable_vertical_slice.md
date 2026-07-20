@@ -1,62 +1,45 @@
-# Phase 2.4a 可玩垂直切片
+# Phase 2.4b 可玩垂直切片
 
 ## 已证明的公共路径
 
-Phase 2.4a 只承诺以下路径能够由玩家通过公共 ASGI API 完成：
+`死亡证明已签发` 的 content version 为 `death-certificate-1.1.0`。Phase 2.4b 通过公共 ASGI API 和无网络 Scripted Provider 证明两条完整路径：
 
-1. `POST /v1/sessions` 创建 `death_certificate` session。
-2. `GET /v1/sessions/{session_id}/view` 取得开局已提交权威状态。
-3. `POST /v1/sessions/{session_id}/actions` 提交合法开局 Narrative 行动。
-4. Scripted Provider 候选经真实 validator、NarrativeOutcomePolicy、NarrativeEventIssuer 和 StoryDirector finalize。
-5. view 显示 `death_certificate.life_disputed` 与 `stop_condition=CONTINUE`。
-6. 玩家连续提交三个无载荷 CONTINUE；每个请求只推进一个 auto beat。
-7. 第三个响应和后续 view 显示 `death_certificate.decision.early_strategy`、`AWAIT_PLAYER`。
+- 成功路径：创建 session，完成开局生命信号、临床复核和 NPC 存活确认，经单 beat `CONTINUE` 与公开 choice 进入 disposal escape；随后由公开调查 choice 开放档案室，再用当前位置内的普通 `EXPLORE`/`OBSERVE` 行动取得三个调查线索组的必要线索并开放地点，经过 self-fulfilling truth，在 core conflict 连续完成四个 rapid decision window，最终由 `core.conflict.resolved` 进入 `death_certificate.ending.protocol_broken` 或 `death_certificate.ending.record_challenged`。
+- 截止失败路径：创建独立 session，以公开 `CONTINUE`、choice 和安全 no-effect Narrative 行动真实消耗 `predicted_death_deadline`，从 0 到 13 后由 `deadline.reached` 进入 `death_certificate.ending.deadline_reached`。
 
-真实生产可达性由 MySQL 上的完整公共 ASGI API 路径证明：它使用生产 Repository 连续完成三个 CONTINUE 并到达首个后续决策。无数据库内存 adapter 仅保留为快速 Repository contract/playtest，不作为唯一 PLAY-001 证明。两条测试都不通过私有 scenario event issuer、`StoryDirector.advance_after_verified_result`、Repository 内部写方法或测试专属状态入口推进剧情。Scripted Provider 不访问网络；整个路径 Provider 调用一次，CONTINUE 期间为零次。
+两条路径都从 `POST /v1/sessions` 开始，只经 `/actions`、`/view` 和 `/requests/{client_request_id}`。测试不直接调用 StoryDirector、私有 issuer、Repository 状态写方法，也不修改 snapshot、runtime 或 clock。成功路径和代表性失败、rollback、duplicate 场景还经过生产 SQLAlchemy Repository 与真实 MySQL；测试结束后五张业务表无残留。
 
-## CONTINUE 合同
+## 生产 outcome 路径
 
-请求体仍使用统一 action endpoint：
+服务器目录定义封闭 outcome templates，Provider 只能从本回合 opaque token 与允许的结果类型中选择：
 
-```json
-{
-  "turn_id": "continue-turn-1",
-  "client_request_id": "continue-request-1",
-  "action_type": "CONTINUE"
-}
-```
+- `life_disputed_clinical_recheck`：普通 TALK/CUSTOM/OBSERVE/EXPLORE 的连贯生命信号可触发 `clinical.reviewed`，固定目标分诊协调员必须给出支持存活与生命体征的可见台词；可信结果补足生命线索，NPC 记忆只由对应持久化事件规则生成。
+- 首个调查公开 choice：固定服务器事件开放并进入 records room；choice 只证明玩家选择，地点效果来自声明式 action template。
+- `investigation_records_route`：在 records room 使用普通 `EXPLORE`/`OBSERVE` 得到 `record_timestamp` 与 `protocol_feedback`。
+- `investigation_audit_route`：仍在 records room 使用普通 `EXPLORE`/`OBSERVE` 得到 `audit_sequence` 与 `comparison_case`，开放并进入 observation level。
+- `investigation_patient_route`：在 observation level 使用普通 `EXPLORE`/`OBSERVE` 得到 `patient_vitals` 与 `monitor_history`，并开放 control room；固定目标 NPC 必须在当前 Frame 可见，但其台词不构成线索权限。
 
-除上述三个公共字段外，CONTINUE 不接受 description、dialogue、target/tool、decision/choice、item/equipment/skill 或 extra 字段；这些非法 HTTP 请求在创建 turn request 或进入 orchestration 前统一返回 422。ActionGateway 与 ContinueInputPolicy 仍作为非 HTTP 调用的独立防线。服务器只在重新锁定并加载后确认 scenario ACTIVE、Frame 为 CONTINUE 且无 decision 时推进。成功响应为本地权威回合，不含文学正文；返回的新 Frame 告诉客户端继续提交 CONTINUE，或在 AWAIT_PLAYER 时提交实际玩家选择/行动。
+自由文本语义、隐藏答案、职业知识和精确措辞都不是线索授权条件。即使玩家用行动句式直接猜中三个隐藏结论，只要尚未经过公开 decision 和正确当前位置，服务器仍只提交固定 no-effect 文本，不授予线索或地点。所有 production outcome 的公开正文均来自固定服务器模板，Provider 的矛盾措辞不会进入响应。
+- 每个允许自由 Narrative 行动的可访问阶段都有服务器定义的 no-effect fallback。fallback 只消耗该阶段声明的时间成本，不发现线索、不开放地点、不产生核心事件或 ending。
 
-同一 `client_request_id` 必须携带同一 turn 和完整语义。相同请求重放或并发到达时返回首次持久化响应，不推进第二次；复用 ID 提交不同语义返回幂等冲突。
+玩家文本直接猜中隐藏事实不会获得线索。模型正文、`continuity_notes` 和 proposal references 不能提供 fact/clue/event payload、NPC authority、location、clock delta、ending 或 memory operation。MOVE 和 CONTINUE 仍走本地确定性路径。
 
-## 断线恢复
+## 节奏、决策与截止
 
-`GET /v1/sessions/{session_id}/view` 返回：
+`CONTINUE` 仍是无载荷协议，每次只调用 Director 一次且不调用 Provider。前期决策保持稀疏：开局立即窗口之后，`life_disputed` 经连续 beats 才开放 `early_strategy`；investigation 只在已声明窗口暂停。core conflict 使用四个相邻 rapid windows。每次 CHOOSE 必须提交当前 Frame 绑定的 public decision token 和 choice ID；旧 token 稳定拒绝且不改变状态。
 
-- session metadata 与 state version；
-- 从最新已提交 snapshot 重新规划的安全 Frame；
-- 玩家公开状态和长期记忆投影；
-- ACTIVE/ENDED 与公开 clock；
-- 最多 6 条、合计最多 12,000 字符和 24,000 UTF-8 bytes 的 COMMITTED 近期正文；
-- 仅在 ENDED 时出现的 ending ID。
+Choice 只证明玩家选择。最终 choice 的世界效果来自目录中固定的 `server_event_type=core.conflict.resolved` 和允许的 mutable fact transition，不能从玩家或模型正文推断。目录校验要求该事件属于已声明 mutable transition，固定 fact update 也必须匹配同一事件和值。
 
-view 不返回 snapshot、GameState、ScenarioDefinition、隐藏事实、未发现线索、NPC 秘密、未来 ending、内部 rule/signature/fingerprint、job/lease/token、proposal、Provider metadata、event sequence 或 memory 内部同步细节。Narrative pending 时 view 仍显示最后已提交状态。
+`predicted_death_deadline` 是唯一实时截止权威。合法 auto beat、阶段 action cost 和 no-effect outcome 从 0 真实推进到 13；不允许正文自报时间或客户端 delta。达到阈值后返回 SETTLEMENT/SCENARIO_ENDED，后续 CONTINUE、CHOOSE 与 Narrative mutation 都稳定拒绝并保持版本不变。
 
-`GET /v1/sessions/{session_id}/requests/{client_request_id}` 用于恢复 Narrative 请求：
+## 原子结算与恢复
 
-| 状态 | 客户端动作 |
-|---|---|
-| `PENDING` | 以同一 request ID 轮询；遵守固定 `Retry-After: 2` |
-| `COMMITTED` | 使用返回的已持久化公共 TurnResponse |
-| `STALE` | 先刷新 view，再决定是否用新 request ID 提交 |
-| `OUTCOME_UNKNOWN` | 禁止自动重发；等待人工/产品策略 |
-| `FAILED` | 终止错误，不自动重发 |
+成功与失败 ending 都来自 StoryDirector 生成的可信事件。结束候选只允许在同一 resolution 已包含与 ending 精确匹配的声明式 COMPLETE_SCENARIO rule 时通过受限预检；预检只临时投影唯一 scenario record 的完成字段并重新运行完整验证。事件 insert/flush 后，memory rule 把真实 ScenarioMemoryRecord 标记为 COMPLETED，随后仍执行最终完整 snapshot/catalog/memory 验证。ending、memory、event、snapshot、TurnResponse、job 和 session version 共享一个 UoW commit，任何失败全部 rollback。Narrative action 提交通常的 Provider job；最终本地 CHOOSE 提交 attempt=0 的 `local-server-template-v1` job，正文只来自可信 decision template且不调用 Provider。
 
-内部遗留 `FAILED_RETRYABLE` 记录也映射为 `FAILED/DO_NOT_RETRY`。当前生产代码没有转换到 FAILED_RETRYABLE 的路径，公共 schema 不宣称支持 RETRY_WITH_NEW_REQUEST。
+`GET /v1/sessions/{session_id}/view` 在活动期恢复当前安全 Frame，在结束后稳定返回 settlement、ending 与完成记忆。`GET /requests/{client_request_id}` 可恢复 COMMITTED Narrative response；查询、拒绝和重复请求不推进 beat、clock、event 或 version。
 
-查询是只读操作，不 claim lease、不调用 Provider。不存在和非 owner session 都遵守安全 ownership 404。
+公开响应不包含隐藏事实、隐藏 clock、未来 ending、rule ID、outcome token 内部结构、lease、receipt、Provider metadata 或 snapshot。Scripted playtest 对每次 prompt 同时验证 32,000 字符与 64,000 UTF-8 bytes 上限。默认与正常验证不调用 live DeepSeek。
 
-## 尚未完成
+## 本阶段之外
 
-Phase 2.4a 不保证 `early_strategy` 之后的 investigation 线索生产路径、disposal escape、self-fulfilling truth、core conflict、正式 ending 或 deadline failure ending。结构化内容中存在这些节点只说明领域定义和静态图存在；让它们通过公共生产协议完整可玩属于 Phase 2.4b。
+Phase 2.4b 不包含 Web 前端、scenario replay/`scenario_run_id`、跨 scenario NPC identity、memory rebuild/compaction、DeviationEvaluator、高维异常、战斗、worker/queue/distributed system、RAG 或 vector database。

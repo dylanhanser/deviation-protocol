@@ -35,6 +35,7 @@ from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.domain.player_memory import stable_npc_subject_key
 from deviation_protocol.domain.persisted_events import _issue_persisted_event_receipt
 from deviation_protocol.domain.scenario import ScenarioCatalog
+from deviation_protocol.domain.scenario_runtime import NarrativeOutcomeEvidence
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 
@@ -413,6 +414,67 @@ def test_opening_rules_separate_purposeful_observe_and_player_ordered_npc_succes
     assert ordered[0].candidate.allowed_results == (
         NarrativeOutcomeResult.NO_EFFECT,
     )
+
+
+def test_once_outcome_uses_rule_evidence_when_public_event_id_is_opaque() -> None:
+    _, definition, state, frame = opening_state()
+    assert state.scenario_runtime is not None
+    state.scenario_runtime.applied_event_ids = frozenset(
+        {"narrative.opaque-server-event-id"}
+    )
+    state.scenario_runtime.narrative_outcome_evidence = (
+        NarrativeOutcomeEvidence(
+            outcome_rule_id="death_certificate.outcome.purposeful_life_signal",
+            outcome_result=NarrativeOutcomeResult.SUCCESS,
+            scenario_event_type="vitals.verified",
+            npc_definition_ids=(
+                "npc.death_certificate.triage_coordinator",
+            ),
+            player_alive_acknowledgement_npc_definition_ids=(
+                "npc.death_certificate.triage_coordinator",
+            ),
+            player_alive_acknowledgement_npc_ids=("scenario-npc-1",),
+        ),
+    )
+
+    allowed = allowed_narrative_outcomes(
+        submission=purposeful_action(),
+        state=state,
+        state_version=1,
+        definition=definition,
+        frame=frame,
+    )
+
+    assert [item.rule.rule_id for item in allowed] == [
+        "death_certificate.outcome.constrained_custom_no_effect"
+    ]
+
+
+def test_snapshot_rejects_multiple_results_for_one_time_outcome_rule() -> None:
+    catalog, _, state, _ = opening_state()
+    payload = state.to_snapshot()
+    assert payload["scenario_runtime"] is not None
+    payload["scenario_runtime"]["narrative_outcome_evidence"] = [
+        {
+            "outcome_rule_id": "death_certificate.outcome.purposeful_life_signal",
+            "outcome_result": "AMBIGUOUS",
+            "scenario_event_type": "vitals.signal.ambiguous",
+            "npc_definition_ids": [],
+            "player_alive_acknowledgement_npc_definition_ids": [],
+            "player_alive_acknowledgement_npc_ids": [],
+        },
+        {
+            "outcome_rule_id": "death_certificate.outcome.purposeful_life_signal",
+            "outcome_result": "FAILURE",
+            "scenario_event_type": "vitals.signal.failed",
+            "npc_definition_ids": [],
+            "player_alive_acknowledgement_npc_definition_ids": [],
+            "player_alive_acknowledgement_npc_ids": [],
+        },
+    ]
+
+    with pytest.raises(ValueError, match="repeated a one-time narrative outcome rule"):
+        GameState.from_snapshot(payload, scenario_catalog=catalog)
 
 
 def test_policy_and_issuer_only_use_server_template_and_story_director() -> None:
@@ -912,7 +974,7 @@ def test_failure_token_with_success_prose_is_rejected_and_model_delta_fields_are
             NarrativeProposalPayload.model_validate({**base, **forbidden})
 
 
-def test_success_requires_visible_npc_utterance_that_supports_the_data_rule() -> None:
+def test_model_utterance_cannot_control_fixed_player_alive_acknowledgement() -> None:
     _, definition, state, frame = opening_state()
     action = purposeful_action()
     allowed = allowed_narrative_outcomes(
@@ -949,18 +1011,43 @@ def test_success_requires_visible_npc_utterance_that_supports_the_data_rule() ->
         ),
     )
 
-    with pytest.raises(ValueError, match="does not support"):
-        NarrativeOutcomePolicy().authorize(
-            unsupported,
-            job_id="job-1",
-            lease_token="a" * 32,
-            lease_owner="worker-1",
-            submission=action,
-            state=state,
-            state_version=0,
-            definition=definition,
-            frame=frame,
-            resolution_status=ResolutionStatus.NARRATIVE_REQUIRED,
-            expected_state_fingerprint=state_fingerprint(state),
-            expected_proposal_digest=proposal_digest(unsupported),
+    authorized = NarrativeOutcomePolicy().authorize(
+        unsupported,
+        job_id="job-1",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+        resolution_status=ResolutionStatus.NARRATIVE_REQUIRED,
+        expected_state_fingerprint=state_fingerprint(state),
+        expected_proposal_digest=proposal_digest(unsupported),
+    )
+    event = NarrativeEventIssuer().issue(
+        authorized,
+        job_id="job-1",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        proposal=unsupported,
+    )
+    assert event.player_alive_acknowledgement_npc_definition_ids == (
+        "npc.death_certificate.triage_coordinator",
+    )
+    assert event.player_alive_acknowledgement_npc_ids == tuple(
+        sorted(
+            npc_id
+            for npc_id, npc in state.npcs.items()
+            if npc.definition_id
+            == "npc.death_certificate.triage_coordinator"
         )
+    )
+    assert "继续观察" not in (
+        authorized.rule.effect(NarrativeOutcomeResult.SUCCESS)
+        .player_alive_acknowledgement_public_text
+    )

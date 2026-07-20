@@ -10,6 +10,7 @@ from deviation_protocol.domain.events import DomainEventDraft
 from deviation_protocol.domain.narrative import NarrativeFrame, SuggestedAction
 from deviation_protocol.domain.scenario import ScenarioDefinition
 from deviation_protocol.domain.scenario_runtime import (
+    FactValueUpdate,
     VerifiedScenarioEvent,
     _seal_verified_scenario_event,
 )
@@ -146,6 +147,7 @@ class ScenarioDecisionResponsePolicy:
 class IssuedScenarioDecisionEvent:
     sealed_event: VerifiedScenarioEvent
     audit_event: DomainEventDraft
+    server_narrative_text: str | None = None
 
 
 class TrustedScenarioEventIssuer:
@@ -165,8 +167,6 @@ class TrustedScenarioEventIssuer:
         event_type = "player.decision.selected"
         if not isinstance(validated, ValidatedDecisionResponse) or not validated.is_authentic():
             raise ValueError("decision response lacks server validation authority")
-        if event_type not in _EVENT_TYPE_WHITELIST[source]:  # pragma: no cover
-            raise ValueError("scenario event type is not allowed for its source")
         runtime = state.scenario_runtime
         if runtime is None:
             raise ValueError("decision response has no authoritative scenario runtime")
@@ -204,6 +204,9 @@ class TrustedScenarioEventIssuer:
             or submission.choice_id != validated.selected_action.action_id
         ):
             raise ValueError("validated choice does not match authoritative content")
+        event_type = declared.server_event_type or event_type
+        if declared.server_event_type is None and event_type not in _EVENT_TYPE_WHITELIST[source]:  # pragma: no cover
+            raise ValueError("scenario event type is not allowed for its source")
         event_id = self._event_id(submission)
         event = _seal_verified_scenario_event(
             VerifiedScenarioEvent(
@@ -212,6 +215,12 @@ class TrustedScenarioEventIssuer:
                 source=source.value,
                 decision_id=current_decision_id,
                 action_type=validated.selected_action.action_type,
+                mutable_fact_updates=tuple(
+                    FactValueUpdate(fact_id=item.fact_id, value=item.value)
+                    for item in declared.mutable_fact_updates
+                ),
+                opened_location_ids=declared.opened_location_ids,
+                new_location_id=declared.new_location_id,
                 resolves_current_decision=True,
                 expose_in_frame=True,
             )
@@ -228,7 +237,7 @@ class TrustedScenarioEventIssuer:
                 "selected_action_type": validated.selected_action.action_type,
             },
         )
-        return IssuedScenarioDecisionEvent(event, audit)
+        return IssuedScenarioDecisionEvent(event, audit, declared.server_narrative_text)
 
     @staticmethod
     def _event_id(submission: ActionSubmission) -> str:

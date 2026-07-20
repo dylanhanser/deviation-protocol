@@ -52,10 +52,13 @@ class NarrativeFactEffect(NarrativeOutcomeModel):
 class NarrativeIntentMatcher(NarrativeOutcomeModel):
     action_types: tuple[ActionType, ...]
     required_any_terms: tuple[Annotated[str, Field(strict=True, min_length=1, max_length=80)], ...] = ()
+    required_action_terms: tuple[
+        Annotated[str, Field(strict=True, min_length=1, max_length=80)], ...
+    ] = ()
     forbidden_terms: tuple[Annotated[str, Field(strict=True, min_length=1, max_length=80)], ...] = ()
     requires_target: bool = False
 
-    @field_validator("required_any_terms", "forbidden_terms")
+    @field_validator("required_any_terms", "required_action_terms", "forbidden_terms")
     @classmethod
     def normalize_terms(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         normalized = tuple(item.casefold().strip() for item in value)
@@ -67,7 +70,9 @@ class NarrativeIntentMatcher(NarrativeOutcomeModel):
     def validate_matcher(self) -> NarrativeIntentMatcher:
         if not self.action_types or len(self.action_types) != len(set(self.action_types)):
             raise ValueError("narrative intent matcher requires unique action types")
-        if set(self.required_any_terms) & set(self.forbidden_terms):
+        if (
+            set(self.required_any_terms) | set(self.required_action_terms)
+        ) & set(self.forbidden_terms):
             raise ValueError("required and forbidden narrative terms overlap")
         return self
 
@@ -79,18 +84,26 @@ class NarrativeOutcomeEffectTemplate(NarrativeOutcomeModel):
     discovered_clue_ids: tuple[DefinitionId, ...] = ()
     deferred_bindings: tuple[NarrativeFactEffect, ...] = ()
     mutable_fact_updates: tuple[NarrativeFactEffect, ...] = ()
+    opened_location_ids: tuple[DefinitionId, ...] = ()
+    new_location_id: DefinitionId | None = None
     resolves_current_decision: bool = False
     expose_in_frame: bool = True
-    requires_visible_npc_utterance: bool = False
-    required_visible_npc_utterance_any_terms: tuple[
+    required_prose_any_terms: tuple[
         Annotated[str, Field(strict=True, min_length=1, max_length=80)], ...
     ] = ()
+    player_alive_acknowledgement_npc_definition_ids: tuple[DefinitionId, ...] = ()
+    player_alive_acknowledgement_public_text: Annotated[
+        str, Field(strict=True, min_length=1, max_length=500)
+    ] | None = None
+    fixed_public_narrative_text: Annotated[
+        str, Field(strict=True, min_length=1, max_length=1000)
+    ] | None = None
     forbidden_prose_terms: tuple[
         Annotated[str, Field(strict=True, min_length=1, max_length=80)], ...
     ] = ()
 
     @field_validator(
-        "required_visible_npc_utterance_any_terms", "forbidden_prose_terms"
+        "required_prose_any_terms", "forbidden_prose_terms"
     )
     @classmethod
     def normalize_prose_terms(cls, value: tuple[str, ...]) -> tuple[str, ...]:
@@ -107,11 +120,17 @@ class NarrativeOutcomeEffectTemplate(NarrativeOutcomeModel):
                 raise ValueError("narrative outcome repeats a fact update")
         if len(self.discovered_clue_ids) != len(set(self.discovered_clue_ids)):
             raise ValueError("narrative outcome repeats a clue")
-        if (
-            self.required_visible_npc_utterance_any_terms
-            and not self.requires_visible_npc_utterance
+        if len(self.opened_location_ids) != len(set(self.opened_location_ids)):
+            raise ValueError("narrative outcome repeats an opened location")
+        acknowledgement_ids = self.player_alive_acknowledgement_npc_definition_ids
+        if len(acknowledgement_ids) != len(set(acknowledgement_ids)):
+            raise ValueError("narrative outcome repeats an acknowledging NPC")
+        if bool(acknowledgement_ids) != bool(
+            self.player_alive_acknowledgement_public_text
         ):
-            raise ValueError("required utterance terms require a visible NPC utterance")
+            raise ValueError(
+                "player-alive acknowledgement requires both NPCs and fixed public text"
+            )
         return self
 
 
@@ -124,6 +143,7 @@ class NarrativeOutcomeRuleDefinition(NarrativeOutcomeModel):
     required_fact_values: tuple[NarrativeFactRequirement, ...] = ()
     required_clue_ids: tuple[DefinitionId, ...] = ()
     required_current_decision_ids: tuple[DefinitionId, ...] = ()
+    required_current_location_ids: tuple[DefinitionId, ...] = ()
     once: bool = True
     safe_description: Annotated[str, Field(strict=True, min_length=1, max_length=300)]
     effects: tuple[NarrativeOutcomeEffectTemplate, ...]
@@ -139,6 +159,7 @@ class NarrativeOutcomeRuleDefinition(NarrativeOutcomeModel):
             self.required_visible_npc_definition_ids,
             self.required_clue_ids,
             self.required_current_decision_ids,
+            self.required_current_location_ids,
         ):
             if len(values) != len(set(values)):
                 raise ValueError("narrative outcome rule contains duplicate references")

@@ -33,6 +33,7 @@ _VERIFIED_SCENARIO_EVENT_ISSUER = object()
 _DYNAMIC_FACT_KEY = re.compile(r"^dynamic\.[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 MAX_APPLIED_SCENARIO_EVENTS = 1_024
 MAX_NARRATIVE_OUTCOME_EVIDENCE = 1_024
+MAX_DECISION_OUTCOME_EVIDENCE = 1_024
 MAX_DECISIONS_MADE = 1_024
 
 
@@ -61,22 +62,45 @@ class NarrativeOutcomeEvidence(ScenarioRuntimeModel):
     outcome_result: NarrativeOutcomeResult
     scenario_event_type: DefinitionId
     npc_definition_ids: tuple[DefinitionId, ...] = ()
+    player_alive_acknowledgement_npc_definition_ids: tuple[DefinitionId, ...] = ()
+    player_alive_acknowledgement_npc_ids: tuple[DefinitionId, ...] = ()
 
     @model_validator(mode="after")
     def validate_targets(self) -> NarrativeOutcomeEvidence:
-        targets = tuple(sorted(self.npc_definition_ids))
-        if len(targets) != len(set(targets)):
-            raise ValueError("narrative outcome evidence repeats an NPC target")
-        object.__setattr__(self, "npc_definition_ids", targets)
+        for field_name in (
+            "npc_definition_ids",
+            "player_alive_acknowledgement_npc_definition_ids",
+            "player_alive_acknowledgement_npc_ids",
+        ):
+            targets = tuple(sorted(getattr(self, field_name)))
+            if len(targets) != len(set(targets)):
+                raise ValueError("narrative outcome evidence repeats an NPC target")
+            object.__setattr__(self, field_name, targets)
         return self
 
-    def stable_key(self) -> tuple[str, str, str, tuple[str, ...]]:
+    def stable_key(
+        self,
+    ) -> tuple[str, str, str, tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
         return (
             self.outcome_rule_id,
             self.outcome_result.value,
             self.scenario_event_type,
             self.npc_definition_ids,
+            self.player_alive_acknowledgement_npc_definition_ids,
+            self.player_alive_acknowledgement_npc_ids,
         )
+
+
+class DecisionOutcomeEvidence(ScenarioRuntimeModel):
+    """Private authoritative proof of a server-issued decision world effect."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    decision_id: DefinitionId
+    scenario_event_type: DefinitionId
+
+    def stable_key(self) -> tuple[str, str]:
+        return (self.decision_id, self.scenario_event_type)
 
 
 class ScenarioRuntimeState(ScenarioRuntimeModel):
@@ -107,6 +131,7 @@ class ScenarioRuntimeState(ScenarioRuntimeModel):
     ] = Field(default_factory=dict)
     applied_event_ids: tuple[DefinitionId, ...] = ()
     narrative_outcome_evidence: tuple[NarrativeOutcomeEvidence, ...] = ()
+    decision_outcome_evidence: tuple[DecisionOutcomeEvidence, ...] = ()
 
     @field_serializer(
         "discovered_clue_ids", "completed_clue_group_ids", "opened_location_ids"
@@ -316,10 +341,17 @@ class ScenarioRuntimeState(ScenarioRuntimeModel):
         outcome_rules = {
             item.rule_id: item for item in definition.narrative_outcome_rules
         }
+        seen_once_outcome_rule_ids: set[DefinitionId] = set()
         for evidence in self.narrative_outcome_evidence:
             outcome_rule = outcome_rules.get(evidence.outcome_rule_id)
             if outcome_rule is None:
                 raise ValueError("runtime narrative outcome evidence references an unknown rule")
+            if outcome_rule.once:
+                if evidence.outcome_rule_id in seen_once_outcome_rule_ids:
+                    raise ValueError(
+                        "runtime repeated a one-time narrative outcome rule"
+                    )
+                seen_once_outcome_rule_ids.add(evidence.outcome_rule_id)
             try:
                 effect = outcome_rule.effect(evidence.outcome_result)
             except StopIteration as exc:
@@ -335,6 +367,35 @@ class ScenarioRuntimeState(ScenarioRuntimeModel):
             ):
                 raise ValueError(
                     "runtime narrative outcome evidence has an unauthorized NPC target"
+                )
+            if evidence.player_alive_acknowledgement_npc_definition_ids != tuple(
+                sorted(effect.player_alive_acknowledgement_npc_definition_ids)
+            ):
+                raise ValueError(
+                    "runtime narrative outcome evidence has mismatched player-alive acknowledgement"
+                )
+        decision_evidence_keys = tuple(
+            item.stable_key() for item in self.decision_outcome_evidence
+        )
+        if len(decision_evidence_keys) > MAX_DECISION_OUTCOME_EVIDENCE:
+            raise ValueError("runtime decision outcome evidence exceeds its limit")
+        if len(decision_evidence_keys) != len(set(decision_evidence_keys)):
+            raise ValueError("runtime decision outcome evidence contains duplicates")
+        if decision_evidence_keys != tuple(sorted(decision_evidence_keys)):
+            raise ValueError("runtime decision outcome evidence is not stably sorted")
+        for evidence in self.decision_outcome_evidence:
+            if evidence.decision_id not in self.decisions_made:
+                raise ValueError(
+                    "runtime decision outcome evidence lacks a completed decision"
+                )
+            window = definition.decision_window(evidence.decision_id)
+            declared_event_types = {
+                action.server_event_type or "player.decision.selected"
+                for action in window.suggested_actions
+            }
+            if evidence.scenario_event_type not in declared_event_types:
+                raise ValueError(
+                    "runtime decision outcome evidence has an undeclared event type"
                 )
         if self.rapid_decision_mode and not phase.rapid_decision_allowed:
             raise ValueError("runtime rapid decision mode is not allowed in this phase")
@@ -393,6 +454,8 @@ class VerifiedScenarioEvent(BaseModel):
     narrative_outcome_rule_id: DefinitionId | None = None
     narrative_outcome_result: NarrativeOutcomeResult | None = None
     narrative_outcome_npc_definition_ids: tuple[DefinitionId, ...] = ()
+    player_alive_acknowledgement_npc_definition_ids: tuple[DefinitionId, ...] = ()
+    player_alive_acknowledgement_npc_ids: tuple[DefinitionId, ...] = ()
     _issuer: object | None = PrivateAttr(default=None)
     _sealed_payload: str | None = PrivateAttr(default=None)
 
@@ -449,6 +512,22 @@ class VerifiedScenarioEvent(BaseModel):
             sorted(self.narrative_outcome_npc_definition_ids)
         ):
             raise ValueError("narrative outcome event NPC targets are not sorted")
+        if self.player_alive_acknowledgement_npc_definition_ids != tuple(
+            sorted(self.player_alive_acknowledgement_npc_definition_ids)
+        ):
+            raise ValueError("player-alive acknowledgement NPC targets are not sorted")
+        if len(self.player_alive_acknowledgement_npc_definition_ids) != len(
+            set(self.player_alive_acknowledgement_npc_definition_ids)
+        ):
+            raise ValueError("player-alive acknowledgement repeats an NPC target")
+        if self.player_alive_acknowledgement_npc_ids != tuple(
+            sorted(self.player_alive_acknowledgement_npc_ids)
+        ):
+            raise ValueError("player-alive acknowledgement runtime NPC IDs are not sorted")
+        if len(self.player_alive_acknowledgement_npc_ids) != len(
+            set(self.player_alive_acknowledgement_npc_ids)
+        ):
+            raise ValueError("player-alive acknowledgement repeats a runtime NPC")
         has_outcome_evidence = all(outcome_fields_present)
         if has_outcome_evidence != (self.source == "VALIDATED_NARRATIVE_OUTCOME"):
             raise ValueError(
@@ -456,6 +535,16 @@ class VerifiedScenarioEvent(BaseModel):
             )
         if self.narrative_outcome_npc_definition_ids and not has_outcome_evidence:
             raise ValueError("narrative outcome NPC targets require exact evidence")
+        if self.player_alive_acknowledgement_npc_definition_ids and not has_outcome_evidence:
+            raise ValueError("player-alive acknowledgement requires exact outcome evidence")
+        if self.player_alive_acknowledgement_npc_ids and not has_outcome_evidence:
+            raise ValueError("runtime NPC acknowledgement requires exact outcome evidence")
+        if bool(self.player_alive_acknowledgement_npc_definition_ids) != bool(
+            self.player_alive_acknowledgement_npc_ids
+        ):
+            raise ValueError(
+                "player-alive acknowledgement requires definition and runtime NPC evidence"
+            )
         return self
 
     def is_authentic(self) -> bool:

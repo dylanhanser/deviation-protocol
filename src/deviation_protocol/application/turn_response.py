@@ -80,8 +80,15 @@ class TurnResponse(BaseModel):
                 self.resolution_kind is ResolutionStatus.NARRATIVE_COMMITTED
             ):
                 raise ValueError("narrative text is visible only after commit")
-        elif self.narrative_text is not None or self.narrative_status is not None:
-            raise ValueError("non-narrative response cannot carry narrative output")
+        elif self.narrative_status is not None:
+            raise ValueError("non-narrative response cannot carry narrative status")
+        elif self.narrative_text is not None and not (
+            self.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
+            and self.state_changed
+        ):
+            raise ValueError(
+                "only a state-changing local response may carry fixed server narrative"
+            )
         if self.local_query_result is not None and (
             self.resolution_kind is not ResolutionStatus.RESOLVED_LOCAL
             or self.state_changed

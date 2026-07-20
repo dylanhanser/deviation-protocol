@@ -14,6 +14,7 @@ from deviation_protocol.domain.scenario import (
     EventOccurredCondition,
     FactEqualsCondition,
     LocationOpenedCondition,
+    NpcAliveAcknowledgedCondition,
     PhaseBeatAtLeastCondition,
     PhaseVisitAtLeastCondition,
     ScenarioDefinition,
@@ -74,6 +75,15 @@ class DeclarativeConditionEvaluator:
             return condition.event_type in event_types
         if isinstance(condition, PhaseVisitAtLeastCondition):
             return runtime.phase_visit_counts.get(condition.phase_id, 0) >= condition.value
+        if isinstance(condition, NpcAliveAcknowledgedCondition):
+            acknowledged = {
+                npc_id
+                for evidence in runtime.narrative_outcome_evidence
+                for npc_id in (
+                    evidence.player_alive_acknowledgement_npc_ids
+                )
+            }
+            return len(acknowledged) >= condition.minimum_count
         raise TypeError(f"unsupported condition definition: {type(condition).__name__}")
 
     @staticmethod

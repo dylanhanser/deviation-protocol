@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "content_version": "death-certificate-1.0.0",
+  "content_version": "death-certificate-1.1.0",
   "content_catalog": {
     "schema_version": 1,
-    "content_version": "death-certificate-1.0.0",
+    "content_version": "death-certificate-1.1.0",
     "characters": [
       {
         "definition_id": "character.death_certificate.investigator",
@@ -99,7 +99,7 @@
     {
       "scenario_id": "death_certificate",
       "schema_version": 1,
-      "content_version": "death-certificate-1.0.0",
+      "content_version": "death-certificate-1.1.0",
       "title": "死亡证明已签发",
       "summary": "一份提前生效的记录推动处置规程，调查者需要以证据阻止记录制造它所声称的结果。",
       "initial_phase_id": "death_certificate.arrival_locked",
@@ -292,6 +292,11 @@
               "from_value": true,
               "to_value": false,
               "event_type": "protocol.suspended"
+            },
+            {
+              "from_value": true,
+              "to_value": false,
+              "event_type": "core.conflict.resolved"
             }
           ]
         },
@@ -318,7 +323,7 @@
         {
           "clue_id": "death_certificate.clue.vital_response",
           "supports_fact_ids": ["death_certificate.fact.player_is_alive"],
-          "source_event_types": ["vitals.verified"],
+          "source_event_types": ["vitals.verified", "clinical.reviewed"],
           "allowed_phase_ids": [
             "death_certificate.arrival_locked",
             "death_certificate.life_disputed"
@@ -328,7 +333,7 @@
         {
           "clue_id": "death_certificate.clue.coherent_response",
           "supports_fact_ids": ["death_certificate.fact.player_is_alive"],
-          "source_event_types": ["response.verified"],
+          "source_event_types": ["response.verified", "clinical.reviewed"],
           "allowed_phase_ids": ["death_certificate.life_disputed"],
           "visible_summary": "连续且可重复的意识反应。"
         },
@@ -343,14 +348,14 @@
         {
           "clue_id": "death_certificate.clue.record_timestamp",
           "supports_fact_ids": ["death_certificate.fact.record_predates_diagnosis"],
-          "source_event_types": ["record.timestamp_verified"],
+          "source_event_types": ["record.timestamp_verified", "record.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "签发时间早于诊断时间。"
         },
         {
           "clue_id": "death_certificate.clue.audit_sequence",
           "supports_fact_ids": ["death_certificate.fact.record_predates_diagnosis"],
-          "source_event_types": ["record.audit_verified"],
+          "source_event_types": ["record.audit_verified", "audit.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "审计序列确认时间顺序。"
         },
@@ -365,14 +370,14 @@
         {
           "clue_id": "death_certificate.clue.protocol_feedback",
           "supports_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
-          "source_event_types": ["protocol.feedback_verified"],
+          "source_event_types": ["protocol.feedback_verified", "record.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "记录触发的措施正在制造预测结果。"
         },
         {
           "clue_id": "death_certificate.clue.comparison_case",
           "supports_fact_ids": ["death_certificate.fact.prediction_causes_outcome"],
-          "source_event_types": ["case.compared"],
+          "source_event_types": ["case.compared", "audit.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "对照案例显示同一因果次序。"
         },
@@ -387,14 +392,14 @@
         {
           "clue_id": "death_certificate.clue.patient_vitals",
           "supports_fact_ids": ["death_certificate.fact.underground_patient_alive"],
-          "source_event_types": ["patient.vitals_verified"],
+          "source_event_types": ["patient.vitals_verified", "patient.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "地下观察对象仍有稳定生命指标。"
         },
         {
           "clue_id": "death_certificate.clue.monitor_history",
           "supports_fact_ids": ["death_certificate.fact.underground_patient_alive"],
-          "source_event_types": ["patient.history_verified"],
+          "source_event_types": ["patient.history_verified", "patient.route.verified"],
           "allowed_phase_ids": ["death_certificate.investigation"],
           "visible_summary": "连续监测记录排除了瞬时误读。"
         },
@@ -523,19 +528,33 @@
         {
           "decision_id": "death_certificate.decision.investigation_route_one",
           "reason": "ROUTE_DIVERGENCE",
-          "earliest_beat": 2,
-          "latest_beat": 3,
+          "earliest_beat": 1,
+          "latest_beat": 2,
           "suggested_actions": [
-            {"action_id": "death_certificate.action.inspect_archive", "action_type": "investigate", "label_hint": "核对档案时间与签发链"},
-            {"action_id": "death_certificate.action.trace_protocol", "action_type": "investigate", "label_hint": "追踪处置规程的触发来源"}
+            {
+              "action_id": "death_certificate.action.inspect_archive",
+              "action_type": "investigate",
+              "label_hint": "核对档案时间与签发链",
+              "server_event_type": "investigation.records.accessed",
+              "opened_location_ids": ["death_certificate.records_room"],
+              "new_location_id": "death_certificate.records_room"
+            },
+            {
+              "action_id": "death_certificate.action.trace_protocol",
+              "action_type": "investigate",
+              "label_hint": "追踪处置规程的触发来源",
+              "server_event_type": "investigation.records.accessed",
+              "opened_location_ids": ["death_certificate.records_room"],
+              "new_location_id": "death_certificate.records_room"
+            }
           ],
           "custom_action_constraints": {"allowed_action_types": ["investigate", "talk", "move"], "max_description_length": 500, "must_target_visible_entity": false}
         },
         {
           "decision_id": "death_certificate.decision.investigation_route_two",
           "reason": "RESOURCE_COMMITMENT",
-          "earliest_beat": 5,
-          "latest_beat": 6,
+          "earliest_beat": 4,
+          "latest_beat": 5,
           "suggested_actions": [
             {"action_id": "death_certificate.action.open_observation", "action_type": "investigate", "label_hint": "进入地下观察层核验对象"},
             {"action_id": "death_certificate.action.secure_audit", "action_type": "investigate", "label_hint": "保存可追溯审计证据"}
@@ -593,8 +612,23 @@
           "earliest_beat": 3,
           "latest_beat": 3,
           "suggested_actions": [
-            {"action_id": "death_certificate.action.final_suspend", "action_type": "commit", "label_hint": "执行最终暂停"},
-            {"action_id": "death_certificate.action.final_disclose", "action_type": "commit", "label_hint": "执行最终披露"}
+            {
+              "action_id": "death_certificate.action.final_suspend",
+              "action_type": "commit",
+              "label_hint": "执行最终暂停",
+              "server_event_type": "core.conflict.resolved",
+              "server_narrative_text": "核心处置链被正式暂停，控制室进入结算状态。",
+              "mutable_fact_updates": [
+                {"fact_id": "death_certificate.fact.disposal_protocol_active", "value": false}
+              ]
+            },
+            {
+              "action_id": "death_certificate.action.final_disclose",
+              "action_type": "commit",
+              "label_hint": "执行最终披露",
+              "server_event_type": "core.conflict.resolved",
+              "server_narrative_text": "核心证据链被正式公开，控制室进入结算状态。"
+            }
           ],
           "custom_action_constraints": {"allowed_action_types": ["commit"], "max_description_length": 500, "must_target_visible_entity": false}
         }
@@ -658,7 +692,10 @@
               "priority": 10
             }
           ],
-          "auto_beat_clock_advances": [{"clock_id": "disposal_protocol", "amount": 1}],
+          "auto_beat_clock_advances": [
+            {"clock_id": "disposal_protocol", "amount": 1},
+            {"clock_id": "predicted_death_deadline", "amount": 1}
+          ],
           "action_time_costs": [{"action_type": "investigate", "clock_advances": [{"clock_id": "disposal_protocol", "amount": 1}]}],
           "rapid_decision_allowed": false,
           "tone_hints": ["procedural", "skeptical"]
@@ -684,6 +721,10 @@
             }
           ],
           "auto_beat_clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}],
+          "action_time_costs": [
+            {"action_type": "move", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]},
+            {"action_type": "observe", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]}
+          ],
           "rapid_decision_allowed": false,
           "tone_hints": ["continuous", "urgent"]
         },
@@ -700,7 +741,7 @@
           "visible_location_ids": ["death_certificate.service_corridor", "death_certificate.records_room", "death_certificate.observation_level"],
           "objective_ids": ["verify.record_order", "verify.causal_chain", "verify.patient"],
           "allowed_action_types": ["observe", "talk", "investigate", "move", "present_evidence"],
-          "min_auto_beats": 2,
+          "min_auto_beats": 1,
           "max_auto_beats": 9,
           "decision_window_ids": ["death_certificate.decision.investigation_route_one", "death_certificate.decision.investigation_route_two", "death_certificate.decision.investigation_route_three"],
           "transitions": [
@@ -745,6 +786,11 @@
             }
           ],
           "auto_beat_clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}],
+          "action_time_costs": [
+            {"action_type": "observe", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]},
+            {"action_type": "present_evidence", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]},
+            {"action_type": "talk", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]}
+          ],
           "rapid_decision_allowed": false,
           "tone_hints": ["revelatory", "evidence-led"]
         },
@@ -769,7 +815,6 @@
               "priority": 10
             }
           ],
-          "action_time_costs": [{"action_type": "commit", "clock_advances": [{"clock_id": "predicted_death_deadline", "amount": 1}]}],
           "rapid_decision_allowed": true,
           "tone_hints": ["rapid", "consequential"]
         },
@@ -795,7 +840,9 @@
           "status": "RESOLVED",
           "priority": 20,
           "conditions": [
-            {"rule_type": "FACT_EQUALS", "fact_id": "death_certificate.fact.disposal_protocol_active", "value": false}
+            {"rule_type": "FACT_EQUALS", "fact_id": "death_certificate.fact.disposal_protocol_active", "value": false},
+            {"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "player_is_alive"},
+            {"rule_type": "NPC_ALIVE_ACKNOWLEDGED", "minimum_count": 1}
           ]
         },
         {
@@ -811,7 +858,9 @@
           "status": "RESOLVED",
           "priority": 30,
           "conditions": [
-            {"rule_type": "EVENT_OCCURRED", "event_type": "core.conflict.resolved"}
+            {"rule_type": "EVENT_OCCURRED", "event_type": "core.conflict.resolved"},
+            {"rule_type": "CLUE_GROUP_COMPLETE", "clue_group_id": "player_is_alive"},
+            {"rule_type": "NPC_ALIVE_ACKNOWLEDGED", "minimum_count": 1}
           ]
         }
       ],
@@ -843,8 +892,10 @@
               "action_type": "physical_response",
               "discovered_clue_ids": ["death_certificate.clue.vital_response"],
               "resolves_current_decision": true,
-              "requires_visible_npc_utterance": true,
-              "required_visible_npc_utterance_any_terms": ["有意识", "还活着", "生命体征"],
+              "required_prose_any_terms": ["手指", "信号", "设备", "反应"],
+              "player_alive_acknowledgement_npc_definition_ids": ["npc.death_certificate.triage_coordinator"],
+              "player_alive_acknowledgement_public_text": "分诊协调员明确确认：你仍然活着，并且有可复核的意识与生命体征。",
+              "fixed_public_narrative_text": "设备记录了连贯且有目的的生命信号。分诊协调员明确确认：你仍然活着。",
               "forbidden_prose_terms": ["没有意识", "无法确认", "不能确认", "无生命体征", "未发现生命体征"]
             },
             {
@@ -852,6 +903,7 @@
               "event_type": "vitals.signal.ambiguous",
               "action_type": "physical_response",
               "resolves_current_decision": true,
+              "fixed_public_narrative_text": "设备捕捉到一次含混反应，但没有形成可复核的生命状态确认。",
               "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "宣告成功"]
             },
             {
@@ -859,6 +911,7 @@
               "event_type": "vitals.signal.failed",
               "action_type": "physical_response",
               "resolves_current_decision": true,
+              "fixed_public_narrative_text": "这次动作没有形成可复核信号，也没有产生新的权威结果。",
               "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "宣告成功"]
             }
           ],
@@ -879,6 +932,7 @@
               "event_type": "observation.completed",
               "action_type": "observe",
               "resolves_current_decision": true,
+              "fixed_public_narrative_text": "你观察了当前公开环境，但没有获得新的权威线索或生命状态确认。",
               "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认"]
             },
             {
@@ -886,6 +940,7 @@
               "event_type": "observation.no_effect",
               "action_type": "observe",
               "resolves_current_decision": true,
+              "fixed_public_narrative_text": "这次观察没有产生可验证的新结果。",
               "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认"]
             }
           ],
@@ -906,11 +961,217 @@
               "event_type": "custom.no_effect",
               "action_type": "respond",
               "resolves_current_decision": true,
+              "fixed_public_narrative_text": "这次尝试没有形成新的可复核结果，现场流程继续推进。",
               "forbidden_prose_terms": ["确认你还活着", "确认你有意识", "护士承认", "获得线索"]
             }
           ],
           "priority": 100,
           "mutex_group": "death_certificate.outcome.opening_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.life_disputed_clinical_recheck",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.life_disputed"],
+          "intent": {
+            "action_types": ["TALK", "CUSTOM", "OBSERVE", "EXPLORE"],
+            "required_any_terms": ["复核", "检查", "生命", "回应", "review", "check", "alive", "respond"],
+            "forbidden_terms": [],
+            "requires_target": false
+          },
+          "required_visible_npc_definition_ids": ["npc.death_certificate.triage_coordinator"],
+          "once": true,
+          "safe_description": "请求基于可重复反应进行临床复核；成功时由现场协调员明确确认生命状态。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "clinical.reviewed",
+              "action_type": "investigate",
+              "discovered_clue_ids": [
+                "death_certificate.clue.vital_response",
+                "death_certificate.clue.coherent_response"
+              ],
+              "required_prose_any_terms": ["复核", "生命体征", "反应", "设备"],
+              "player_alive_acknowledgement_npc_definition_ids": ["npc.death_certificate.triage_coordinator"],
+              "player_alive_acknowledgement_public_text": "分诊协调员完成复核并明确确认：你仍然活着。",
+              "fixed_public_narrative_text": "设备记录了连续回应与生命体征。分诊协调员完成复核并明确确认：你仍然活着。",
+              "forbidden_prose_terms": ["无法确认", "没有生命体征", "已经死亡"]
+            }
+          ],
+          "priority": 290,
+          "mutex_group": "death_certificate.outcome.life_disputed_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.life_disputed_no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.life_disputed"],
+          "intent": {"action_types": ["TALK", "CUSTOM", "OBSERVE", "EXPLORE"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "once": false,
+          "safe_description": "该尝试没有产生服务器授权的临床确认、线索或地点变化。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "life_dispute.no_effect",
+              "action_type": "observe",
+              "fixed_public_narrative_text": "这次尝试没有形成新的可复核结果，现场流程继续推进。",
+              "forbidden_prose_terms": ["获得线索", "开放档案室", "确认你还活着", "早于诊断", "预测导致", "地下患者还活着"]
+            }
+          ],
+          "priority": 90,
+          "mutex_group": "death_certificate.outcome.life_disputed_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.disposal_escape_no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.disposal_escape"],
+          "intent": {"action_types": ["MOVE", "OBSERVE", "CUSTOM", "EXPLORE"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "once": false,
+          "safe_description": "沿当前公开路线继续行动，不产生额外线索、地点开放或世界事实。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "disposal_escape.no_effect",
+              "action_type": "observe",
+              "fixed_public_narrative_text": "你沿当前公开路线继续行动，但没有发现新的权威线索或入口。",
+              "forbidden_prose_terms": ["获得线索", "开放档案室", "开放观察层", "早于诊断", "预测导致", "地下患者还活着"]
+            }
+          ],
+          "priority": 80,
+          "mutex_group": "death_certificate.outcome.disposal_escape_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.investigation_records_route",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "intent": {
+            "action_types": ["OBSERVE", "EXPLORE"],
+            "required_any_terms": [],
+            "required_action_terms": [],
+            "forbidden_terms": [],
+            "requires_target": false
+          },
+          "required_current_location_ids": ["death_certificate.records_room"],
+          "required_visible_npc_definition_ids": ["npc.death_certificate.records_custodian"],
+          "once": true,
+          "safe_description": "沿公开记录链核对签发顺序，并由固定结果开放档案路径。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "record.route.verified",
+              "action_type": "investigate",
+              "discovered_clue_ids": [
+                "death_certificate.clue.record_timestamp",
+                "death_certificate.clue.protocol_feedback"
+              ],
+              "required_prose_any_terms": ["记录", "档案", "签发", "时间"],
+              "fixed_public_narrative_text": "你在档案室完成逐项核验，签发时间与处置反馈形成了可复查的记录证据。"
+            }
+          ],
+          "priority": 280,
+          "mutex_group": "death_certificate.outcome.investigation_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.investigation_audit_route",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "intent": {
+            "action_types": ["OBSERVE", "EXPLORE"],
+            "required_any_terms": [],
+            "required_action_terms": [],
+            "forbidden_terms": [],
+            "requires_target": false
+          },
+          "required_current_location_ids": ["death_certificate.records_room"],
+          "required_visible_npc_definition_ids": ["npc.death_certificate.records_custodian"],
+          "once": true,
+          "safe_description": "核验审计顺序与处置反馈，并由固定结果开放地下观察路径。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "audit.route.verified",
+              "action_type": "investigate",
+              "discovered_clue_ids": [
+                "death_certificate.clue.audit_sequence",
+                "death_certificate.clue.comparison_case"
+              ],
+              "opened_location_ids": ["death_certificate.observation_level"],
+              "new_location_id": "death_certificate.observation_level",
+              "required_prose_any_terms": ["审计", "日志", "顺序", "规程"],
+              "fixed_public_narrative_text": "审计日志显示出稳定的时间与规程反馈顺序，地下观察层入口已由服务器规则开放。"
+            }
+          ],
+          "priority": 270,
+          "mutex_group": "death_certificate.outcome.investigation_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.investigation_patient_route",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "intent": {
+            "action_types": ["OBSERVE", "EXPLORE"],
+            "required_any_terms": [],
+            "required_action_terms": [],
+            "forbidden_terms": [],
+            "requires_target": false
+          },
+          "required_current_location_ids": ["death_certificate.observation_level"],
+          "required_visible_npc_definition_ids": ["npc.death_certificate.underground_patient"],
+          "once": true,
+          "safe_description": "复核地下观察对象的即时指标与连续监测历史，并开放控制室路径。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "patient.route.verified",
+              "action_type": "investigate",
+              "discovered_clue_ids": [
+                "death_certificate.clue.patient_vitals",
+                "death_certificate.clue.monitor_history"
+              ],
+              "opened_location_ids": ["death_certificate.control_room"],
+              "required_prose_any_terms": ["患者", "生命体征", "监测", "观察对象"],
+              "forbidden_prose_terms": ["已经死亡", "没有生命体征"],
+              "fixed_public_narrative_text": "地下观察对象的即时生命体征与连续监测历史一致，控制室路径已按固定结果开放。"
+            }
+          ],
+          "priority": 260,
+          "mutex_group": "death_certificate.outcome.investigation_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.investigation_no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.investigation"],
+          "intent": {"action_types": ["TALK", "CUSTOM", "OBSERVE", "EXPLORE"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "once": false,
+          "safe_description": "该调查尝试消耗时间，但不授予线索、地点、事实或结局。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "investigation.no_effect",
+              "action_type": "investigate",
+              "fixed_public_narrative_text": "这次调查没有形成可验证的新线索，也没有开放新的地点。",
+              "forbidden_prose_terms": ["获得线索", "开放档案室", "开放观察层", "解决核心冲突", "早于诊断", "预测导致", "地下患者还活着", "签发早于", "记录制造结果"]
+            }
+          ],
+          "priority": 70,
+          "mutex_group": "death_certificate.outcome.investigation_action"
+        },
+        {
+          "rule_id": "death_certificate.outcome.self_fulfilling_truth_no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": ["death_certificate.self_fulfilling_truth"],
+          "intent": {"action_types": ["TALK", "CUSTOM", "OBSERVE", "EXPLORE"], "required_any_terms": [], "forbidden_terms": [], "requires_target": false},
+          "once": false,
+          "safe_description": "在已公开的因果材料内继续观察，不新增线索或改变权威事实。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "self_fulfilling_truth.no_effect",
+              "action_type": "observe",
+              "fixed_public_narrative_text": "你继续整理已经公开的因果材料，没有产生新的权威结果。",
+              "forbidden_prose_terms": ["新线索", "暂停规程", "核心冲突已解决", "未来结局"]
+            }
+          ],
+          "priority": 60,
+          "mutex_group": "death_certificate.outcome.truth_action"
         }
       ],
       "memory_rules": [
@@ -989,12 +1250,22 @@
           "npc_definition_id": "npc.death_certificate.triage_coordinator"
         },
         {
+          "rule_id": "death_certificate.memory.41_clinical_npc_encounter",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "RECORD_NPC_ENCOUNTER",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.life_disputed_clinical_recheck"],
+          "required_scenario_event_types": ["clinical.reviewed"],
+          "required_outcome_results": ["SUCCESS"],
+          "npc_definition_id": "npc.death_certificate.triage_coordinator"
+        },
+        {
           "rule_id": "death_certificate.memory.50_player_alive_fact",
           "rule_version": "1.0.0",
           "source_event_type": "NarrativeOutcomeAccepted",
           "operation": "REMEMBER_PUBLIC_FACT",
-          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal"],
-          "required_scenario_event_types": ["vitals.verified"],
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal", "death_certificate.outcome.life_disputed_clinical_recheck"],
+          "required_scenario_event_types": ["vitals.verified", "clinical.reviewed"],
           "required_outcome_results": ["SUCCESS"],
           "public_fact_id": "death_certificate.fact.player_is_alive"
         },
@@ -1003,35 +1274,72 @@
           "rule_version": "1.0.0",
           "source_event_type": "NarrativeOutcomeAccepted",
           "operation": "RECORD_SIGNIFICANT_EXPERIENCE",
-          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal"],
-          "required_scenario_event_types": ["vitals.verified"],
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal", "death_certificate.outcome.life_disputed_clinical_recheck"],
+          "required_scenario_event_types": ["vitals.verified", "clinical.reviewed"],
           "required_outcome_results": ["SUCCESS"],
           "public_fact_id": "death_certificate.fact.player_is_alive",
           "significant_experience_category": "IMPORTANT_PUBLIC_DISCOVERY",
           "significant_experience_summary": "CRITICAL_PUBLIC_FACT_LEARNED",
           "important_experience": true
         },
-          {
-            "rule_id": "death_certificate.memory.90_scenario_completed",
+        {
+          "rule_id": "death_certificate.memory.62_underground_patient_encounter",
           "rule_version": "1.0.0",
           "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "RECORD_NPC_ENCOUNTER",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.investigation_patient_route"],
+          "required_scenario_event_types": ["patient.route.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "npc_definition_id": "npc.death_certificate.underground_patient"
+        },
+        {
+          "rule_id": "death_certificate.memory.70_record_order_fact",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.investigation_audit_route"],
+          "required_scenario_event_types": ["audit.route.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "public_fact_id": "death_certificate.fact.record_predates_diagnosis"
+        },
+        {
+          "rule_id": "death_certificate.memory.71_prediction_causation_fact",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.investigation_audit_route"],
+          "required_scenario_event_types": ["audit.route.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "public_fact_id": "death_certificate.fact.prediction_causes_outcome"
+        },
+        {
+          "rule_id": "death_certificate.memory.72_underground_patient_fact",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.investigation_patient_route"],
+          "required_scenario_event_types": ["patient.route.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "public_fact_id": "death_certificate.fact.underground_patient_alive"
+        },
+        {
+          "rule_id": "death_certificate.memory.89_scenario_completed_by_runtime_event",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioRuntimeEventGenerated",
           "operation": "COMPLETE_SCENARIO",
+          "required_scenario_event_types": ["deadline.reached"],
           "requires_scenario_completed": true,
-          "allowed_ending_ids": [
-            "death_certificate.ending.protocol_broken",
-            "death_certificate.ending.deadline_reached",
-              "death_certificate.ending.record_challenged"
-            ]
-          },
-          {
+          "allowed_ending_ids": ["death_certificate.ending.deadline_reached"]
+        },
+        {
             "rule_id": "death_certificate.memory.91_scenario_completed_by_decision",
             "rule_version": "1.0.0",
             "source_event_type": "ScenarioDecisionSelected",
             "operation": "COMPLETE_SCENARIO",
+            "required_scenario_event_types": ["core.conflict.resolved"],
             "requires_scenario_completed": true,
             "allowed_ending_ids": [
               "death_certificate.ending.protocol_broken",
-              "death_certificate.ending.deadline_reached",
               "death_certificate.ending.record_challenged"
             ]
           }

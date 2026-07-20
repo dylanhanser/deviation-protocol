@@ -77,7 +77,7 @@ def test_formal_scenario_validate_succeeds_with_authoritative_counts(
         "decisions": 9,
         "endings": 3,
         "facts": 15,
-        "outcome_rules": 3,
+        "outcome_rules": 11,
         "phases": 7,
         "transitions": 6,
     }

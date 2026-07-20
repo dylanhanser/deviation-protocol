@@ -84,6 +84,7 @@ class MemoryRuleDefinition(_MemoryRuleModel):
         if self.required_scenario_event_types and self.source_event_type not in {
             MemoryRuleSourceEventType.NARRATIVE_OUTCOME_ACCEPTED,
             MemoryRuleSourceEventType.SCENARIO_RUNTIME_EVENT_GENERATED,
+            MemoryRuleSourceEventType.SCENARIO_DECISION_SELECTED,
         }:
             raise ValueError("scenario-event conditions require a trusted world event")
 
