@@ -42,3 +42,5 @@
 See `docs/architecture.md` for detailed design boundaries.
 
 See `docs/engineering/codex_workflow.md` for implementation, review, environment, and Git handoff workflow.
+
+Before planning the next phase, read `PLANS.md`.
