@@ -1,6 +1,8 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-当前实现到 Phase 2.2c：生产 action API 已接入耐久的 prepare / provider / finalize 三阶段协调器。外部 DeepSeek 调用发生在所有 UoW、`AsyncSession` 与 MySQL 行锁退出之后；模型只选择本回合 opaque outcome token，最终状态仍由服务器声明式规则、`NarrativeOutcomePolicy`、专用 issuer 与 `StoryDirector` 决定。
+当前实现到 Phase 2.3a：`GameState` 快照 v3 已加入确定性、有界的玩家长期记忆领域状态与玩家安全公开投影；它尚未接入生产回合编排或叙事 prompt。生产 action API 仍使用 Phase 2.2c 的耐久 prepare / provider / finalize 三阶段协调器，外部 DeepSeek 调用发生在所有 UoW、`AsyncSession` 与 MySQL 行锁退出之后。
+
+Phase 2.3a 的 `PlayerMemoryState` 只索引可信确认的副本记录、真正遇见的稳定 NPC 身份、受限类型的重要经历和玩家已知公开事实引用。属性、资源、钱包、库存/装备、技能、当前 NPC、`ScenarioRuntimeState` 与完整 `domain_events` 仍是各自唯一事实来源。详细边界、容量和 v1/v2/v3 兼容规则见 [玩家长期记忆](docs/player_memory.md)。
 
 ## Phase 2.2c production narrative coordination
 
@@ -239,7 +241,7 @@ Phase 2.1 新增与具体题材无关的 `ScenarioDefinition`、`ScenarioRuntime
 
 ## Phase 2.2a 场景事务接线
 
-`POST /v1/sessions` 现在必须由玩家显式提交服务器允许的 `scenario_id`，同时继续提交经 `ContentCatalog` 验证的 `character_definition_id`。玩家不能提交 scenario 内容版本、初始 phase、事实、线索、时钟、`ScenarioRuntimeState`、`NarrativeFrame` 或可信事件。lifespan 加载 `ScenarioCatalog` 及其匹配的 `ContentCatalog`；`SessionService` 创建基础 `GameState` 和场景引用的运行时 NPC，再调用纯 `DeterministicStoryDirector.start_scenario()`。得到的 v2 快照、session 行与创建幂等绑定在同一个 UoW 中一次提交，响应只附带安全初始 `NarrativeFrame`。同一玩家的创建键同时绑定角色与 scenario；任一项不同均为 409，不同玩家仍可复用同一键。
+`POST /v1/sessions` 现在必须由玩家显式提交服务器允许的 `scenario_id`，同时继续提交经 `ContentCatalog` 验证的 `character_definition_id`。玩家不能提交 scenario 内容版本、初始 phase、事实、线索、时钟、`ScenarioRuntimeState`、`NarrativeFrame` 或可信事件。lifespan 加载 `ScenarioCatalog` 及其匹配的 `ContentCatalog`；`SessionService` 创建基础 `GameState` 和场景引用的运行时 NPC，再调用纯 `DeterministicStoryDirector.start_scenario()`。得到的 v3 快照、session 行与创建幂等绑定在同一个 UoW 中一次提交，响应只附带安全初始 `NarrativeFrame`。同一玩家的创建键同时绑定角色与 scenario；任一项不同均为 409，不同玩家仍可复用同一键。
 
 实际创建流为：
 

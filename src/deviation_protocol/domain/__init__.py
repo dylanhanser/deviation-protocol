@@ -12,6 +12,7 @@ from deviation_protocol.domain.facts import (
     StoryMutationValidator,
 )
 from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.player_memory import PlayerMemoryState
 from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.scenario_runtime import ScenarioRuntimeState
 from deviation_protocol.domain.state import AuthoritativeStateView, GameState
@@ -28,6 +29,7 @@ __all__ = [
     "NarrativeFact",
     "NarrativeFactKind",
     "NarrativeFrame",
+    "PlayerMemoryState",
     "ScenarioCatalog",
     "ScenarioDefinition",
     "ScenarioRuntimeState",

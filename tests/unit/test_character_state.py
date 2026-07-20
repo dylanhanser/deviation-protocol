@@ -71,11 +71,11 @@ def test_snapshot_json_round_trip_is_stable(
     restored = GameState.from_snapshot(json.loads(encoded), catalog=catalog)
 
     assert restored == state
-    assert restored.schema_version == 2
+    assert restored.schema_version == 3
     assert restored.to_snapshot() == state.to_snapshot()
 
 
-@pytest.mark.parametrize("schema_version", [3, True, 1.0])
+@pytest.mark.parametrize("schema_version", [4, True, 1.0, "3"])
 def test_unknown_or_non_integer_snapshot_schema_is_rejected(
     state: GameState, schema_version: object
 ) -> None:

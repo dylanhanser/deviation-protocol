@@ -172,7 +172,7 @@ def scenario_service_and_store() -> tuple[SessionService, Store]:
 
 
 @pytest.mark.asyncio
-async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
+async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
     scenario_service_and_store: tuple[SessionService, Store],
 ) -> None:
     service, store = scenario_service_and_store
@@ -196,7 +196,7 @@ async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
         catalog=service.catalog,
         scenario_catalog=service.scenario_catalog,
     )
-    assert snapshot.state["schema_version"] == 2
+    assert snapshot.state["schema_version"] == 3
     assert state.scenario_runtime is not None
     assert state.scenario_runtime.scenario_id == "death_certificate"
     assert state.scenario_runtime.scenario_content_version == (
@@ -237,7 +237,7 @@ async def test_create_scenario_builds_v2_runtime_and_safe_initial_frame(
         allow_nan=False,
     ).encode("utf-8")
     assert hashlib.sha256(stable_json(snapshot.state)).hexdigest() == (
-        "900bf732d802a47b53371389f2ccbceaaef6a0ab6a8f2bef4d5890e0c975d48f"
+        "2d46c5c9827dd66a55199e7f9a799eae30c25de921fe8bda25c4f70843b641dd"
     )
     assert result.narrative_frame.decision_id == (
         "decision.758c3b9771b465e887dedbdd889c41b6"

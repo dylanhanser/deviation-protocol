@@ -87,7 +87,7 @@ class DeterministicStoryDirector:
             raise StoryDirectorError("game state and scenario content versions do not match")
         tags = self._profession_tags(definition, profession_tags)
         candidate = deepcopy(state)
-        candidate.schema_version = 2
+        candidate.schema_version = 3
         candidate.scenario_runtime = ScenarioRuntimeState.from_definition(definition)
         candidate.scenario_runtime.validate_against(definition)
         self._open_decision(candidate.scenario_runtime, definition, ())

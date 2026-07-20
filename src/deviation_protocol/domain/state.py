@@ -4,6 +4,8 @@ from collections.abc import Iterable
 from copy import deepcopy
 from dataclasses import dataclass
 from enum import StrEnum
+import hashlib
+import json
 from typing import Annotated, Any, Mapping, cast
 from uuid import uuid4
 
@@ -25,8 +27,14 @@ from deviation_protocol.domain.content import (
     NpcDefinition,
     SkillRequirement,
 )
-from deviation_protocol.domain.scenario import ScenarioCatalog
+from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.scenario_runtime import ScenarioRuntimeState
+from deviation_protocol.domain.player_memory import (
+    MemoryMutationPlan,
+    PlayerMemoryState,
+    memory_state_fingerprint,
+    scenario_definition_fingerprint,
+)
 
 
 NonNegativeInt = Annotated[int, Field(strict=True, ge=0)]
@@ -213,17 +221,18 @@ class NpcState(RuntimeModel):
 class GameState(RuntimeModel):
     """Authoritative snapshot aggregate for frequently changing gameplay state."""
 
-    schema_version: Annotated[int, Field(strict=True)] = 2
+    schema_version: Annotated[int, Field(strict=True)] = 3
     content_version: DefinitionId
     player: PlayerState
     npcs: dict[DefinitionId, NpcState] = Field(default_factory=dict)
     scenario_runtime: ScenarioRuntimeState | None = None
+    player_memory: PlayerMemoryState = Field(default_factory=PlayerMemoryState)
 
     @field_validator("schema_version")
     @classmethod
     def require_supported_schema_version(cls, value: int) -> int:
-        if value != 2:
-            raise ValueError("unsupported snapshot schema_version; expected 2")
+        if value != 3:
+            raise ValueError("unsupported snapshot schema_version; expected 3")
         return value
 
     @model_validator(mode="after")
@@ -255,6 +264,54 @@ class GameState(RuntimeModel):
         copied = type(self).model_validate(self.to_snapshot())
         copied.validate_against(catalog)
         return copied
+
+    def memory_authority_fingerprint(self) -> str:
+        """Bind a memory plan to every authoritative non-memory field."""
+        payload = self.to_snapshot()
+        del payload["player_memory"]
+        encoded = json.dumps(
+            payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        ).encode("utf-8")
+        return hashlib.sha256(encoded).hexdigest()
+
+    def apply_memory_plan(
+        self,
+        plan: MemoryMutationPlan,
+        *,
+        session_id: str,
+        state_version: int,
+        scenario_definition: ScenarioDefinition,
+    ) -> None:
+        """Atomically apply one sealed, deterministic long-term-memory update."""
+        if type(state_version) is not int or state_version < 0:
+            raise ValueError("memory mutation state_version must be non-negative integer")
+        before = self.to_snapshot()
+        current_memory_fingerprint = memory_state_fingerprint(self.player_memory)
+        if not isinstance(plan, MemoryMutationPlan) or not plan.is_authentic_for(
+            session_id=session_id,
+            state_version=state_version,
+            non_memory_state_fingerprint=self.memory_authority_fingerprint(),
+            scenario_definition_fingerprint=scenario_definition_fingerprint(
+                scenario_definition
+            ),
+            memory_fingerprint=current_memory_fingerprint,
+        ):
+            raise ValueError("memory mutation is forged, stale, or bound elsewhere")
+        candidate = self.player_memory._apply_issued_plan(plan)
+        # model_copy intentionally does not validate updates. Rebuild from JSON so
+        # collection order, duplicate checks and every nested bound are enforced
+        # before the authoritative aggregate is touched.
+        candidate = PlayerMemoryState.model_validate(candidate.model_dump(mode="json"))
+        if memory_state_fingerprint(candidate) != plan.memory_after_fingerprint:
+            raise ValueError("memory mutation result does not match its sealed post-state")
+        validated_state = type(self).model_validate(
+            {**before, "player_memory": candidate.model_dump(mode="json")}
+        )
+        self.player_memory = validated_state.player_memory
 
     @classmethod
     def from_snapshot(
@@ -1053,10 +1110,37 @@ def migrate_snapshot_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
             raise ValueError("v1 snapshot cannot contain scenario_runtime")
         copied["schema_version"] = 2
         copied["scenario_runtime"] = None
-        return copied
+        version = 2
     if version == 2:
+        if "player_memory" in copied:
+            raise ValueError("v2 snapshot cannot contain player_memory")
+        copied["schema_version"] = 3
+        copied["player_memory"] = PlayerMemoryState().model_dump(mode="json")
+        _require_json_snapshot_value(copied)
+        return copied
+    if version == 3:
+        _require_json_snapshot_value(copied)
         return copied
     raise ValueError(f"unsupported snapshot schema_version: {version}")
+
+
+def _require_json_snapshot_value(value: Any, *, path: str = "snapshot") -> None:
+    """Reject Python-only or lossy values before validating a v3 JSON snapshot."""
+    if value is None or type(value) in (bool, int, str):
+        return
+    if isinstance(value, float):
+        raise TypeError(f"{path} contains a float")
+    if isinstance(value, dict):
+        for key, nested in value.items():
+            if not isinstance(key, str):
+                raise TypeError(f"{path} contains a non-string object key")
+            _require_json_snapshot_value(nested, path=f"{path}.{key}")
+        return
+    if isinstance(value, list):
+        for index, nested in enumerate(value):
+            _require_json_snapshot_value(nested, path=f"{path}[{index}]")
+        return
+    raise TypeError(f"{path} contains a non-JSON value of type {type(value).__name__}")
 
 
 def _canonical_json(value: Any) -> Any:

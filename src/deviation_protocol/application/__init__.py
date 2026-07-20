@@ -35,6 +35,10 @@ from deviation_protocol.application.story_director import (
     DeterministicStoryDirector,
     StoryDirectorResult,
 )
+from deviation_protocol.application.player_memory import (
+    PlayerMemoryProjection,
+    PlayerMemoryProjector,
+)
 
 __all__ = [
     "ActionGateway",
@@ -55,6 +59,8 @@ __all__ = [
     "NarrativeStyleProfile",
     "NarrativeUsage",
     "PromptBuilder",
+    "PlayerMemoryProjection",
+    "PlayerMemoryProjector",
     "FirstPhaseTurnOrchestrator",
     "ResolutionResult",
     "ResolutionStatus",

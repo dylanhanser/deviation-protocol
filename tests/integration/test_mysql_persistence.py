@@ -97,6 +97,7 @@ async def test_mysql_v1_snapshot_loads_through_pure_migration_while_v2_is_curren
     v1 = state.to_snapshot()
     v1["schema_version"] = 1
     v1.pop("scenario_runtime")
+    v1.pop("player_memory")
     async with mysql_session_factory.begin() as session:
         session.add(
             GameSnapshotRow(
@@ -119,8 +120,8 @@ async def test_mysql_v1_snapshot_loads_through_pure_migration_while_v2_is_curren
         )
     )
     assert response.resolution_kind is ResolutionStatus.RESOLVED_LOCAL
-    assert GameState.from_snapshot(v1, catalog=catalog).schema_version == 2
-    assert state.to_snapshot()["schema_version"] == 2
+    assert GameState.from_snapshot(v1, catalog=catalog).schema_version == 3
+    assert state.to_snapshot()["schema_version"] == 3
 
 
 @pytest.mark.integration

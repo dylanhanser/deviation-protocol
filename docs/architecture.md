@@ -1,5 +1,15 @@
 # 第一阶段架构边界
 
+## Phase 2.3a deterministic player memory boundary
+
+`GameState` 的当前快照 schema 为 v3，并新增 `PlayerMemoryState`。它是玩家长期记忆的有界索引，不是第二套运行时剧情状态，也不是事件流副本：同一 `scenario_id`、同一稳定 NPC subject key 和同一 experience ID 都更新或幂等复用现有记录；容量耗尽会显式失败且保持完整快照不变。v1 先纯迁移到 v2 的 `scenario_runtime=null`，v2 再纯迁移到 v3 的空记忆，旧 payload 不被原地修改，也不会据此虚构经历、NPC 关系或重要事件。
+
+唯一事实来源保持分离：当前属性/资源/技能属于 `PlayerState`，货币属于 `WalletState`，物品/装备属于 `InventoryState`，当前 NPC 属于 `GameState.npcs`，当前副本 phase/fact/clue/clock/decision/ending 属于 `ScenarioRuntimeState`，完整已持久化历史属于 `domain_events`，只有长期有界索引属于 `PlayerMemoryState`。记忆仅保存稳定引用、封闭里程碑和最后可信事件顺序；不保存当前数值、runtime NPC ID、完整事实字典、`NarrativeFrame` 或文学正文。
+
+`AuthoritativePlayerMemoryPlanFactory` 只产生带内部 issuer、session/state-version、状态前后指纹、规范化 scenario-definition 指纹和完整载荷摘要的不可变 mutation plan。它只接受进程内签发的 `MemoryAuthoritySource` capability，再从当前 `GameState`、匹配的 `ScenarioDefinition` 和封闭枚举重新派生值；普通 `DomainEvent`、事件类型字符串、JSON/Pydantic、Frame 或模型文本不能签发或篡改有效 plan。Phase 2.3a 未把 capability/factory 注入 API、`ActionGateway`、`TurnOrchestrator`、`NarrativePromptBuilder` 或 Provider 流程，也不声称 capability 的 source event 已持久化；未来 Phase 2.3b 必须在事务边界内证明 source event 已持久化，并从受信 catalog 解析相同 definition 后才可接线。
+
+`PlayerMemoryProjector` 输出不可变、深度隔离、稳定排序的玩家已知投影，具有独立的集合数、字符数和 JSON byte 上限，并剥离 source event ID/sequence。它不包含隐藏事实、NPC 秘密、未来结局、密封/capability、action signature、outcome token、policy trace、数据库对象、完整快照或模型 proposal。详细模型与容量见 [`player_memory.md`](player_memory.md)。`game_snapshots.state_json` 已能承载 v3，因此 ORM 和 Alembic revision 均不变化。
+
 ## Phase 2.2c production narrative architecture
 
 The production action boundary now uses `DurableNarrativeTurnOrchestrator`. Phase A locks the session and persists a PREPARED narrative job only after authoritative idempotency, snapshot/content/scenario, Gateway, RuleResolver, frame, and outcome-candidate checks. Phase B atomically claims the job, commits and closes every database context, calls the provider, validates untrusted output, and persists PROPOSAL_VALIDATED in a new short transaction. Phase C locks session then job, performs version/fingerprint/action/scenario/request/lease/proposal CAS, recomputes outcome authorization, and commits once.
