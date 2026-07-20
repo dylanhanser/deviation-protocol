@@ -27,8 +27,13 @@ from deviation_protocol.application.errors import (
     StoredTurnResponseInvalidError,
     UnsupportedResolutionError,
 )
-from deviation_protocol.application.narrative_jobs import NarrativeJob, NarrativeJobStatus
+from deviation_protocol.application.narrative_jobs import (
+    ACTIVE_NARRATIVE_JOB_STATUSES,
+    NarrativeJob,
+    NarrativeJobStatus,
+)
 from deviation_protocol.application.narrative_models import (
+    PROMPT_SCHEMA_VERSION,
     NarrativeBoundaryError,
     NarrativePlayerIntent,
     NarrativeProposalRejectedError,
@@ -196,6 +201,29 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     raise RuntimeError("narrative job disappeared while locking")
                 self._validate_job_request(existing_job, submission)
                 if (
+                    existing_job.status in ACTIVE_NARRATIVE_JOB_STATUSES
+                    and existing_job.prompt_schema_version != PROMPT_SCHEMA_VERSION
+                ):
+                    stale = self._transition_job(
+                        existing_job,
+                        {
+                            "status": NarrativeJobStatus.STALE,
+                            "lease_token": None,
+                            "lease_owner": None,
+                            "lease_expires_at": None,
+                            "error_code": "NARRATIVE_REQUEST_SCHEMA_STALE",
+                            "updated_at": self._now(),
+                        },
+                    )
+                    if await uow.narrative_jobs.replace(
+                        stale,
+                        expected_status=existing_job.status,
+                        expected_lease_token=existing_job.lease_token,
+                        expected_lease_owner=existing_job.lease_owner,
+                    ):
+                        await uow.commit()
+                    raise NarrativeJobStaleError(submission.session_id)
+                if (
                     existing_job.status is NarrativeJobStatus.IN_PROGRESS
                     and self._lease_expired(existing_job, self._now())
                 ):
@@ -282,6 +310,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     game_session,
                     resolution,
                     frame,
+                    definition,
                 )
             if self.narrative_provider is None:
                 raise NarrativeProviderNotConfiguredError(submission.session_id)
@@ -306,6 +335,9 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 raise CandidateStateInvalidError(submission.session_id)
             request = NarrativeRequest(
                 frame=frame,
+                player_memory=self.memory_projector.project(
+                    state, self.scenario_catalog
+                ),
                 player_intent=NarrativePlayerIntent.from_submission(submission),
                 player_visible_character_tags=tuple(sorted(character.tags)),
                 recent_narrative_fragments=recent,
@@ -345,24 +377,18 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
         game_session: Any,
         resolution: ResolutionResult,
         frame: NarrativeFrame | None,
+        definition: ScenarioDefinition | None,
     ) -> TurnResponse:
         expected_version = game_session.state_version
         resulting_version = expected_version
         if resolution.state_changed:
-            candidate_snapshot = self._validated_candidate_snapshot(
-                resolution,
-                submission.session_id,
-                expected_player_id=game_session.player_id,
-            )
-            first_sequence = await uow.sessions.next_event_sequence_no(
-                submission.session_id
-            )
-            events = self._envelope_events(resolution, submission, first_sequence)
-            await uow.sessions.save_snapshot_and_events(
-                game_session,
-                candidate_snapshot,
-                events,
-                expected_state_version=expected_version,
+            await self._persist_state_change(
+                uow=uow,
+                submission=submission,
+                game_session=game_session,
+                resolution=resolution,
+                definition=definition,
+                expected_version=expected_version,
             )
             resulting_version += 1
         response = self._build_response(
@@ -555,6 +581,8 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 self._json_digest(persisted_request.model_dump(mode="json"))
                 != current.request_fingerprint
                 or persisted_request.frame != frame
+                or persisted_request.player_memory
+                != self.memory_projector.project(state, self.scenario_catalog)
             ):
                 raise NarrativeJobStaleError(submission.session_id)
             proposal = ValidatedNarrativeProposal.model_validate(
@@ -616,6 +644,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                     "proposal_digest": current.validated_proposal_digest,
                     "scenario_event_id": sealed.event_id,
                     "scenario_event_type": sealed.event_type,
+                    "npc_definition_ids": authorized.npc_definition_ids,
                 },
             )
             result = ResolutionResult(
@@ -632,20 +661,13 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             )
             if self._lease_expired(current, self._now()):
                 raise NarrativeJobStaleError(submission.session_id)
-            candidate_snapshot = self._validated_candidate_snapshot(
-                result,
-                submission.session_id,
-                expected_player_id=game_session.player_id,
-            )
-            first_sequence = await uow.sessions.next_event_sequence_no(
-                submission.session_id
-            )
-            events = self._envelope_events(result, submission, first_sequence)
-            await uow.sessions.save_snapshot_and_events(
-                game_session,
-                candidate_snapshot,
-                events,
-                expected_state_version=current.prepared_state_version,
+            await self._persist_state_change(
+                uow=uow,
+                submission=submission,
+                game_session=game_session,
+                resolution=result,
+                definition=definition,
+                expected_version=current.prepared_state_version,
             )
             final_frame = bind_public_decision_frame(
                 directed.frame,

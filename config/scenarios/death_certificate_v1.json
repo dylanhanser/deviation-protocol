@@ -913,6 +913,129 @@
           "mutex_group": "death_certificate.outcome.opening_action"
         }
       ],
+      "memory_rules": [
+        {
+          "rule_id": "death_certificate.memory.00_scenario_started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "death_certificate.memory.10_player_conscious",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.player_conscious"
+        },
+        {
+          "rule_id": "death_certificate.memory.11_record_marks_player_dead",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.record_marks_player_dead"
+        },
+        {
+          "rule_id": "death_certificate.memory.12_opening_body_bag_state",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.opening_body_bag_state"
+        },
+        {
+          "rule_id": "death_certificate.memory.13_opening_time_conflict",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.opening_time_conflict"
+        },
+        {
+          "rule_id": "death_certificate.memory.14_certificate_issued",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.death_certificate_issued"
+        },
+        {
+          "rule_id": "death_certificate.memory.15_disposition_imminent",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.comfort_disposition_imminent"
+        },
+        {
+          "rule_id": "death_certificate.memory.16_initial_survival_objective",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "death_certificate.fact.initial_survival_objective"
+        },
+        {
+          "rule_id": "death_certificate.memory.20_scenario_begin_experience",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "RECORD_SIGNIFICANT_EXPERIENCE",
+          "significant_experience_category": "SCENARIO_BEGIN",
+          "significant_experience_summary": "SCENARIO_BEGAN",
+          "important_experience": true
+        },
+        {
+          "rule_id": "death_certificate.memory.40_vitals_npc_encounter",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "RECORD_NPC_ENCOUNTER",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal"],
+          "required_scenario_event_types": ["vitals.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "npc_definition_id": "npc.death_certificate.triage_coordinator"
+        },
+        {
+          "rule_id": "death_certificate.memory.50_player_alive_fact",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal"],
+          "required_scenario_event_types": ["vitals.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "public_fact_id": "death_certificate.fact.player_is_alive"
+        },
+        {
+          "rule_id": "death_certificate.memory.60_player_alive_experience",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "RECORD_SIGNIFICANT_EXPERIENCE",
+          "required_narrative_outcome_rule_ids": ["death_certificate.outcome.purposeful_life_signal"],
+          "required_scenario_event_types": ["vitals.verified"],
+          "required_outcome_results": ["SUCCESS"],
+          "public_fact_id": "death_certificate.fact.player_is_alive",
+          "significant_experience_category": "IMPORTANT_PUBLIC_DISCOVERY",
+          "significant_experience_summary": "CRITICAL_PUBLIC_FACT_LEARNED",
+          "important_experience": true
+        },
+          {
+            "rule_id": "death_certificate.memory.90_scenario_completed",
+          "rule_version": "1.0.0",
+          "source_event_type": "NarrativeOutcomeAccepted",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "death_certificate.ending.protocol_broken",
+            "death_certificate.ending.deadline_reached",
+              "death_certificate.ending.record_challenged"
+            ]
+          },
+          {
+            "rule_id": "death_certificate.memory.91_scenario_completed_by_decision",
+            "rule_version": "1.0.0",
+            "source_event_type": "ScenarioDecisionSelected",
+            "operation": "COMPLETE_SCENARIO",
+            "requires_scenario_completed": true,
+            "allowed_ending_ids": [
+              "death_certificate.ending.protocol_broken",
+              "death_certificate.ending.deadline_reached",
+              "death_certificate.ending.record_challenged"
+            ]
+          }
+      ],
       "narrative_length": {"target": 650, "minimum": 350, "maximum": 900}
     }
   ]

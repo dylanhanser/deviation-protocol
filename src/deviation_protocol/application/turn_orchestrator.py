@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import json
 from typing import Any
@@ -31,6 +31,10 @@ from deviation_protocol.application.ports import (
     PersistedTurnRequest,
     RuleResolver,
     UnitOfWorkFactory,
+)
+from deviation_protocol.application.player_memory import (
+    DeclarativePlayerMemoryRuleEngine,
+    PlayerMemoryProjector,
 )
 from deviation_protocol.application.resolution import ResolutionResult, ResolutionStatus
 from deviation_protocol.application.resolution import PlayerFeedback
@@ -90,6 +94,12 @@ class FirstPhaseTurnOrchestrator:
     )
     clock: Clock = system_utc_clock
     event_id_generator: EventIdGenerator = uuid_event_id
+    memory_rule_engine: DeclarativePlayerMemoryRuleEngine = field(
+        default_factory=DeclarativePlayerMemoryRuleEngine
+    )
+    memory_projector: PlayerMemoryProjector = field(
+        default_factory=PlayerMemoryProjector
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -170,25 +180,14 @@ class FirstPhaseTurnOrchestrator:
             expected_version = game_session.state_version
             resulting_version = expected_version
             if resolution.state_changed:
-                candidate_snapshot = self._validated_candidate_snapshot(
-                    resolution,
-                    submission.session_id,
-                    expected_player_id=game_session.player_id,
-                )
                 resulting_version = expected_version + 1
-                first_sequence_no = await uow.sessions.next_event_sequence_no(
-                    submission.session_id
-                )
-                events = self._envelope_events(
-                    resolution,
-                    submission,
-                    first_sequence_no,
-                )
-                await uow.sessions.save_snapshot_and_events(
-                    game_session,
-                    candidate_snapshot,
-                    events,
-                    expected_state_version=expected_version,
+                await self._persist_state_change(
+                    uow=uow,
+                    submission=submission,
+                    game_session=game_session,
+                    resolution=resolution,
+                    definition=definition,
+                    expected_version=expected_version,
                 )
 
             response = self._build_response(
@@ -205,6 +204,56 @@ class FirstPhaseTurnOrchestrator:
             )
             await uow.commit()
             return response
+
+    async def _persist_state_change(
+        self,
+        *,
+        uow: Any,
+        submission: ActionSubmission,
+        game_session: Any,
+        resolution: ResolutionResult,
+        definition: ScenarioDefinition | None,
+        expected_version: int,
+    ) -> GameState:
+        # Reject malformed candidates before issuing any database capability.
+        self._validated_candidate_snapshot(
+            resolution,
+            submission.session_id,
+            expected_player_id=game_session.player_id,
+        )
+        assert resolution.updated_state is not None
+        first_sequence_no = await uow.sessions.next_event_sequence_no(
+            submission.session_id
+        )
+        events = self._envelope_events(
+            resolution, submission, first_sequence_no
+        )
+        receipts = await uow.sessions.persist_events(
+            events, state_version=expected_version + 1
+        )
+        candidate = resolution.updated_state
+        if definition is not None and definition.memory_rules:
+            candidate = self.memory_rule_engine.apply(
+                state=candidate,
+                definition=definition,
+                session_id=submission.session_id,
+                turn_id=submission.turn_id,
+                state_version=expected_version + 1,
+                receipts=receipts,
+            )
+        candidate_resolution = replace(resolution, updated_state=candidate)
+        candidate_snapshot = self._validated_candidate_snapshot(
+            candidate_resolution,
+            submission.session_id,
+            expected_player_id=game_session.player_id,
+        )
+        await uow.sessions.save_snapshot_and_events(
+            game_session,
+            candidate_snapshot,
+            (),
+            expected_state_version=expected_version,
+        )
+        return candidate
 
     async def _restore_concurrent_winner(
         self, submission: ActionSubmission
@@ -236,11 +285,7 @@ class FirstPhaseTurnOrchestrator:
             return GameState.from_snapshot(
                 payload,
                 catalog=self.catalog,
-                scenario_catalog=(
-                    self.scenario_catalog
-                    if payload.get("scenario_runtime") is not None
-                    else None
-                ),
+                scenario_catalog=self.scenario_catalog,
             )
         except DomainRuleViolation as exc:
             if exc.code is DomainErrorCode.SNAPSHOT_CONTENT_MISMATCH:
@@ -268,11 +313,7 @@ class FirstPhaseTurnOrchestrator:
             GameState.from_snapshot(
                 snapshot,
                 catalog=self.catalog,
-                scenario_catalog=(
-                    self.scenario_catalog
-                    if snapshot.get("scenario_runtime") is not None
-                    else None
-                ),
+                scenario_catalog=self.scenario_catalog,
             )
             return snapshot
         except (DomainRuleViolation, ValidationError, TypeError, ValueError):

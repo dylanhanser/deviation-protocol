@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 import asyncio
 import json
@@ -16,6 +17,7 @@ from deviation_protocol.application.errors import (
     NarrativeJobActiveError,
     NarrativeJobStaleError,
     NarrativeOutcomeUnknownError,
+    SnapshotInvalidError,
 )
 from deviation_protocol.application.narrative_jobs import NarrativeJob
 from deviation_protocol.application.narrative_models import (
@@ -35,6 +37,11 @@ from deviation_protocol.application.rule_resolver import DeterministicRuleResolv
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
+from deviation_protocol.domain.player_memory import (
+    MemoryIndexSyncStatus,
+)
+from deviation_protocol.domain.state import GameState
+from deviation_protocol.domain.scenario import ScenarioCatalog
 from deviation_protocol.infrastructure.orm_models import (
     DomainEventRow,
     GameSessionRow,
@@ -57,10 +64,13 @@ class LockCheckingProvider:
         factory: async_sessionmaker[AsyncSession],
         session_id: str,
         active_uows: list[int] | None = None,
+        *,
+        selected_outcome_references: bool = True,
     ) -> None:
         self.factory = factory
         self.session_id = session_id
         self.active_uows = active_uows
+        self.selected_outcome_references = selected_outcome_references
         self.calls = 0
 
     async def generate(self, request: NarrativeRequest) -> UntrustedNarrativeProposal:
@@ -93,7 +103,9 @@ class LockCheckingProvider:
                 selected_outcome=SelectedNarrativeOutcome(
                     outcome_token=candidate.outcome_token,
                     result=NarrativeOutcomeResult.SUCCESS,
-                    referenced_entity_ids=(speaker,),
+                    referenced_entity_ids=(
+                        (speaker,) if self.selected_outcome_references else ()
+                    ),
                 ),
                 continuity_notes=("仅供候选校验的非权威连续性备注",),
             ),
@@ -108,6 +120,46 @@ class LockCheckingProvider:
 
     async def aclose(self) -> None:
         return None
+
+
+async def _corrupt_snapshot_with_unparticipated_scenario(
+    factory: async_sessionmaker[AsyncSession], session_id: str
+) -> None:
+    async with factory.begin() as database:
+        snapshot = await database.get(GameSnapshotRow, session_id)
+        assert snapshot is not None
+        payload = deepcopy(snapshot.state_json)
+        memory = payload["player_memory"]
+        source_record = memory["scenario_records"][0]
+        injected_record = deepcopy(source_record)
+        injected_record["scenario_id"] = "scenario.never_entered"
+        fact_ref = injected_record["known_public_fact_refs"][0]
+        source_fact = next(
+            item
+            for item in memory["known_public_facts"]
+            if item["fact_ref"] == fact_ref
+        )
+        injected_fact = deepcopy(source_fact)
+        injected_fact["scenario_id"] = "scenario.never_entered"
+        memory["scenario_records"].append(injected_record)
+        memory["known_public_facts"].append(injected_fact)
+        snapshot.state_json = payload
+
+
+class CorruptingMemoryProvider(LockCheckingProvider):
+    def __init__(
+        self, factory: async_sessionmaker[AsyncSession], session_id: str
+    ) -> None:
+        super().__init__(factory, session_id)
+        self.request: NarrativeRequest | None = None
+
+    async def generate(self, request: NarrativeRequest) -> UntrustedNarrativeProposal:
+        self.request = request
+        proposal = await super().generate(request)
+        await _corrupt_snapshot_with_unparticipated_scenario(
+            self.factory, self.session_id
+        )
+        return proposal
 
 
 class TrackingUnitOfWork(SqlAlchemyUnitOfWork):
@@ -220,6 +272,21 @@ class FailNthCommitUnitOfWork(SqlAlchemyUnitOfWork):
         await super().commit()
 
 
+class FailAfterNarrativeEventFlushUnitOfWork(SqlAlchemyUnitOfWork):
+    async def __aenter__(self) -> "FailAfterNarrativeEventFlushUnitOfWork":
+        await super().__aenter__()
+        original = self.sessions.persist_events
+
+        async def persist_then_fail(events, *, state_version):
+            receipts = await original(events, state_version=state_version)
+            if any(item.event_type == "NarrativeOutcomeAccepted" for item in events):
+                raise RuntimeError("simulated failure after narrative event flush")
+            return receipts
+
+        self.sessions.persist_events = persist_then_fail
+        return self
+
+
 class DisconnectAfterFinalizeOrchestrator(DurableNarrativeTurnOrchestrator):
     disconnect_once: bool = True
 
@@ -295,8 +362,9 @@ async def _create_narrative_session(
     *,
     prefix: str,
     clock_value: list[datetime],
+    catalog: ScenarioCatalog | None = None,
 ) -> tuple[object, str, ActionSubmission]:
-    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    catalog = catalog or JsonScenarioCatalogLoader(SCENARIO_PACK).load()
     session_id = f"{prefix}-{uuid4().hex}"
     service = SessionService(
         uow_factory=lambda: SqlAlchemyUnitOfWork(factory),
@@ -326,6 +394,73 @@ async def _create_narrative_session(
             description="我尝试有规律地移动手指发出生命信号",
         ),
     )
+
+
+async def _downgrade_job_request_schema(
+    factory: async_sessionmaker[AsyncSession], job_id: str
+) -> None:
+    async with factory.begin() as database:
+        row = await database.get(NarrativeJobRow, job_id)
+        assert row is not None
+        old_request = dict(row.narrative_request_json)
+        old_request.pop("player_memory", None)
+        old_request["prompt_schema_version"] = "narrative-prompt-v1"
+        row.narrative_request_json = old_request
+        row.prompt_schema_version = "narrative-prompt-v1"
+
+
+def _catalog_with_failing_memory_milestone():
+    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    payload = catalog.model_dump(mode="json")
+    definition = payload["scenarios"][0]
+    encounter = next(
+        item
+        for item in definition["memory_rules"]
+        if item["rule_id"] == "death_certificate.memory.40_vitals_npc_encounter"
+    )
+    definition["memory_rules"].append(
+        {
+            **encounter,
+            "rule_id": "death_certificate.memory.39_invalid_early_milestone",
+            "operation": "UPDATE_NPC_MILESTONE",
+            "npc_milestone": "COOPERATED",
+        }
+    )
+    return ScenarioCatalog.model_validate(payload)
+
+
+def _catalog_with_full_initial_fact_memory() -> ScenarioCatalog:
+    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    payload = catalog.model_dump(mode="json")
+    definition = payload["scenarios"][0]
+    template = next(
+        item
+        for item in definition["facts"]
+        if item["fact_id"] == "death_certificate.fact.player_conscious"
+    )
+    for index in range(25):
+        fact_id = f"death_certificate.fact.capacity_{index:02d}"
+        definition["facts"].append({**template, "fact_id": fact_id})
+        definition["memory_rules"].append(
+            {
+                "rule_id": f"death_certificate.memory.17_capacity_{index:02d}",
+                "rule_version": "1.0.0",
+                "source_event_type": "ScenarioStarted",
+                "operation": "REMEMBER_PUBLIC_FACT",
+                "public_fact_id": fact_id,
+            }
+        )
+    definition["memory_rules"].sort(key=lambda item: item["rule_id"])
+    return ScenarioCatalog.model_validate(payload)
+
+
+def _catalog_with_unentered_scenario() -> ScenarioCatalog:
+    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    payload = catalog.model_dump(mode="json")
+    unentered = deepcopy(payload["scenarios"][0])
+    unentered["scenario_id"] = "scenario.never_entered"
+    payload["scenarios"].append(unentered)
+    return ScenarioCatalog.model_validate(payload)
 
 
 def _orchestrator(
@@ -372,7 +507,12 @@ async def test_real_mysql_narrative_prepare_call_finalize_is_atomic_and_replay_s
         session_id_generator=lambda: session_id,
         seed_generator=lambda: 42,
     )
-    provider = LockCheckingProvider(mysql_session_factory, session_id, active_uows)
+    provider = LockCheckingProvider(
+        mysql_session_factory,
+        session_id,
+        active_uows,
+        selected_outcome_references=False,
+    )
     orchestrator = DurableNarrativeTurnOrchestrator(
         resolver=DeterministicRuleResolver(),
         uow_factory=uow_factory,
@@ -419,6 +559,13 @@ async def test_real_mysql_narrative_prepare_call_finalize_is_atomic_and_replay_s
             turn = await database.scalar(
                 select(TurnRequestRow).where(TurnRequestRow.session_id == session_id)
             )
+            events = (
+                await database.scalars(
+                    select(DomainEventRow)
+                    .where(DomainEventRow.session_id == session_id)
+                    .order_by(DomainEventRow.sequence_no)
+                )
+            ).all()
         assert session_row is not None and session_row.state_version == 1
         assert snapshot is not None
         assert response.narrative_text not in json.dumps(
@@ -427,10 +574,204 @@ async def test_real_mysql_narrative_prepare_call_finalize_is_atomic_and_replay_s
         assert "仅供候选校验的非权威连续性备注" not in json.dumps(
             snapshot.state_json, ensure_ascii=False
         )
+        restored = GameState.from_snapshot(
+            snapshot.state_json,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+        assert [item.event_type for item in events] == [
+            "ScenarioStarted",
+            "NarrativeOutcomeAccepted",
+        ]
+        assert events[1].payload_json["npc_definition_ids"] == [
+            "npc.death_certificate.triage_coordinator"
+        ]
+        assert len(restored.player_memory.npc_records) == 1
+        assert restored.player_memory.npc_records[0].npc_definition_id == (
+            "npc.death_certificate.triage_coordinator"
+        )
+        assert {
+            item.fact_ref for item in restored.player_memory.known_public_facts
+        } >= {"death_certificate.fact.player_is_alive"}
+        assert "仅供候选校验的非权威连续性备注" not in (
+            restored.player_memory.model_dump_json()
+        )
+        assert restored.scenario_runtime is not None
+        assert len(restored.scenario_runtime.narrative_outcome_evidence) == 1
+        evidence = restored.scenario_runtime.narrative_outcome_evidence[0]
+        assert evidence.outcome_rule_id == (
+            "death_certificate.outcome.purposeful_life_signal"
+        )
+        assert evidence.outcome_result is NarrativeOutcomeResult.SUCCESS
+        assert evidence.scenario_event_type == "vitals.verified"
+        assert "narrative_outcome_evidence" not in response.model_dump_json()
+        assert job is not None
+        assert "narrative_outcome_evidence" not in json.dumps(
+            job.narrative_request_json, ensure_ascii=False
+        )
         assert job is not None and job.status == "COMMITTED"
         assert job.accepted_narrative_text == response.narrative_text
         assert job.lease_token is None
         assert turn is not None and turn.response_json == response.to_persistence()
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_real_mysql_memory_capacity_marks_lagging_without_rolling_back_turn(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    capacity_catalog = _catalog_with_full_initial_fact_memory()
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory,
+        prefix="memory-capacity",
+        clock_value=clock_value,
+        catalog=capacity_catalog,
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        response = await orchestrator.handle(action)
+
+        assert response.resolution_kind is ResolutionStatus.NARRATIVE_COMMITTED
+        assert response.resulting_state_version == 1
+        async with mysql_session_factory() as database:
+            session_row = await database.get(GameSessionRow, session_id)
+            snapshot = await database.get(GameSnapshotRow, session_id)
+            events = (
+                await database.scalars(
+                    select(DomainEventRow)
+                    .where(DomainEventRow.session_id == session_id)
+                    .order_by(DomainEventRow.sequence_no)
+                )
+            ).all()
+            turn = await database.scalar(
+                select(TurnRequestRow).where(TurnRequestRow.session_id == session_id)
+            )
+            job = await database.scalar(
+                select(NarrativeJobRow).where(NarrativeJobRow.session_id == session_id)
+            )
+        assert session_row is not None and session_row.state_version == 1
+        assert snapshot is not None
+        restored = GameState.from_snapshot(
+            snapshot.state_json,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+        assert restored.player_memory.sync_status is MemoryIndexSyncStatus.REBUILD_REQUIRED
+        assert restored.player_memory.first_deferred_source_sequence_no == 2
+        assert restored.player_memory.deferred_event_count == 1
+        assert len(restored.player_memory.known_public_facts) == 32
+        assert restored.player_memory.npc_records == ()
+        assert "death_certificate.fact.player_is_alive" not in {
+            item.fact_ref for item in restored.player_memory.known_public_facts
+        }
+        assert [item.event_type for item in events] == [
+            "ScenarioStarted",
+            "NarrativeOutcomeAccepted",
+        ]
+        assert turn is not None and turn.response_json is not None
+        assert job is not None and job.status == "COMMITTED"
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_real_mysql_api_and_narrative_prepare_reject_inconsistent_memory(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    scenario_catalog = _catalog_with_unentered_scenario()
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory,
+        prefix="memory-prepare-invalid",
+        clock_value=clock_value,
+        catalog=scenario_catalog,
+    )
+    async with mysql_session_factory() as database:
+        session_row = await database.get(GameSessionRow, session_id)
+        assert session_row is not None
+        principal = RequestPrincipal(
+            player_id=session_row.player_id,
+            authentication_scheme="integration",
+        )
+    service = SessionService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+        clock=lambda: clock_value[0],
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        await _corrupt_snapshot_with_unparticipated_scenario(
+            mysql_session_factory, session_id
+        )
+
+        with pytest.raises(SnapshotInvalidError):
+            await service.get_visible_state(principal, session_id)
+        with pytest.raises(SnapshotInvalidError):
+            await orchestrator.handle(action)
+        assert provider.calls == 0
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_real_mysql_narrative_finalize_rejects_memory_corrupted_after_prepare(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    scenario_catalog = _catalog_with_unentered_scenario()
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory,
+        prefix="memory-finalize-invalid",
+        clock_value=clock_value,
+        catalog=scenario_catalog,
+    )
+    provider = CorruptingMemoryProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        with pytest.raises(SnapshotInvalidError):
+            await orchestrator.handle(action)
+
+        assert provider.calls == 1
+        assert provider.request is not None
+        assert provider.request.player_memory.npcs == ()
+        async with mysql_session_factory() as database:
+            session_row = await database.get(GameSessionRow, session_id)
+            events = (
+                await database.scalars(
+                    select(DomainEventRow)
+                    .where(DomainEventRow.session_id == session_id)
+                    .order_by(DomainEventRow.sequence_no)
+                )
+            ).all()
+            turn = await database.scalar(
+                select(TurnRequestRow).where(TurnRequestRow.session_id == session_id)
+            )
+        assert session_row is not None and session_row.state_version == 0
+        assert [item.event_type for item in events] == ["ScenarioStarted"]
+        assert turn is None
     finally:
         async with mysql_session_factory.begin() as database:
             await database.execute(
@@ -821,6 +1162,99 @@ async def test_proposal_validated_crash_recovery_finalizes_without_provider_rein
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "stage", ["PREPARED", "IN_PROGRESS", "PROPOSAL_VALIDATED"]
+)
+async def test_old_active_request_schema_becomes_stale_without_provider_recall(
+    mysql_session_factory: async_sessionmaker[AsyncSession], stage: str
+) -> None:
+    clock_value = [NOW]
+    stage_code = {
+        "PREPARED": "prepared",
+        "IN_PROGRESS": "progress",
+        "PROPOSAL_VALIDATED": "validated",
+    }[stage]
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory, prefix=f"old-schema-{stage_code}", clock_value=clock_value
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        if stage in {"PREPARED", "IN_PROGRESS"}:
+            prepared = await orchestrator._prepare_or_execute(action)
+            job_id = prepared.job.job_id
+            if stage == "IN_PROGRESS":
+                claimed = await orchestrator._claim(job_id)
+                assert claimed is not None and claimed.status.value == "IN_PROGRESS"
+            expected_calls = 0
+        else:
+            stored = await _store_proposal_without_finalizing(
+                orchestrator, provider, action
+            )
+            job_id = stored.job_id
+            expected_calls = 1
+        await _downgrade_job_request_schema(mysql_session_factory, job_id)
+
+        with pytest.raises(NarrativeJobStaleError):
+            await orchestrator.handle(action)
+
+        assert provider.calls == expected_calls
+        async with mysql_session_factory() as database:
+            job = await database.get(NarrativeJobRow, job_id)
+            turn = await database.scalar(
+                select(TurnRequestRow).where(
+                    TurnRequestRow.session_id == session_id,
+                    TurnRequestRow.client_request_id == action.client_request_id,
+                )
+            )
+        assert job is not None and job.status == "STALE"
+        assert job.error_code == "NARRATIVE_REQUEST_SCHEMA_STALE"
+        assert job.accepted_narrative_text is None
+        assert turn is None
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_committed_old_request_schema_replays_stored_response(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory, prefix="old-schema-committed", clock_value=clock_value
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        response = await orchestrator.handle(action)
+        async with mysql_session_factory() as database:
+            job = await database.scalar(
+                select(NarrativeJobRow).where(NarrativeJobRow.session_id == session_id)
+            )
+        assert job is not None and job.status == "COMMITTED"
+        await _downgrade_job_request_schema(mysql_session_factory, job.job_id)
+
+        replay = await orchestrator.handle(action)
+
+        assert replay == response
+        assert provider.calls == 1
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_expired_in_progress_is_unknown_even_when_transport_was_not_observed(
     mysql_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -1040,6 +1474,143 @@ async def test_finalize_commit_failure_rolls_back_all_authority_but_retains_cand
 
 @pytest.mark.integration
 @pytest.mark.asyncio
+async def test_event_flush_then_failure_rolls_back_event_memory_snapshot_and_response(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    catalog, session_id, action = await _create_narrative_session(
+        mysql_session_factory, prefix="event-flush-rollback", clock_value=clock_value
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory,
+        catalog,
+        provider,
+        clock_value,
+        uow_factory=lambda: FailAfterNarrativeEventFlushUnitOfWork(
+            mysql_session_factory
+        ),
+    )
+    try:
+        async with mysql_session_factory() as database:
+            baseline_snapshot = await database.get(GameSnapshotRow, session_id)
+            assert baseline_snapshot is not None
+            baseline_json = dict(baseline_snapshot.state_json)
+
+        with pytest.raises(RuntimeError, match="after narrative event flush"):
+            await orchestrator.handle(action)
+
+        async with mysql_session_factory() as database:
+            session_row = await database.get(GameSessionRow, session_id)
+            snapshot = await database.get(GameSnapshotRow, session_id)
+            events = (
+                await database.scalars(
+                    select(DomainEventRow)
+                    .where(DomainEventRow.session_id == session_id)
+                    .order_by(DomainEventRow.sequence_no)
+                )
+            ).all()
+            turn = await database.scalar(
+                select(TurnRequestRow).where(
+                    TurnRequestRow.session_id == session_id,
+                    TurnRequestRow.client_request_id == action.client_request_id,
+                )
+            )
+            job = await database.scalar(
+                select(NarrativeJobRow).where(NarrativeJobRow.session_id == session_id)
+            )
+        assert session_row is not None and session_row.state_version == 0
+        assert snapshot is not None and dict(snapshot.state_json) == baseline_json
+        assert [item.event_type for item in events] == ["ScenarioStarted"]
+        assert turn is None
+        assert job is not None and job.status == "PROPOSAL_VALIDATED"
+        assert job.accepted_narrative_text is None
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_non_capacity_memory_plan_failure_rolls_back_real_mysql_turn(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> None:
+    clock_value = [NOW]
+    catalog = _catalog_with_failing_memory_milestone()
+    session_id = f"memory-plan-rollback-{uuid4().hex}"
+    service = SessionService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+        clock=lambda: clock_value[0],
+        session_id_generator=lambda: session_id,
+        seed_generator=lambda: 42,
+    )
+    await service.create(
+        RequestPrincipal(
+            player_id=f"memory-plan-player-{uuid4().hex}",
+            authentication_scheme="integration",
+        ),
+        client_request_id="create-memory-plan-rollback",
+        character_definition_id="character.death_certificate.investigator",
+        scenario_id="death_certificate",
+    )
+    action = ActionSubmission(
+        session_id=session_id,
+        turn_id="memory-plan-turn",
+        client_request_id="memory-plan-request",
+        action_type=ActionType.CUSTOM,
+        description="我尝试有规律地移动手指发出生命信号",
+    )
+    provider = LockCheckingProvider(mysql_session_factory, session_id)
+    orchestrator = _orchestrator(
+        mysql_session_factory, catalog, provider, clock_value
+    )
+    try:
+        async with mysql_session_factory() as database:
+            baseline_snapshot = await database.get(GameSnapshotRow, session_id)
+            assert baseline_snapshot is not None
+            baseline_json = dict(baseline_snapshot.state_json)
+
+        with pytest.raises(NarrativeProposalRejectedError):
+            await orchestrator.handle(action)
+
+        async with mysql_session_factory() as database:
+            session_row = await database.get(GameSessionRow, session_id)
+            snapshot = await database.get(GameSnapshotRow, session_id)
+            events = (
+                await database.scalars(
+                    select(DomainEventRow)
+                    .where(DomainEventRow.session_id == session_id)
+                    .order_by(DomainEventRow.sequence_no)
+                )
+            ).all()
+            turn = await database.scalar(
+                select(TurnRequestRow).where(
+                    TurnRequestRow.session_id == session_id,
+                    TurnRequestRow.client_request_id == action.client_request_id,
+                )
+            )
+            job = await database.scalar(
+                select(NarrativeJobRow).where(NarrativeJobRow.session_id == session_id)
+            )
+        assert session_row is not None and session_row.state_version == 0
+        assert snapshot is not None and dict(snapshot.state_json) == baseline_json
+        assert [item.event_type for item in events] == ["ScenarioStarted"]
+        assert turn is None
+        assert job is not None and job.status == "FAILED_TERMINAL"
+        assert job.accepted_narrative_text is None
+    finally:
+        async with mysql_session_factory.begin() as database:
+            await database.execute(
+                delete(GameSessionRow).where(GameSessionRow.session_id == session_id)
+            )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
 async def test_disconnect_after_finalize_commit_replays_exact_persisted_response(
     mysql_session_factory: async_sessionmaker[AsyncSession],
 ) -> None:
@@ -1157,7 +1728,8 @@ async def test_rejected_outcome_retains_only_non_authoritative_candidate_text(
 
         assert session_row is not None and session_row.state_version == 0
         assert snapshot is not None and snapshot.state_version == 0
-        assert turn is None and not events
+        assert turn is None
+        assert [item.event_type for item in events] == ["ScenarioStarted"]
         assert job is not None and job.status == "FAILED_TERMINAL"
         assert job.validated_proposal_json is not None
         assert job.accepted_narrative_text is None

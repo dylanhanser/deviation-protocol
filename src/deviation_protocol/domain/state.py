@@ -31,9 +31,16 @@ from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefiniti
 from deviation_protocol.domain.scenario_runtime import ScenarioRuntimeState
 from deviation_protocol.domain.player_memory import (
     MemoryMutationPlan,
+    MemoryIndexSyncStatus,
+    NpcInteractionMilestone,
     PlayerMemoryState,
+    ScenarioMemoryMilestone,
+    ScenarioMemoryStatus,
+    SignificantExperienceCategory,
+    migrate_player_memory_payload,
     memory_state_fingerprint,
     scenario_definition_fingerprint,
+    stable_npc_subject_key,
 )
 
 
@@ -347,7 +354,369 @@ class GameState(RuntimeModel):
             if definition is None:
                 raise ValueError("snapshot references an unknown scenario")
             state.scenario_runtime.validate_against(definition)
+        if _memory_has_records(state.player_memory):
+            if scenario_catalog is None:
+                raise ValueError("scenario catalog is required for a player-memory snapshot")
+            state.validate_player_memory_against(scenario_catalog)
         return state
+
+    def validate_player_memory_against(
+        self, scenario_catalog: ScenarioCatalog
+    ) -> None:
+        """Reject catalog-invalid or not-yet-known authoritative memory."""
+
+        from deviation_protocol.domain.facts import FactVisibility
+        from deviation_protocol.domain.memory_rules import (
+            MemoryRuleOperation,
+            MemoryRuleSourceEventType,
+        )
+        from deviation_protocol.domain.scenario import EndingStatus
+
+        memory = self.player_memory
+        if not _memory_has_records(memory):
+            return
+        runtime = self.scenario_runtime
+        scenario_records = {
+            item.scenario_id: item for item in memory.scenario_records
+        }
+        definitions: dict[str, ScenarioDefinition] = {}
+
+        def definition_for(scenario_id: str) -> ScenarioDefinition:
+            existing = definitions.get(scenario_id)
+            if existing is not None:
+                return existing
+            definition = scenario_catalog.scenario(scenario_id)
+            if definition is None:
+                self._invalid_snapshot(
+                    f"player memory references unknown scenario {scenario_id!r}"
+                )
+            record = scenario_records[scenario_id]
+            if record.scenario_content_version != definition.content_version:
+                self._invalid_snapshot(
+                    f"player memory scenario {scenario_id!r} has a mismatched content version"
+                )
+            definitions[scenario_id] = definition
+            return definition
+
+        # Catalog membership and public visibility do not prove that the player
+        # participated in a scenario.  This phase has only one authoritative
+        # participation source: the matching runtime carried by this snapshot.
+        for record in memory.scenario_records:
+            definition_for(record.scenario_id)
+
+        participating_runtimes: dict[str, ScenarioRuntimeState] = {}
+        for record in memory.scenario_records:
+            if (
+                runtime is None
+                or runtime.scenario_id != record.scenario_id
+                or runtime.scenario_content_version
+                != record.scenario_content_version
+            ):
+                self._invalid_snapshot(
+                    f"player memory scenario {record.scenario_id!r} lacks "
+                    "authoritative runtime participation"
+                )
+            participating_runtimes[record.scenario_id] = runtime
+
+        def runtime_for(scenario_id: str) -> ScenarioRuntimeState | None:
+            return participating_runtimes.get(scenario_id)
+
+        def rule_occurrence_is_proven(
+            rule: Any,
+            scenario_runtime: ScenarioRuntimeState | None,
+            *,
+            npc_definition_id: str | None = None,
+        ) -> bool:
+            if scenario_runtime is None:
+                return False
+            if (
+                rule.source_event_type
+                is MemoryRuleSourceEventType.NARRATIVE_OUTCOME_ACCEPTED
+            ):
+                return any(
+                    (
+                        not rule.required_narrative_outcome_rule_ids
+                        or evidence.outcome_rule_id
+                        in rule.required_narrative_outcome_rule_ids
+                    )
+                    and (
+                        not rule.required_outcome_results
+                        or evidence.outcome_result in rule.required_outcome_results
+                    )
+                    and (
+                        not rule.required_scenario_event_types
+                        or evidence.scenario_event_type
+                        in rule.required_scenario_event_types
+                    )
+                    and (
+                        npc_definition_id is None
+                        or npc_definition_id in evidence.npc_definition_ids
+                    )
+                    for evidence in scenario_runtime.narrative_outcome_evidence
+                )
+            if rule.source_event_type is MemoryRuleSourceEventType.SCENARIO_STARTED:
+                return True
+            if (
+                rule.source_event_type
+                is MemoryRuleSourceEventType.SCENARIO_DECISION_SELECTED
+            ):
+                return bool(scenario_runtime.decisions_made)
+            if (
+                rule.source_event_type
+                is MemoryRuleSourceEventType.SCENARIO_RUNTIME_EVENT_GENERATED
+            ):
+                # The target-specific runtime checks below prove the generated
+                # result itself (discovered fact or ending), rather than treating
+                # the mere declaration of a rule as occurrence evidence.
+                return True
+            return False
+
+        def fact_is_player_known(
+            scenario_id: str, fact_ref: str
+        ) -> bool:
+            definition = definition_for(scenario_id)
+            fact = next(
+                (item for item in definition.facts if item.fact_id == fact_ref),
+                None,
+            )
+            if fact is None or fact.visibility is FactVisibility.HIDDEN:
+                return False
+            if fact.visibility is FactVisibility.PLAYER_KNOWN:
+                # Participation was independently established for every scenario
+                # record before any fact validation reached this branch.
+                return True
+            scenario_runtime = runtime_for(scenario_id)
+            if scenario_runtime is None:
+                return False
+            discovered = any(
+                fact_ref in definition.clue(clue_id).supports_fact_ids
+                for clue_id in scenario_runtime.discovered_clue_ids
+            )
+            if not discovered:
+                return False
+            return any(
+                rule.operation is MemoryRuleOperation.REMEMBER_PUBLIC_FACT
+                and rule.public_fact_id == fact_ref
+                and rule_occurrence_is_proven(rule, scenario_runtime)
+                for rule in definition.memory_rules
+            )
+
+        for record in memory.scenario_records:
+            definition = definition_for(record.scenario_id)
+            rules = definition.memory_rules
+            expected_milestones = {ScenarioMemoryMilestone.STARTED}
+            if record.known_public_fact_refs:
+                expected_milestones.add(
+                    ScenarioMemoryMilestone.IMPORTANT_FACT_CONFIRMED
+                )
+            if record.status is ScenarioMemoryStatus.COMPLETED:
+                expected_milestones.update(
+                    {
+                        ScenarioMemoryMilestone.COMPLETED,
+                        ScenarioMemoryMilestone.ENDING_CONFIRMED,
+                    }
+                )
+                ending_ids = {item.ending_id for item in definition.endings}
+                scenario_runtime = runtime_for(record.scenario_id)
+                if (
+                    scenario_runtime is None
+                    or scenario_runtime.ending_status is EndingStatus.ACTIVE
+                    or scenario_runtime.ending_id != record.ending_id
+                    or record.ending_id not in ending_ids
+                    or not any(
+                        rule.operation is MemoryRuleOperation.COMPLETE_SCENARIO
+                        and record.ending_id in rule.allowed_ending_ids
+                        and rule_occurrence_is_proven(rule, scenario_runtime)
+                        for rule in rules
+                    )
+                ):
+                    self._invalid_snapshot(
+                        f"player memory scenario {record.scenario_id!r} has an unauthorized ending"
+                    )
+            if set(record.milestone_refs) != expected_milestones:
+                self._invalid_snapshot(
+                    f"player memory scenario {record.scenario_id!r} has inconsistent milestones"
+                )
+            for fact_ref in record.known_public_fact_refs:
+                if not fact_is_player_known(record.scenario_id, fact_ref):
+                    self._invalid_snapshot(
+                        f"player memory contains unknown public fact {fact_ref!r}"
+                    )
+            scenario_runtime = runtime_for(record.scenario_id)
+            if scenario_runtime is not None:
+                if (
+                    memory.sync_status is MemoryIndexSyncStatus.CURRENT
+                    and scenario_runtime.ending_status is not EndingStatus.ACTIVE
+                    and record.status is not ScenarioMemoryStatus.COMPLETED
+                ):
+                    self._invalid_snapshot(
+                        "current player memory omits the authoritative ending"
+                    )
+
+        known_fact_pairs = {
+            (item.scenario_id, item.fact_ref)
+            for item in memory.known_public_facts
+        }
+        for fact in memory.known_public_facts:
+            definition_for(fact.scenario_id)
+            if not fact_is_player_known(fact.scenario_id, fact.fact_ref):
+                self._invalid_snapshot(
+                    f"player memory contains unknown public fact {fact.fact_ref!r}"
+                )
+
+        npc_records = {item.subject_key: item for item in memory.npc_records}
+        for npc in memory.npc_records:
+            definition = definition_for(npc.scenario_id)
+            if npc.npc_definition_id not in {
+                item.npc_definition_id for item in definition.npc_references
+            }:
+                self._invalid_snapshot(
+                    f"player memory references unknown NPC {npc.npc_definition_id!r}"
+                )
+            encounter_rules = tuple(
+                rule
+                for rule in definition.memory_rules
+                if rule.operation is MemoryRuleOperation.RECORD_NPC_ENCOUNTER
+                and rule.npc_definition_id == npc.npc_definition_id
+            )
+            if not encounter_rules or (
+                NpcInteractionMilestone.FIRST_ENCOUNTER
+                not in npc.interaction_milestones
+            ):
+                self._invalid_snapshot(
+                    f"player memory NPC {npc.npc_definition_id!r} lacks encounter authority"
+                )
+            for milestone in npc.interaction_milestones:
+                if milestone is NpcInteractionMilestone.FIRST_ENCOUNTER:
+                    continue
+                if not any(
+                    rule.operation is MemoryRuleOperation.UPDATE_NPC_MILESTONE
+                    and rule.npc_definition_id == npc.npc_definition_id
+                    and rule.npc_milestone is milestone
+                    for rule in definition.memory_rules
+                ):
+                    self._invalid_snapshot(
+                        f"player memory NPC milestone {milestone.value!r} is undeclared"
+                    )
+            for fact_ref in npc.known_public_fact_refs:
+                if not fact_is_player_known(npc.scenario_id, fact_ref):
+                    self._invalid_snapshot(
+                        f"player memory NPC references unknown fact {fact_ref!r}"
+                    )
+            scenario_runtime = runtime_for(npc.scenario_id)
+            runtime_subjects = tuple(
+                candidate
+                for candidate in self.npcs.values()
+                if candidate.definition_id == npc.npc_definition_id
+            )
+            if (
+                scenario_runtime is None
+                or len(runtime_subjects) != 1
+                or not any(
+                    rule_occurrence_is_proven(
+                        rule,
+                        scenario_runtime,
+                        npc_definition_id=npc.npc_definition_id,
+                    )
+                    for rule in encounter_rules
+                )
+            ):
+                self._invalid_snapshot(
+                    f"player memory NPC {npc.npc_definition_id!r} was not encountered"
+                )
+            for milestone in npc.interaction_milestones:
+                if milestone is NpcInteractionMilestone.FIRST_ENCOUNTER:
+                    continue
+                milestone_rules = tuple(
+                    rule
+                    for rule in definition.memory_rules
+                    if rule.operation is MemoryRuleOperation.UPDATE_NPC_MILESTONE
+                    and rule.npc_definition_id == npc.npc_definition_id
+                    and rule.npc_milestone is milestone
+                )
+                if not any(
+                    rule_occurrence_is_proven(
+                        rule,
+                        scenario_runtime,
+                        npc_definition_id=npc.npc_definition_id,
+                    )
+                    for rule in milestone_rules
+                ):
+                    self._invalid_snapshot(
+                        f"player memory NPC milestone {milestone.value!r} lacks occurrence evidence"
+                    )
+
+        for experience in memory.significant_experiences:
+            definition = definition_for(experience.scenario_id)
+            scenario_record = scenario_records[experience.scenario_id]
+            matching_rules = tuple(
+                rule
+                for rule in definition.memory_rules
+                if rule.operation
+                is MemoryRuleOperation.RECORD_SIGNIFICANT_EXPERIENCE
+                and rule.significant_experience_category is experience.category
+                and rule.significant_experience_summary is experience.summary
+            )
+            if experience.category is SignificantExperienceCategory.SCENARIO_BEGIN:
+                valid = (
+                    not (experience.subject_refs or experience.public_fact_refs)
+                    and any(
+                        rule_occurrence_is_proven(
+                            rule, runtime_for(experience.scenario_id)
+                        )
+                        for rule in matching_rules
+                    )
+                )
+            elif (
+                experience.category
+                is SignificantExperienceCategory.SCENARIO_COMPLETION
+            ):
+                valid = (
+                    scenario_record.status is ScenarioMemoryStatus.COMPLETED
+                    and experience.subject_refs == (scenario_record.ending_id,)
+                    and any(
+                        rule.requires_scenario_completed
+                        and rule_occurrence_is_proven(
+                            rule, runtime_for(experience.scenario_id)
+                        )
+                        for rule in matching_rules
+                    )
+                )
+            elif experience.category in {
+                SignificantExperienceCategory.IMPORTANT_NPC_ENCOUNTER,
+                SignificantExperienceCategory.NPC_RELATIONSHIP_MILESTONE,
+            }:
+                valid = any(
+                    rule.npc_definition_id is not None
+                    and experience.subject_refs
+                    == (
+                        stable_npc_subject_key(
+                            experience.scenario_id, rule.npc_definition_id
+                        ),
+                    )
+                    and experience.subject_refs[0] in npc_records
+                    and rule_occurrence_is_proven(
+                        rule,
+                        runtime_for(experience.scenario_id),
+                        npc_definition_id=rule.npc_definition_id,
+                    )
+                    for rule in matching_rules
+                )
+            else:
+                valid = any(
+                    rule.public_fact_id is not None
+                    and experience.public_fact_refs == (rule.public_fact_id,)
+                    and (experience.scenario_id, rule.public_fact_id)
+                    in known_fact_pairs
+                    and rule_occurrence_is_proven(
+                        rule, runtime_for(experience.scenario_id)
+                    )
+                    for rule in matching_rules
+                )
+            if not valid:
+                self._invalid_snapshot(
+                    f"player memory experience {experience.entry_id!r} is undeclared or unknown"
+                )
 
     def validate_against(self, catalog: ContentCatalog) -> None:
         if self.content_version != catalog.content_version:
@@ -1119,6 +1488,11 @@ def migrate_snapshot_payload(payload: Mapping[str, Any]) -> dict[str, Any]:
         _require_json_snapshot_value(copied)
         return copied
     if version == 3:
+        memory = copied.get("player_memory")
+        if not isinstance(memory, dict):
+            raise ValueError("v3 snapshot requires a player_memory object")
+        if memory.get("memory_model_version") == 1:
+            copied["player_memory"] = migrate_player_memory_payload(memory)
         _require_json_snapshot_value(copied)
         return copied
     raise ValueError(f"unsupported snapshot schema_version: {version}")
@@ -1156,3 +1530,12 @@ def _unique_instance_id(reserved_ids: set[str]) -> str:
         candidate = f"item-{uuid4().hex}"
         if candidate not in reserved_ids:
             return candidate
+
+
+def _memory_has_records(memory: PlayerMemoryState) -> bool:
+    return bool(
+        memory.scenario_records
+        or memory.npc_records
+        or memory.significant_experiences
+        or memory.known_public_facts
+    )

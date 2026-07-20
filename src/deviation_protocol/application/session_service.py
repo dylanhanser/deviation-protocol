@@ -24,6 +24,11 @@ from deviation_protocol.application.errors import (
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import PersistedSession, UnitOfWorkFactory
+from deviation_protocol.application.player_memory import (
+    DeclarativePlayerMemoryRuleEngine,
+    PlayerMemoryProjection,
+    PlayerMemoryProjector,
+)
 from deviation_protocol.application.scenario_event_bridge import (
     bind_public_decision_frame,
 )
@@ -38,6 +43,7 @@ from deviation_protocol.application.story_director import (
 )
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.models import GameSession
+from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.narrative import NarrativeFrame
 from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
@@ -46,6 +52,7 @@ from deviation_protocol.domain.state import DomainRuleViolation, GameState, Play
 Clock = Callable[[], datetime]
 SessionIdGenerator = Callable[[], str]
 SeedGenerator = Callable[[], int]
+EventIdGenerator = Callable[[], str]
 
 
 def system_utc_clock() -> datetime:
@@ -132,6 +139,9 @@ class PlayerVisibleStateProjection(BaseModel):
     skills: tuple[PublicSkill, ...]
     visible_npcs: tuple[PublicNpc, ...] = ()
     quests: tuple[PublicQuest, ...] = ()
+    player_memory: PlayerMemoryProjection = Field(
+        default_factory=PlayerMemoryProjection
+    )
 
 
 @dataclass(slots=True)
@@ -145,6 +155,13 @@ class SessionService:
     clock: Clock = system_utc_clock
     session_id_generator: SessionIdGenerator = uuid_session_id
     seed_generator: SeedGenerator = lambda: secrets.randbits(63)
+    event_id_generator: EventIdGenerator = lambda: str(uuid4())
+    memory_rule_engine: DeclarativePlayerMemoryRuleEngine = dataclass_field(
+        default_factory=DeclarativePlayerMemoryRuleEngine
+    )
+    memory_projector: PlayerMemoryProjector = dataclass_field(
+        default_factory=PlayerMemoryProjector
+    )
 
     def __post_init__(self) -> None:
         if (
@@ -246,13 +263,53 @@ class SessionService:
                     scenario_content_version=definition.content_version,
                 )
             state.validate_against(self.catalog)
-            await uow.sessions.add_initial(
-                session,
-                character_definition_id=character_definition_id,
-                creation_client_request_id=client_request_id,
-                state=state.to_snapshot(),
-                created_at=created_at,
-            )
+            if definition is None:
+                await uow.sessions.add_initial(
+                    session,
+                    character_definition_id=character_definition_id,
+                    creation_client_request_id=client_request_id,
+                    state=state.to_snapshot(),
+                    created_at=created_at,
+                )
+            else:
+                await uow.sessions.add_initial_session(
+                    session,
+                    character_definition_id=character_definition_id,
+                    creation_client_request_id=client_request_id,
+                    created_at=created_at,
+                )
+                event_id = self.event_id_generator()
+                if not isinstance(event_id, str) or not 1 <= len(event_id) <= 64:
+                    raise ValueError("event ID generator returned an invalid value")
+                sequence_no = await uow.sessions.next_event_sequence_no(
+                    session.session_id
+                )
+                started_event = DomainEvent(
+                    event_id=event_id,
+                    session_id=session.session_id,
+                    turn_id="session-created",
+                    sequence_no=sequence_no,
+                    event_type="ScenarioStarted",
+                    payload={
+                        "scenario_id": definition.scenario_id,
+                        "scenario_content_version": definition.content_version,
+                    },
+                    occurred_at=created_at,
+                )
+                receipts = await uow.sessions.persist_events(
+                    (started_event,), state_version=0
+                )
+                state = self.memory_rule_engine.apply(
+                    state=state,
+                    definition=definition,
+                    session_id=session.session_id,
+                    turn_id="session-created",
+                    state_version=0,
+                    receipts=receipts,
+                )
+                await uow.sessions.add_initial_snapshot(
+                    session, state=state.to_snapshot(), created_at=created_at
+                )
             await uow.commit()
             metadata = self._metadata(
                 PersistedSession(
@@ -342,11 +399,7 @@ class SessionService:
             state = GameState.from_snapshot(
                 payload,
                 catalog=self.catalog,
-                scenario_catalog=(
-                    self.scenario_catalog
-                    if payload.get("scenario_runtime") is not None
-                    else None
-                ),
+                scenario_catalog=self.scenario_catalog,
             )
         except (DomainRuleViolation, ValidationError, TypeError, ValueError):
             raise SnapshotInvalidError(session.session_id) from None
@@ -520,4 +573,5 @@ class SessionService:
             skills=skills,
             visible_npcs=visible_npcs,
             quests=(),
+            player_memory=self.memory_projector.project(state, self.scenario_catalog),
         )

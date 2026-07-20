@@ -15,6 +15,7 @@ from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.persisted_events import PersistedEventReceipt
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.state import GameState
 
@@ -71,6 +72,28 @@ class StoryDirector(Protocol):
 
 class GameSessionRepository(ABC):
     @abstractmethod
+    async def add_initial_session(
+        self,
+        session: GameSession,
+        *,
+        character_definition_id: str,
+        creation_client_request_id: str,
+        created_at: datetime,
+    ) -> None:
+        """Insert and flush the session row without committing."""
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_initial_snapshot(
+        self,
+        session: GameSession,
+        *,
+        state: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
     async def get_owned(self, session_id: str, player_id: str) -> PersistedSession | None:
         """Load safe session metadata using ownership as part of the query."""
         raise NotImplementedError
@@ -109,6 +132,16 @@ class GameSessionRepository(ABC):
 
     @abstractmethod
     async def next_event_sequence_no(self, session_id: str) -> int:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def persist_events(
+        self,
+        events: Sequence[DomainEvent],
+        *,
+        state_version: int,
+    ) -> tuple[PersistedEventReceipt, ...]:
+        """Insert/flush events and return transaction-local receipts; never commit."""
         raise NotImplementedError
 
     @abstractmethod

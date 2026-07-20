@@ -20,6 +20,7 @@ from deviation_protocol.domain.json_values import (
     freeze_bounded_json_value,
     json_values_equal,
 )
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.domain.scenario import (
     EndingStatus,
     MAX_SCENARIO_COUNTER,
@@ -31,6 +32,7 @@ StrictBool = Annotated[bool, Field(strict=True)]
 _VERIFIED_SCENARIO_EVENT_ISSUER = object()
 _DYNAMIC_FACT_KEY = re.compile(r"^dynamic\.[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 MAX_APPLIED_SCENARIO_EVENTS = 1_024
+MAX_NARRATIVE_OUTCOME_EVIDENCE = 1_024
 MAX_DECISIONS_MADE = 1_024
 
 
@@ -48,6 +50,33 @@ class ThreatClockState(ScenarioRuntimeModel):
     @field_serializer("triggered_thresholds")
     def serialize_thresholds(self, value: frozenset[int]) -> list[int]:
         return sorted(value)
+
+
+class NarrativeOutcomeEvidence(ScenarioRuntimeModel):
+    """Private authoritative proof of one accepted narrative outcome shape."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    outcome_rule_id: DefinitionId
+    outcome_result: NarrativeOutcomeResult
+    scenario_event_type: DefinitionId
+    npc_definition_ids: tuple[DefinitionId, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_targets(self) -> NarrativeOutcomeEvidence:
+        targets = tuple(sorted(self.npc_definition_ids))
+        if len(targets) != len(set(targets)):
+            raise ValueError("narrative outcome evidence repeats an NPC target")
+        object.__setattr__(self, "npc_definition_ids", targets)
+        return self
+
+    def stable_key(self) -> tuple[str, str, str, tuple[str, ...]]:
+        return (
+            self.outcome_rule_id,
+            self.outcome_result.value,
+            self.scenario_event_type,
+            self.npc_definition_ids,
+        )
 
 
 class ScenarioRuntimeState(ScenarioRuntimeModel):
@@ -77,6 +106,7 @@ class ScenarioRuntimeState(ScenarioRuntimeModel):
         Annotated[int, Field(strict=True, ge=1, le=MAX_SCENARIO_COUNTER)],
     ] = Field(default_factory=dict)
     applied_event_ids: tuple[DefinitionId, ...] = ()
+    narrative_outcome_evidence: tuple[NarrativeOutcomeEvidence, ...] = ()
 
     @field_serializer(
         "discovered_clue_ids", "completed_clue_group_ids", "opened_location_ids"
@@ -274,6 +304,38 @@ class ScenarioRuntimeState(ScenarioRuntimeModel):
             raise ValueError("runtime applied event history exceeds its limit")
         if len(self.applied_event_ids) != len(set(self.applied_event_ids)):
             raise ValueError("runtime applied event history contains duplicates")
+        evidence_keys = tuple(
+            item.stable_key() for item in self.narrative_outcome_evidence
+        )
+        if len(evidence_keys) > MAX_NARRATIVE_OUTCOME_EVIDENCE:
+            raise ValueError("runtime narrative outcome evidence exceeds its limit")
+        if len(evidence_keys) != len(set(evidence_keys)):
+            raise ValueError("runtime narrative outcome evidence contains duplicates")
+        if evidence_keys != tuple(sorted(evidence_keys)):
+            raise ValueError("runtime narrative outcome evidence is not stably sorted")
+        outcome_rules = {
+            item.rule_id: item for item in definition.narrative_outcome_rules
+        }
+        for evidence in self.narrative_outcome_evidence:
+            outcome_rule = outcome_rules.get(evidence.outcome_rule_id)
+            if outcome_rule is None:
+                raise ValueError("runtime narrative outcome evidence references an unknown rule")
+            try:
+                effect = outcome_rule.effect(evidence.outcome_result)
+            except StopIteration as exc:
+                raise ValueError(
+                    "runtime narrative outcome evidence references an unknown result"
+                ) from exc
+            if effect.event_type != evidence.scenario_event_type:
+                raise ValueError(
+                    "runtime narrative outcome evidence has a mismatched event type"
+                )
+            if not set(evidence.npc_definition_ids) <= set(
+                outcome_rule.required_visible_npc_definition_ids
+            ):
+                raise ValueError(
+                    "runtime narrative outcome evidence has an unauthorized NPC target"
+                )
         if self.rapid_decision_mode and not phase.rapid_decision_allowed:
             raise ValueError("runtime rapid decision mode is not allowed in this phase")
         if self.current_location_id not in self.opened_location_ids:
@@ -328,6 +390,9 @@ class VerifiedScenarioEvent(BaseModel):
     new_location_id: DefinitionId | None = None
     resolves_current_decision: StrictBool = False
     expose_in_frame: StrictBool = False
+    narrative_outcome_rule_id: DefinitionId | None = None
+    narrative_outcome_result: NarrativeOutcomeResult | None = None
+    narrative_outcome_npc_definition_ids: tuple[DefinitionId, ...] = ()
     _issuer: object | None = PrivateAttr(default=None)
     _sealed_payload: str | None = PrivateAttr(default=None)
 
@@ -370,6 +435,27 @@ class VerifiedScenarioEvent(BaseModel):
             ids = tuple(item.fact_id for item in updates)
             if len(ids) != len(set(ids)):
                 raise ValueError(f"verified scenario event repeats a {label} fact update")
+        outcome_fields_present = (
+            self.narrative_outcome_rule_id is not None,
+            self.narrative_outcome_result is not None,
+        )
+        if any(outcome_fields_present) != all(outcome_fields_present):
+            raise ValueError("narrative outcome event evidence is incomplete")
+        if len(self.narrative_outcome_npc_definition_ids) != len(
+            set(self.narrative_outcome_npc_definition_ids)
+        ):
+            raise ValueError("narrative outcome event repeats an NPC target")
+        if self.narrative_outcome_npc_definition_ids != tuple(
+            sorted(self.narrative_outcome_npc_definition_ids)
+        ):
+            raise ValueError("narrative outcome event NPC targets are not sorted")
+        has_outcome_evidence = all(outcome_fields_present)
+        if has_outcome_evidence != (self.source == "VALIDATED_NARRATIVE_OUTCOME"):
+            raise ValueError(
+                "validated narrative outcome source and exact evidence must agree"
+            )
+        if self.narrative_outcome_npc_definition_ids and not has_outcome_evidence:
+            raise ValueError("narrative outcome NPC targets require exact evidence")
         return self
 
     def is_authentic(self) -> bool:

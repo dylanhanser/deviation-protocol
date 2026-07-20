@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -21,20 +22,28 @@ from deviation_protocol.application.narrative_outcome_policy import (
     proposal_digest,
     state_fingerprint,
 )
+from deviation_protocol.application.player_memory import DeclarativePlayerMemoryRuleEngine
 from deviation_protocol.application.resolution import ResolutionStatus
 from deviation_protocol.application.scenario_event_bridge import bind_public_decision_frame
-from deviation_protocol.application.story_director import DeterministicStoryDirector
+from deviation_protocol.application.story_director import (
+    DeterministicStoryDirector,
+    StoryDirectorError,
+)
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
+from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
-from deviation_protocol.domain.state import GameState, PlayerState
+from deviation_protocol.domain.player_memory import stable_npc_subject_key
+from deviation_protocol.domain.persisted_events import _issue_persisted_event_receipt
+from deviation_protocol.domain.scenario import ScenarioCatalog
+from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 
 
 SCENARIO_PACK = Path(__file__).parents[2] / "config" / "scenarios" / "death_certificate_v1.json"
 
 
-def opening_state():
-    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+def opening_state(catalog: ScenarioCatalog | None = None):
+    catalog = catalog or JsonScenarioCatalogLoader(SCENARIO_PACK).load()
     definition = catalog.scenarios[0]
     character = catalog.content_catalog.character(
         "character.death_certificate.investigator"
@@ -77,7 +86,9 @@ def purposeful_action(**updates: object) -> ActionSubmission:
     return base.model_copy(update=updates)
 
 
-def _validated_success(allowed) -> ValidatedNarrativeProposal:
+def _validated_success(
+    allowed, *, selected_references: tuple[str, ...] | None = None
+) -> ValidatedNarrativeProposal:
     speaker = allowed.candidate.allowed_entity_ids[0]
     return ValidatedNarrativeProposal(
         proposal=NarrativeProposalPayload(
@@ -93,7 +104,9 @@ def _validated_success(allowed) -> ValidatedNarrativeProposal:
             selected_outcome=SelectedNarrativeOutcome(
                 outcome_token=allowed.candidate.outcome_token,
                 result=NarrativeOutcomeResult.SUCCESS,
-                referenced_entity_ids=(speaker,),
+                referenced_entity_ids=(
+                    (speaker,) if selected_references is None else selected_references
+                ),
             ),
         ),
         provider_metadata=NarrativeProviderMetadata(
@@ -103,6 +116,53 @@ def _validated_success(allowed) -> ValidatedNarrativeProposal:
             attempts=1,
             latency_ms=1,
         ),
+    )
+
+
+def _validated_non_success(
+    allowed, result: NarrativeOutcomeResult
+) -> ValidatedNarrativeProposal:
+    speaker = allowed.candidate.allowed_entity_ids[0]
+    return ValidatedNarrativeProposal(
+        proposal=NarrativeProposalPayload(
+            schema_version="narrative-proposal-v1",
+            narrative_text="你发出的信号没有形成明确确认，分诊协调员仍按原流程继续观察。" * 20,
+            referenced_entity_ids=(speaker,),
+            selected_outcome=SelectedNarrativeOutcome(
+                outcome_token=allowed.candidate.outcome_token,
+                result=result,
+                referenced_entity_ids=(),
+            ),
+        ),
+        provider_metadata=NarrativeProviderMetadata(
+            provider="fake",
+            model="fake-model",
+            finish_reason="stop",
+            attempts=1,
+            latency_ms=1,
+        ),
+    )
+
+
+def _receipt(
+    *,
+    event_id: str,
+    event_type: str,
+    sequence_no: int,
+    turn_id: str,
+    payload: dict[str, object],
+):
+    return _issue_persisted_event_receipt(
+        DomainEvent(
+            event_id=event_id,
+            session_id="session-1",
+            turn_id=turn_id,
+            sequence_no=sequence_no,
+            event_type=event_type,
+            payload=payload,
+            occurred_at=datetime(2026, 7, 20, tzinfo=timezone.utc),
+        ),
+        state_version=0,
     )
 
 
@@ -290,6 +350,7 @@ def test_issuer_rejects_an_ordinary_unminted_capability() -> None:
         capability=fake_capability,
         rule=allowed.rule,
         result_name=NarrativeOutcomeResult.SUCCESS.value,
+        npc_definition_ids=("npc.death_certificate.triage_coordinator",),
     )
 
     with pytest.raises(ValueError, match="lacks policy authority"):
@@ -421,6 +482,11 @@ def test_policy_and_issuer_only_use_server_template_and_story_director() -> None
     assert event.discovered_clue_ids == (
         "death_certificate.clue.vital_response",
     )
+    assert event.narrative_outcome_rule_id == authorized.rule.rule_id
+    assert event.narrative_outcome_result is NarrativeOutcomeResult.SUCCESS
+    assert event.narrative_outcome_npc_definition_ids == (
+        "npc.death_certificate.triage_coordinator",
+    )
     assert text not in event.model_dump_json()
     directed = DeterministicStoryDirector().advance_after_verified_result(
         state,
@@ -440,6 +506,345 @@ def test_policy_and_issuer_only_use_server_template_and_story_director() -> None
     assert directed.candidate_state.scenario_runtime.current_phase_id == (
         "death_certificate.life_disputed"
     )
+    evidence = directed.candidate_state.scenario_runtime.narrative_outcome_evidence
+    assert len(evidence) == 1
+    assert evidence[0].outcome_rule_id == authorized.rule.rule_id
+    assert evidence[0].outcome_result is NarrativeOutcomeResult.SUCCESS
+    assert evidence[0].scenario_event_type == "vitals.verified"
+    with pytest.raises(StoryDirectorError, match="already applied"):
+        DeterministicStoryDirector().advance_after_verified_result(
+            directed.candidate_state,
+            definition,
+            (event,),
+        )
+    assert directed.candidate_state.scenario_runtime.narrative_outcome_evidence == evidence
+
+
+def test_selected_npc_references_cannot_change_authoritative_event_or_memory() -> None:
+    catalog, definition, state, frame = opening_state()
+    action = purposeful_action()
+    started = DeclarativePlayerMemoryRuleEngine().apply(
+        state=state,
+        definition=definition,
+        session_id="session-1",
+        turn_id="session-created",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_id="event-started",
+                event_type="ScenarioStarted",
+                sequence_no=1,
+                turn_id="session-created",
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    allowed = allowed_narrative_outcomes(
+        submission=action,
+        state=started,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+    )[0]
+    speaker = allowed.candidate.allowed_entity_ids[0]
+    results = []
+    for index, selected_references in enumerate(((), (speaker,)), start=1):
+        proposal = _validated_success(
+            allowed, selected_references=selected_references
+        )
+        digest = proposal_digest(proposal)
+        authorized = NarrativeOutcomePolicy().authorize(
+            proposal,
+            job_id=f"job-{index}",
+            lease_token="a" * 32,
+            lease_owner="worker-1",
+            submission=action,
+            state=started,
+            state_version=0,
+            definition=definition,
+            frame=frame,
+            resolution_status=ResolutionStatus.NARRATIVE_REQUIRED,
+            expected_state_fingerprint=state_fingerprint(started),
+            expected_proposal_digest=digest,
+        )
+        sealed = NarrativeEventIssuer().issue(
+            authorized,
+            job_id=f"job-{index}",
+            lease_token="a" * 32,
+            lease_owner="worker-1",
+            submission=action,
+            state=started,
+            state_version=0,
+            definition=definition,
+            proposal=proposal,
+        )
+        directed = DeterministicStoryDirector().advance_after_verified_result(
+            started,
+            definition,
+            (sealed,),
+            profession_tags=frozenset(
+                catalog.content_catalog.character(
+                    started.player.character_definition_id
+                ).tags
+            )
+            & set(definition.available_profession_tags),
+        )
+        accepted_payload = {
+            "outcome_rule_id": authorized.rule.rule_id,
+            "outcome_result": authorized.result_name,
+            "scenario_event_type": sealed.event_type,
+            "npc_definition_ids": authorized.npc_definition_ids,
+        }
+        with_memory = DeclarativePlayerMemoryRuleEngine().apply(
+            state=directed.candidate_state,
+            definition=definition,
+            session_id="session-1",
+            turn_id="turn-1",
+            state_version=0,
+            receipts=(
+                _receipt(
+                    event_id="event-accepted",
+                    event_type="NarrativeOutcomeAccepted",
+                    sequence_no=2,
+                    turn_id="turn-1",
+                    payload=accepted_payload,
+                ),
+            ),
+        )
+        results.append(
+            (
+                accepted_payload,
+                with_memory.player_memory,
+                with_memory.scenario_runtime.narrative_outcome_evidence,
+            )
+        )
+
+    assert results[0] == results[1]
+    assert results[0][0]["npc_definition_ids"] == (
+        "npc.death_certificate.triage_coordinator",
+    )
+
+
+@pytest.mark.parametrize(
+    "result",
+    [NarrativeOutcomeResult.FAILURE, NarrativeOutcomeResult.AMBIGUOUS],
+)
+def test_executed_non_success_once_rule_cannot_support_success_only_npc_memory(
+    result: NarrativeOutcomeResult,
+) -> None:
+    catalog, definition, state, frame = opening_state()
+    state = DeclarativePlayerMemoryRuleEngine().apply(
+        state=state,
+        definition=definition,
+        session_id="session-1",
+        turn_id="session-created",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_id="event-started-non-success",
+                event_type="ScenarioStarted",
+                sequence_no=1,
+                turn_id="session-created",
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    action = purposeful_action()
+    allowed = allowed_narrative_outcomes(
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+    )[0]
+    proposal = _validated_non_success(allowed, result)
+    authorized = NarrativeOutcomePolicy().authorize(
+        proposal,
+        job_id=f"job-{result.value.lower()}",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+        resolution_status=ResolutionStatus.NARRATIVE_REQUIRED,
+        expected_state_fingerprint=state_fingerprint(state),
+        expected_proposal_digest=proposal_digest(proposal),
+    )
+    event = NarrativeEventIssuer().issue(
+        authorized,
+        job_id=f"job-{result.value.lower()}",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        proposal=proposal,
+    )
+    directed = DeterministicStoryDirector().advance_after_verified_result(
+        state,
+        definition,
+        (event,),
+    )
+    payload = directed.candidate_state.to_snapshot()
+    memory = payload["player_memory"]
+    memory["npc_records"] = [
+        {
+            "subject_key": stable_npc_subject_key(
+                definition.scenario_id,
+                "npc.death_certificate.triage_coordinator",
+            ),
+            "scenario_id": definition.scenario_id,
+            "npc_definition_id": "npc.death_certificate.triage_coordinator",
+            "encountered": True,
+            "interaction_milestones": ["FIRST_ENCOUNTER"],
+            "known_public_fact_refs": [],
+            "last_source_event_id": "event-injected-npc",
+            "last_source_sequence_no": 2,
+        }
+    ]
+    memory["last_applied_source_event_id"] = "event-injected-npc"
+    memory["last_applied_source_sequence_no"] = 2
+
+    with pytest.raises(DomainRuleViolation, match="was not encountered"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_allowed_non_target_npc_reference_does_not_create_that_npc_memory() -> None:
+    base_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    payload = base_catalog.model_dump(mode="json")
+    definition_payload = payload["scenarios"][0]
+    initial_location_id = definition_payload["initial_location_id"]
+    initial_location = next(
+        item
+        for item in definition_payload["locations"]
+        if item["location_id"] == initial_location_id
+    )
+    extra_definition_id = "npc.death_certificate.records_custodian"
+    initial_location["visible_entity_ids"].append(extra_definition_id)
+    purposeful_rule = next(
+        item
+        for item in definition_payload["narrative_outcome_rules"]
+        if item["rule_id"]
+        == "death_certificate.outcome.purposeful_life_signal"
+    )
+    purposeful_rule["required_visible_npc_definition_ids"].append(
+        extra_definition_id
+    )
+    catalog = ScenarioCatalog.model_validate(payload)
+    _, definition, state, frame = opening_state(catalog)
+    action = purposeful_action()
+    state = DeclarativePlayerMemoryRuleEngine().apply(
+        state=state,
+        definition=definition,
+        session_id="session-1",
+        turn_id="session-created",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_id="event-started-extra",
+                event_type="ScenarioStarted",
+                sequence_no=1,
+                turn_id="session-created",
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    allowed = allowed_narrative_outcomes(
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+    )[0]
+    extra_runtime_id = next(
+        npc_id
+        for npc_id, npc in state.npcs.items()
+        if npc.definition_id == extra_definition_id
+    )
+    proposal = _validated_success(
+        allowed, selected_references=(extra_runtime_id,)
+    )
+    authorized = NarrativeOutcomePolicy().authorize(
+        proposal,
+        job_id="job-extra-reference",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        frame=frame,
+        resolution_status=ResolutionStatus.NARRATIVE_REQUIRED,
+        expected_state_fingerprint=state_fingerprint(state),
+        expected_proposal_digest=proposal_digest(proposal),
+    )
+
+    assert authorized.npc_definition_ids == (
+        "npc.death_certificate.triage_coordinator",
+    )
+    assert extra_definition_id not in authorized.npc_definition_ids
+    sealed = NarrativeEventIssuer().issue(
+        authorized,
+        job_id="job-extra-reference",
+        lease_token="a" * 32,
+        lease_owner="worker-1",
+        submission=action,
+        state=state,
+        state_version=0,
+        definition=definition,
+        proposal=proposal,
+    )
+    directed = DeterministicStoryDirector().advance_after_verified_result(
+        state,
+        definition,
+        (sealed,),
+        profession_tags=frozenset(
+            catalog.content_catalog.character(
+                state.player.character_definition_id
+            ).tags
+        )
+        & set(definition.available_profession_tags),
+    )
+    remembered = DeclarativePlayerMemoryRuleEngine().apply(
+        state=directed.candidate_state,
+        definition=definition,
+        session_id="session-1",
+        turn_id="turn-1",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_id="event-accepted-extra",
+                event_type="NarrativeOutcomeAccepted",
+                sequence_no=2,
+                turn_id="turn-1",
+                payload={
+                    "outcome_rule_id": authorized.rule.rule_id,
+                    "outcome_result": authorized.result_name,
+                    "scenario_event_type": sealed.event_type,
+                    "npc_definition_ids": authorized.npc_definition_ids,
+                },
+            ),
+        ),
+    )
+    assert tuple(
+        item.npc_definition_id for item in remembered.player_memory.npc_records
+    ) == ("npc.death_certificate.triage_coordinator",)
 
 
 def test_failure_token_with_success_prose_is_rejected_and_model_delta_fields_are_forbidden() -> None:

@@ -19,6 +19,12 @@ from deviation_protocol.domain.json_values import (
     json_values_equal,
 )
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeRuleDefinition
+from deviation_protocol.domain.memory_rules import (
+    MemoryRuleDefinition,
+    MemoryRuleOperation,
+    MemoryRuleSourceEventType,
+)
+from deviation_protocol.domain.player_memory import SignificantExperienceCategory
 
 
 MAX_SCENARIOS_PER_CATALOG = 32
@@ -493,6 +499,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
     dynamic_fact_value_max_length: Annotated[int, Field(strict=True, ge=1, le=4000)] = 500
     narrative_length: NarrativeLengthDefinition
     narrative_outcome_rules: tuple[NarrativeOutcomeRuleDefinition, ...] = ()
+    memory_rules: tuple[MemoryRuleDefinition, ...] = ()
 
     @model_validator(mode="before")
     @classmethod
@@ -528,6 +535,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
         outcome_rules = _unique_map(
             self.narrative_outcome_rules, "rule_id", "narrative outcome rule"
         )
+        memory_rules = _unique_map(self.memory_rules, "rule_id", "memory rule")
         _reject_duplicates(
             (item.npc_definition_id for item in self.npc_references), "scenario NPC reference"
         )
@@ -548,6 +556,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
             *windows,
             *(item.ending_id for item in self.endings),
             *outcome_rules,
+            *memory_rules,
             *(
                 transition.transition_id
                 for phase in self.phases
@@ -724,6 +733,107 @@ class ScenarioDefinition(ScenarioDefinitionModel):
                 )
             mutex_priorities.add(key)
 
+        ending_ids = {item.ending_id for item in self.endings}
+        all_outcome_event_types = {
+            effect.event_type
+            for outcome_rule in self.narrative_outcome_rules
+            for effect in outcome_rule.effects
+        }
+        all_runtime_event_types = {
+            *all_outcome_event_types,
+            *(
+                transition.event_type
+                for fact in self.facts
+                for transition in fact.mutable_transitions
+            ),
+            *(group.completion_event_type for group in self.clue_groups),
+            *(
+                threshold.event_type
+                for clock in self.threat_clocks
+                for threshold in clock.thresholds
+            ),
+        }
+        for rule in self.memory_rules:
+            _require_all(
+                rule.required_narrative_outcome_rule_ids,
+                outcome_rules,
+                f"memory rule {rule.rule_id!r} narrative outcome rule",
+            )
+            _require_all(
+                rule.allowed_ending_ids,
+                ending_ids,
+                f"memory rule {rule.rule_id!r} ending",
+            )
+            if rule.npc_definition_id is not None:
+                _require_all(
+                    (rule.npc_definition_id,),
+                    npc_definition_ids,
+                    f"memory rule {rule.rule_id!r} NPC",
+                )
+            if rule.public_fact_id is not None:
+                fact = facts.get(rule.public_fact_id)
+                if fact is None or fact.visibility is FactVisibility.HIDDEN:
+                    raise ContentDefinitionError(
+                        f"memory rule {rule.rule_id!r} references a non-public fact"
+                    )
+            if rule.source_event_type is MemoryRuleSourceEventType.SCENARIO_STARTED:
+                if rule.required_narrative_outcome_rule_ids:
+                    raise ContentDefinitionError(
+                        "scenario-started memory rule cannot require a narrative outcome"
+                    )
+            if rule.required_scenario_event_types:
+                permitted_event_types = all_runtime_event_types
+                if (
+                    rule.source_event_type
+                    is MemoryRuleSourceEventType.NARRATIVE_OUTCOME_ACCEPTED
+                ):
+                    permitted_event_types = all_outcome_event_types
+                if rule.required_narrative_outcome_rule_ids:
+                    permitted_event_types = {
+                        effect.event_type
+                        for rule_id in rule.required_narrative_outcome_rule_ids
+                        for effect in outcome_rules[rule_id].effects
+                    }
+                _require_all(
+                    rule.required_scenario_event_types,
+                    permitted_event_types,
+                    f"memory rule {rule.rule_id!r} scenario event",
+                )
+            if rule.required_outcome_results:
+                permitted_results = {
+                    effect.result
+                    for rule_id in (
+                        rule.required_narrative_outcome_rule_ids
+                        or tuple(outcome_rules)
+                    )
+                    for effect in outcome_rules[rule_id].effects
+                }
+                _require_all(
+                    rule.required_outcome_results,
+                    permitted_results,
+                    f"memory rule {rule.rule_id!r} outcome result",
+                )
+            if (
+                rule.operation
+                is MemoryRuleOperation.RECORD_SIGNIFICANT_EXPERIENCE
+            ):
+                category = rule.significant_experience_category
+                if category in {
+                    SignificantExperienceCategory.IMPORTANT_NPC_ENCOUNTER,
+                    SignificantExperienceCategory.NPC_RELATIONSHIP_MILESTONE,
+                } and rule.npc_definition_id is None:
+                    raise ContentDefinitionError(
+                        "NPC significant memory rule requires an NPC reference"
+                    )
+                if (
+                    category
+                    is SignificantExperienceCategory.IMPORTANT_PUBLIC_DISCOVERY
+                    and rule.public_fact_id is None
+                ):
+                    raise ContentDefinitionError(
+                        "public-discovery memory rule requires a fact reference"
+                    )
+
         reachable = {self.initial_phase_id}
         changed = True
         while changed:
@@ -752,6 +862,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
             ("decision", len(self.decision_windows), MAX_DECISIONS_PER_SCENARIO),
             ("ending", len(self.endings), MAX_ENDINGS_PER_SCENARIO),
             ("narrative outcome rule", len(self.narrative_outcome_rules), 128),
+            ("memory rule", len(self.memory_rules), 256),
         )
         for label, count, maximum in limits:
             if count > maximum:
@@ -932,6 +1043,42 @@ class ScenarioCatalog(ScenarioDefinitionModel):
                     entity_ids,
                     f"location {location.location_id!r} entity",
                 )
+            outcome_rules = {
+                item.rule_id: item for item in scenario.narrative_outcome_rules
+            }
+            for memory_rule in scenario.memory_rules:
+                npc_definition_id = memory_rule.npc_definition_id
+                if npc_definition_id is None:
+                    continue
+                candidate_outcomes = tuple(
+                    outcome_rules[rule_id]
+                    for rule_id in (
+                        memory_rule.required_narrative_outcome_rule_ids
+                        or tuple(outcome_rules)
+                    )
+                )
+                if not any(
+                    npc_definition_id
+                    in outcome.required_visible_npc_definition_ids
+                    and any(
+                        (
+                            not memory_rule.required_outcome_results
+                            or effect.result
+                            in memory_rule.required_outcome_results
+                        )
+                        and (
+                            not memory_rule.required_scenario_event_types
+                            or effect.event_type
+                            in memory_rule.required_scenario_event_types
+                        )
+                        for effect in outcome.effects
+                    )
+                    for outcome in candidate_outcomes
+                ):
+                    raise ContentDefinitionError(
+                        f"memory rule {memory_rule.rule_id!r} NPC is not an "
+                        "authoritative narrative outcome subject"
+                    )
         return self
 
     def scenario(self, scenario_id: str) -> ScenarioDefinition | None:

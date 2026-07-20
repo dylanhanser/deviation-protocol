@@ -1,8 +1,8 @@
-# NarrativeProvider 边界（Phase 2.2c）
+# NarrativeProvider 边界（Phase 2.3b）
 
-## Phase 2.2c production boundary
+## Phase 2.3b production boundary
 
-Production uses `DurableNarrativeTurnOrchestrator` with three database phases. Prepare holds the session row lock only while checking idempotency, snapshot/catalog compatibility, Gateway/RuleResolver, the safe frame, declarative outcome candidates, and the bounded request; it commits PREPARED and closes the UoW. Claim holds only the job row long enough to mint a server lease and commit. `NarrativeProvider.generate()` is then called with no active UoW, `AsyncSession`, session lock, or job lock. A validated proposal is persisted promptly in a fresh short transaction. Finalize locks session then job, revalidates every binding and lease, and atomically commits text plus authoritative state.
+Production uses `DurableNarrativeTurnOrchestrator` with three database phases. Prepare holds the session row lock only while checking idempotency, snapshot/catalog compatibility, Gateway/RuleResolver, the safe frame, declarative outcome candidates, and the bounded request. It also creates a public `PlayerMemoryProjection` and binds the request to the locked state version/fingerprint before committing PREPARED and closing the UoW. Claim holds only the job row long enough to mint a server lease and commit. `NarrativeProvider.generate()` is then called with no active UoW, `AsyncSession`, session lock, or job lock. A validated proposal is persisted promptly in a fresh short transaction. Finalize locks session then job, revalidates every binding and lease, recomputes the memory projection/request, and atomically commits accepted text plus authoritative state, flushed events and deterministic memory.
 
 External HTTP latency must not retain MySQL locks: otherwise a seconds-long model call would block safe same-session reads, enlarge deadlock windows, and tie database connection capacity to provider latency. Real MySQL tests acquire the same session row from inside a delayed Fake Provider, execute a local query during the wait, deduplicate the same request, and allow different sessions to enter the provider concurrently.
 
@@ -16,11 +16,13 @@ PROPOSAL_VALIDATED persists the bounded `ValidatedNarrativeProposal`, including 
 
 ## 责任与数据流
 
-`NarrativeProvider` 是 application 层的供应商无关 Protocol。调用方只能构造 `NarrativeRequest`，其数据来源限定为安全 `NarrativeFrame` 的不可变副本、已通过本地行动边界的规范化玩家意图、玩家可见角色标签、最多 6 个近期已接受叙事片段、最多 2,000 字符公开摘要，以及语言、style profile ID 和 prompt schema version。
+`NarrativeProvider` 是 application 层的供应商无关 Protocol。调用方只能构造 prompt schema v2 的 `NarrativeRequest`，其数据来源限定为安全 `NarrativeFrame` 的不可变副本、公开且有界的 `PlayerMemoryProjection`、已通过本地行动边界的规范化玩家意图、玩家可见角色标签、最多 6 个近期已接受叙事片段、最多 2,000 字符公开摘要，以及语言和 style profile ID。记忆投影最多 16 scenarios、32 NPCs、64 experiences、128 public facts，同时受 16,000 字符和 32,000 UTF-8 bytes 上限约束；可能包含 `complete=false`/`REBUILD_REQUIRED`，但不包含 deferred 数量或内容。
 
-请求绝不会包含完整 `GameState`/snapshot、`ScenarioDefinition`/catalog、隐藏事实、未发现线索、未来地点或结局、NPC 秘密、action signature、policy trace、capability、seal、数据库对象、API key、供应商配置或参考作品原文。Chat Completions 是无状态接口；适配器不会假设服务端保存任何玩家历史，也不会发送完整事件流或副本 JSON。
+请求绝不会包含完整 `GameState`/`PlayerMemoryState`/snapshot、`ScenarioDefinition`/catalog、domain events、source event ID/sequence、deferred metadata、memory rule ID、receipt/capability/seal、隐藏事实、未发现线索、未来地点或结局、NPC 秘密、action signature、policy trace、数据库对象、API key、供应商配置或参考作品原文。Chat Completions 是无状态接口；适配器不会假设服务端保存任何玩家历史，也不会发送完整事件流或副本 JSON。
 
-`PromptBuilder` 与供应商适配器分离。同一输入和同一 profile 构建完全相同的 prompt。默认 profile `original-zh-second-person-v1@1.0.0` 只包含简洁原创风格约束，不含题材专属内容或长篇示例。玩家文本放在 `INPUT_DATA_JSON.untrusted_player_intent` 数据段；公开摘要和近期正文也明确只是数据，任何一项都不能改变 system 规则。规范 JSON 会转义可伪造分隔符的尖括号。
+`PromptBuilder` 与供应商适配器分离。同一输入和同一 profile 构建字节级相同的 prompt。默认 profile `original-zh-second-person-v1@1.0.0` 只包含简洁原创风格约束，不含题材专属内容或长篇示例。玩家文本放在 `INPUT_DATA_JSON.untrusted_player_intent`，公开摘要、近期正文和 memory projection 都位于 `server_public_context` 的规范 JSON 数据区，任何一项都不能成为 system instruction；`complete=false` 也不表示授权。规范 JSON 执行 NFC、稳定集合排序、key 排序并转义可伪造分隔符的尖括号。User prompt 上限为 32,000 字符，总 prompt 上限为 32,000 字符和 64,000 UTF-8 bytes；超限在 transport/provider token 消耗前拒绝。
+
+升级前已是 `PREPARED`、`IN_PROGRESS` 或 `PROPOSAL_VALIDATED` 的 prompt-v1 job 不会由新代码解析或 finalize，也不会自动再次调用 Provider；命中同一请求时会稳定转为 `STALE/NARRATIVE_REQUEST_SCHEMA_STALE`，客户端需使用新的 `client_request_id`。旧 job 的 prompt/proposal/provider error 不出现在安全错误中。已经 `COMMITTED` 的旧 job 仍先读取持久化 turn response，保持现有幂等语义，不重新生成。
 
 ## 不可信与已验证候选
 
@@ -36,6 +38,8 @@ DeepSeek JSON 先解析为 `NarrativeProposalPayload`，再由应用包装为 `U
 所有模型字段禁止 extra，并有字符串、集合和正文上限。模型不能声明 provider metadata；适配器只记录安全的 provider、配置模型、request ID、finish reason、attempt 数、整数 latency 和实际存在的 usage 字段。
 
 `NarrativeProposalValidator` 使用当前 Frame 与权威公开引用集合验证结构、引用、可见 NPC speaker、玩家拥有且已公开的物品、长度和内部数据泄漏形态。通过后得到的 `ValidatedNarrativeProposal` 仍只是可展示候选：它不代表 NPC 已承认某事，不把玩家声称的结果变成世界结果，也没有创建事件、修改 `GameState` 或取得 issuer capability 的接口。
+
+Proposal schema 没有 memory operation、importance、summary code、relationship、milestone 或 fact ID 授权字段；extra 字段会被拒绝。`continuity_notes` 只用于候选连续性，永远不进入 `PlayerMemoryState`。Finalize 中只有 outcome policy 重新授权后由 `NarrativeEventIssuer` 产生、并在当前 UoW insert/flush 的可信世界事件，才可以匹配声明式 `MemoryRule`。因此玩家文本或模型台词声称 NPC 已承认玩家存活不会写记忆；只有既有 outcome rule 的 SUCCESS 与 `vitals.verified` 可信结果能够触发对应固定规则。
 
 ## DeepSeek V4 配置
 

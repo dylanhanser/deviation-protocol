@@ -10,8 +10,12 @@ from deviation_protocol.application.narrative_models import (
 )
 from deviation_protocol.application.resolution import ResolutionStatus
 from deviation_protocol.domain.actions import ActionSubmission
+from deviation_protocol.domain.memory_rules import MemoryRuleSourceEventType
 from deviation_protocol.domain.narrative import NarrativeFrame
-from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeRuleDefinition
+from deviation_protocol.domain.narrative_outcome import (
+    NarrativeOutcomeResult,
+    NarrativeOutcomeRuleDefinition,
+)
 from deviation_protocol.domain.scenario import ScenarioDefinition
 from deviation_protocol.domain.scenario_rules import DeclarativeConditionEvaluator
 from deviation_protocol.domain.scenario_runtime import (
@@ -147,6 +151,7 @@ class ValidatedNarrativeOutcomeCapability:
     scenario_id: str
     scenario_content_version: str
     outcome_rule_id: str
+    npc_definition_ids: tuple[str, ...]
     proposal_digest: str
     _authority: object
 
@@ -159,6 +164,7 @@ class AuthorizedNarrativeOutcome:
     capability: ValidatedNarrativeOutcomeCapability
     rule: NarrativeOutcomeRuleDefinition
     result_name: str
+    npc_definition_ids: tuple[str, ...]
 
 
 class NarrativeOutcomePolicy:
@@ -231,6 +237,11 @@ class NarrativeOutcomePolicy:
             ):
                 raise ValueError("visible NPC utterance does not support the outcome")
 
+        npc_definition_ids = _authorized_memory_npc_definition_ids(
+            definition=definition,
+            outcome_rule=matched.rule,
+            result=selected.result,
+        )
         capability = object.__new__(ValidatedNarrativeOutcomeCapability)
         values = {
             "job_id": job_id,
@@ -245,6 +256,7 @@ class NarrativeOutcomePolicy:
             "scenario_id": definition.scenario_id,
             "scenario_content_version": definition.content_version,
             "outcome_rule_id": matched.rule.rule_id,
+            "npc_definition_ids": npc_definition_ids,
             "proposal_digest": expected_proposal_digest,
             "_authority": _NARRATIVE_OUTCOME_AUTHORITY,
         }
@@ -254,6 +266,7 @@ class NarrativeOutcomePolicy:
             capability=capability,
             rule=matched.rule,
             result_name=selected.result.value,
+            npc_definition_ids=npc_definition_ids,
         )
 
 
@@ -290,6 +303,7 @@ class NarrativeEventIssuer:
             or capability.scenario_id != definition.scenario_id
             or capability.scenario_content_version != definition.content_version
             or capability.outcome_rule_id != authorized.rule.rule_id
+            or capability.npc_definition_ids != authorized.npc_definition_ids
             or capability.proposal_digest != proposal_digest(proposal)
         ):
             raise ValueError("narrative outcome capability binding changed")
@@ -322,6 +336,9 @@ class NarrativeEventIssuer:
                 ),
                 resolves_current_decision=effect.resolves_current_decision,
                 expose_in_frame=effect.expose_in_frame,
+                narrative_outcome_rule_id=authorized.rule.rule_id,
+                narrative_outcome_result=result.result,
+                narrative_outcome_npc_definition_ids=authorized.npc_definition_ids,
             )
         )
 
@@ -345,6 +362,43 @@ def _token_bindings(
             definition.scenario_id,
             definition.content_version,
             _sha256_json(frame.model_dump(mode="json")),
+        )
+    )
+
+
+def _authorized_memory_npc_definition_ids(
+    *,
+    definition: ScenarioDefinition,
+    outcome_rule: NarrativeOutcomeRuleDefinition,
+    result: NarrativeOutcomeResult,
+) -> tuple[str, ...]:
+    """Derive memory subjects only from server-owned declarative authority."""
+
+    effect = outcome_rule.effect(result)
+    involved_npcs = set(outcome_rule.required_visible_npc_definition_ids)
+    return tuple(
+        sorted(
+            {
+                rule.npc_definition_id
+                for rule in definition.memory_rules
+                if rule.source_event_type
+                is MemoryRuleSourceEventType.NARRATIVE_OUTCOME_ACCEPTED
+                and rule.npc_definition_id is not None
+                and rule.npc_definition_id in involved_npcs
+                and (
+                    not rule.required_narrative_outcome_rule_ids
+                    or outcome_rule.rule_id
+                    in rule.required_narrative_outcome_rule_ids
+                )
+                and (
+                    not rule.required_scenario_event_types
+                    or effect.event_type in rule.required_scenario_event_types
+                )
+                and (
+                    not rule.required_outcome_results
+                    or result in rule.required_outcome_results
+                )
+            }
         )
     )
 

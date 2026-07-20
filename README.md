@@ -1,8 +1,10 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-当前实现到 Phase 2.3a：`GameState` 快照 v3 已加入确定性、有界的玩家长期记忆领域状态与玩家安全公开投影；它尚未接入生产回合编排或叙事 prompt。生产 action API 仍使用 Phase 2.2c 的耐久 prepare / provider / finalize 三阶段协调器，外部 DeepSeek 调用发生在所有 UoW、`AsyncSession` 与 MySQL 行锁退出之后。
+当前实现到 Phase 2.3b：确定性、有界的玩家长期记忆已经接入 session 创建、本地权威回合、Narrative finalize、只读玩家状态和安全 prompt。可信事件必须先在当前 UoW 中 insert/flush 并取得不可序列化的事务内 receipt，声明式 `MemoryRule` 才能生成并应用绑定 session/version/state 的 plan；event、memory、snapshot、response/job 和 session version 仍只 commit 一次。外部 DeepSeek 调用发生在所有 UoW、`AsyncSession` 与 MySQL 行锁退出之后。
 
-Phase 2.3a 的 `PlayerMemoryState` 只索引可信确认的副本记录、真正遇见的稳定 NPC 身份、受限类型的重要经历和玩家已知公开事实引用。属性、资源、钱包、库存/装备、技能、当前 NPC、`ScenarioRuntimeState` 与完整 `domain_events` 仍是各自唯一事实来源。详细边界、容量和 v1/v2/v3 兼容规则见 [玩家长期记忆](docs/player_memory.md)。
+`PlayerMemoryState` 只索引可信确认的副本记录、真正遇见的稳定 NPC 身份、受限类型的重要经历和玩家已知公开事实引用。容量耗尽不会阻断游戏：当前事件的 memory mutation 整体放弃，索引进入 `REBUILD_REQUIRED` 并公开标记为不完整，完整事件仍保存在 `domain_events`；本阶段不实现 rebuild/compaction。属性、资源、钱包、库存/装备、技能、当前 NPC 和 `ScenarioRuntimeState` 仍是各自唯一事实来源。详细边界见 [玩家长期记忆](docs/player_memory.md)。
+
+`NarrativeRequest` 的 prompt schema 已升级为 v2，只包含公开、有界、深度隔离的 `PlayerMemoryProjection`；不包含 source event、sequence、receipt、seal、capability、内部规则或完整 memory state。升级前仍处于活动状态的旧 narrative job 会安全转为 `STALE` 并要求新 `client_request_id`，不会再次调用 Provider；旧 COMMITTED response 继续按原幂等结果读取。玩家和模型都没有记忆写入接口。
 
 ## Phase 2.2c production narrative coordination
 

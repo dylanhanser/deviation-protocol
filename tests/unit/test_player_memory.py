@@ -6,6 +6,7 @@ import hashlib
 import inspect
 import json
 import pickle
+from pathlib import Path
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -16,6 +17,7 @@ from deviation_protocol.application.narrative_models import (
 )
 from deviation_protocol.application.player_memory import (
     AuthoritativePlayerMemoryPlanFactory,
+    DeclarativePlayerMemoryRuleEngine,
     MAX_MEMORY_PROJECTION_CHARACTERS,
     MAX_MEMORY_PROJECTION_JSON_BYTES,
     MemoryAuthorityEventType,
@@ -34,25 +36,42 @@ from deviation_protocol.domain.player_memory import (
     MemoryConflictError,
     MemoryMutationKind,
     MemoryMutationPlan,
+    MemoryIndexSyncStatus,
     NpcInteractionMilestone,
+    ScenarioMemoryStatus,
     SignificantExperienceCategory,
     _issue_memory_mutation,
+    migrate_player_memory_payload,
     scenario_definition_fingerprint,
     stable_npc_subject_key,
     stable_significant_experience_id,
 )
-from deviation_protocol.domain.scenario import ScenarioDefinition
+from deviation_protocol.domain.memory_rules import MemoryRuleDefinition
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
+from deviation_protocol.domain.persisted_events import (
+    PersistedEventReceipt,
+    _issue_persisted_event_receipt,
+)
+from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.scenario_runtime import (
     FactValueUpdate,
+    NarrativeOutcomeEvidence,
     _issue_verified_scenario_event,
 )
-from deviation_protocol.domain.state import GameState
+from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
+from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from tests.unit.test_story_director import mini_catalog, state_for
 
 
 NOW = datetime(2026, 7, 20, tzinfo=timezone.utc)
 SESSION_ID = "session-1"
 STATE_VERSION = 7
+SCENARIO_PACK = (
+    Path(__file__).parents[2]
+    / "config"
+    / "scenarios"
+    / "death_certificate_v1.json"
+)
 
 
 def _started():
@@ -60,6 +79,181 @@ def _started():
     definition = catalog.scenarios[0]
     directed = DeterministicStoryDirector().start_scenario(state_for(catalog), definition)
     return catalog, definition, directed.candidate_state, directed.frame
+
+
+def _production_started_with_memory():
+    catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    definition = catalog.scenarios[0]
+    character = catalog.content_catalog.character(
+        "character.death_certificate.investigator"
+    )
+    assert character is not None
+    state = GameState(
+        content_version=catalog.content_version,
+        player=PlayerState.from_definition("player-1", character),
+    )
+    for index, reference in enumerate(definition.npc_references, start=1):
+        state.spawn_npc(
+            catalog.content_catalog,
+            reference.npc_definition_id,
+            f"runtime-npc-{index}",
+        )
+    directed = DeterministicStoryDirector().start_scenario(
+        state,
+        definition,
+        profession_tags=frozenset(character.tags)
+        & set(definition.available_profession_tags),
+    )
+    with_memory = DeclarativePlayerMemoryRuleEngine().apply(
+        state=directed.candidate_state,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="session-created",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_type="ScenarioStarted",
+                sequence=1,
+                turn_id="session-created",
+                state_version=0,
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    return catalog, definition, with_memory
+
+
+def _production_success_memory():
+    catalog, definition, state = _production_started_with_memory()
+    runtime = state.scenario_runtime
+    assert runtime is not None
+    runtime.discovered_clue_ids = frozenset(
+        {*runtime.discovered_clue_ids, "death_certificate.clue.vital_response"}
+    )
+    runtime.applied_event_ids = (
+        *runtime.applied_event_ids,
+        "death_certificate.outcome.purposeful_life_signal",
+    )
+    runtime.narrative_outcome_evidence = (
+        NarrativeOutcomeEvidence(
+            outcome_rule_id="death_certificate.outcome.purposeful_life_signal",
+            outcome_result=NarrativeOutcomeResult.SUCCESS,
+            scenario_event_type="vitals.verified",
+            npc_definition_ids=(
+                "npc.death_certificate.triage_coordinator",
+            ),
+        ),
+    )
+    learned = DeclarativePlayerMemoryRuleEngine().apply(
+        state=state,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-2",
+        state_version=0,
+        receipts=(
+            _receipt(
+                event_type="NarrativeOutcomeAccepted",
+                sequence=2,
+                turn_id="turn-2",
+                state_version=0,
+                payload={
+                    "outcome_rule_id": (
+                        "death_certificate.outcome.purposeful_life_signal"
+                    ),
+                    "outcome_result": "SUCCESS",
+                    "scenario_event_type": "vitals.verified",
+                    "npc_definition_ids": (
+                        "npc.death_certificate.triage_coordinator",
+                    ),
+                },
+            ),
+        ),
+    )
+    return catalog, definition, learned
+
+
+def _catalog_with_scenario_clones(
+    catalog: ScenarioCatalog,
+    scenario_ids: tuple[str, ...],
+    *,
+    scenario_begin_experience: bool = False,
+) -> ScenarioCatalog:
+    payload = catalog.model_dump(mode="json")
+    base = payload["scenarios"][0]
+    scenarios = []
+    for index, scenario_id in enumerate(scenario_ids):
+        definition = deepcopy(base)
+        definition["scenario_id"] = scenario_id
+        if scenario_begin_experience:
+            definition["memory_rules"] = [
+                {
+                    "rule_id": f"memory.begin.{index:02d}",
+                    "rule_version": "1.0.0",
+                    "source_event_type": "ScenarioStarted",
+                    "operation": "RECORD_SIGNIFICANT_EXPERIENCE",
+                    "significant_experience_category": "SCENARIO_BEGIN",
+                    "significant_experience_summary": "SCENARIO_BEGAN",
+                    "important_experience": True,
+                }
+            ]
+        scenarios.append(definition)
+    payload["scenarios"] = scenarios
+    return ScenarioCatalog.model_validate(payload)
+
+
+def _unparticipated_scenario_memory_payload(
+    *, include_player_known_fact: bool
+) -> tuple[ScenarioCatalog, dict[str, object]]:
+    catalog, _, state = _production_started_with_memory()
+    catalog = _catalog_with_scenario_clones(
+        catalog, ("death_certificate", "scenario.never_entered")
+    )
+    payload = state.to_snapshot()
+    memory = payload["player_memory"]
+    source_record = memory["scenario_records"][0]
+    injected_record = deepcopy(source_record)
+    injected_record.update(
+        {
+            "scenario_id": "scenario.never_entered",
+            "milestone_refs": ["STARTED"],
+            "known_public_fact_refs": [],
+        }
+    )
+    if include_player_known_fact:
+        fact_ref = source_record["known_public_fact_refs"][0]
+        injected_record["milestone_refs"] = [
+            "STARTED",
+            "IMPORTANT_FACT_CONFIRMED",
+        ]
+        injected_record["known_public_fact_refs"] = [fact_ref]
+        source_fact = next(
+            item
+            for item in memory["known_public_facts"]
+            if item["fact_ref"] == fact_ref
+        )
+        injected_fact = deepcopy(source_fact)
+        injected_fact["scenario_id"] = "scenario.never_entered"
+        memory["known_public_facts"].append(injected_fact)
+    memory["scenario_records"].append(injected_record)
+    return catalog, payload
+
+
+def _catalog_with_public_capacity_facts(
+    catalog: ScenarioCatalog, count: int
+) -> tuple[ScenarioCatalog, tuple[str, ...]]:
+    payload = catalog.model_dump(mode="json")
+    definition = payload["scenarios"][0]
+    template = next(
+        item for item in definition["facts"] if item["fact_id"] == "alpine.fact.weather"
+    )
+    fact_refs = tuple(f"alpine.fact.capacity-{index:02d}" for index in range(count))
+    definition["facts"].extend(
+        [{**template, "fact_id": fact_ref} for fact_ref in fact_refs]
+    )
+    return ScenarioCatalog.model_validate(payload), fact_refs
 
 
 def _domain_event(
@@ -80,6 +274,27 @@ def _event(
     event_type: MemoryAuthorityEventType, sequence: int
 ) -> MemoryAuthoritySource:
     return _issue_memory_authority_source(_domain_event(event_type, sequence))
+
+
+def _receipt(
+    *,
+    event_type: str,
+    sequence: int,
+    turn_id: str,
+    state_version: int = STATE_VERSION,
+    session_id: str = SESSION_ID,
+    payload: dict[str, object] | None = None,
+):
+    event = DomainEvent(
+        event_id=f"persisted-event.{sequence}",
+        session_id=session_id,
+        turn_id=turn_id,
+        sequence_no=sequence,
+        event_type=event_type,
+        payload=payload or {},
+        occurred_at=NOW,
+    )
+    return _issue_persisted_event_receipt(event, state_version=state_version)
 
 
 def _start_memory(state, definition, frame, *, sequence: int = 1):
@@ -783,7 +998,7 @@ def test_detached_copy_deeply_isolates_memory() -> None:
 
 
 def test_projection_is_stable_bounded_frozen_and_deeply_isolated() -> None:
-    _, definition, state, frame = _started()
+    catalog, definition, state, frame = _started()
     _start_memory(state, definition, frame)
     factory = AuthoritativePlayerMemoryPlanFactory()
     _apply(
@@ -798,31 +1013,23 @@ def test_projection_is_stable_bounded_frozen_and_deeply_isolated() -> None:
         definition,
     )
     projector = PlayerMemoryProjector()
-    first = projector.project(state)
-    second = projector.project(state)
+    first = projector.project(state, catalog)
+    second = projector.project(state, catalog)
     assert first == second
     encoded = first.model_dump_json()
-    payload = first.model_dump(mode="json")
     assert first.known_public_facts[0].scenario_id == "alpine_signal"
     assert first.known_public_facts[0].fact_ref == "alpine.fact.weather"
     assert len(encoded.encode("utf-8")) <= MAX_MEMORY_PROJECTION_JSON_BYTES
-    assert _string_characters(payload) <= MAX_MEMORY_PROJECTION_CHARACTERS
+    assert len(encoded) <= MAX_MEMORY_PROJECTION_CHARACTERS
     with pytest.raises(ValidationError):
         first.scenarios[0].scenario_id = "changed"  # type: ignore[misc]
 
-    _apply(
-        state,
-        factory.record_npc_encounter(
-            state=state,
-            definition=definition,
-            state_version=STATE_VERSION,
-            runtime_npc_id="alpine-ranger-runtime",
-            source_event=_event(MemoryAuthorityEventType.NPC_ENCOUNTER_CONFIRMED, 3),
-        ),
-        definition,
+    state.player_memory = state.player_memory.mark_rebuild_required(
+        source_sequence_no=3,
+        source_event_id="memory-source.3",
     )
-    assert not first.npcs
-    assert projector.project(state).npcs
+    assert first.complete is True
+    assert projector.project(state, catalog).complete is False
     for forbidden in (
         "event_id", "source_sequence", "capability", "seal", "action_signature",
         "outcome_token", "policy_trace", "scenario_runtime", "narrative_text",
@@ -831,13 +1038,457 @@ def test_projection_is_stable_bounded_frozen_and_deeply_isolated() -> None:
         assert forbidden not in encoded
 
 
-def test_projection_collection_limit_keeps_newest_records_and_reports_truncation() -> None:
-    catalog, _, state, _ = _started()
+def test_memory_integrity_rejects_unknown_and_not_encountered_npcs() -> None:
+    catalog, _, state = _production_started_with_memory()
+    source_event_id = state.player_memory.last_applied_source_event_id
+    assert source_event_id is not None
+    for npc_definition_id in (
+        "npc.death_certificate.not_in_catalog",
+        "npc.death_certificate.triage_coordinator",
+    ):
+        payload = state.to_snapshot()
+        payload["player_memory"]["npc_records"] = [
+            {
+                "subject_key": stable_npc_subject_key(
+                    "death_certificate", npc_definition_id
+                ),
+                "scenario_id": "death_certificate",
+                "npc_definition_id": npc_definition_id,
+                "encountered": True,
+                "interaction_milestones": ["FIRST_ENCOUNTER"],
+                "known_public_fact_refs": [],
+                "last_source_event_id": source_event_id,
+                "last_source_sequence_no": 1,
+            }
+        ]
+        with pytest.raises(DomainRuleViolation):
+            GameState.from_snapshot(
+                payload,
+                catalog=catalog.content_catalog,
+                scenario_catalog=catalog,
+            )
+
+    structurally_valid = GameState.model_validate(payload)
+    with pytest.raises(DomainRuleViolation):
+        PlayerMemoryProjector().project(structurally_valid, catalog)
+
+
+@pytest.mark.parametrize(
+    ("scenario_id", "content_version"),
+    [
+        ("scenario.not_in_catalog", "death-certificate-1.0.0"),
+        ("death_certificate", "content.wrong-version"),
+    ],
+)
+def test_memory_integrity_rejects_unknown_scenario_or_content_version(
+    scenario_id: str, content_version: str
+) -> None:
+    catalog, _, state = _production_started_with_memory()
+    payload = state.to_snapshot()
+    payload["player_memory"] = {
+        "memory_model_version": 2,
+        "sync_status": "CURRENT",
+        "last_applied_source_sequence_no": 1,
+        "last_applied_source_event_id": "event.memory-start",
+        "first_deferred_source_sequence_no": None,
+        "last_deferred_source_sequence_no": None,
+        "deferred_event_count": 0,
+        "scenario_records": [
+            {
+                "scenario_id": scenario_id,
+                "scenario_content_version": content_version,
+                "status": "STARTED",
+                "ending_id": None,
+                "milestone_refs": ["STARTED"],
+                "known_public_fact_refs": [],
+                "last_source_event_id": "event.memory-start",
+                "last_source_sequence_no": 1,
+            }
+        ],
+        "npc_records": [],
+        "significant_experiences": [],
+        "known_public_facts": [],
+    }
+
+    with pytest.raises(DomainRuleViolation):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_memory_integrity_rejects_hidden_fact_and_unfinished_ending() -> None:
+    catalog, definition, state = _production_started_with_memory()
+    hidden_fact = next(
+        item.fact_id
+        for item in definition.facts
+        if item.visibility.value == "DISCOVERABLE"
+        and item.fact_id != "death_certificate.fact.player_is_alive"
+    )
+    hidden_payload = state.to_snapshot()
+    old_fact = hidden_payload["player_memory"]["known_public_facts"][0]["fact_ref"]
+    hidden_payload["player_memory"]["known_public_facts"][0]["fact_ref"] = hidden_fact
+    scenario_facts = hidden_payload["player_memory"]["scenario_records"][0][
+        "known_public_fact_refs"
+    ]
+    scenario_facts[scenario_facts.index(old_fact)] = hidden_fact
+    with pytest.raises(DomainRuleViolation):
+        GameState.from_snapshot(
+            hidden_payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+    ending_payload = state.to_snapshot()
+    scenario_record = ending_payload["player_memory"]["scenario_records"][0]
+    scenario_record.update(
+        {
+            "status": "COMPLETED",
+            "ending_id": definition.endings[0].ending_id,
+            "milestone_refs": [
+                "STARTED",
+                "IMPORTANT_FACT_CONFIRMED",
+                "COMPLETED",
+                "ENDING_CONFIRMED",
+            ],
+        }
+    )
+    with pytest.raises(DomainRuleViolation, match="ending"):
+        GameState.from_snapshot(
+            ending_payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_initial_public_memory_and_authoritatively_learned_npc_fact_pass() -> None:
+    catalog, definition, state = _production_started_with_memory()
+    restored = GameState.from_snapshot(
+        state.to_snapshot(),
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+    )
+    assert len(restored.player_memory.known_public_facts) == 7
+    initial_projection = PlayerMemoryProjector().project(restored, catalog)
+    assert len(initial_projection.known_public_facts) == 7
+
+    _, _, learned = _production_success_memory()
+    validated = GameState.from_snapshot(
+        learned.to_snapshot(),
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+    )
+    projection = PlayerMemoryProjector().project(validated, catalog)
+    assert projection.npcs[0].npc_definition_id == (
+        "npc.death_certificate.triage_coordinator"
+    )
+    assert "death_certificate.fact.player_is_alive" in {
+        item.fact_ref for item in projection.known_public_facts
+    }
+    evidence = validated.scenario_runtime.narrative_outcome_evidence
+    assert tuple(item.model_dump(mode="json") for item in evidence) == (
+        {
+            "outcome_rule_id": "death_certificate.outcome.purposeful_life_signal",
+            "outcome_result": "SUCCESS",
+            "scenario_event_type": "vitals.verified",
+            "npc_definition_ids": [
+                "npc.death_certificate.triage_coordinator"
+            ],
+        },
+    )
+
+
+def test_missing_runtime_rejects_nonempty_memory_with_player_known_facts() -> None:
+    catalog, _, state = _production_started_with_memory()
+    payload = state.to_snapshot()
+    payload["scenario_runtime"] = None
+    payload["player_memory"]["significant_experiences"] = []
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_unparticipated_scenario_record_and_player_known_fact_are_rejected() -> None:
+    catalog, payload = _unparticipated_scenario_memory_payload(
+        include_player_known_fact=True
+    )
+
+    with pytest.raises(DomainRuleViolation, match="scenario.never_entered"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_unparticipated_scenario_record_without_facts_is_rejected() -> None:
+    catalog, payload = _unparticipated_scenario_memory_payload(
+        include_player_known_fact=False
+    )
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_projector_rejects_unparticipated_scenario_memory() -> None:
+    catalog, payload = _unparticipated_scenario_memory_payload(
+        include_player_known_fact=True
+    )
+    structurally_valid = GameState.model_validate(payload)
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        PlayerMemoryProjector().project(structurally_valid, catalog)
+
+
+def test_missing_runtime_rejects_undiscovered_fact_memory() -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    payload["scenario_runtime"] = None
+    payload["player_memory"]["npc_records"] = []
+    payload["player_memory"]["significant_experiences"] = []
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_missing_runtime_rejects_npc_memory_and_projector_refuses_it() -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    payload["scenario_runtime"] = None
+    payload["player_memory"]["significant_experiences"] = []
+    dynamic_fact = "death_certificate.fact.player_is_alive"
+    payload["player_memory"]["known_public_facts"] = [
+        item
+        for item in payload["player_memory"]["known_public_facts"]
+        if item["fact_ref"] != dynamic_fact
+    ]
+    record = payload["player_memory"]["scenario_records"][0]
+    record["known_public_fact_refs"].remove(dynamic_fact)
+    structurally_valid = GameState.model_validate(payload)
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        PlayerMemoryProjector().project(structurally_valid, catalog)
+
+
+def test_missing_runtime_rejects_ending_memory() -> None:
+    catalog, definition, state = _production_started_with_memory()
+    payload = state.to_snapshot()
+    payload["scenario_runtime"] = None
+    payload["player_memory"]["significant_experiences"] = []
+    record = payload["player_memory"]["scenario_records"][0]
+    record.update(
+        {
+            "status": "COMPLETED",
+            "ending_id": definition.endings[0].ending_id,
+            "milestone_refs": [
+                "STARTED",
+                "IMPORTANT_FACT_CONFIRMED",
+                "COMPLETED",
+                "ENDING_CONFIRMED",
+            ],
+        }
+    )
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_missing_runtime_rejects_dynamic_experience() -> None:
+    catalog, _, state = _production_started_with_memory()
+    payload = state.to_snapshot()
+    payload["scenario_runtime"] = None
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_missing_runtime_rejects_dynamic_npc_milestone() -> None:
+    catalog, _, learned = _production_success_memory()
+    catalog_payload = catalog.model_dump(mode="json")
+    catalog_payload["scenarios"][0]["memory_rules"].append(
+        {
+            "rule_id": "death_certificate.memory.41_cooperated",
+            "rule_version": "1.0.0",
+            "source_event_type": "NarrativeOutcomeAccepted",
+            "operation": "UPDATE_NPC_MILESTONE",
+            "required_narrative_outcome_rule_ids": [
+                "death_certificate.outcome.purposeful_life_signal"
+            ],
+            "required_scenario_event_types": ["vitals.verified"],
+            "required_outcome_results": ["SUCCESS"],
+            "npc_definition_id": "npc.death_certificate.triage_coordinator",
+            "npc_milestone": "COOPERATED",
+        }
+    )
+    catalog = ScenarioCatalog.model_validate(catalog_payload)
+    payload = learned.to_snapshot()
+    payload["player_memory"]["npc_records"][0]["interaction_milestones"].append(
+        "COOPERATED"
+    )
+    GameState.from_snapshot(
+        payload,
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+    )
+    payload["player_memory"]["significant_experiences"] = []
+    dynamic_fact = "death_certificate.fact.player_is_alive"
+    payload["player_memory"]["known_public_facts"] = [
+        item
+        for item in payload["player_memory"]["known_public_facts"]
+        if item["fact_ref"] != dynamic_fact
+    ]
+    payload["player_memory"]["scenario_records"][0][
+        "known_public_fact_refs"
+    ].remove(dynamic_fact)
+    payload["scenario_runtime"] = None
+
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+@pytest.mark.parametrize(
+    ("result", "event_type"),
+    [
+        ("FAILURE", "vitals.signal.failed"),
+        ("AMBIGUOUS", "vitals.signal.ambiguous"),
+    ],
+)
+def test_success_only_npc_memory_rejects_other_once_rule_results(
+    result: str, event_type: str
+) -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    payload["player_memory"]["significant_experiences"] = []
+    dynamic_fact = "death_certificate.fact.player_is_alive"
+    payload["player_memory"]["known_public_facts"] = [
+        item
+        for item in payload["player_memory"]["known_public_facts"]
+        if item["fact_ref"] != dynamic_fact
+    ]
+    payload["player_memory"]["scenario_records"][0][
+        "known_public_fact_refs"
+    ].remove(dynamic_fact)
+    evidence = payload["scenario_runtime"]["narrative_outcome_evidence"][0]
+    evidence["outcome_result"] = result
+    evidence["scenario_event_type"] = event_type
+
+    with pytest.raises(DomainRuleViolation, match="was not encountered"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+@pytest.mark.parametrize(
+    ("result", "event_type"),
+    [
+        ("SUCCESS", "vitals.signal.failed"),
+        ("FAILURE", "vitals.verified"),
+    ],
+)
+def test_outcome_evidence_rejects_mismatched_result_event_pair(
+    result: str, event_type: str
+) -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    evidence = payload["scenario_runtime"]["narrative_outcome_evidence"][0]
+    evidence["outcome_result"] = result
+    evidence["scenario_event_type"] = event_type
+
+    with pytest.raises(ValueError, match="mismatched event type"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_success_only_npc_memory_requires_matching_evidence_target() -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    payload["scenario_runtime"]["narrative_outcome_evidence"][0][
+        "npc_definition_ids"
+    ] = []
+
+    with pytest.raises(DomainRuleViolation, match="was not encountered"):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_old_snapshot_without_outcome_evidence_loads_only_without_dynamic_memory() -> None:
+    catalog, _, state = _production_started_with_memory()
+    payload = state.to_snapshot()
+    payload["scenario_runtime"].pop("narrative_outcome_evidence")
+    payload["player_memory"]["significant_experiences"] = []
+
+    restored = GameState.from_snapshot(
+        payload,
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+    )
+    assert restored.scenario_runtime.narrative_outcome_evidence == ()
+
+
+def test_old_snapshot_claiming_dynamic_memory_without_evidence_is_rejected() -> None:
+    catalog, _, learned = _production_success_memory()
+    payload = learned.to_snapshot()
+    payload["scenario_runtime"].pop("narrative_outcome_evidence")
+
+    with pytest.raises(DomainRuleViolation):
+        GameState.from_snapshot(
+            payload,
+            catalog=catalog.content_catalog,
+            scenario_catalog=catalog,
+        )
+
+
+def test_multi_scenario_memory_shape_is_retained_but_requires_participation() -> None:
+    catalog, definition, state, _ = _started()
+    scenario_ids = (
+        definition.scenario_id,
+        *(f"memory-scenario-{index:02d}" for index in range(16)),
+    )
+    catalog = _catalog_with_scenario_clones(catalog, scenario_ids)
     payload = state.to_snapshot()
     payload["player_memory"]["scenario_records"] = [
         {
-            "scenario_id": f"memory-scenario-{index:02d}",
-            "scenario_content_version": "content-1",
+            "scenario_id": scenario_id,
+            "scenario_content_version": definition.content_version,
             "status": "STARTED",
             "ending_id": None,
             "milestone_refs": ["STARTED"],
@@ -845,32 +1496,29 @@ def test_projection_collection_limit_keeps_newest_records_and_reports_truncation
             "last_source_event_id": f"memory-source-{index:02d}",
             "last_source_sequence_no": index + 1,
         }
-        for index in range(17)
+        for index, scenario_id in enumerate(scenario_ids)
     ]
     payload["player_memory"]["last_applied_source_sequence_no"] = 17
-    restored = GameState.from_snapshot(
-        payload,
-        catalog=catalog.content_catalog,
-        scenario_catalog=catalog,
-    )
-    projection = PlayerMemoryProjector().project(restored)
-    assert projection.truncated is True
-    assert projection.total_scenario_records == 17
-    assert len(projection.scenarios) == 16
-    assert "memory-scenario-00" not in {
-        item.scenario_id for item in projection.scenarios
-    }
+    payload["player_memory"]["last_applied_source_event_id"] = "memory-source-16"
+    structurally_valid = GameState.model_validate(payload)
+
+    assert len(structurally_valid.player_memory.scenario_records) == 17
+    with pytest.raises(DomainRuleViolation, match="runtime participation"):
+        PlayerMemoryProjector().project(structurally_valid, catalog)
 
 
 def test_projection_enforces_real_character_and_utf8_byte_budgets() -> None:
-    catalog, _, state, _ = _started()
+    catalog, definition, state, _ = _started()
+    scenario_id = "scenario." + "s" * 119
+    catalog = _catalog_with_scenario_clones(
+        catalog, (scenario_id,), scenario_begin_experience=True
+    )
     payload = state.to_snapshot()
-    scenario_id = "s" * 128
-    content_version = "c" * 128
+    payload["scenario_runtime"]["scenario_id"] = scenario_id
     payload["player_memory"]["scenario_records"] = [
         {
             "scenario_id": scenario_id,
-            "scenario_content_version": content_version,
+            "scenario_content_version": definition.content_version,
             "status": "STARTED",
             "ending_id": None,
             "milestone_refs": ["STARTED"],
@@ -880,51 +1528,55 @@ def test_projection_enforces_real_character_and_utf8_byte_budgets() -> None:
         }
     ]
     experiences = []
-    for index in range(64):
-        source_event_id = f"event.{index:02d}." + "e" * 119
-        fact_ref = f"fact.{index:02d}." + "f" * 120
+    for occurrence in range(100):
+        sequence = occurrence + 2
+        source_event_id = f"event.begin.{occurrence:03d}." + "e" * 100
         entry_id = stable_significant_experience_id(
             source_event_id=source_event_id,
             scenario_id=scenario_id,
-            category=SignificantExperienceCategory.IMPORTANT_PUBLIC_DISCOVERY,
+            category=SignificantExperienceCategory.SCENARIO_BEGIN,
             subject_refs=(),
-            public_fact_refs=(fact_ref,),
+            public_fact_refs=(),
         )
         experiences.append(
             {
                 "entry_id": entry_id,
                 "scenario_id": scenario_id,
-                "category": "IMPORTANT_PUBLIC_DISCOVERY",
-                "summary": "CRITICAL_PUBLIC_FACT_LEARNED",
+                "category": "SCENARIO_BEGIN",
+                "summary": "SCENARIO_BEGAN",
                 "subject_refs": [],
-                "public_fact_refs": [fact_ref],
+                "public_fact_refs": [],
                 "source_event_id": source_event_id,
-                "source_sequence_no": index + 2,
+                "source_sequence_no": sequence,
             }
         )
     payload["player_memory"]["significant_experiences"] = experiences
-    payload["player_memory"]["last_applied_source_sequence_no"] = 65
+    payload["player_memory"]["last_applied_source_sequence_no"] = 101
+    payload["player_memory"]["last_applied_source_event_id"] = experiences[-1][
+        "source_event_id"
+    ]
     restored = GameState.from_snapshot(
         payload,
         catalog=catalog.content_catalog,
         scenario_catalog=catalog,
     )
     projector = PlayerMemoryProjector()
-    first = projector.project(restored)
-    second = projector.project(restored)
+    first = projector.project(restored, catalog)
+    second = projector.project(restored, catalog)
     projection_payload = first.model_dump(mode="json")
-    encoded = json.dumps(
+    serialized = json.dumps(
         projection_payload,
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
         allow_nan=False,
-    ).encode("utf-8")
+    )
+    encoded = serialized.encode("utf-8")
     assert first == second
     assert first.truncated is True
     assert len(first.significant_experiences) < 64
     assert len(encoded) <= MAX_MEMORY_PROJECTION_JSON_BYTES
-    assert _string_characters(projection_payload) <= MAX_MEMORY_PROJECTION_CHARACTERS
+    assert len(serialized) <= MAX_MEMORY_PROJECTION_CHARACTERS
     with pytest.raises(ValidationError):
         PlayerMemoryProjection.model_validate(
             {
@@ -943,6 +1595,372 @@ def test_memory_snapshot_json_has_no_float_exception_set_or_internal_object() ->
     assert json.loads(json.dumps(snapshot, allow_nan=False)) == snapshot
 
 
+def test_non_hospital_memory_rule_requires_an_authentic_bound_receipt() -> None:
+    catalog, definition, state, _ = _started()
+    payload = definition.model_dump(mode="json")
+    payload["memory_rules"] = [
+        {
+            "rule_id": "alpine.memory.started",
+            "rule_version": "1.0.0",
+            "source_event_type": "ScenarioStarted",
+            "operation": "START_SCENARIO",
+        }
+    ]
+    definition = ScenarioDefinition.model_validate(payload)
+    receipt = _receipt(
+        event_type="ScenarioStarted",
+        sequence=1,
+        turn_id="session-created",
+        payload={
+            "scenario_id": definition.scenario_id,
+            "scenario_content_version": definition.content_version,
+        },
+    )
+    engine = DeclarativePlayerMemoryRuleEngine()
+    applied = engine.apply(
+        state=state,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="session-created",
+        state_version=STATE_VERSION,
+        receipts=(receipt,),
+    )
+    assert len(applied.player_memory.scenario_records) == 1
+    assert state.player_memory.scenario_records == ()
+
+    for changes in (
+        {"session_id": "another-session"},
+        {"turn_id": "another-turn"},
+        {"state_version": STATE_VERSION + 1},
+        {"sequence_no": 2},
+        {"event_type": "NarrativeOutcomeAccepted"},
+        {"payload_digest": "0" * 64},
+    ):
+        tampered = object.__new__(PersistedEventReceipt)
+        for field_name in (
+            "session_id",
+            "event_id",
+            "sequence_no",
+            "turn_id",
+            "state_version",
+            "event_type",
+            "payload_digest",
+            "_payload",
+            "_seal",
+        ):
+            object.__setattr__(tampered, field_name, getattr(receipt, field_name))
+        for name, value in changes.items():
+            object.__setattr__(tampered, name, value)
+        with pytest.raises(ValueError, match="receipt"):
+            engine.apply(
+                state=state,
+                definition=definition,
+                session_id=SESSION_ID,
+                turn_id="session-created",
+                state_version=STATE_VERSION,
+                receipts=(tampered,),
+            )
+    for foreign in (
+        _receipt(
+            event_type="ScenarioStarted",
+            sequence=1,
+            turn_id="session-created",
+            session_id="another-session",
+            payload={
+                "scenario_id": definition.scenario_id,
+                "scenario_content_version": definition.content_version,
+            },
+        ),
+        _receipt(
+            event_type="ScenarioStarted",
+            sequence=1,
+            turn_id="another-turn",
+            payload={
+                "scenario_id": definition.scenario_id,
+                "scenario_content_version": definition.content_version,
+            },
+        ),
+        _receipt(
+            event_type="ScenarioStarted",
+            sequence=1,
+            turn_id="session-created",
+            state_version=STATE_VERSION + 1,
+            payload={
+                "scenario_id": definition.scenario_id,
+                "scenario_content_version": definition.content_version,
+            },
+        ),
+    ):
+        assert foreign.is_authentic()
+        with pytest.raises(ValueError, match="bound"):
+            engine.apply(
+                state=state,
+                definition=definition,
+                session_id=SESSION_ID,
+                turn_id="session-created",
+                state_version=STATE_VERSION,
+                receipts=(foreign,),
+            )
+    with pytest.raises(ValueError, match="receipt"):
+        engine.apply(
+            state=state,
+            definition=definition,
+            session_id=SESSION_ID,
+            turn_id="session-created",
+            state_version=STATE_VERSION,
+            receipts=("ScenarioStarted",),  # type: ignore[arg-type]
+        )
+
+
+def test_one_event_multiple_rules_are_atomic_on_later_rule_failure() -> None:
+    _, definition, state, _ = _started()
+    started_payload = definition.model_dump(mode="json")
+    started_payload["memory_rules"] = [
+        {
+            "rule_id": "alpine.memory.00_started",
+            "rule_version": "1.0.0",
+            "source_event_type": "ScenarioStarted",
+            "operation": "START_SCENARIO",
+        }
+    ]
+    started_definition = ScenarioDefinition.model_validate(started_payload)
+    engine = DeclarativePlayerMemoryRuleEngine()
+    state = engine.apply(
+        state=state,
+        definition=started_definition,
+        session_id=SESSION_ID,
+        turn_id="session-created",
+        state_version=STATE_VERSION,
+        receipts=(
+            _receipt(
+                event_type="ScenarioStarted",
+                sequence=1,
+                turn_id="session-created",
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    failing_payload = definition.model_dump(mode="json")
+    failing_payload["memory_rules"] = [
+        {
+            "rule_id": "alpine.memory.10_fact",
+            "rule_version": "1.0.0",
+            "source_event_type": "NarrativeOutcomeAccepted",
+            "operation": "REMEMBER_PUBLIC_FACT",
+            "public_fact_id": "alpine.fact.weather",
+        },
+        {
+            "rule_id": "alpine.memory.20_missing_encounter",
+            "rule_version": "1.0.0",
+            "source_event_type": "NarrativeOutcomeAccepted",
+            "operation": "UPDATE_NPC_MILESTONE",
+            "npc_definition_id": "npc.alpine.ranger",
+            "npc_milestone": "COOPERATED",
+        },
+    ]
+    failing_definition = ScenarioDefinition.model_validate(failing_payload)
+    before = state.to_snapshot()
+    with pytest.raises(MemoryConflictError, match="encountered"):
+        engine.apply(
+            state=state,
+            definition=failing_definition,
+            session_id=SESSION_ID,
+            turn_id="turn-2",
+            state_version=STATE_VERSION,
+            receipts=(
+                _receipt(
+                    event_type="NarrativeOutcomeAccepted",
+                    sequence=2,
+                    turn_id="turn-2",
+                    payload={"npc_definition_ids": ("npc.alpine.ranger",)},
+                ),
+            ),
+        )
+    assert state.to_snapshot() == before
+
+
+def test_trusted_decision_event_can_complete_scenario_but_not_invent_world_success() -> None:
+    _, definition, ended_state, _ = _ended()
+    payload = definition.model_dump(mode="json")
+    payload["memory_rules"] = [
+        {
+            "rule_id": "alpine.memory.00_started",
+            "rule_version": "1.0.0",
+            "source_event_type": "ScenarioStarted",
+            "operation": "START_SCENARIO",
+        },
+        {
+            "rule_id": "alpine.memory.90_completed_by_choice",
+            "rule_version": "1.0.0",
+            "source_event_type": "ScenarioDecisionSelected",
+            "operation": "COMPLETE_SCENARIO",
+            "requires_scenario_completed": True,
+            "allowed_ending_ids": ["alpine.ending.arrived"],
+        },
+    ]
+    definition = ScenarioDefinition.model_validate(payload)
+    engine = DeclarativePlayerMemoryRuleEngine()
+    started = engine.apply(
+        state=ended_state,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="session-created",
+        state_version=STATE_VERSION,
+        receipts=(
+            _receipt(
+                event_type="ScenarioStarted",
+                sequence=1,
+                turn_id="session-created",
+                payload={
+                    "scenario_id": definition.scenario_id,
+                    "scenario_content_version": definition.content_version,
+                },
+            ),
+        ),
+    )
+    completed = engine.apply(
+        state=started,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-choice",
+        state_version=STATE_VERSION,
+        receipts=(
+            _receipt(
+                event_type="ScenarioDecisionSelected",
+                sequence=2,
+                turn_id="turn-choice",
+                payload={"choice_id": "alpine.choice.wait"},
+            ),
+        ),
+    )
+
+    record = completed.player_memory.scenario_records[0]
+    assert record.status is ScenarioMemoryStatus.COMPLETED
+    assert record.ending_id == "alpine.ending.arrived"
+    assert completed.player_memory.npc_records == ()
+    assert completed.player_memory.known_public_facts == ()
+
+
+def test_capacity_enters_rebuild_required_without_crossing_the_gap() -> None:
+    catalog, definition, state, _ = _started()
+    catalog, fact_refs = _catalog_with_public_capacity_facts(catalog, 32)
+    definition = catalog.scenarios[0]
+    payload = state.to_snapshot()
+    payload["player_memory"] = {
+        "memory_model_version": 2,
+        "sync_status": "CURRENT",
+        "last_applied_source_sequence_no": 1,
+        "last_applied_source_event_id": "event.start",
+        "first_deferred_source_sequence_no": None,
+        "last_deferred_source_sequence_no": None,
+        "deferred_event_count": 0,
+        "scenario_records": [
+            {
+                "scenario_id": definition.scenario_id,
+                "scenario_content_version": definition.content_version,
+                "status": "STARTED",
+                "ending_id": None,
+                "milestone_refs": ["STARTED", "IMPORTANT_FACT_CONFIRMED"],
+                "known_public_fact_refs": list(fact_refs),
+                "last_source_event_id": "event.start",
+                "last_source_sequence_no": 1,
+            }
+        ],
+        "npc_records": [],
+        "significant_experiences": [],
+        "known_public_facts": [
+            {
+                "scenario_id": definition.scenario_id,
+                "fact_ref": fact_ref,
+                "source_event_id": "event.start",
+                "source_sequence_no": 1,
+            }
+            for fact_ref in fact_refs
+        ],
+    }
+    state = GameState.from_snapshot(
+        payload,
+        catalog=catalog.content_catalog,
+        scenario_catalog=catalog,
+    )
+    rule_payload = definition.model_dump(mode="json")
+    rule_payload["memory_rules"] = [
+        {
+            "rule_id": "alpine.memory.capacity_fact",
+            "rule_version": "1.0.0",
+            "source_event_type": "NarrativeOutcomeAccepted",
+            "operation": "REMEMBER_PUBLIC_FACT",
+            "public_fact_id": "alpine.fact.weather",
+        }
+    ]
+    definition = ScenarioDefinition.model_validate(rule_payload)
+    engine = DeclarativePlayerMemoryRuleEngine()
+    first = _receipt(
+        event_type="NarrativeOutcomeAccepted", sequence=2, turn_id="turn-2"
+    )
+    lagging = engine.apply(
+        state=state,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-2",
+        state_version=STATE_VERSION,
+        receipts=(first,),
+    )
+    assert lagging.player_memory.sync_status is MemoryIndexSyncStatus.REBUILD_REQUIRED
+    assert lagging.player_memory.last_applied_source_sequence_no == 1
+    assert lagging.player_memory.first_deferred_source_sequence_no == 2
+    assert lagging.player_memory.deferred_event_count == 1
+    assert len(lagging.player_memory.known_public_facts) == 32
+    projection = PlayerMemoryProjector().project(lagging, catalog)
+    assert projection.complete is False
+    assert projection.sync_status is MemoryIndexSyncStatus.REBUILD_REQUIRED
+
+    second = _receipt(
+        event_type="NarrativeOutcomeAccepted", sequence=3, turn_id="turn-3"
+    )
+    later = engine.apply(
+        state=lagging,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-3",
+        state_version=STATE_VERSION,
+        receipts=(second,),
+    )
+    replay = engine.apply(
+        state=later,
+        definition=definition,
+        session_id=SESSION_ID,
+        turn_id="turn-3",
+        state_version=STATE_VERSION,
+        receipts=(second,),
+    )
+    assert later.player_memory.last_applied_source_sequence_no == 1
+    assert later.player_memory.last_deferred_source_sequence_no == 3
+    assert later.player_memory.deferred_event_count == 2
+    assert replay == later
+
+
+def test_player_memory_v1_to_v2_migration_is_pure() -> None:
+    v1 = {
+        "memory_model_version": 1,
+        "last_applied_source_sequence_no": 0,
+        "scenario_records": [],
+        "npc_records": [],
+        "significant_experiences": [],
+        "known_public_facts": [],
+    }
+    before = deepcopy(v1)
+    migrated = migrate_player_memory_payload(v1)
+    assert v1 == before
+    assert migrated["memory_model_version"] == 2
+    assert migrated["sync_status"] == "CURRENT"
+    assert migrated["last_applied_source_event_id"] is None
+    assert migrated["deferred_event_count"] == 0
+
+
 def _all_keys(value: object) -> tuple[str, ...]:
     keys: list[str] = []
     if isinstance(value, dict):
@@ -953,13 +1971,3 @@ def _all_keys(value: object) -> tuple[str, ...]:
         for nested in value:
             keys.extend(_all_keys(nested))
     return tuple(keys)
-
-
-def _string_characters(value: object) -> int:
-    if isinstance(value, str):
-        return len(value)
-    if isinstance(value, dict):
-        return sum(len(key) + _string_characters(item) for key, item in value.items())
-    if isinstance(value, list):
-        return sum(_string_characters(item) for item in value)
-    return 0

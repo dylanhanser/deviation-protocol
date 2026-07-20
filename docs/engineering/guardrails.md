@@ -112,6 +112,8 @@ Observed failure:
 
 - Callers could previously forge Gateway routes, skill authorization, trusted
   events, decision authority, or narrative outcomes.
+- A memory-rule boundary once read `sequence_no` to sort receipt-like input
+  before proving that each object was an authentic repository-issued receipt.
 
 Rule:
 
@@ -127,6 +129,13 @@ Players and models may submit intent or proposals only. They cannot create:
 
 Authority must be issued by a trusted server-side policy and rebound to the
 current session, turn, action, state version, state fingerprint, and scenario.
+Opaque capabilities and persisted-event receipts must be authenticated before
+their bound fields are read, compared, sorted, or used to select a rule.
+
+Enforcement:
+
+- Receipt construction, tamper, cross-binding, and ordinary-string tests
+- Declarative memory-rule authority tests
 
 ## STATE-001: Authoritative state and candidates stay isolated
 

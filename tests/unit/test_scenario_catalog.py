@@ -68,6 +68,63 @@ def test_death_certificate_pack_loads_as_strict_versioned_scenario() -> None:
         for fact_id in reference.known_fact_ids
     }
     assert "death_certificate.fact.prediction_causes_outcome" not in npc_fact_ids
+    assert len(definition.memory_rules) == 14
+    assert tuple(rule.rule_id for rule in definition.memory_rules) == tuple(
+        sorted(rule.rule_id for rule in definition.memory_rules)
+    )
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "duplicate_rule",
+        "unknown_event_type",
+        "extra_field",
+        "unknown_fact",
+        "unknown_npc",
+        "non_target_npc",
+        "unknown_ending",
+        "unknown_outcome_rule",
+        "incompatible_operation",
+    ],
+)
+def test_memory_rules_reject_ambiguous_or_unreachable_authority(
+    tmp_path: Path, mutation: str
+) -> None:
+    data = payload()
+    rules = scenario(data)["memory_rules"]
+    assert isinstance(rules, list) and isinstance(rules[0], dict)
+    if mutation == "duplicate_rule":
+        rules.append(deepcopy(rules[0]))
+    elif mutation == "unknown_event_type":
+        rules[0]["source_event_type"] = "player.free_text"
+    elif mutation == "extra_field":
+        rules[0]["script"] = "setattr(memory, 'ending', 'forged')"
+    elif mutation == "unknown_fact":
+        fact_rule = next(item for item in rules if "public_fact_id" in item)
+        fact_rule["public_fact_id"] = "death_certificate.fact.missing"
+    elif mutation == "unknown_npc":
+        npc_rule = next(item for item in rules if "npc_definition_id" in item)
+        npc_rule["npc_definition_id"] = "npc.death_certificate.missing"
+    elif mutation == "non_target_npc":
+        npc_rule = next(item for item in rules if "npc_definition_id" in item)
+        npc_rule["npc_definition_id"] = (
+            "npc.death_certificate.records_custodian"
+        )
+    elif mutation == "unknown_ending":
+        completion = next(item for item in rules if "allowed_ending_ids" in item)
+        completion["allowed_ending_ids"] = ["death_certificate.ending.missing"]
+    elif mutation == "unknown_outcome_rule":
+        outcome = next(
+            item for item in rules if "required_narrative_outcome_rule_ids" in item
+        )
+        outcome["required_narrative_outcome_rule_ids"] = [
+            "death_certificate.outcome.missing"
+        ]
+    else:
+        rules[0]["operation"] = "RECORD_NPC_ENCOUNTER"
+    with pytest.raises(ScenarioPackLoadError):
+        load_changed(tmp_path, data)
 
 
 def test_death_certificate_opening_facts_are_structured_and_clock_consistent() -> None:

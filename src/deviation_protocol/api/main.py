@@ -122,14 +122,14 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Deviation Protocol",
-        version="0.2.2c",
+        version="0.2.3b",
         lifespan=lifespan,
     )
     install_exception_handlers(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "phase": "2.2c"}
+        return {"status": "ok", "phase": "2.3b"}
 
     @app.post(
         "/v1/sessions",

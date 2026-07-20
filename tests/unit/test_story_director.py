@@ -1297,6 +1297,10 @@ def test_generic_runtime_modules_contain_no_first_scenario_identifiers_or_specia
         Path("src/deviation_protocol/domain/scenario_rules.py"),
         Path("src/deviation_protocol/domain/decision_cadence.py"),
         Path("src/deviation_protocol/domain/narrative.py"),
+        Path("src/deviation_protocol/domain/memory_rules.py"),
+        Path("src/deviation_protocol/domain/persisted_events.py"),
+        Path("src/deviation_protocol/domain/player_memory.py"),
+        Path("src/deviation_protocol/application/player_memory.py"),
         Path("src/deviation_protocol/application/story_director.py"),
         Path("src/deviation_protocol/infrastructure/scenario_loader.py"),
     )

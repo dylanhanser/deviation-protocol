@@ -18,6 +18,7 @@ from deviation_protocol.application.errors import (
     IdempotencyConflictError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
+    SnapshotInvalidError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.resolution import ResolutionStatus
@@ -363,7 +364,7 @@ def test_health_response_does_not_expose_runtime_configuration(
     with client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "phase": "2.2c"}
+    assert response.json() == {"status": "ok", "phase": "2.3b"}
 
 
 def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -519,6 +520,10 @@ def test_query_and_headers_cannot_override_principal(
         "model",
         "narrative_proposal",
         "validated_narrative_outcome",
+        "memory",
+        "player_memory",
+        "memory_mutation",
+        "memory_rule_id",
     ],
 )
 def test_action_body_rejects_identity_and_internal_injection(
@@ -601,6 +606,17 @@ def test_session_metadata_and_visible_state_are_safe(
     assert not ({"snapshot", "random_seed", "npcs", "database_url"} & metadata_payload.keys())
     assert state_payload["visible_npcs"] == []
     assert "npcs" not in state_payload
+    assert state_payload["player_memory"]["complete"] is True
+    for forbidden in (
+        "source_event_id",
+        "sequence_no",
+        "receipt",
+        "capability",
+        "rule_id",
+    ):
+        assert forbidden not in json.dumps(
+            state_payload["player_memory"], ensure_ascii=False
+        )
 
 
 def test_openapi_excludes_trusted_and_persistence_only_fields(
@@ -627,6 +643,9 @@ def test_openapi_excludes_trusted_and_persistence_only_fields(
         "outcome_token",
         "deepseek_api_key",
         "provider_metadata",
+        "memorymutationplan",
+        "memoryruledefinition",
+        "persistedeventreceipt",
     ):
         assert forbidden not in rendered
 
@@ -773,6 +792,20 @@ def test_central_error_mapping_does_not_leak_internal_details(
     assert "secret sql" not in rendered
     assert "database_url" not in rendered
     assert "traceback" not in rendered
+
+
+def test_state_api_never_returns_an_inconsistent_memory_projection(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+) -> None:
+    client, service, _ = api
+    service.error = SnapshotInvalidError("session-1")
+
+    with client:
+        response = client.get("/v1/sessions/session-1/state")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["error_code"] == "SNAPSHOT_INVALID"
+    assert "player_memory" not in response.text
 
 
 def test_unknown_error_is_sanitized(

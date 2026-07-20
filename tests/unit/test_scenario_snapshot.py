@@ -37,7 +37,12 @@ def test_v1_snapshot_migrates_purely_through_v2_to_v3() -> None:
     assert migrated["player_memory"] == {
         "known_public_facts": [],
         "last_applied_source_sequence_no": 0,
-        "memory_model_version": 1,
+        "last_applied_source_event_id": None,
+        "memory_model_version": 2,
+        "sync_status": "CURRENT",
+        "first_deferred_source_sequence_no": None,
+        "last_deferred_source_sequence_no": None,
+        "deferred_event_count": 0,
         "npc_records": [],
         "scenario_records": [],
         "significant_experiences": [],
@@ -58,7 +63,7 @@ def test_v2_snapshot_migrates_purely_to_v3_empty_memory() -> None:
     assert v2 == untouched
     assert migrated["schema_version"] == 3
     assert migrated["scenario_runtime"] is None
-    assert migrated["player_memory"]["memory_model_version"] == 1
+    assert migrated["player_memory"]["memory_model_version"] == 2
     assert all(
         migrated["player_memory"][key] == []
         for key in (

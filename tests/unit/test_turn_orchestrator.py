@@ -46,6 +46,7 @@ from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.events import DomainEvent, DomainEventDraft
+from deviation_protocol.domain.persisted_events import _issue_persisted_event_receipt
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog
 from deviation_protocol.domain.state import GameState, PlayerState
@@ -191,10 +192,19 @@ class FakeSessionRepository:
         self.uow.pending_state = (
             expected_state_version + 1,
             deepcopy(dict(state)),
-            tuple(events),
+            tuple(events) or self.uow.pending_events,
         )
+
+    async def persist_events(
+        self, events: tuple[DomainEvent, ...], *, state_version: int
+    ):
         if self.store.fail_event:
             raise RuntimeError("simulated event failure")
+        self.uow.pending_events = tuple(events)
+        return tuple(
+            _issue_persisted_event_receipt(event, state_version=state_version)
+            for event in events
+        )
 
 
 class FakeTurnRequestRepository:
@@ -235,6 +245,7 @@ class FakeUnitOfWork:
         self.sessions = FakeSessionRepository(store, self)
         self.turn_requests = FakeTurnRequestRepository(store, self)
         self.pending_state: tuple[int, dict[str, Any], tuple[DomainEvent, ...]] | None = None
+        self.pending_events: tuple[DomainEvent, ...] = ()
         self.pending_request: tuple[tuple[str, str], PersistedTurnRequest] | None = None
         self.lock_acquired = False
         self.committed = False
@@ -270,6 +281,7 @@ class FakeUnitOfWork:
 
     async def rollback(self) -> None:
         self.pending_state = None
+        self.pending_events = ()
         self.pending_request = None
 
 

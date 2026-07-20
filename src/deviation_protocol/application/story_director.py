@@ -37,6 +37,7 @@ from deviation_protocol.domain.scenario_rules import DeclarativeConditionEvaluat
 from deviation_protocol.domain.scenario_runtime import (
     MAX_APPLIED_SCENARIO_EVENTS,
     MAX_DECISIONS_MADE,
+    NarrativeOutcomeEvidence,
     ScenarioRuntimeState,
     VerifiedScenarioEvent,
 )
@@ -184,6 +185,22 @@ class DeterministicStoryDirector:
             resolved_decision |= self._apply_verified_event(
                 runtime, definition, event, tags
             )
+            if event.narrative_outcome_rule_id is not None:
+                assert event.narrative_outcome_result is not None
+                evidence = NarrativeOutcomeEvidence(
+                    outcome_rule_id=event.narrative_outcome_rule_id,
+                    outcome_result=event.narrative_outcome_result,
+                    scenario_event_type=event.event_type,
+                    npc_definition_ids=event.narrative_outcome_npc_definition_ids,
+                )
+                evidence_by_key = {
+                    item.stable_key(): item
+                    for item in runtime.narrative_outcome_evidence
+                }
+                evidence_by_key.setdefault(evidence.stable_key(), evidence)
+                runtime.narrative_outcome_evidence = tuple(
+                    evidence_by_key[key] for key in sorted(evidence_by_key)
+                )
         runtime.applied_event_ids = (
             *runtime.applied_event_ids,
             *(event.event_id for event in events),

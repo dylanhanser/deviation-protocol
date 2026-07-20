@@ -9,9 +9,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
+from deviation_protocol.application.player_memory import PlayerMemoryProjection
 
 
-PROMPT_SCHEMA_VERSION = "narrative-prompt-v1"
+PROMPT_SCHEMA_VERSION = "narrative-prompt-v2"
 PROPOSAL_SCHEMA_VERSION = "narrative-proposal-v1"
 MAX_NARRATIVE_TEXT_CHARACTERS = 10_000
 MAX_NARRATIVE_USAGE_TOKENS = 2_000_000
@@ -107,6 +108,7 @@ class NarrativeRequest(NarrativeBoundaryModel):
     """Vendor-neutral, player-safe, bounded input to a narrative provider."""
 
     frame: NarrativeFrame
+    player_memory: PlayerMemoryProjection = PlayerMemoryProjection()
     player_intent: NarrativePlayerIntent
     player_visible_character_tags: Annotated[
         tuple[StableNarrativeId, ...], Field(max_length=32)
@@ -123,7 +125,7 @@ class NarrativeRequest(NarrativeBoundaryModel):
     outcome_candidates: Annotated[
         tuple["NarrativeOutcomeCandidate", ...], Field(max_length=16)
     ] = ()
-    prompt_schema_version: Literal["narrative-prompt-v1"] = PROMPT_SCHEMA_VERSION
+    prompt_schema_version: Literal["narrative-prompt-v2"] = PROMPT_SCHEMA_VERSION
 
     @field_validator("frame", mode="before")
     @classmethod
@@ -139,11 +141,21 @@ class NarrativeRequest(NarrativeBoundaryModel):
             return NarrativePlayerIntent.model_validate_json(value.model_dump_json())
         return value
 
+    @field_validator("player_memory", mode="before")
+    @classmethod
+    def detach_player_memory(cls, value: object) -> object:
+        if isinstance(value, PlayerMemoryProjection):
+            return PlayerMemoryProjection.model_validate_json(value.model_dump_json())
+        return value
+
     @model_validator(mode="after")
     def validate_safe_bounds(self) -> NarrativeRequest:
         frame_json = self.frame.model_dump_json()
         if len(frame_json) > 24_000:
             raise ValueError("narrative frame exceeds the provider serialization limit")
+        memory_json = self.player_memory.model_dump_json()
+        if len(memory_json) > 16_000 or len(memory_json.encode("utf-8")) > 32_000:
+            raise ValueError("player memory projection exceeds the provider limit")
         if self.frame.max_length > MAX_NARRATIVE_TEXT_CHARACTERS:
             raise ValueError("narrative frame exceeds the proposal text limit")
         knowledge_npc_ids = tuple(item.npc_id for item in self.frame.npc_knowledge)

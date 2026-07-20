@@ -141,6 +141,11 @@ class NarrativeJob(BaseModel):
             raise ValueError("narrative job error code does not match terminal status")
         if self.attempt_count > 0 and self.status is NarrativeJobStatus.PREPARED:
             raise ValueError("prepared narrative job cannot have an attempt")
+        if (
+            self.status is NarrativeJobStatus.STALE
+            and self.attempt_count == 0
+        ):
+            return self
         if self.status is not NarrativeJobStatus.PREPARED and self.attempt_count != 1:
             raise ValueError("claimed narrative jobs require exactly one attempt")
         return self

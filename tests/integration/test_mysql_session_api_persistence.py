@@ -143,13 +143,19 @@ async def test_real_mysql_scenario_create_and_concurrent_decision_are_one_transa
         event_id_generator=lambda: f"decision-event-{uuid4().hex}",
     )
     try:
-        created = await service.create(
-            principal,
-            client_request_id="mysql-create-scenario",
-            character_definition_id="character.death_certificate.investigator",
-            scenario_id="death_certificate",
+        created, create_replay = await asyncio.gather(
+            *(
+                service.create(
+                    principal,
+                    client_request_id="mysql-create-scenario",
+                    character_definition_id="character.death_certificate.investigator",
+                    scenario_id="death_certificate",
+                )
+                for _ in range(2)
+            )
         )
         assert isinstance(created, SessionCreationResult)
+        assert create_replay == created
         action = ActionSubmission(
             session_id=session_id,
             turn_id="mysql-decision-turn",
@@ -190,9 +196,17 @@ async def test_real_mysql_scenario_create_and_concurrent_decision_are_one_transa
         assert restored.scenario_runtime.current_phase_id == (
             "death_certificate.life_disputed"
         )
-        assert [item.sequence_no for item in events] == [1]
+        assert len(restored.player_memory.scenario_records) == 1
+        assert restored.player_memory.scenario_records[0].scenario_id == (
+            "death_certificate"
+        )
+        assert len(restored.player_memory.known_public_facts) == 7
+        assert len(restored.player_memory.significant_experiences) == 1
+        assert restored.player_memory.npc_records == ()
+        assert [item.sequence_no for item in events] == [1, 2]
         assert [item.event_type for item in events] == [
-            "ScenarioDecisionSelected"
+            "ScenarioStarted",
+            "ScenarioDecisionSelected",
         ]
         assert request_count == 1
     finally:

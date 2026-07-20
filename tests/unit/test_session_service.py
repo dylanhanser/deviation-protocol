@@ -27,6 +27,8 @@ from deviation_protocol.application.session_service import (
     SessionService,
 )
 from deviation_protocol.domain.models import GameSession
+from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.persisted_events import _issue_persisted_event_receipt
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, NpcState
 from deviation_protocol.infrastructure.content_loader import JsonContentCatalogLoader
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
@@ -46,6 +48,7 @@ class Store:
     def __init__(self) -> None:
         self.sessions: dict[str, PersistedSession] = {}
         self.snapshots: dict[str, PersistedSnapshot] = {}
+        self.events: list[DomainEvent] = []
         self.creation_keys: dict[tuple[str, str], str] = {}
         self.commit_lock = asyncio.Lock()
         self.fail_commit = False
@@ -82,15 +85,58 @@ class Repository:
         state: Mapping[str, Any],
         created_at: datetime,
     ) -> None:
-        self.uow.pending = (
-            PersistedSession(
-                session=replace(session),
-                character_definition_id=character_definition_id,
-                creation_client_request_id=creation_client_request_id,
-                created_at=created_at,
-                updated_at=created_at,
+        await self.add_initial_session(
+            session,
+            character_definition_id=character_definition_id,
+            creation_client_request_id=creation_client_request_id,
+            created_at=created_at,
+        )
+        await self.add_initial_snapshot(session, state=state, created_at=created_at)
+
+    async def add_initial_session(
+        self,
+        session: GameSession,
+        *,
+        character_definition_id: str,
+        creation_client_request_id: str,
+        created_at: datetime,
+    ) -> None:
+        self.uow.pending_session = PersistedSession(
+            session=replace(session),
+            character_definition_id=character_definition_id,
+            creation_client_request_id=creation_client_request_id,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+
+    async def add_initial_snapshot(
+        self,
+        session: GameSession,
+        *,
+        state: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
+        self.uow.pending_snapshot = PersistedSnapshot(
+            session.state_version, deepcopy(dict(state))
+        )
+
+    async def next_event_sequence_no(self, session_id: str) -> int:
+        return max(
+            (
+                event.sequence_no
+                for event in self.store.events
+                if event.session_id == session_id
             ),
-            PersistedSnapshot(session.state_version, deepcopy(dict(state))),
+            default=0,
+        ) + 1
+
+    async def persist_events(
+        self, events: tuple[DomainEvent, ...], *, state_version: int
+    ):
+        self.uow.pending_events = tuple(events)
+        return tuple(
+            _issue_persisted_event_receipt(event, state_version=state_version)
+            for event in events
         )
 
     async def get_latest_snapshot(self, session_id: str) -> PersistedSnapshot | None:
@@ -102,7 +148,9 @@ class Uow:
         self.store = store
         self.sessions = Repository(store, self)
         self.turn_requests = None
-        self.pending: tuple[PersistedSession, PersistedSnapshot] | None = None
+        self.pending_session: PersistedSession | None = None
+        self.pending_snapshot: PersistedSnapshot | None = None
+        self.pending_events: tuple[DomainEvent, ...] = ()
         self.committed = False
 
     async def __aenter__(self) -> Uow:
@@ -110,13 +158,15 @@ class Uow:
 
     async def __aexit__(self, *args: object) -> None:
         if not self.committed:
-            self.pending = None
+            self.pending_session = None
+            self.pending_snapshot = None
+            self.pending_events = ()
 
     async def commit(self) -> None:
         if self.store.fail_commit:
             raise RuntimeError("simulated commit failure")
-        assert self.pending is not None
-        persisted, snapshot = self.pending
+        assert self.pending_session is not None and self.pending_snapshot is not None
+        persisted, snapshot = self.pending_session, self.pending_snapshot
         key = (
             persisted.session.player_id,
             persisted.creation_client_request_id,
@@ -127,11 +177,14 @@ class Uow:
             session_id = persisted.session.session_id
             self.store.sessions[session_id] = deepcopy(persisted)
             self.store.snapshots[session_id] = deepcopy(snapshot)
+            self.store.events.extend(deepcopy(self.pending_events))
             self.store.creation_keys[key] = session_id  # type: ignore[index]
         self.committed = True
 
     async def rollback(self) -> None:
-        self.pending = None
+        self.pending_session = None
+        self.pending_snapshot = None
+        self.pending_events = ()
 
 
 @pytest.fixture
@@ -166,6 +219,7 @@ def scenario_service_and_store() -> tuple[SessionService, Store]:
             clock=lambda: NOW,
             session_id_generator=lambda: next(ids),
             seed_generator=lambda: 42,
+            event_id_generator=lambda: "scenario-start-event",
         ),
         store,
     )
@@ -237,8 +291,13 @@ async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
         allow_nan=False,
     ).encode("utf-8")
     assert hashlib.sha256(stable_json(snapshot.state)).hexdigest() == (
-        "2d46c5c9827dd66a55199e7f9a799eae30c25de921fe8bda25c4f70843b641dd"
+        "376f55d10a474da9b96141b479f085cf07333c8d0c19fc3a3be06374bf95d2f5"
     )
+    assert len(store.events) == 1
+    assert store.events[0].event_type == "ScenarioStarted"
+    assert len(state.player_memory.scenario_records) == 1
+    assert len(state.player_memory.known_public_facts) == 7
+    assert len(state.player_memory.significant_experiences) == 1
     assert result.narrative_frame.decision_id == (
         "decision.758c3b9771b465e887dedbdd889c41b6"
     )

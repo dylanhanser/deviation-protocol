@@ -1,14 +1,20 @@
 # 第一阶段架构边界
 
-## Phase 2.3a deterministic player memory boundary
+## Phase 2.3b production player memory boundary
 
-`GameState` 的当前快照 schema 为 v3，并新增 `PlayerMemoryState`。它是玩家长期记忆的有界索引，不是第二套运行时剧情状态，也不是事件流副本：同一 `scenario_id`、同一稳定 NPC subject key 和同一 experience ID 都更新或幂等复用现有记录；容量耗尽会显式失败且保持完整快照不变。v1 先纯迁移到 v2 的 `scenario_runtime=null`，v2 再纯迁移到 v3 的空记忆，旧 payload 不被原地修改，也不会据此虚构经历、NPC 关系或重要事件。
+`GameState` 的当前快照 schema 仍为 v3，`PlayerMemoryState.memory_model_version` 独立升级为 2。它是玩家长期记忆的有界索引，不是第二套运行时剧情状态，也不是事件流副本：同一 `scenario_id`、稳定 NPC subject key 和 experience ID 更新或幂等复用现有记录。旧 snapshot 与 memory payload 都经纯函数迁移，不修改输入，也不根据旧正文、runtime 或 catalog 虚构经历。
 
 唯一事实来源保持分离：当前属性/资源/技能属于 `PlayerState`，货币属于 `WalletState`，物品/装备属于 `InventoryState`，当前 NPC 属于 `GameState.npcs`，当前副本 phase/fact/clue/clock/decision/ending 属于 `ScenarioRuntimeState`，完整已持久化历史属于 `domain_events`，只有长期有界索引属于 `PlayerMemoryState`。记忆仅保存稳定引用、封闭里程碑和最后可信事件顺序；不保存当前数值、runtime NPC ID、完整事实字典、`NarrativeFrame` 或文学正文。
 
-`AuthoritativePlayerMemoryPlanFactory` 只产生带内部 issuer、session/state-version、状态前后指纹、规范化 scenario-definition 指纹和完整载荷摘要的不可变 mutation plan。它只接受进程内签发的 `MemoryAuthoritySource` capability，再从当前 `GameState`、匹配的 `ScenarioDefinition` 和封闭枚举重新派生值；普通 `DomainEvent`、事件类型字符串、JSON/Pydantic、Frame 或模型文本不能签发或篡改有效 plan。Phase 2.3a 未把 capability/factory 注入 API、`ActionGateway`、`TurnOrchestrator`、`NarrativePromptBuilder` 或 Provider 流程，也不声称 capability 的 source event 已持久化；未来 Phase 2.3b 必须在事务边界内证明 source event 已持久化，并从受信 catalog 解析相同 definition 后才可接线。
+生产写入顺序固定为：锁定并加载原状态；分配稳定 event ID/sequence；Repository 在当前 UoW insert/flush `domain_events`；成功后返回绑定 session/event/sequence/turn/state-version/type/规范 payload 摘要的 opaque `PersistedEventReceipt`；可信 catalog 中的声明式 `MemoryRule` 稳定匹配；`AuthoritativePlayerMemoryPlanFactory` 从权威候选状态派生并密封 plan；最后保存 snapshot、turn response、narrative job 和 session version并单次 commit。Repository 从不 commit。receipt 只表示当前事务内 flush 成功，不是最终提交证明；rollback 时上述写入全部消失。普通 `DomainEvent`、事件类型字符串、JSON/Pydantic、Frame、玩家或模型文本不能构造 receipt、签发 plan 或篡改有效绑定。
 
-`PlayerMemoryProjector` 输出不可变、深度隔离、稳定排序的玩家已知投影，具有独立的集合数、字符数和 JSON byte 上限，并剥离 source event ID/sequence。它不包含隐藏事实、NPC 秘密、未来结局、密封/capability、action signature、outcome token、policy trace、数据库对象、完整快照或模型 proposal。详细模型与容量见 [`player_memory.md`](player_memory.md)。`game_snapshots.state_json` 已能承载 v3，因此 ORM 和 Alembic revision 均不变化。
+`ScenarioDefinition.memory_rules` 仅允许封闭 source event enum、权威 outcome/event/result/completion 条件、封闭 operation 和固定 NPC/fact/ending/milestone/experience 引用。Catalog 严格拒绝重复 ID、未知事件、extra 字段、不兼容 operation、无效或不可达引用；无 eval/exec、脚本、任意字段路径或 setattr。事件按 sequence、规则按 ID 执行，同一事件多规则先在独立候选上完成，任一非容量失败回滚整笔事务。容量失败是唯一降级路径：当前 event 的所有 memory 修改放弃，索引进入 `REBUILD_REQUIRED`，记录有界缺口元数据，游戏的机械/剧情结果、正文、事件和响应仍正常提交；索引不越过缺口，完整历史保留在 `domain_events`。
+
+`ScenarioRuntimeState.narrative_outcome_evidence` 私有保存服务器授权 outcome 的精确 rule/result/event-type/NPC-target 组合，由 `NarrativeEventIssuer` 绑定进密封事件并由 `StoryDirector` 在候选 runtime 中稳定去重写入。snapshot 完整性校验不再把 memory rule 或 `applied_event_ids` 当作发生证明：outcome 条件 fact、NPC、ending、milestone 和 experience 必须匹配精确 evidence；没有 runtime/evidence 的动态历史严格拒绝。只有 catalog 无条件标记 `PLAYER_KNOWN` 的初始公开 fact 可不依赖动态发生证据。该字段在 snapshot v3 中默认空，旧 v1/v2/v3 无动态记忆时兼容，ORM/Alembic 不变。
+
+`PlayerMemoryProjector` 输出不可变、深度隔离、稳定排序的玩家已知投影，具有集合数、字符数和规范 JSON byte 上限，并剥离 source event/sequence、deferred 细节、receipt/seal/capability 和 rule ID。投影进入只读玩家状态和 prompt-v2 的规范 JSON 数据区；`complete=false` 只告知索引可能不完整，不授予 Provider 任何权限。Prepare 在锁内创建并用 state version/fingerprint 和 request fingerprint 绑定，Provider 在无 UoW/锁时只读，Finalize 重新锁定、重载、重算并比较后，只有 `NarrativeEventIssuer` 的可信世界事件可以匹配 memory rule。升级前的活动 job 安全转 STALE且不重复调用 Provider；已 COMMITTED 响应先于 job schema 检查按幂等结果读取。
+
+Session 创建也使用相同边界：`ScenarioStarted`、初始规则记忆、version-zero snapshot 和 session 同事务提交；查询、拒绝和 narrative pending 不更新记忆；选择事件只能证明玩家做了选择，不能冒充 NPC 响应或世界成功。当前不支持同一 scenario 重入或跨 scenario NPC identity。只有存在重大隐藏设定、关键 NPC、新路线或明确二周目价值时，未来才值得引入 `scenario_run_id`；普通副本不为回收而回收。`game_snapshots.state_json` 足以承载 memory-v2，ORM 和 Alembic revision 均不变化。详细模型与容量见 [`player_memory.md`](player_memory.md)。
 
 ## Phase 2.2c production narrative architecture
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
@@ -28,6 +28,10 @@ from deviation_protocol.application.narrative_jobs import (
 )
 from deviation_protocol.domain.actions import ActionSubmission
 from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.persisted_events import (
+    PersistedEventReceipt,
+    _issue_persisted_event_receipt,
+)
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 from deviation_protocol.infrastructure.orm_models import (
@@ -38,6 +42,16 @@ from deviation_protocol.infrastructure.orm_models import (
     NarrativeJobRow,
     utc_now,
 )
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Restore MySQL DATETIME values to the application UTC contract."""
+
+    return (
+        value.replace(tzinfo=timezone.utc)
+        if value.tzinfo is None
+        else value.astimezone(timezone.utc)
+    )
 
 
 class SqlAlchemyGameSessionRepository(GameSessionRepository):
@@ -60,8 +74,8 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
             ),
             character_definition_id=row.character_definition_id,
             creation_client_request_id=row.creation_client_request_id,
-            created_at=row.created_at,
-            updated_at=row.updated_at,
+            created_at=_as_utc(row.created_at),
+            updated_at=_as_utc(row.updated_at),
         )
 
     async def get_owned(self, session_id: str, player_id: str) -> PersistedSession | None:
@@ -93,6 +107,24 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
         state: Mapping[str, Any],
         created_at: datetime,
     ) -> None:
+        await self.add_initial_session(
+            session,
+            character_definition_id=character_definition_id,
+            creation_client_request_id=creation_client_request_id,
+            created_at=created_at,
+        )
+        await self.add_initial_snapshot(
+            session, state=state, created_at=created_at
+        )
+
+    async def add_initial_session(
+        self,
+        session: GameSession,
+        *,
+        character_definition_id: str,
+        creation_client_request_id: str,
+        created_at: datetime,
+    ) -> None:
         session_row = GameSessionRow(
             session_id=session.session_id,
             player_id=session.player_id,
@@ -114,6 +146,14 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
             if _is_mysql_duplicate_key(exc):
                 raise ConcurrentSessionCreateError from exc
             raise
+
+    async def add_initial_snapshot(
+        self,
+        session: GameSession,
+        *,
+        state: Mapping[str, Any],
+        created_at: datetime,
+    ) -> None:
         self._session.add(
             GameSnapshotRow(
                 session_id=session.session_id,
@@ -153,6 +193,33 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
             )
         )
         return int(latest or 0) + 1
+
+    async def persist_events(
+        self,
+        events: Sequence[DomainEvent],
+        *,
+        state_version: int,
+    ) -> tuple[PersistedEventReceipt, ...]:
+        rows = tuple(
+            DomainEventRow(
+                event_id=event.event_id,
+                session_id=event.session_id,
+                turn_id=event.turn_id,
+                sequence_no=event.sequence_no,
+                event_type=event.event_type,
+                payload_json=dict(event.payload),
+                occurred_at=event.occurred_at,
+            )
+            for event in events
+        )
+        if not rows:
+            return ()
+        self._session.add_all(rows)
+        await self._session.flush(rows)
+        return tuple(
+            _issue_persisted_event_receipt(event, state_version=state_version)
+            for event in events
+        )
 
     async def save_snapshot_and_events(
         self,
@@ -210,20 +277,8 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
                     updated_at=utc_now(),
                 )
             )
-        self._session.add_all(
-            [
-                DomainEventRow(
-                    event_id=event.event_id,
-                    session_id=event.session_id,
-                    turn_id=event.turn_id,
-                    sequence_no=event.sequence_no,
-                    event_type=event.event_type,
-                    payload_json=dict(event.payload),
-                    occurred_at=event.occurred_at,
-                )
-                for event in events
-            ]
-        )
+        if events:
+            await self.persist_events(events, state_version=next_version)
         self._pending_session_versions.append((session, session.state_version))
         session.state_version = next_version
 

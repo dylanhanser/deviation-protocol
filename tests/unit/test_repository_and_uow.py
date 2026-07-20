@@ -14,6 +14,8 @@ from deviation_protocol.application.errors import (
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.models import GameSession
+from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.persisted_events import PersistedEventReceipt
 from deviation_protocol.infrastructure.orm_models import GameSnapshotRow
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 from deviation_protocol.infrastructure.repositories import SqlAlchemyGameSessionRepository
@@ -115,6 +117,61 @@ async def test_repository_allocates_next_session_event_sequence(
     assert await repository.next_event_sequence_no("session-1") == expected
     statement = sql_session.scalar.await_args.args[0]
     assert "max(domain_events.sequence_no)" in str(statement)
+
+
+@pytest.mark.asyncio
+async def test_repository_returns_receipt_only_after_event_insert_flush() -> None:
+    sql_session = AsyncMock()
+    sql_session.add_all = Mock()
+    repository = SqlAlchemyGameSessionRepository(sql_session)
+    event = DomainEvent(
+        event_id="event-1",
+        session_id="session-1",
+        turn_id="turn-1",
+        sequence_no=3,
+        event_type="ScenarioStarted",
+        payload={"scenario_id": "scenario-1"},
+        occurred_at=datetime(2026, 7, 20, tzinfo=timezone.utc),
+    )
+
+    receipts = await repository.persist_events((event,), state_version=4)
+
+    sql_session.add_all.assert_called_once()
+    sql_session.flush.assert_awaited_once()
+    assert len(receipts) == 1
+    receipt = receipts[0]
+    assert receipt.is_authentic()
+    assert (
+        receipt.session_id,
+        receipt.event_id,
+        receipt.sequence_no,
+        receipt.turn_id,
+        receipt.state_version,
+        receipt.event_type,
+    ) == ("session-1", "event-1", 3, "turn-1", 4, "ScenarioStarted")
+    with pytest.raises(TypeError):
+        PersistedEventReceipt()  # type: ignore[call-arg]
+
+
+@pytest.mark.asyncio
+async def test_event_flush_failure_returns_no_receipt_capability() -> None:
+    sql_session = AsyncMock()
+    sql_session.add_all = Mock()
+    sql_session.flush.side_effect = RuntimeError("simulated event flush failure")
+    repository = SqlAlchemyGameSessionRepository(sql_session)
+    event = DomainEvent(
+        event_id="event-1",
+        session_id="session-1",
+        turn_id="turn-1",
+        sequence_no=1,
+        event_type="ScenarioStarted",
+        payload={},
+        occurred_at=datetime(2026, 7, 20, tzinfo=timezone.utc),
+    )
+
+    with pytest.raises(RuntimeError, match="flush failure"):
+        await repository.persist_events((event,), state_version=0)
+    sql_session.flush.assert_awaited_once()
 
 
 class FakeSession:

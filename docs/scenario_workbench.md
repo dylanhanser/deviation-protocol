@@ -99,7 +99,13 @@ preview 的 content pack 必须使用同一正式 content version。Workbench �
 
 ## validate
 
-`validate` 直接通过现有严格 loader 和 `ScenarioCatalog`，不会在 CLI 中维护第二套验证器。它覆盖现有模型已经实施的 JSON/重复 key、schema/content version、额外字段、ID 与交叉引用、必要阶段可达性、自动循环上界、事实变化、decision cadence、outcome effect 边界，以及文件大小、嵌套、集合和字符串限制。正式目录验证成功后还会运行有界静态分析；若存在阻断级诊断，输出验证摘要并退出 `2`，不会以成功退出码掩盖 analyzer 的错误。
+`validate` 直接通过现有严格 loader 和 `ScenarioCatalog`，不会在 CLI 中维护第二套验证器。它覆盖现有模型已经实施的 JSON/重复 key、schema/content version、额外字段、ID 与交叉引用、必要阶段可达性、自动循环上界、事实变化、decision cadence、outcome effect 边界、声明式 memory rules，以及文件大小、嵌套、集合和字符串限制。正式目录验证成功后还会运行有界静态分析；若存在阻断级诊断，输出验证摘要并退出 `2`，不会以成功退出码掩盖 analyzer 的错误。
+
+### 声明式 memory rules
+
+每个 scenario 的 `memory_rules` 可为空，因此既有微型场景和 scaffold 无需声明长期记忆。规则只能从封闭的可信 source event type 中选择，并指定一个固定 operation；可选条件仅限已验证的 narrative outcome rule ID、scenario event type、outcome result 或 scenario completion。NPC、fact、ending、milestone、significant experience category/summary 必须引用当前内容包和封闭枚举，重要经历还必须使用 category 对应的固定 summary code。Loader 拒绝重复 rule ID、未知事件、extra 字段、不兼容 operation、无效/不可达引用和不稳定组合。
+
+内容包不能提供 event receipt、seal、capability、脚本、任意字段路径、任意 `setattr` 或模型自由文本映射。规则按稳定 ID 执行，同一可信事件触发多条规则时由生产事务整体应用。Workbench 只校验和展示结构，不签发 receipt、不运行生产记忆 mutation，也不根据 catalog 中存在 NPC 就推断玩家已结识。
 
 成功摘要只包含 scenario/version、初始 phase/location、结构计数和诊断计数；不输出隐藏事实值、NPC 秘密、结局条件、outcome token 或规则模板。
 

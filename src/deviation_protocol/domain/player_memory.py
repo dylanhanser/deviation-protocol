@@ -1,19 +1,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from copy import deepcopy
 from enum import StrEnum
 import hashlib
 import json
-from typing import Annotated, Literal
+from typing import Annotated, Literal, Mapping, TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
 
 from deviation_protocol.domain.content import DefinitionId
 from deviation_protocol.domain.events import DomainEvent
-from deviation_protocol.domain.scenario import ScenarioDefinition
+from deviation_protocol.domain.persisted_events import PersistedEventReceipt
+
+if TYPE_CHECKING:
+    from deviation_protocol.domain.scenario import ScenarioDefinition
 
 
-MEMORY_MODEL_VERSION = 1
+MEMORY_MODEL_VERSION = 2
+MAX_DEFERRED_MEMORY_EVENTS = 1_000_000
 MAX_SCENARIO_MEMORY_RECORDS = 64
 MAX_NPC_MEMORY_RECORDS = 256
 MAX_SIGNIFICANT_EXPERIENCES = 256
@@ -54,6 +59,11 @@ class MemoryAuthorityEventType(StrEnum):
     NPC_MILESTONE_CONFIRMED = "PlayerMemoryNpcMilestoneConfirmed"
     PUBLIC_FACT_CONFIRMED = "PlayerMemoryPublicFactConfirmed"
     SIGNIFICANT_EXPERIENCE_CONFIRMED = "PlayerMemorySignificantExperienceConfirmed"
+
+
+class MemoryIndexSyncStatus(StrEnum):
+    CURRENT = "CURRENT"
+    REBUILD_REQUIRED = "REBUILD_REQUIRED"
 
 
 _MEMORY_AUTHORITY_ISSUER = object()
@@ -107,6 +117,30 @@ def _issue_memory_authority_source(event: DomainEvent) -> MemoryAuthoritySource:
     object.__setattr__(source, "session_id", event.session_id)
     object.__setattr__(source, "sequence_no", event.sequence_no)
     object.__setattr__(source, "event_type", event_type)
+    object.__setattr__(
+        source,
+        "_seal",
+        _MemoryAuthoritySeal(
+            target=source,
+            issuer=_MEMORY_AUTHORITY_ISSUER,
+            digest=_memory_authority_digest(source),
+        ),
+    )
+    return source
+
+
+def _issue_memory_authority_source_from_receipt(
+    receipt: PersistedEventReceipt,
+    *,
+    memory_event_type: MemoryAuthorityEventType,
+) -> MemoryAuthoritySource:
+    if not isinstance(receipt, PersistedEventReceipt) or not receipt.is_authentic():
+        raise ValueError("memory authority requires a flushed persisted-event receipt")
+    source = object.__new__(MemoryAuthoritySource)
+    object.__setattr__(source, "event_id", receipt.event_id)
+    object.__setattr__(source, "session_id", receipt.session_id)
+    object.__setattr__(source, "sequence_no", receipt.sequence_no)
+    object.__setattr__(source, "event_type", memory_event_type)
     object.__setattr__(
         source,
         "_seal",
@@ -306,7 +340,14 @@ class PlayerMemoryState(MemoryModel):
     """Bounded long-term index; never a replacement for current authoritative state."""
 
     memory_model_version: Annotated[int, Field(strict=True)] = MEMORY_MODEL_VERSION
+    sync_status: MemoryIndexSyncStatus = MemoryIndexSyncStatus.CURRENT
     last_applied_source_sequence_no: MemoryIndexSequence = 0
+    last_applied_source_event_id: StableMemoryId | None = None
+    first_deferred_source_sequence_no: MemorySequence | None = None
+    last_deferred_source_sequence_no: MemorySequence | None = None
+    deferred_event_count: Annotated[
+        int, Field(strict=True, ge=0, le=MAX_DEFERRED_MEMORY_EVENTS)
+    ] = 0
     scenario_records: Annotated[
         tuple[ScenarioMemoryRecord, ...], Field(max_length=MAX_SCENARIO_MEMORY_RECORDS)
     ] = ()
@@ -325,6 +366,26 @@ class PlayerMemoryState(MemoryModel):
     def validate_memory(self) -> PlayerMemoryState:
         if self.memory_model_version != MEMORY_MODEL_VERSION:
             raise ValueError("unsupported player memory model version")
+        if self.sync_status is MemoryIndexSyncStatus.CURRENT:
+            if any(
+                value is not None
+                for value in (
+                    self.first_deferred_source_sequence_no,
+                    self.last_deferred_source_sequence_no,
+                )
+            ) or self.deferred_event_count != 0:
+                raise ValueError("current memory index cannot contain deferred markers")
+        else:
+            if (
+                self.first_deferred_source_sequence_no is None
+                or self.last_deferred_source_sequence_no is None
+                or self.deferred_event_count < 1
+                or self.first_deferred_source_sequence_no
+                > self.last_deferred_source_sequence_no
+                or self.first_deferred_source_sequence_no
+                <= self.last_applied_source_sequence_no
+            ):
+                raise ValueError("rebuild-required memory has invalid deferred markers")
         groups = (
             ("scenario", self.scenario_records, lambda item: item.scenario_id),
             ("NPC", self.npc_records, lambda item: item.subject_key),
@@ -375,6 +436,37 @@ class PlayerMemoryState(MemoryModel):
             raise ValueError(
                 "player memory ordering marker does not match its newest record"
             )
+        newest_event_ids = {
+            *(
+                item.last_source_event_id
+                for item in self.scenario_records
+                if item.last_source_sequence_no
+                == self.last_applied_source_sequence_no
+            ),
+            *(
+                item.last_source_event_id
+                for item in self.npc_records
+                if item.last_source_sequence_no
+                == self.last_applied_source_sequence_no
+            ),
+            *(
+                item.source_event_id
+                for item in self.significant_experiences
+                if item.source_sequence_no
+                == self.last_applied_source_sequence_no
+            ),
+            *(
+                item.source_event_id
+                for item in self.known_public_facts
+                if item.source_sequence_no
+                == self.last_applied_source_sequence_no
+            ),
+        }
+        if self.last_applied_source_sequence_no == 0:
+            if self.last_applied_source_event_id is not None:
+                raise ValueError("empty memory cannot name an applied source event")
+        elif newest_event_ids != {self.last_applied_source_event_id}:
+            raise ValueError("memory applied source event marker is inconsistent")
         object.__setattr__(
             self, "scenario_records", tuple(sorted(self.scenario_records, key=lambda x: x.scenario_id))
         )
@@ -416,12 +508,55 @@ class PlayerMemoryState(MemoryModel):
         else:  # pragma: no cover
             raise ValueError("unsupported memory mutation")
         if candidate != self:
-            _require_newer(plan, self.last_applied_source_sequence_no)
+            _require_newer(
+                plan,
+                self.last_applied_source_sequence_no,
+                self.last_applied_source_event_id,
+            )
             candidate = candidate.model_copy(
                 update={
-                    "last_applied_source_sequence_no": plan.source_sequence_no
+                    "last_applied_source_sequence_no": plan.source_sequence_no,
+                    "last_applied_source_event_id": plan.source_event_id,
                 }
             )
+        return type(self).model_validate(candidate.model_dump(mode="json"))
+
+    def mark_rebuild_required(
+        self, *, source_sequence_no: int, source_event_id: str
+    ) -> PlayerMemoryState:
+        if type(source_sequence_no) is not int or source_sequence_no < 1:
+            raise ValueError("deferred memory sequence must be positive")
+        _STABLE_MEMORY_ID_ADAPTER.validate_python(source_event_id)
+        if source_sequence_no <= self.last_applied_source_sequence_no:
+            if (
+                source_sequence_no == self.last_applied_source_sequence_no
+                and source_event_id == self.last_applied_source_event_id
+            ):
+                return self
+            raise MemoryConflictError("deferred memory source is stale")
+        if self.sync_status is MemoryIndexSyncStatus.CURRENT:
+            candidate = self.model_copy(
+                update={
+                    "sync_status": MemoryIndexSyncStatus.REBUILD_REQUIRED,
+                    "first_deferred_source_sequence_no": source_sequence_no,
+                    "last_deferred_source_sequence_no": source_sequence_no,
+                    "deferred_event_count": 1,
+                }
+            )
+            return type(self).model_validate(candidate.model_dump(mode="json"))
+        assert self.last_deferred_source_sequence_no is not None
+        if source_sequence_no == self.last_deferred_source_sequence_no:
+            return self
+        if source_sequence_no < self.last_deferred_source_sequence_no:
+            raise MemoryConflictError("deferred memory source is stale")
+        candidate = self.model_copy(
+            update={
+                "last_deferred_source_sequence_no": source_sequence_no,
+                "deferred_event_count": min(
+                    MAX_DEFERRED_MEMORY_EVENTS, self.deferred_event_count + 1
+                ),
+            }
+        )
         return type(self).model_validate(candidate.model_dump(mode="json"))
 
     def _start_scenario(self, plan: MemoryMutationPlan) -> PlayerMemoryState:
@@ -451,7 +586,7 @@ class PlayerMemoryState(MemoryModel):
             if existing.ending_id != plan.ending_id:
                 raise MemoryConflictError("scenario memory has a different confirmed ending")
             return self
-        _require_newer(plan, existing.last_source_sequence_no)
+        _require_newer(plan, existing.last_source_sequence_no, existing.last_source_event_id)
         updated = existing.model_copy(
             update={
                 "status": ScenarioMemoryStatus.COMPLETED,
@@ -501,7 +636,7 @@ class PlayerMemoryState(MemoryModel):
             return self
         if len(milestones) > MAX_MEMORY_REFS_PER_RECORD or len(facts) > MAX_MEMORY_REFS_PER_RECORD:
             raise MemoryCapacityError("NPC memory reference capacity reached")
-        _require_newer(plan, existing.last_source_sequence_no)
+        _require_newer(plan, existing.last_source_sequence_no, existing.last_source_event_id)
         updated = existing.model_copy(
             update={
                 "interaction_milestones": tuple(milestones),
@@ -535,7 +670,7 @@ class PlayerMemoryState(MemoryModel):
         facts = set(scenario.known_public_fact_refs) | {plan.public_fact_ref}
         if len(facts) > MAX_MEMORY_REFS_PER_RECORD:
             raise MemoryCapacityError("scenario public fact reference capacity reached")
-        _require_newer(plan, scenario.last_source_sequence_no)
+        _require_newer(plan, scenario.last_source_sequence_no, scenario.last_source_event_id)
         updated_scenario = scenario.model_copy(
             update={
                 "known_public_fact_refs": tuple(facts),
@@ -860,6 +995,8 @@ def memory_state_fingerprint(memory: PlayerMemoryState) -> str:
 
 
 def scenario_definition_fingerprint(definition: ScenarioDefinition) -> str:
+    from deviation_protocol.domain.scenario import ScenarioDefinition
+
     if not isinstance(definition, ScenarioDefinition):
         raise TypeError("memory authority requires a scenario definition")
     encoded = json.dumps(
@@ -931,6 +1068,62 @@ def _require_capacity(records: tuple[MemoryModel, ...], maximum: int, label: str
         raise MemoryCapacityError(f"{label} memory capacity reached")
 
 
-def _require_newer(plan: MemoryMutationPlan, current_sequence: int) -> None:
-    if plan.source_sequence_no <= current_sequence:
+def _require_newer(
+    plan: MemoryMutationPlan,
+    current_sequence: int,
+    current_event_id: str | None,
+) -> None:
+    if plan.source_sequence_no < current_sequence or (
+        plan.source_sequence_no == current_sequence
+        and plan.source_event_id != current_event_id
+    ):
         raise MemoryConflictError("memory update is stale")
+
+
+def migrate_player_memory_payload(payload: Mapping[str, object]) -> dict[str, object]:
+    """Purely upgrade the independent player-memory model without snapshot v4."""
+
+    copied = deepcopy(dict(payload))
+    version = copied.get("memory_model_version")
+    if type(version) is not int:
+        raise ValueError("memory_model_version must be a strict integer")
+    if version == 1:
+        source_records: list[tuple[int, str]] = []
+        for field, sequence_field, event_field in (
+            ("scenario_records", "last_source_sequence_no", "last_source_event_id"),
+            ("npc_records", "last_source_sequence_no", "last_source_event_id"),
+            ("significant_experiences", "source_sequence_no", "source_event_id"),
+            ("known_public_facts", "source_sequence_no", "source_event_id"),
+        ):
+            records = copied.get(field, [])
+            if isinstance(records, list):
+                for record in records:
+                    if isinstance(record, dict):
+                        sequence = record.get(sequence_field)
+                        event_id = record.get(event_field)
+                        if type(sequence) is int and isinstance(event_id, str):
+                            source_records.append((sequence, event_id))
+        newest_sequence = copied.get("last_applied_source_sequence_no", 0)
+        newest_ids = {
+            event_id
+            for sequence, event_id in source_records
+            if sequence == newest_sequence
+        }
+        if newest_sequence and len(newest_ids) != 1:
+            raise ValueError("v1 memory has an ambiguous newest source event")
+        copied.update(
+            {
+                "memory_model_version": 2,
+                "sync_status": MemoryIndexSyncStatus.CURRENT.value,
+                "last_applied_source_event_id": (
+                    next(iter(newest_ids)) if newest_ids else None
+                ),
+                "first_deferred_source_sequence_no": None,
+                "last_deferred_source_sequence_no": None,
+                "deferred_event_count": 0,
+            }
+        )
+        return copied
+    if version == MEMORY_MODEL_VERSION:
+        return copied
+    raise ValueError(f"unsupported player memory model version: {version}")
