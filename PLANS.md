@@ -6,10 +6,9 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `65af134 feat: add playable scenario progression API`
-- Latest completed phase: Phase 2.4a
-- Working-tree status at roadmap creation: clean and synchronized with
-  `origin/main`
+- Commit: `8d4f100 feat: complete death certificate playthrough`
+- Latest completed phase: Phase 2.4b
+- Repository status: clean
 
 ## Phase Status
 
@@ -21,23 +20,29 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 2.3a | Complete |
 | Phase 2.3b | Complete |
 | Phase 2.4a | Complete |
-| Phase 2.4b | Next phase |
-| Web client | Later phase |
+| Phase 2.4b | Complete |
+| Player-facing Web Client Planning | Planned |
 
 ## Phase 2.4b
 
-Phase 2.4b extends the playable scenario through the public production API.
-Its scope is to:
+Phase 2.4b completed the first-copy public API playthrough:
 
-- complete the production investigation-clue path;
-- complete the path after disposal escape;
-- implement the self-fulfilling-truth path;
-- implement rapid decisions in the core conflict;
-- provide at least one successful ending;
-- provide a deadline-failure ending; and
-- prove the complete route with a deterministic public-API playtest.
+- The public API is fully playable for the first copy.
+- The `life_disputed` to resolution route is reachable in production.
+- `protocol_broken` and `record_challenged` are successful endings.
+- `deadline_reached` is a failure ending.
+- Deterministic end-to-end and MySQL routes cover the complete path.
 
-Phase 2.4b does not implement a web frontend.
+## Next Step
+
+### Player-facing Web Client Planning
+
+This stage is planning only; implementation has not started. Its goals are to:
+
+- build a player interface on the stable public API;
+- display the `NarrativeFrame`, body text, public clock, decisions, and state;
+- support free input, `CONTINUE`, request polling, and reconnection recovery; and
+- avoid direct reads of snapshots or internal job state.
 
 ## Deferred by Design
 
