@@ -105,6 +105,74 @@ exit 93
     assert "expected-command-failure" in remaining_output
 
 
+def test_capture_native_command_returns_only_captured_output() -> None:
+    probe = r'''
+$tokens = $null
+$parseErrors = $null
+$scriptPath = [Environment]::GetEnvironmentVariable(
+    "VERIFY_SCRIPT_UNDER_TEST",
+    [EnvironmentVariableTarget]::Process
+)
+$ast = [System.Management.Automation.Language.Parser]::ParseFile(
+    $scriptPath,
+    [ref]$tokens,
+    [ref]$parseErrors
+)
+if ($parseErrors.Count -ne 0) {
+    exit 91
+}
+$functionAst = $ast.Find(
+    {
+        param($node)
+        $node -is [System.Management.Automation.Language.FunctionDefinitionAst] -and
+            $node.Name -eq "Invoke-NativeCommand"
+    },
+    $true
+)
+Invoke-Expression $functionAst.Extent.Text
+$childPath = Join-Path $PSHOME $(if ($IsWindows) { "pwsh.exe" } else { "pwsh" })
+$captured = @(Invoke-NativeCommand `
+    -Stage "capture regression probe" `
+    -FilePath $childPath `
+    -Arguments @("-NoLogo", "-NoProfile", "-Command", "Write-Output 'captured-中文'") `
+    -CaptureOutput)
+if ($captured.Count -ne 1 -or $captured[0].ToString() -cne "captured-中文") {
+    exit 92
+}
+Write-Output "capture-returned-only-captured-content"
+'''
+    environment = offline_environment()
+    environment["VERIFY_SCRIPT_UNDER_TEST"] = str(VERIFY_SCRIPT)
+
+    completed = subprocess.run(
+        [pwsh_path(), "-NoLogo", "-NoProfile", "-Command", probe],
+        cwd=ROOT,
+        env=environment,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=10,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert completed.stdout.splitlines() == [
+        "==> capture regression probe",
+        "capture-returned-only-captured-content",
+    ]
+
+
+def test_mysql_mode_routes_integration_tests_through_streaming_native_path() -> None:
+    script = VERIFY_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'Invoke-NativeCommand -Stage "MySQL integration tests"' in script
+    native_function = script.split("function Invoke-NativeCommand {", maxsplit=1)[1].split(
+        "function Test-LiveDeepSeekEnabled", maxsplit=1
+    )[0]
+    assert "& $FilePath @Arguments 2>&1 | ForEach-Object { Write-Host $_ }" in native_function
+    assert "[System.Diagnostics.ProcessStartInfo]" not in native_function
+
+
 def test_offline_doctor_treats_empty_variable_as_present() -> None:
     environment = offline_environment()
     environment["DATABASE_URL"] = ""

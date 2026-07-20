@@ -43,24 +43,11 @@ function Invoke-NativeCommand {
         return $output
     }
 
-    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
-    $startInfo.FileName = $FilePath
-    $startInfo.UseShellExecute = $false
-    foreach ($argument in $Arguments) {
-        [void]$startInfo.ArgumentList.Add($argument)
-    }
-
-    $process = [System.Diagnostics.Process]::Start($startInfo)
-    if ($null -eq $process) {
-        throw "$Stage failed to start."
-    }
-    try {
-        $process.WaitForExit()
-        $exitCode = [int]$process.ExitCode
-    }
-    finally {
-        $process.Dispose()
-    }
+    # Let PowerShell forward native stdout and stderr as the process runs.  A
+    # ProcessStartInfo with inherited handles can deadlock in piped hosts while
+    # WaitForExit is blocking, which made MySQL verification appear to hang.
+    & $FilePath @Arguments 2>&1 | ForEach-Object { Write-Host $_ }
+    $exitCode = $LASTEXITCODE
     if ($exitCode -ne 0) {
         throw "$Stage failed (exit code $exitCode)."
     }
