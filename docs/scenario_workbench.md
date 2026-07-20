@@ -2,6 +2,8 @@
 
 Scenario Workbench 是完全本地、确定性的副本内容工具。第一阶段的检查命令保持只读；第二阶段增加安全、确定性且不覆盖现有内容的 `scenario new` 草案脚手架。所有命令复用正式 `JsonScenarioCatalogLoader`、`ScenarioCatalog`、`ContentCatalog`、`GameState` 和 `DeterministicStoryDirector`；不读取 `.env`，不连接数据库，不调用 NarrativeProvider，也不发送网络请求。
 
+Workbench 的 preview/analyze 或直接 StoryDirector 测试只能证明内容和领域推进在本地可计算，不能证明玩家能从公共 API 到达同一状态。生产可达性声明必须由经过 ownership、ActionGateway、事务编排、Repository 和严格 HTTP schema 的公共入口测试覆盖。Phase 2.4a 的公共 playtest 只证明 `death_certificate` 从创建到 `life_disputed` 首个后续决策可达；Workbench 的七阶段结构可达分析不代表七阶段已经完整可玩。
+
 ## 命令
 
 在 PowerShell 7+ 中使用仓库 `.venv`：

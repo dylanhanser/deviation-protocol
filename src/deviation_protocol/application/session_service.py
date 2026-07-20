@@ -3,17 +3,19 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timezone
+from enum import StrEnum
 import secrets
-from typing import Any
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 
 from deviation_protocol.application.errors import (
     ConcurrentSessionCreateError,
     IdempotencyConflictError,
     InvalidCharacterDefinitionError,
     InvalidScenarioDefinitionError,
+    NarrativeRequestNotFoundError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
     SnapshotInvalidError,
@@ -21,8 +23,10 @@ from deviation_protocol.application.errors import (
     SnapshotSchemaVersionMismatchError,
     SnapshotSessionMismatchError,
     SnapshotStateVersionMismatchError,
+    StoredTurnResponseInvalidError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
 from deviation_protocol.application.ports import PersistedSession, UnitOfWorkFactory
 from deviation_protocol.application.player_memory import (
     DeclarativePlayerMemoryRuleEngine,
@@ -41,11 +45,12 @@ from deviation_protocol.application.story_director import (
     DeterministicStoryDirector,
     StoryDirectorError,
 )
+from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.events import DomainEvent
-from deviation_protocol.domain.narrative import NarrativeFrame
-from deviation_protocol.domain.scenario import ScenarioCatalog, ScenarioDefinition
+from deviation_protocol.domain.narrative import NarrativeFrame, VisibleClock
+from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
 
 
@@ -53,6 +58,10 @@ Clock = Callable[[], datetime]
 SessionIdGenerator = Callable[[], str]
 SeedGenerator = Callable[[], int]
 EventIdGenerator = Callable[[], str]
+MAX_VIEW_RECENT_NARRATIVES = 6
+MAX_VIEW_RECENT_NARRATIVE_CHARACTERS = 12_000
+MAX_VIEW_RECENT_NARRATIVE_UTF8_BYTES = 24_000
+NARRATIVE_REQUEST_RETRY_AFTER_SECONDS = 2
 
 
 def system_utc_clock() -> datetime:
@@ -142,6 +151,118 @@ class PlayerVisibleStateProjection(BaseModel):
     player_memory: PlayerMemoryProjection = Field(
         default_factory=PlayerMemoryProjection
     )
+
+
+class PublicNarrativeRequestStatus(StrEnum):
+    PENDING = "PENDING"
+    COMMITTED = "COMMITTED"
+    STALE = "STALE"
+    OUTCOME_UNKNOWN = "OUTCOME_UNKNOWN"
+    FAILED = "FAILED"
+
+
+class NarrativeRequestClientAction(StrEnum):
+    POLL_SAME_REQUEST = "POLL_SAME_REQUEST"
+    RESPONSE_AVAILABLE = "RESPONSE_AVAILABLE"
+    REFRESH_VIEW = "REFRESH_VIEW"
+    DO_NOT_RETRY = "DO_NOT_RETRY"
+
+
+class NarrativeRequestStatusResult(BaseModel):
+    """Application result; API code must project TurnResponse before serialization."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: Annotated[str, Field(strict=True, min_length=1, max_length=64)]
+    client_request_id: Annotated[str, Field(strict=True, min_length=1, max_length=64)]
+    status: PublicNarrativeRequestStatus
+    client_action: NarrativeRequestClientAction
+    error_code: Annotated[
+        str, Field(strict=True, pattern=r"^[A-Z][A-Z0-9_]{0,127}$")
+    ] | None = None
+    retry_after_seconds: int | None = Field(default=None, ge=1, le=60)
+    response: TurnResponse | None = None
+
+    @model_validator(mode="after")
+    def validate_public_status_shape(self) -> NarrativeRequestStatusResult:
+        if self.status is PublicNarrativeRequestStatus.PENDING:
+            if (
+                self.client_action is not NarrativeRequestClientAction.POLL_SAME_REQUEST
+                or self.retry_after_seconds is None
+                or self.error_code is not None
+                or self.response is not None
+            ):
+                raise ValueError("pending narrative status has an invalid shape")
+            return self
+        if self.status is PublicNarrativeRequestStatus.COMMITTED:
+            if (
+                self.client_action
+                is not NarrativeRequestClientAction.RESPONSE_AVAILABLE
+                or self.response is None
+                or self.retry_after_seconds is not None
+                or self.error_code is not None
+            ):
+                raise ValueError("committed narrative status has an invalid shape")
+            return self
+        expected = {
+            PublicNarrativeRequestStatus.STALE: (
+                NarrativeRequestClientAction.REFRESH_VIEW,
+                "NARRATIVE_REQUEST_STALE",
+            ),
+            PublicNarrativeRequestStatus.OUTCOME_UNKNOWN: (
+                NarrativeRequestClientAction.DO_NOT_RETRY,
+                "NARRATIVE_OUTCOME_UNKNOWN",
+            ),
+            PublicNarrativeRequestStatus.FAILED: (
+                NarrativeRequestClientAction.DO_NOT_RETRY,
+                "NARRATIVE_REQUEST_FAILED",
+            ),
+        }[self.status]
+        if (
+            (self.client_action, self.error_code) != expected
+            or self.retry_after_seconds is not None
+            or self.response is not None
+        ):
+            raise ValueError("terminal narrative status has an invalid shape")
+        return self
+
+
+class PlayerSessionView(BaseModel):
+    """Reconnect-safe aggregate built only from validated player projections."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    metadata: SessionMetadata
+    narrative_frame: NarrativeFrame
+    player_state: PlayerVisibleStateProjection
+    player_memory: PlayerMemoryProjection
+    scenario_status: Literal["ACTIVE", "ENDED"]
+    public_clocks: tuple[VisibleClock, ...] = Field(default=(), max_length=32)
+    recent_narrative_texts: tuple[
+        Annotated[str, Field(strict=True, min_length=1, max_length=10_000)], ...
+    ] = Field(default=(), max_length=MAX_VIEW_RECENT_NARRATIVES)
+    ending_id: str | None = None
+
+    @model_validator(mode="after")
+    def validate_view_shape(self) -> PlayerSessionView:
+        if (
+            self.metadata.session_id != self.player_state.session_id
+            or self.metadata.state_version != self.player_state.state_version
+            or self.metadata.phase != self.player_state.phase
+            or self.metadata.content_version != self.player_state.content_version
+            or self.player_memory != self.player_state.player_memory
+            or self.public_clocks != self.narrative_frame.player_visible_clocks
+        ):
+            raise ValueError("player session view projections do not share one authority")
+        if (self.scenario_status == "ACTIVE") != (self.ending_id is None):
+            raise ValueError("ending is visible only for an ended scenario")
+        if sum(map(len, self.recent_narrative_texts)) > (
+            MAX_VIEW_RECENT_NARRATIVE_CHARACTERS
+        ) or sum(
+            len(text.encode("utf-8")) for text in self.recent_narrative_texts
+        ) > MAX_VIEW_RECENT_NARRATIVE_UTF8_BYTES:
+            raise ValueError("recent narrative texts exceed the public view budget")
+        return self
 
 
 @dataclass(slots=True)
@@ -375,6 +496,146 @@ class SessionService:
             state = self._load_state(persisted, snapshot.state_version, snapshot.state)
             return self._project(persisted, state)
 
+    async def get_view(
+        self, principal: RequestPrincipal, session_id: str
+    ) -> PlayerSessionView:
+        async with self.uow_factory() as uow:
+            persisted = await uow.sessions.get_owned(session_id, principal.player_id)
+            if persisted is None:
+                raise SessionNotFoundError(session_id)
+            try:
+                snapshot = await uow.sessions.get_latest_snapshot(session_id)
+                if snapshot is None:
+                    raise SnapshotNotFoundError(session_id)
+                state = self._load_state(
+                    persisted, snapshot.state_version, snapshot.state
+                )
+                runtime = state.scenario_runtime
+                if runtime is None:
+                    raise SnapshotInvalidError(session_id)
+                definition = self._scenario_definition(runtime.scenario_id)
+                if definition is None:  # pragma: no cover - helper raises
+                    raise SnapshotInvalidError(session_id)
+                character = self.catalog.character(
+                    state.player.character_definition_id
+                )
+                if character is None:
+                    raise SnapshotInvalidError(session_id)
+                frame = bind_public_decision_frame(
+                    self.story_director.plan_frame(
+                        state,
+                        definition,
+                        profession_tags=profession_tags_for(
+                            character.tags, definition
+                        ),
+                    ),
+                    session_id=session_id,
+                    state_version=persisted.session.state_version,
+                    scenario_content_version=definition.content_version,
+                )
+                projected = self._project(persisted, state)
+            except (
+                InvalidScenarioDefinitionError,
+                SnapshotContentVersionMismatchError,
+                SnapshotInvalidError,
+                SnapshotNotFoundError,
+                SnapshotSchemaVersionMismatchError,
+                SnapshotSessionMismatchError,
+                SnapshotStateVersionMismatchError,
+                StoryDirectorError,
+            ):
+                raise SnapshotInvalidError(session_id) from None
+            recent = await uow.narrative_jobs.recent_committed_texts(
+                session_id, limit=MAX_VIEW_RECENT_NARRATIVES
+            )
+            ended = runtime.ending_status is not EndingStatus.ACTIVE
+            return PlayerSessionView(
+                metadata=self._metadata(persisted),
+                narrative_frame=frame,
+                player_state=projected,
+                player_memory=projected.player_memory,
+                scenario_status="ENDED" if ended else "ACTIVE",
+                public_clocks=frame.player_visible_clocks,
+                recent_narrative_texts=self._bounded_recent_texts(recent),
+                ending_id=runtime.ending_id if ended else None,
+            )
+
+    async def get_narrative_request_status(
+        self,
+        principal: RequestPrincipal,
+        session_id: str,
+        client_request_id: str,
+    ) -> NarrativeRequestStatusResult:
+        async with self.uow_factory() as uow:
+            if await uow.sessions.get_owned(session_id, principal.player_id) is None:
+                raise SessionNotFoundError(session_id)
+            stored = await uow.turn_requests.get_by_client_request_id(
+                session_id, client_request_id
+            )
+            if stored is not None:
+                try:
+                    response = TurnResponse.model_validate(stored.response)
+                except (ValidationError, TypeError, ValueError):
+                    raise StoredTurnResponseInvalidError(session_id) from None
+                if (
+                    response.session_id != session_id
+                    or response.client_request_id != client_request_id
+                    or response.action_signature != stored.action_signature
+                ):
+                    raise StoredTurnResponseInvalidError(session_id)
+                return NarrativeRequestStatusResult(
+                    session_id=session_id,
+                    client_request_id=client_request_id,
+                    status=PublicNarrativeRequestStatus.COMMITTED,
+                    client_action=NarrativeRequestClientAction.RESPONSE_AVAILABLE,
+                    response=response,
+                )
+            job = await uow.narrative_jobs.get_by_client_request_id(
+                session_id, client_request_id
+            )
+            if job is None:
+                raise NarrativeRequestNotFoundError(session_id)
+            if job.status in {
+                NarrativeJobStatus.PREPARED,
+                NarrativeJobStatus.IN_PROGRESS,
+                NarrativeJobStatus.PROPOSAL_VALIDATED,
+            }:
+                return NarrativeRequestStatusResult(
+                    session_id=session_id,
+                    client_request_id=client_request_id,
+                    status=PublicNarrativeRequestStatus.PENDING,
+                    client_action=NarrativeRequestClientAction.POLL_SAME_REQUEST,
+                    retry_after_seconds=NARRATIVE_REQUEST_RETRY_AFTER_SECONDS,
+                )
+            if job.status is NarrativeJobStatus.STALE:
+                return NarrativeRequestStatusResult(
+                    session_id=session_id,
+                    client_request_id=client_request_id,
+                    status=PublicNarrativeRequestStatus.STALE,
+                    client_action=NarrativeRequestClientAction.REFRESH_VIEW,
+                    error_code="NARRATIVE_REQUEST_STALE",
+                )
+            if job.status is NarrativeJobStatus.OUTCOME_UNKNOWN:
+                return NarrativeRequestStatusResult(
+                    session_id=session_id,
+                    client_request_id=client_request_id,
+                    status=PublicNarrativeRequestStatus.OUTCOME_UNKNOWN,
+                    client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
+                    error_code="NARRATIVE_OUTCOME_UNKNOWN",
+                )
+            if job.status in {
+                NarrativeJobStatus.FAILED_RETRYABLE,
+                NarrativeJobStatus.FAILED_TERMINAL,
+            }:
+                return NarrativeRequestStatusResult(
+                    session_id=session_id,
+                    client_request_id=client_request_id,
+                    status=PublicNarrativeRequestStatus.FAILED,
+                    client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
+                    error_code="NARRATIVE_REQUEST_FAILED",
+                )
+            raise StoredTurnResponseInvalidError(session_id)
+
     async def require_owner(
         self, principal: RequestPrincipal, session_id: str
     ) -> None:
@@ -491,6 +752,25 @@ class SessionService:
         if definition is None:
             raise InvalidScenarioDefinitionError(scenario_id)
         return definition
+
+    @staticmethod
+    def _bounded_recent_texts(texts: tuple[str, ...]) -> tuple[str, ...]:
+        selected: list[str] = []
+        character_count = 0
+        byte_count = 0
+        for text in reversed(texts[-MAX_VIEW_RECENT_NARRATIVES:]):
+            text_characters = len(text)
+            text_bytes = len(text.encode("utf-8"))
+            if (
+                character_count + text_characters
+                > MAX_VIEW_RECENT_NARRATIVE_CHARACTERS
+                or byte_count + text_bytes > MAX_VIEW_RECENT_NARRATIVE_UTF8_BYTES
+            ):
+                continue
+            selected.append(text)
+            character_count += text_characters
+            byte_count += text_bytes
+        return tuple(reversed(selected))
 
     def _metadata(self, persisted: PersistedSession) -> SessionMetadata:
         character_id = persisted.character_definition_id

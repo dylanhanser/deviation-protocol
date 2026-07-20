@@ -18,6 +18,8 @@ class NarrativeJobStatus(StrEnum):
     IN_PROGRESS = "IN_PROGRESS"
     PROPOSAL_VALIDATED = "PROPOSAL_VALIDATED"
     COMMITTED = "COMMITTED"
+    # Retained only to deserialize legacy rows. Production orchestration has no
+    # transition to this state and exposes it conservatively as terminal failure.
     FAILED_RETRYABLE = "FAILED_RETRYABLE"
     FAILED_TERMINAL = "FAILED_TERMINAL"
     STALE = "STALE"

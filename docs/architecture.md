@@ -1,5 +1,36 @@
 # 第一阶段架构边界
 
+## Phase 2.4a 生产推进与恢复边界
+
+领域可达不等于玩家/API 可达。Phase 2.4a 之前，`DeterministicStoryDirector.advance_after_verified_result(..., ())` 已能推进没有可信事件的 auto beat，但公共 `ActionType`、Gateway、Resolver 与 ASGI API 没有对应入口；开局 Narrative finalize 转入 `death_certificate.life_disputed` 并返回 `CONTINUE` 后，客户端只能停住。真实公共 API + Scripted Provider + MySQL 回归在修复前稳定得到 422，因而确认这是生产入口断点。
+
+现行链路为：
+
+```text
+POST ActionType.CONTINUE（无载荷）
+  -> ownership
+  -> session row lock
+  -> turn-request idempotency replay/conflict
+  -> reload + validate session/snapshot/catalog/runtime
+  -> TrustedResolutionContext
+  -> ActionGateway ContinueInputPolicy
+  -> DeterministicRuleResolver local protocol marker
+  -> re-plan current safe NarrativeFrame
+  -> ScenarioContinuePolicy(ACTIVE + CONTINUE + no decision)
+  -> StoryDirector.advance_after_verified_result(state, definition, ()) once
+  -> server ScenarioAutoBeatAdvanced + generated scenario events
+  -> persist/flush events -> memory rules -> snapshot + response + version
+  -> one UoW commit
+```
+
+客户端不能通过 CONTINUE 提供 fact、clue、NPC、location、clock delta、ending、memory operation 或任何模型字段；已知载荷字段和 extra 字段都由严格 API schema 在 orchestration 前以 422 拒绝，Gateway/ContinueInputPolicy 继续保护非 HTTP 构造。每次合法请求只调用一次 Director 推进一步，不调用 NarrativeProvider。AWAIT_PLAYER、SCENARIO_ENDED 和非活动场景在应用边界稳定拒绝且不改变 beat、clock、memory、snapshot 或 version。同请求的串行重放和并发竞争都返回持久化 winner。
+
+`PlayerSessionView` 是应用服务聚合，不是 snapshot DTO。服务以 ownership 查询 session，重新验证最新已提交 snapshot，重新规划 safe Frame，并组合 metadata、公开 player state、公开 memory、公开 clock、active/ended 状态和有界 COMMITTED 正文。它不读取或改变 narrative lease；pending Narrative 期间看到的仍是最后已提交权威状态。近期正文按 Repository 的 `(updated_at, job_id)` 稳定顺序取最多 6 条，再施加 12,000 字符和 24,000 UTF-8 bytes 总预算；活动场景不序列化 ending。
+
+Narrative request status 同样只读。持久化 TurnResponse 优先由逐字段 allowlist DTO 投影为公共 `COMMITTED` response；PREPARED/IN_PROGRESS/PROPOSAL_VALIDATED 映射为可轮询 PENDING；STALE 要求先刷新 view；OUTCOME_UNKNOWN 明确禁止自动重发；FAILED_TERMINAL 和遗留 FAILED_RETRYABLE 都映射为无供应商细节的 `FAILED/DO_NOT_RETRY`。当前生产代码没有 FAILED_RETRYABLE 转换路径，公共协议不返回 RETRY_WITH_NEW_REQUEST。查询不 claim lease、不执行 Provider，也不公开 job/proposal/lease/outcome token/provider metadata。
+
+公共 ASGI playtest 使用真实 SessionService、ActionGateway、RuleResolver、DurableNarrativeTurnOrchestrator、NarrativeOutcomePolicy、NarrativeEventIssuer 和 StoryDirector，以及无网络 Scripted Provider。路径在三个 CONTINUE 后到达 `death_certificate.decision.early_strategy`；Provider 总调用一次且所有 CONTINUE 合计调用零次。该路径只证明“创建至首个后续决策”生产可达，完整七阶段、调查、核心冲突和正式 ending 仍是 Phase 2.4b。
+
 ## Phase 2.3b production player memory boundary
 
 `GameState` 的当前快照 schema 仍为 v3，`PlayerMemoryState.memory_model_version` 独立升级为 2。它是玩家长期记忆的有界索引，不是第二套运行时剧情状态，也不是事件流副本：同一 `scenario_id`、稳定 NPC subject key 和 experience ID 更新或幂等复用现有记录。旧 snapshot 与 memory payload 都经纯函数迁移，不修改输入，也不根据旧正文、runtime 或 catalog 虚构经历。
@@ -26,7 +57,7 @@ The provider sees opaque tokens rather than internal rule IDs/templates. `Narrat
 
 The validated proposal JSON deliberately contains bounded candidate prose so a PROPOSAL_VALIDATED job can survive a crash. That text is validated-but-unaccepted, internal, non-authoritative, and unavailable to APIs, player projections, recent context, prompts, snapshots, facts, NPC knowledge, or summaries. STALE, FAILED, and OUTCOME_UNKNOWN rows may retain it until job/session deletion; retention does not make it accepted history. The accepted narrative text, snapshot, events, turn response, COMMITTED job, and session version share one UoW commit. Accepted text is invisible before commit, is replayed from the stored response, and is not stored in snapshots. Only bounded COMMITTED accepted text feeds later context; continuity notes do not enter authoritative knowledge.
 
-`20260719_0003` adds `narrative_jobs` with PREPARED, IN_PROGRESS, PROPOSAL_VALIDATED, COMMITTED, FAILED_RETRYABLE, FAILED_TERMINAL, STALE, and OUTCOME_UNKNOWN. A same-job caller that cannot claim returns 202; other same-session mutations return 409 while read-only queries remain possible. An expired PROPOSAL_VALIDATED job can acquire a new finalize-only fenced lease and continue without Provider. An expired IN_PROGRESS job becomes OUTCOME_UNKNOWN because storage cannot prove whether HTTP was never sent; it is not resent. Job-level provider invocation is one. DeepSeek defaults to one HTTP transport attempt; explicit retry configuration allows at most three attempts total but cannot guarantee exactly-once billing. Expired/old leases cannot save a proposal, finalize, or change terminal state. Future workers may reuse the job ports, but no worker, queue, or distributed task system is included. DeepSeek is built/closed in application lifespan, missing keys do not prevent startup, and default tests never use the network. `DeviationEvaluator`, anomaly effects, combat, and frontend work are still absent.
+`20260719_0003` adds `narrative_jobs` with PREPARED, IN_PROGRESS, PROPOSAL_VALIDATED, COMMITTED, FAILED_RETRYABLE, FAILED_TERMINAL, STALE, and OUTCOME_UNKNOWN. FAILED_RETRYABLE is retained solely for legacy-row deserialization; production orchestration does not transition to it. A same-job caller that cannot claim returns 202; other same-session mutations return 409 while read-only queries remain possible. An expired PROPOSAL_VALIDATED job can acquire a new finalize-only fenced lease and continue without Provider. An expired IN_PROGRESS job becomes OUTCOME_UNKNOWN because storage cannot prove whether HTTP was never sent; it is not resent. Job-level provider invocation is one. DeepSeek defaults to one HTTP transport attempt; explicit retry configuration allows at most three attempts total but cannot guarantee exactly-once billing. Expired/old leases cannot save a proposal, finalize, or change terminal state. Future workers may reuse the job ports, but no worker, queue, or distributed task system is included. DeepSeek is built/closed in application lifespan, missing keys do not prevent startup, and default tests never use the network. `DeviationEvaluator`, anomaly effects, combat, and frontend work are still absent.
 
 请求先进入 `ActionGateway`。它按 JSON 配置装配策略链，遇到拒绝或本地动作即停止，且保留截至该点的完整 `policy_trace`。只有通过全部本地规则的输入才得到 `NARRATIVE_NORMAL`。
 

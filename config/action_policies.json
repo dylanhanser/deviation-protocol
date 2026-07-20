@@ -2,6 +2,7 @@
   "policy_order": [
     "TurnStatePolicy",
     "DuplicateRequestPolicy",
+    "ContinueInputPolicy",
     "InputContractPolicy",
     "EntityReferencePolicy",
     "InventoryOwnershipPolicy",
@@ -15,6 +16,7 @@
   "enabled": {
     "TurnStatePolicy": true,
     "DuplicateRequestPolicy": true,
+    "ContinueInputPolicy": true,
     "InputContractPolicy": true,
     "EntityReferencePolicy": true,
     "InventoryOwnershipPolicy": true,
@@ -61,6 +63,7 @@
     ]
   },
   "local_action_types": [
+    "CONTINUE",
     "INSPECT_STATUS",
     "INSPECT_INVENTORY",
     "INSPECT_EQUIPMENT",

@@ -12,6 +12,10 @@ from pydantic import ValidationError
 from deviation_protocol.application.action_context import (
     AuthoritativeActionContextFactory,
 )
+from deviation_protocol.application.continue_policy import (
+    ContinuePolicyViolation,
+    ScenarioContinuePolicy,
+)
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.errors import (
     CandidateStateInvalidError,
@@ -85,6 +89,9 @@ class FirstPhaseTurnOrchestrator:
     )
     decision_policy: ScenarioDecisionResponsePolicy = field(
         default_factory=ScenarioDecisionResponsePolicy
+    )
+    continue_policy: ScenarioContinuePolicy = field(
+        default_factory=ScenarioContinuePolicy
     )
     scenario_event_issuer: TrustedScenarioEventIssuer = field(
         default_factory=TrustedScenarioEventIssuer
@@ -437,6 +444,8 @@ class FirstPhaseTurnOrchestrator:
         *,
         state_version: int,
     ) -> tuple[ResolutionResult, NarrativeFrame | None]:
+        if definition is None and submission.action_type is ActionType.CONTINUE:
+            return self._scenario_rejection("CONTINUE_REQUIRES_ACTIVE_SCENARIO"), None
         if definition is None:
             return resolution, None
         character = self.catalog.character(state.player.character_definition_id)
@@ -460,6 +469,66 @@ class FirstPhaseTurnOrchestrator:
                 return resolution, current_frame
             runtime = state.scenario_runtime
             assert runtime is not None
+            if submission.action_type is ActionType.CONTINUE:
+                try:
+                    self.continue_policy.validate(
+                        submission,
+                        state=state,
+                        frame=current_frame,
+                    )
+                except ContinuePolicyViolation as exc:
+                    return self._scenario_rejection(exc.code), current_frame
+                before_phase_id = runtime.current_phase_id
+                before_beat_index = runtime.phase_beat_index
+                directed = self.story_director.advance_after_verified_result(
+                    state,
+                    definition,
+                    (),
+                    profession_tags=profession_tags,
+                )
+                advanced_runtime = directed.candidate_state.scenario_runtime
+                assert advanced_runtime is not None
+                audit = DomainEventDraft(
+                    "ScenarioAutoBeatAdvanced",
+                    {
+                        "source": "SERVER_AUTO_ADVANCE",
+                        "scenario_id": definition.scenario_id,
+                        "from_phase_id": before_phase_id,
+                        "from_beat_index": before_beat_index,
+                        "to_phase_id": advanced_runtime.current_phase_id,
+                        "to_beat_index": advanced_runtime.phase_beat_index,
+                    },
+                )
+                generated_drafts = tuple(
+                    DomainEventDraft(
+                        "ScenarioRuntimeEventGenerated",
+                        {
+                            "scenario_event_id": item.event_id,
+                            "scenario_event_type": item.event_type,
+                        },
+                    )
+                    for item in directed.generated_events
+                )
+                return (
+                    ResolutionResult(
+                        status=ResolutionStatus.RESOLVED_LOCAL,
+                        success=True,
+                        result_code="SCENARIO_AUTO_BEAT_ADVANCED",
+                        updated_state=directed.candidate_state,
+                        state_changed=True,
+                        events=(audit, *generated_drafts),
+                        feedback=PlayerFeedback(
+                            "SCENARIO_AUTO_BEAT_ADVANCED",
+                            {},
+                        ),
+                    ),
+                    bind_public_decision_frame(
+                        directed.frame,
+                        session_id=submission.session_id,
+                        state_version=state_version + 1,
+                        scenario_content_version=definition.content_version,
+                    ),
+                )
             if (
                 resolution.status is ResolutionStatus.RESOLVED_LOCAL
                 and not resolution.state_changed

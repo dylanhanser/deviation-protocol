@@ -163,6 +163,9 @@ Observed failure:
 
 - API responses exposed `action_signature` and unsupported internal routes.
 - Ownership and internal exception handling required leakage protection.
+- Internal-model `dump(exclude=...)` projections could publish future fields by
+  default, and an unreachable retry state was advertised publicly.
+- View snapshot-integrity failures exposed multiple internal classifications.
 
 Rule:
 
@@ -170,7 +173,17 @@ Public responses must not expose snapshots, internal state, signatures,
 fingerprints, policy traces, capabilities, leases, provider payloads, SQL,
 stack traces, local paths, or internal rule IDs.
 
+Public DTOs derived from internal models enumerate every allowed field; they do
+not use dump/exclude projection. Public enums advertise only production-reachable
+protocol behavior. Aggregate view endpoints map known snapshot-integrity
+failures to one stable public code without catching unrelated failures.
+
 Missing and unauthorized sessions use the same safe response.
+
+Enforcement:
+
+- Exact top-level and nested public response allowlists
+- OpenAPI enum and snapshot-integrity API regressions
 
 ## SCENE-001: Scenario logic remains data-driven and private
 
@@ -309,3 +322,32 @@ Enforcement:
 - Scenario cadence tests
 - ActionGateway tests
 - Manual content review
+
+## PLAY-001: Production reachability requires a production public entry point
+
+Observed failure:
+
+- StoryDirector already supported deterministic empty-event auto-beat advancement.
+- After the opening Narrative committed into `life_disputed`, the public Frame
+  required CONTINUE but the public ActionType/API had no CONTINUE entry point.
+- Direct Director and private issuer tests therefore proved domain reachability
+  while a real public ASGI request still failed with 422.
+- The first MySQL regression stopped after one CONTINUE while the claimed public
+  slice required three steps to reach the next decision.
+
+Rule:
+
+- Claim player/API reachability only when a production-authorized public entry
+  point test covers ownership, validation, orchestration and persistence.
+- Direct calls to StoryDirector, private event issuers or repository test helpers
+  prove only domain or component reachability.
+- A structural scenario graph or Workbench preview does not prove a playable
+  production path.
+- A claimed multi-step production slice is covered end-to-end for every step by
+  the public API and production Repository on real MySQL.
+
+Enforcement:
+
+- Public ASGI vertical-slice playtest with real production application services
+- Real MySQL public-entry regression through all three CONTINUE steps, with
+  persisted version/beat/frame/events/response/snapshot and cleanup checks

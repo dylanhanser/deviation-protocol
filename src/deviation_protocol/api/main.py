@@ -18,12 +18,15 @@ from deviation_protocol.api.schemas import (
     ActionRequest,
     ActionResponse,
     CreateSessionRequest,
+    NarrativeRequestStatusResponse,
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import TurnOrchestrator
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
+    PlayerSessionView,
+    PublicNarrativeRequestStatus,
     SessionCreationResult,
     SessionMetadata,
     SessionService,
@@ -52,6 +55,14 @@ SCENARIO_PACK = (
     / "death_certificate_v1.json"
 )
 SessionPathId = Annotated[
+    str,
+    Path(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    ),
+]
+RequestPathId = Annotated[
     str,
     Path(
         min_length=1,
@@ -122,14 +133,14 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Deviation Protocol",
-        version="0.2.3b",
+        version="0.2.4a",
         lifespan=lifespan,
     )
     install_exception_handlers(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "phase": "2.3b"}
+        return {"status": "ok", "phase": "2.4a"}
 
     @app.post(
         "/v1/sessions",
@@ -175,6 +186,39 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         service: SessionService = Depends(get_session_service),
     ) -> PlayerVisibleStateProjection:
         return await service.get_visible_state(principal, session_id)
+
+    @app.get(
+        "/v1/sessions/{session_id}/view",
+        response_model=PlayerSessionView,
+        response_model_exclude_none=True,
+        tags=["sessions"],
+    )
+    async def get_session_view(
+        session_id: SessionPathId,
+        principal: RequestPrincipal = Depends(get_current_principal),
+        service: SessionService = Depends(get_session_service),
+    ) -> PlayerSessionView:
+        return await service.get_view(principal, session_id)
+
+    @app.get(
+        "/v1/sessions/{session_id}/requests/{client_request_id}",
+        response_model=NarrativeRequestStatusResponse,
+        tags=["actions"],
+    )
+    async def get_narrative_request_status(
+        session_id: SessionPathId,
+        client_request_id: RequestPathId,
+        http_response: Response,
+        principal: RequestPrincipal = Depends(get_current_principal),
+        service: SessionService = Depends(get_session_service),
+    ) -> NarrativeRequestStatusResponse:
+        result = await service.get_narrative_request_status(
+            principal, session_id, client_request_id
+        )
+        if result.status is PublicNarrativeRequestStatus.PENDING:
+            assert result.retry_after_seconds is not None
+            http_response.headers["Retry-After"] = str(result.retry_after_seconds)
+        return NarrativeRequestStatusResponse.from_application_result(result)
 
     @app.post(
         "/v1/sessions/{session_id}/actions",

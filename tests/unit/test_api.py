@@ -37,6 +37,22 @@ from deviation_protocol.infrastructure.errors import OptimisticLockError
 
 
 NOW = datetime(2026, 7, 19, 12, 0, tzinfo=timezone.utc)
+ACTION_RESPONSE_ALLOWLIST = {
+    "session_id",
+    "client_request_id",
+    "resolution_kind",
+    "result_code",
+    "feedback_code",
+    "feedback_parameters",
+    "resulting_state_version",
+    "state_changed",
+    "narrative_required",
+    "narrative_pending",
+    "narrative_frame",
+    "narrative_text",
+    "narrative_status",
+    "local_query_result",
+}
 
 
 @dataclass(frozen=True)
@@ -259,7 +275,10 @@ class FakeOrchestrator:
             ActionType.USE_SKILL,
         }
         rejected = submission.action_type is ActionType.LEARN_SKILL
-        query = submission.action_type is ActionType.INSPECT_STATUS
+        query = submission.action_type in {
+            ActionType.CONTINUE,
+            ActionType.INSPECT_STATUS,
+        }
         kind = (
             ResolutionStatus.NARRATIVE_REQUIRED
             if narrative
@@ -364,7 +383,7 @@ def test_health_response_does_not_expose_runtime_configuration(
     with client:
         response = client.get("/health")
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "phase": "2.3b"}
+    assert response.json() == {"status": "ok", "phase": "2.4a"}
 
 
 def test_default_lifespan_disposes_its_engine(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -544,6 +563,135 @@ def test_action_body_rejects_identity_and_internal_injection(
 
 
 @pytest.mark.parametrize(
+    "payload",
+    [
+        pytest.param({"description": "推进剧情"}, id="description-value"),
+        pytest.param({"dialogue": "继续说话"}, id="dialogue-value"),
+        pytest.param({"target_ids": ["door"]}, id="target-ids-value"),
+        pytest.param({"tool_ids": ["mirror"]}, id="tool-ids-value"),
+        pytest.param({"decision_id": "decision.current"}, id="decision-value"),
+        pytest.param({"choice_id": "choice.current"}, id="choice-value"),
+        pytest.param({"item_instance_id": "item-1"}, id="item-value"),
+        pytest.param({"equipment_slot_id": "hand.main"}, id="equipment-value"),
+        pytest.param(
+            {"skill_definition_id": "skill.observation"}, id="skill-value"
+        ),
+        pytest.param({"description": None}, id="description-null"),
+        pytest.param({"dialogue": None}, id="dialogue-null"),
+        pytest.param({"decision_id": None}, id="decision-null"),
+        pytest.param({"choice_id": None}, id="choice-null"),
+        pytest.param({"item_instance_id": None}, id="item-null"),
+        pytest.param({"equipment_slot_id": None}, id="equipment-null"),
+        pytest.param({"skill_definition_id": None}, id="skill-null"),
+        pytest.param({"target_ids": None}, id="target-ids-null"),
+        pytest.param({"tool_ids": None}, id="tool-ids-null"),
+        pytest.param({"target_ids": []}, id="target-ids-empty-array"),
+        pytest.param({"tool_ids": []}, id="tool-ids-empty-array"),
+        pytest.param({"description": ""}, id="description-empty-string"),
+        pytest.param({"dialogue": ""}, id="dialogue-empty-string"),
+        pytest.param({"decision_id": ""}, id="decision-empty-string"),
+        pytest.param({"choice_id": ""}, id="choice-empty-string"),
+        pytest.param({"item_instance_id": ""}, id="item-empty-string"),
+        pytest.param({"equipment_slot_id": ""}, id="equipment-empty-string"),
+        pytest.param({"skill_definition_id": ""}, id="skill-empty-string"),
+        pytest.param(
+            {
+                "description": None,
+                "target_ids": [],
+                "skill_definition_id": "skill.observation",
+            },
+            id="combined",
+        ),
+        pytest.param({"unexpected_payload": None}, id="unknown-extra"),
+    ],
+)
+def test_continue_explicit_payload_is_rejected_at_http_validation(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+    payload: dict[str, object],
+) -> None:
+    client, service, orchestrator = api
+    with client:
+        response = client.post(
+            "/v1/sessions/session-1/actions",
+            json={
+                "turn_id": "continue-turn",
+                "client_request_id": "continue-invalid-payload",
+                "action_type": "CONTINUE",
+                **payload,
+            },
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["error_code"] == "REQUEST_VALIDATION_FAILED"
+    assert service.calls == []
+    assert orchestrator.submissions == []
+    assert orchestrator.responses == {}
+
+
+def test_payload_free_continue_passes_http_validation(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+) -> None:
+    client, service, orchestrator = api
+    with client:
+        response = client.post(
+            "/v1/sessions/session-1/actions",
+            json={
+                "turn_id": "continue-turn",
+                "client_request_id": "continue-empty",
+                "action_type": "CONTINUE",
+            },
+        )
+
+    assert response.status_code == 200
+    assert [call[0] for call in service.calls] == ["owner"]
+    assert len(orchestrator.submissions) == 1
+    assert orchestrator.submissions[0].action_type is ActionType.CONTINUE
+    normalized_payload = orchestrator.submissions[0].model_dump(
+        exclude={"session_id", "turn_id", "client_request_id", "action_type"}
+    )
+    assert normalized_payload == {
+        "target_ids": (),
+        "tool_ids": (),
+        "description": None,
+        "dialogue": None,
+        "decision_id": None,
+        "choice_id": None,
+        "item_instance_id": None,
+        "equipment_slot_id": None,
+        "skill_definition_id": None,
+    }
+    assert set(response.json()) == ACTION_RESPONSE_ALLOWLIST
+
+
+def test_non_continue_optional_payload_defaults_keep_existing_http_semantics(
+    api: tuple[AsgiClient, FakeSessionService, FakeOrchestrator],
+) -> None:
+    client, service, orchestrator = api
+    with client:
+        response = client.post(
+            "/v1/sessions/session-1/actions",
+            json={
+                "turn_id": "explore-turn",
+                "client_request_id": "explore-empty-optionals",
+                "action_type": "EXPLORE",
+                "target_ids": [],
+                "tool_ids": [],
+                "description": None,
+                "dialogue": None,
+                "decision_id": None,
+                "choice_id": None,
+                "item_instance_id": None,
+                "equipment_slot_id": None,
+                "skill_definition_id": None,
+            },
+        )
+
+    assert response.status_code == 202
+    assert [call[0] for call in service.calls] == ["owner"]
+    assert len(orchestrator.submissions) == 1
+
+
+@pytest.mark.parametrize(
     "invalid_fields",
     [
         {"description": "x" * 151},
@@ -648,6 +796,7 @@ def test_openapi_excludes_trusted_and_persistence_only_fields(
         "persistedeventreceipt",
     ):
         assert forbidden not in rendered
+    assert "retry_with_new_request" not in rendered
 
 
 def test_other_player_cannot_read_or_submit_actions(
@@ -708,6 +857,7 @@ def test_action_api_exposes_local_and_pending_results(
         202 if expected_kind == "NARRATIVE_REQUIRED" else 200
     )
     payload = response.json()
+    assert set(payload) == ACTION_RESPONSE_ALLOWLIST
     assert "action_signature" not in payload
     assert payload["resolution_kind"] == expected_kind
     assert payload["state_changed"] is state_changed

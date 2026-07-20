@@ -51,6 +51,33 @@ class DuplicateRequestPolicy(ActionPolicy):
         return self.pass_decision()
 
 
+class ContinueInputPolicy(ActionPolicy):
+    """Keep server-directed auto advancement free of player-authored payloads."""
+
+    def evaluate(self, context: ActionContext) -> PolicyDecision:
+        action = context.submission
+        if action.action_type is not ActionType.CONTINUE:
+            return self.pass_decision()
+        if any(
+            (
+                action.target_ids,
+                action.tool_ids,
+                action.description is not None,
+                action.dialogue is not None,
+                action.decision_id is not None,
+                action.choice_id is not None,
+                action.item_instance_id is not None,
+                action.equipment_slot_id is not None,
+                action.skill_definition_id is not None,
+            )
+        ):
+            return self.reject(
+                "continue_payload_forbidden",
+                "CONTINUE accepts no player-authored payload fields",
+            )
+        return self.pass_decision()
+
+
 class InputContractPolicy(ActionPolicy):
     def evaluate(self, context: ActionContext) -> PolicyDecision:
         action = context.submission
@@ -262,6 +289,7 @@ POLICY_TYPES: dict[str, type[ActionPolicy]] = {
     for policy in (
         TurnStatePolicy,
         DuplicateRequestPolicy,
+        ContinueInputPolicy,
         InputContractPolicy,
         EntityReferencePolicy,
         InventoryOwnershipPolicy,

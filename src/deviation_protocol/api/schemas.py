@@ -3,9 +3,14 @@ from __future__ import annotations
 import unicodedata
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from deviation_protocol.application.turn_response import TurnResponse
+from deviation_protocol.application.session_service import (
+    NarrativeRequestStatusResult,
+    PublicNarrativeRequestStatus,
+    NarrativeRequestClientAction,
+)
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame
 
@@ -69,6 +74,25 @@ class ActionRequest(StrictApiModel):
     equipment_slot_id: SafeId128 | None = None
     skill_definition_id: SafeId128 | None = None
 
+    @model_validator(mode="after")
+    def validate_continue_payload(self) -> ActionRequest:
+        if self.action_type is not ActionType.CONTINUE:
+            return self
+        payload_fields = {
+            "target_ids",
+            "tool_ids",
+            "description",
+            "dialogue",
+            "decision_id",
+            "choice_id",
+            "item_instance_id",
+            "equipment_slot_id",
+            "skill_definition_id",
+        }
+        if self.model_fields_set.intersection(payload_fields):
+            raise ValueError("CONTINUE does not accept an action payload")
+        return self
+
     def to_submission(self, session_id: str) -> ActionSubmission:
         return ActionSubmission(
             session_id=session_id,
@@ -103,8 +127,98 @@ class ActionResponse(BaseModel):
 
     @classmethod
     def from_turn_response(cls, response: TurnResponse) -> ActionResponse:
-        return cls.model_validate(
-            response.model_dump(mode="json", exclude={"action_signature"})
+        return cls(
+            session_id=response.session_id,
+            client_request_id=response.client_request_id,
+            resolution_kind=response.resolution_kind.value,
+            result_code=response.result_code,
+            feedback_code=response.feedback_code,
+            feedback_parameters=dict(response.feedback_parameters),
+            resulting_state_version=response.resulting_state_version,
+            state_changed=response.state_changed,
+            narrative_required=response.narrative_required,
+            narrative_pending=response.narrative_pending,
+            narrative_frame=response.narrative_frame,
+            narrative_text=response.narrative_text,
+            narrative_status=response.narrative_status,
+            local_query_result=(
+                dict(response.local_query_result)
+                if response.local_query_result is not None
+                else None
+            ),
+        )
+
+
+class NarrativeRequestStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    session_id: SafeId64
+    client_request_id: SafeId64
+    status: PublicNarrativeRequestStatus
+    client_action: NarrativeRequestClientAction
+    error_code: Annotated[
+        str, Field(strict=True, pattern=r"^[A-Z][A-Z0-9_]{0,127}$")
+    ] | None = None
+    retry_after_seconds: int | None = Field(default=None, ge=1, le=60)
+    response: ActionResponse | None = None
+
+    @model_validator(mode="after")
+    def validate_status_shape(self) -> NarrativeRequestStatusResponse:
+        if self.status is PublicNarrativeRequestStatus.PENDING:
+            valid = (
+                self.client_action is NarrativeRequestClientAction.POLL_SAME_REQUEST
+                and self.retry_after_seconds is not None
+                and self.error_code is None
+                and self.response is None
+            )
+        elif self.status is PublicNarrativeRequestStatus.COMMITTED:
+            valid = (
+                self.client_action
+                is NarrativeRequestClientAction.RESPONSE_AVAILABLE
+                and self.response is not None
+                and self.retry_after_seconds is None
+                and self.error_code is None
+            )
+        else:
+            expected = {
+                PublicNarrativeRequestStatus.STALE: (
+                    NarrativeRequestClientAction.REFRESH_VIEW,
+                    "NARRATIVE_REQUEST_STALE",
+                ),
+                PublicNarrativeRequestStatus.OUTCOME_UNKNOWN: (
+                    NarrativeRequestClientAction.DO_NOT_RETRY,
+                    "NARRATIVE_OUTCOME_UNKNOWN",
+                ),
+                PublicNarrativeRequestStatus.FAILED: (
+                    NarrativeRequestClientAction.DO_NOT_RETRY,
+                    "NARRATIVE_REQUEST_FAILED",
+                ),
+            }[self.status]
+            valid = (
+                (self.client_action, self.error_code) == expected
+                and self.retry_after_seconds is None
+                and self.response is None
+            )
+        if not valid:
+            raise ValueError("narrative request status response has an invalid shape")
+        return self
+
+    @classmethod
+    def from_application_result(
+        cls, result: NarrativeRequestStatusResult
+    ) -> NarrativeRequestStatusResponse:
+        return cls(
+            session_id=result.session_id,
+            client_request_id=result.client_request_id,
+            status=result.status,
+            client_action=result.client_action,
+            error_code=result.error_code,
+            retry_after_seconds=result.retry_after_seconds,
+            response=(
+                ActionResponse.from_turn_response(result.response)
+                if result.response is not None
+                else None
+            ),
         )
 
 

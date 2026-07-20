@@ -1,4 +1,12 @@
-# NarrativeProvider 边界（Phase 2.3b）
+# NarrativeProvider 边界（Phase 2.4a）
+
+## Phase 2.4a public recovery boundary
+
+`ActionType.CONTINUE` 不属于 Narrative Provider 输入。它只在锁内重载的权威 Frame 为 CONTINUE、scenario 为 ACTIVE 且不存在当前 decision 时，通过 StoryDirector 的空事件路径推进一个 auto beat。CONTINUE 不创建 PREPARED job、不 claim lease、不构造 prompt、不调用 `NarrativeProvider.generate()`；开局到 `life_disputed` 首个后续决策的确定性 playtest 中 Provider 只为开局调用一次，三个 CONTINUE 的 Provider 调用数为零。
+
+`GET /v1/sessions/{session_id}/requests/{client_request_id}` 是 narrative job 的玩家安全只读投影，不是 job 调试接口。查询优先读取已提交 TurnResponse；PENDING 覆盖 PREPARED、IN_PROGRESS 与 PROPOSAL_VALIDATED，但即使后者已持久化 candidate prose，响应也只含状态、固定 retry 秒数和客户端动作，不含 proposal。STALE 与 OUTCOME_UNKNOWN 分别使用 `NARRATIVE_REQUEST_STALE/REFRESH_VIEW` 和 `NARRATIVE_OUTCOME_UNKNOWN/DO_NOT_RETRY`，不能互换。FAILED 不透传 Provider、model、usage 或内部 error detail；遗留 FAILED_RETRYABLE 与当前 FAILED_TERMINAL 都公开为 `FAILED/DO_NOT_RETRY`。公共协议不返回 RETRY_WITH_NEW_REQUEST。
+
+状态查询和 `GET /view` 都不 claim 或延长 lease、不调用 Provider、不改变 job/snapshot/version。Provider 尚在处理时，view 从最新已提交 snapshot 重算 Frame，因此不会显示候选正文或假定结果；只有 finalize 原子提交后的 accepted text 才进入 view 的近期正文。
 
 ## Phase 2.3b production boundary
 
@@ -6,7 +14,7 @@ Production uses `DurableNarrativeTurnOrchestrator` with three database phases. P
 
 External HTTP latency must not retain MySQL locks: otherwise a seconds-long model call would block safe same-session reads, enlarge deadlock windows, and tie database connection capacity to provider latency. Real MySQL tests acquire the same session row from inside a delayed Fake Provider, execute a local query during the wait, deduplicate the same request, and allow different sessions to enter the provider concurrently.
 
-`narrative_jobs` records job/session/turn/request/action signature, prepared state version and fingerprint, scenario/content version, safe request/fingerprint, prompt/style version, provider/model names, status, a single job invocation attempt, lease, validated proposal subset, stable error, and timestamps. It does not record the API key, Authorization, complete prompt, raw response, or reasoning. `PREPARED`, `IN_PROGRESS`, `PROPOSAL_VALIDATED`, and `COMMITTED` are the normal states; `FAILED_RETRYABLE`, `FAILED_TERMINAL`, `STALE`, and `OUTCOME_UNKNOWN` make failures explicit. Once a provider may have started but the result/charge is uncertain, the job is not automatically resent. An expired PROPOSAL_VALIDATED job instead receives a new finalize-only fenced lease and continues without Provider. Expired and old lease holders cannot save a proposal, finalize, or change the job.
+`narrative_jobs` records job/session/turn/request/action signature, prepared state version and fingerprint, scenario/content version, safe request/fingerprint, prompt/style version, provider/model names, status, a single job invocation attempt, lease, validated proposal subset, stable error, and timestamps. It does not record the API key, Authorization, complete prompt, raw response, or reasoning. `PREPARED`, `IN_PROGRESS`, `PROPOSAL_VALIDATED`, and `COMMITTED` are the normal states; current failures transition only to `FAILED_TERMINAL`, `STALE`, or `OUTCOME_UNKNOWN`. `FAILED_RETRYABLE` remains an internal legacy-compatible enum with no production transition. Once a provider may have started but the result/charge is uncertain, the job is not automatically resent. An expired PROPOSAL_VALIDATED job instead receives a new finalize-only fenced lease and continues without Provider. Expired and old lease holders cannot save a proposal, finalize, or change the job.
 
 Declarative `NarrativeOutcomeRuleDefinition` entries contain a stable/versioned rule ID, phases, bounded action matcher, visible-NPC and fact/clue/decision preconditions, once/repeat semantics, safe public description, fixed effect templates, server action/time cost, priority, and mutex group. Catalog loading rejects missing references, unreachable decision bindings, invalid fixed effect values, and ambiguous mutex priorities. There is no eval/exec/import/expression language, arbitrary setattr, model-supplied delta/fact/clue/event payload, inventory/equipment/skill/currency/resource/attribute/NPC-existence change, FIXED-fact rewrite, or anomaly route.
 

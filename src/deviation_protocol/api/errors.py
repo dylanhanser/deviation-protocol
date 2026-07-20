@@ -25,6 +25,7 @@ from deviation_protocol.application.errors import (
     NarrativeOutcomeUnknownError,
     NarrativeOutcomeUnavailableError,
     NarrativeProviderNotConfiguredError,
+    NarrativeRequestNotFoundError,
 )
 from deviation_protocol.application.narrative_models import NarrativeBoundaryError
 from deviation_protocol.domain.state import DomainRuleViolation
@@ -51,6 +52,16 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SessionNotFoundError)
     async def not_found_handler(_: Request, __: SessionNotFoundError) -> JSONResponse:
         return error_response(404, "SESSION_NOT_FOUND", "Session was not found")
+
+    @app.exception_handler(NarrativeRequestNotFoundError)
+    async def narrative_request_not_found_handler(
+        _: Request, __: NarrativeRequestNotFoundError
+    ) -> JSONResponse:
+        return error_response(
+            404,
+            "NARRATIVE_REQUEST_NOT_FOUND",
+            "Narrative request was not found",
+        )
 
     @app.exception_handler(InvalidCharacterDefinitionError)
     async def invalid_character_handler(

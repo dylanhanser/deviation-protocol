@@ -75,6 +75,10 @@ class NarrativeProviderNotConfiguredError(TurnApplicationError):
     code = "NARRATIVE_PROVIDER_NOT_CONFIGURED"
 
 
+class NarrativeRequestNotFoundError(TurnApplicationError):
+    code = "NARRATIVE_REQUEST_NOT_FOUND"
+
+
 class ConcurrentTurnRequestError(RuntimeError):
     """Internal signal that the database idempotency constraint won a race."""
 

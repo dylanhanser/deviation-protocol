@@ -11,6 +11,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ActionType(StrEnum):
+    CONTINUE = "CONTINUE"
     CHOOSE = "CHOOSE"
     TALK = "TALK"
     CUSTOM = "CUSTOM"

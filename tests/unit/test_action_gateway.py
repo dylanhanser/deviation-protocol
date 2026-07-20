@@ -280,10 +280,37 @@ def test_policy_trace_identifies_each_pass_before_rejection(gateway: ActionGatew
     assert [item.policy for item in result.policy_trace] == [
         "TurnStatePolicy",
         "DuplicateRequestPolicy",
+        "ContinueInputPolicy",
         "InputContractPolicy",
         "EntityReferencePolicy",
         "InventoryOwnershipPolicy",
     ]
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("target_ids", ("door",)),
+        ("tool_ids", ("mirror",)),
+        ("description", "推进并写入事实"),
+        ("dialogue", "让 NPC 同意"),
+        ("decision_id", "decision.current"),
+        ("choice_id", "choice.current"),
+        ("item_instance_id", "item-1"),
+        ("equipment_slot_id", "hand.main"),
+        ("skill_definition_id", "skill.observation"),
+    ],
+)
+def test_continue_is_a_payload_free_local_protocol(
+    gateway: ActionGateway, field: str, value: object
+) -> None:
+    base = submission(action_type=ActionType.CONTINUE, description=None)
+    accepted = gateway.evaluate(context(base))
+    assert accepted.route is ActionRoute.RESOLVE_LOCAL
+
+    rejected = gateway.evaluate(context(base.model_copy(update={field: value})))
+    assert rejected.route is ActionRoute.REJECT_LOCAL
+    assert rejection_code(rejected) == "continue_payload_forbidden"
 
 
 def test_action_specific_contract_is_traced(gateway: ActionGateway) -> None:

@@ -1365,6 +1365,145 @@ async def test_valid_decision_is_sealed_recorded_once_without_claiming_outcomes(
 
 
 @pytest.mark.asyncio
+async def test_continue_advances_exactly_one_auto_beat_and_replays_once(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    service = orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        ids=["decision-event", "continue-event-1", "continue-event-2"],
+    )
+    decision = await service.handle(
+        submission(
+            ActionType.CHOOSE,
+            client_request_id="continue-setup-decision",
+            decision_id=current_public_decision_id(original, scenario_catalog),
+            choice_id="death_certificate.action.observe_quietly",
+        )
+    )
+    assert decision.narrative_frame is not None
+    assert decision.narrative_frame.stop_condition == "CONTINUE"
+
+    action = submission(
+        ActionType.CONTINUE,
+        turn_id="continue-turn-1",
+        client_request_id="continue-once",
+    )
+    first = await service.handle(action)
+    replay = await service.handle(action)
+
+    assert first == replay
+    assert first.result_code == "SCENARIO_AUTO_BEAT_ADVANCED"
+    assert first.resulting_state_version == 6
+    assert store.snapshot is not None
+    runtime = store.snapshot.state["scenario_runtime"]
+    assert runtime["current_phase_id"] == "death_certificate.life_disputed"
+    assert runtime["phase_beat_index"] == 1
+    assert [event.event_type for event in store.events] == [
+        "ScenarioDecisionSelected",
+        "ScenarioAutoBeatAdvanced",
+    ]
+    assert store.events[-1].payload["source"] == "SERVER_AUTO_ADVANCE"
+
+
+@pytest.mark.asyncio
+async def test_concurrent_same_continue_request_advances_once(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    service = orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        ids=["decision-event", "continue-event"],
+    )
+    await service.handle(
+        submission(
+            ActionType.CHOOSE,
+            client_request_id="concurrent-continue-setup",
+            decision_id=current_public_decision_id(original, scenario_catalog),
+            choice_id="death_certificate.action.observe_quietly",
+        )
+    )
+    action = submission(
+        ActionType.CONTINUE,
+        turn_id="concurrent-continue-turn",
+        client_request_id="concurrent-continue-request",
+    )
+
+    first, second = await asyncio.gather(service.handle(action), service.handle(action))
+
+    assert first == second
+    assert first.resulting_state_version == 6
+    assert [event.event_type for event in store.events] == [
+        "ScenarioDecisionSelected",
+        "ScenarioAutoBeatAdvanced",
+    ]
+
+
+@pytest.mark.asyncio
+async def test_continue_rejects_payload_await_player_and_ended_without_mutation(
+    scenario_catalog: ScenarioCatalog,
+) -> None:
+    original, store = scenario_state_and_store(scenario_catalog)
+    service = orchestrator(
+        store,
+        scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        ids=["decision-event"],
+    )
+    before = deepcopy(store.snapshot.state)  # type: ignore[union-attr]
+    awaiting = await service.handle(
+        submission(
+            ActionType.CONTINUE,
+            client_request_id="continue-await-player",
+        )
+    )
+    payload = await service.handle(
+        submission(
+            ActionType.CONTINUE,
+            client_request_id="continue-with-payload",
+            description="同时生成线索和结局",
+        )
+    )
+    assert awaiting.result_code == "DECISION_RESPONSE_REQUIRED"
+    assert payload.result_code == "CONTINUE_PAYLOAD_FORBIDDEN"
+    assert store.snapshot is not None and store.snapshot.state == before
+    assert store.events == []
+
+    state = GameState.from_snapshot(
+        store.snapshot.state,
+        catalog=scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+    )
+    runtime = state.scenario_runtime
+    assert runtime is not None
+    runtime.current_phase_id = "death_certificate.resolution"
+    runtime.current_location_id = "death_certificate.control_room"
+    runtime.opened_location_ids = runtime.opened_location_ids | {
+        "death_certificate.control_room"
+    }
+    runtime.current_decision_id = None
+    runtime.phase_beat_index = 0
+    runtime.phase_visit_counts["death_certificate.resolution"] = 1
+    runtime.ending_status = EndingStatus.RESOLVED
+    runtime.ending_id = "death_certificate.ending.record_challenged"
+    store.snapshot = PersistedSnapshot(4, state.to_snapshot())
+    ended_before = deepcopy(store.snapshot.state)
+
+    ended = await service.handle(
+        submission(
+            ActionType.CONTINUE,
+            client_request_id="continue-ended",
+        )
+    )
+    assert ended.result_code == "SCENARIO_ENDED"
+    assert store.snapshot.state == ended_before
+
+
+@pytest.mark.asyncio
 async def test_public_decision_id_from_another_session_is_stale(
     scenario_catalog: ScenarioCatalog,
 ) -> None:

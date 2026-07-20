@@ -75,6 +75,7 @@ class DeterministicRuleResolver:
 
         action_type = context.submission.action_type
         query_handlers: dict[ActionType, Callable[[GameState], ResolutionResult]] = {
+            ActionType.CONTINUE: self._continue_requested,
             ActionType.INSPECT_STATUS: self._inspect_status,
             ActionType.INSPECT_INVENTORY: self._inspect_inventory,
             ActionType.INSPECT_EQUIPMENT: self._inspect_equipment,
@@ -109,6 +110,16 @@ class DeterministicRuleResolver:
             state,
             catalog,
             skill_learning_authority=skill_learning_authority,
+        )
+
+    @staticmethod
+    def _continue_requested(state: GameState) -> ResolutionResult:
+        del state
+        return ResolutionResult(
+            status=ResolutionStatus.RESOLVED_LOCAL,
+            success=True,
+            result_code="SCENARIO_CONTINUE_REQUESTED",
+            feedback=PlayerFeedback("SCENARIO_CONTINUE_REQUESTED", {}),
         )
 
     def _resolve_mutation(
