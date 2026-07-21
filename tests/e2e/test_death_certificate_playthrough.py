@@ -593,6 +593,18 @@ async def test_complete_public_api_happy_path_reaches_resolved_ending(
     assert view_status == 200
     assert view["scenario_status"] == "ENDED"
     assert view["ending_id"] == ending_id
+    assert view["action_affordances"] == {
+        "mode": "ENDED",
+        "actions": [],
+        "choices": [],
+    }
+    expected_ending_titles = {
+        "death_certificate.ending.protocol_broken": "规程已中断",
+        "death_certificate.ending.record_challenged": "记录已被质疑",
+    }
+    assert view["presentation"]["ending"]["title"] == expected_ending_titles[
+        ending_id
+    ]
     scenario_memory = view["player_memory"]["scenarios"][0]
     assert scenario_memory["status"] == "COMPLETED"
     assert scenario_memory["ending_id"] == view["ending_id"]
@@ -824,6 +836,15 @@ async def test_complete_public_api_deadline_path_reaches_failed_ending() -> None
     assert view_status == 200
     assert view["scenario_status"] == "ENDED"
     assert view["ending_id"] == "death_certificate.ending.deadline_reached"
+    assert view["presentation"]["ending"] == {
+        "title": "记录成为现实",
+        "summary": "截止时刻到达，处置规程完成了记录所预告的结果。",
+    }
+    assert view["action_affordances"] == {
+        "mode": "ENDED",
+        "actions": [],
+        "choices": [],
+    }
     assert view["player_memory"]["scenarios"][0]["status"] == "COMPLETED"
     assert view["player_memory"]["scenarios"][0]["ending_id"] == view["ending_id"]
     assert provider.calls == 7

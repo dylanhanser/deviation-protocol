@@ -9,7 +9,7 @@ from deviation_protocol.application.narrative_models import (
     ValidatedNarrativeProposal,
 )
 from deviation_protocol.application.resolution import ResolutionStatus
-from deviation_protocol.domain.actions import ActionSubmission
+from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.memory_rules import MemoryRuleSourceEventType
 from deviation_protocol.domain.narrative import NarrativeFrame
 from deviation_protocol.domain.narrative_outcome import (
@@ -43,6 +43,36 @@ class AllowedNarrativeOutcome:
     candidate: NarrativeOutcomeCandidate
 
 
+@dataclass(frozen=True, slots=True)
+class NarrativeActionAvailability:
+    action_type: ActionType
+
+
+def available_narrative_actions(
+    *,
+    state: GameState,
+    definition: ScenarioDefinition,
+    frame: NarrativeFrame,
+) -> tuple[NarrativeActionAvailability, ...]:
+    """Describe action types that can match the current authoritative rule set.
+
+    Text terms remain server-validated after submission. This query intentionally
+    exposes neither the matching terms nor the rules that contain them.
+    """
+    eligible = _structurally_eligible_rules(
+        state=state,
+        definition=definition,
+        frame=frame,
+    )
+    available_types: set[ActionType] = set()
+    for rule, _ in eligible:
+        available_types.update(rule.intent.action_types)
+    return tuple(
+        NarrativeActionAvailability(action_type=action_type)
+        for action_type in sorted(available_types, key=lambda item: item.value)
+    )
+
+
 def allowed_narrative_outcomes(
     *,
     submission: ActionSubmission,
@@ -51,26 +81,15 @@ def allowed_narrative_outcomes(
     definition: ScenarioDefinition,
     frame: NarrativeFrame,
 ) -> tuple[AllowedNarrativeOutcome, ...]:
-    runtime = state.scenario_runtime
-    if runtime is None:
-        return ()
-    runtime.validate_against(definition)
-    applied_outcome_rule_ids = {
-        item.outcome_rule_id for item in runtime.narrative_outcome_evidence
-    }
-    visible_npcs_by_definition: dict[str, list[str]] = {}
-    visible_ids = set(frame.visible_entities)
-    for npc_id, npc in state.npcs.items():
-        if npc_id in visible_ids:
-            visible_npcs_by_definition.setdefault(npc.definition_id, []).append(npc_id)
     text = " ".join(
         item for item in (submission.description, submission.dialogue) if item
     ).casefold()
     eligible: list[tuple[NarrativeOutcomeRuleDefinition, tuple[str, ...]]] = []
-    evaluator = DeclarativeConditionEvaluator()
-    for rule in definition.narrative_outcome_rules:
-        if runtime.current_phase_id not in rule.allowed_phase_ids:
-            continue
+    for rule, runtime_npcs in _structurally_eligible_rules(
+        state=state,
+        definition=definition,
+        frame=frame,
+    ):
         if submission.action_type not in rule.intent.action_types:
             continue
         if rule.intent.required_any_terms and not any(
@@ -84,6 +103,65 @@ def allowed_narrative_outcomes(
         if any(term in text for term in rule.intent.forbidden_terms):
             continue
         if rule.intent.requires_target and not submission.target_ids:
+            continue
+        eligible.append((rule, runtime_npcs))
+
+    # A mutex group is deterministic: only its highest-priority matching rule is
+    # exposed. Equal priorities are rejected while loading the catalog.
+    selected: dict[str, tuple[NarrativeOutcomeRuleDefinition, tuple[str, ...]]] = {}
+    for rule, runtime_npcs in eligible:
+        current = selected.get(rule.mutex_group)
+        if current is None or rule.priority > current[0].priority:
+            selected[rule.mutex_group] = (rule, runtime_npcs)
+
+    bindings = _token_bindings(
+        submission=submission,
+        state=state,
+        state_version=state_version,
+        definition=definition,
+        frame=frame,
+    )
+    results: list[AllowedNarrativeOutcome] = []
+    for rule, runtime_npcs in sorted(selected.values(), key=lambda item: item[0].rule_id):
+        token = "outcome." + hashlib.sha256(
+            (bindings + "\0" + rule.rule_id + "\0" + rule.rule_version).encode("utf-8")
+        ).hexdigest()[:48]
+        results.append(
+            AllowedNarrativeOutcome(
+                rule=rule,
+                candidate=NarrativeOutcomeCandidate(
+                    outcome_token=token,
+                    safe_description=rule.safe_description,
+                    allowed_results=tuple(item.result for item in rule.effects),
+                    allowed_entity_ids=runtime_npcs,
+                ),
+            )
+        )
+    return tuple(results)
+
+
+def _structurally_eligible_rules(
+    *,
+    state: GameState,
+    definition: ScenarioDefinition,
+    frame: NarrativeFrame,
+) -> tuple[tuple[NarrativeOutcomeRuleDefinition, tuple[str, ...]], ...]:
+    runtime = state.scenario_runtime
+    if runtime is None:
+        return ()
+    runtime.validate_against(definition)
+    applied_outcome_rule_ids = {
+        item.outcome_rule_id for item in runtime.narrative_outcome_evidence
+    }
+    visible_npcs_by_definition: dict[str, list[str]] = {}
+    visible_ids = set(frame.visible_entities)
+    for npc_id, npc in state.npcs.items():
+        if npc_id in visible_ids:
+            visible_npcs_by_definition.setdefault(npc.definition_id, []).append(npc_id)
+    evaluator = DeclarativeConditionEvaluator()
+    eligible: list[tuple[NarrativeOutcomeRuleDefinition, tuple[str, ...]]] = []
+    for rule in definition.narrative_outcome_rules:
+        if runtime.current_phase_id not in rule.allowed_phase_ids:
             continue
         if rule.required_current_decision_ids and (
             runtime.current_decision_id not in rule.required_current_decision_ids
@@ -118,39 +196,7 @@ def allowed_narrative_outcomes(
         if rule.once and rule.rule_id in applied_outcome_rule_ids:
             continue
         eligible.append((rule, tuple(sorted(required_runtime_npcs))))
-
-    # A mutex group is deterministic: only its highest-priority matching rule is
-    # exposed. Equal priorities are rejected while loading the catalog.
-    selected: dict[str, tuple[NarrativeOutcomeRuleDefinition, tuple[str, ...]]] = {}
-    for rule, runtime_npcs in eligible:
-        current = selected.get(rule.mutex_group)
-        if current is None or rule.priority > current[0].priority:
-            selected[rule.mutex_group] = (rule, runtime_npcs)
-
-    bindings = _token_bindings(
-        submission=submission,
-        state=state,
-        state_version=state_version,
-        definition=definition,
-        frame=frame,
-    )
-    results: list[AllowedNarrativeOutcome] = []
-    for rule, runtime_npcs in sorted(selected.values(), key=lambda item: item[0].rule_id):
-        token = "outcome." + hashlib.sha256(
-            (bindings + "\0" + rule.rule_id + "\0" + rule.rule_version).encode("utf-8")
-        ).hexdigest()[:48]
-        results.append(
-            AllowedNarrativeOutcome(
-                rule=rule,
-                candidate=NarrativeOutcomeCandidate(
-                    outcome_token=token,
-                    safe_description=rule.safe_description,
-                    allowed_results=tuple(item.result for item in rule.effects),
-                    allowed_entity_ids=runtime_npcs,
-                ),
-            )
-        )
-    return tuple(results)
+    return tuple(eligible)
 
 
 @dataclass(frozen=True, slots=True, init=False)

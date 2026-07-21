@@ -26,6 +26,7 @@ from deviation_protocol.application.rule_resolver import DeterministicRuleResolv
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
     PlayerSessionView,
+    PublicScenarioCatalog,
     PublicNarrativeRequestStatus,
     SessionCreationResult,
     SessionMetadata,
@@ -133,14 +134,24 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
 
     app = FastAPI(
         title="Deviation Protocol",
-        version="0.2.4b",
+        version="0.3.0",
         lifespan=lifespan,
     )
     install_exception_handlers(app)
 
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
-        return {"status": "ok", "phase": "2.4b"}
+        return {"status": "ok", "phase": "3.0"}
+
+    @app.get(
+        "/v1/scenarios",
+        response_model=PublicScenarioCatalog,
+        tags=["scenarios"],
+    )
+    async def list_scenarios(
+        service: SessionService = Depends(get_session_service),
+    ) -> PublicScenarioCatalog:
+        return service.list_public_scenarios()
 
     @app.post(
         "/v1/sessions",

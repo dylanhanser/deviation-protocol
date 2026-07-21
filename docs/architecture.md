@@ -1,5 +1,38 @@
 # 第一阶段架构边界
 
+## Phase 3.0 Public Client Contract
+
+Phase 3.0 adds a read-only, explicitly allowlisted client contract without a
+frontend or a new persistence model. `GET /v1/scenarios` lists only scenarios
+that declare bounded `public_client` metadata in their versioned content pack.
+The response is constructed field by field from scenario ID/content version,
+public copy and validated public character references; it never serializes a
+`ScenarioDefinition` or exposes future phases, endings, facts, clues, NPC
+knowledge, outcome rules or memory rules.
+
+`PlayerSessionView` now combines the validated snapshot projections with the
+current scene's public title/summary and deterministic action affordances. An
+ending title/summary is selected only after authoritative runtime settlement.
+Missing phase/ending presentation bindings fail through the existing
+`SNAPSHOT_INVALID` boundary. View construction remains read-only and never
+advances state, claims a job, acquires a lease or calls `NarrativeProvider`.
+
+Affordances do not form a second action authority. Free narrative types are
+derived by the structural half of the existing `allowed_narrative_outcomes`
+rule selection; input kind and limits are read from `InputContractPolicy`; and
+`CONTINUE` is exposed only through `ScenarioContinuePolicy.allows`. Labels are
+versioned content. Targets are the intersection of the current safe Frame and
+player-visible runtime NPC projection. TALK retains its existing optional-target
+domain contract. A submitted target is still checked by `EntityReferencePolicy`.
+
+When a decision is active, the public affordance contains only `CHOOSE` entries
+copied from the bound Frame. The public Frame replaces internal semantic choice
+types with `choice`, removes definition-level targets and custom-action
+constraints, while the decision policy re-resolves the choice ID against the
+locked versioned definition before the trusted issuer copies any effect. Ended
+sessions expose no actions. Details and field-level client behavior are in
+[`public_client_contract.md`](public_client_contract.md).
+
 ## Phase 2.4b 完整生产可达边界
 
 领域可达不等于玩家/API 可达。Phase 2.4b 以公共 ASGI API 补齐 `death_certificate` 的七阶段生产闭环：服务器模板授权临床复核、三个调查线索组与必要地点；CONTINUE 驱动 disposal escape 和 self-fulfilling truth；绑定当前 Frame 的 choices 驱动 core conflict rapid windows；可信事件产生成功或 deadline 失败 ending。完整成功路径使用内存 adapter 与真实 MySQL，deadline 路径覆盖公开推进、完成记忆和结束后拒绝；测试不使用私有 issuer 或直接状态写入。

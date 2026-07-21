@@ -27,6 +27,11 @@ from deviation_protocol.application.errors import (
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
+from deviation_protocol.application.continue_policy import ScenarioContinuePolicy
+from deviation_protocol.application.narrative_outcome_policy import (
+    NarrativeActionAvailability,
+    available_narrative_actions,
+)
 from deviation_protocol.application.ports import PersistedSession, UnitOfWorkFactory
 from deviation_protocol.application.player_memory import (
     DeclarativePlayerMemoryRuleEngine,
@@ -49,7 +54,9 @@ from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame, VisibleClock
+from deviation_protocol.domain.policies import ActionInputKind, InputContractPolicy
 from deviation_protocol.domain.scenario import EndingStatus, ScenarioCatalog, ScenarioDefinition
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, PlayerState
 
@@ -105,6 +112,104 @@ class PublicNpc(BaseModel):
     npc_id: str
     npc_definition_id: str
     display_name: str
+
+
+class PublicPlayableCharacter(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    character_definition_id: str
+    display_name: str
+    description: str
+
+
+class PublicScenarioDescription(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    scenario_id: str
+    content_version: str
+    title: str
+    hook: str
+    playable_characters: tuple[PublicPlayableCharacter, ...] = Field(
+        max_length=16
+    )
+    default_character_definition_id: str
+
+
+class PublicScenarioCatalog(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    scenarios: tuple[PublicScenarioDescription, ...] = Field(max_length=32)
+
+
+class PublicEndingPresentation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    title: str
+    summary: str
+
+
+class PublicScenarioPresentation(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    title: str
+    scene_title: str
+    scene_summary: str
+    ending: PublicEndingPresentation | None = None
+
+
+class PublicActionTarget(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    target_id: str
+    display_name: str
+
+
+class PublicActionAffordance(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    action_type: ActionType
+    label: str
+    input_kind: ActionInputKind
+    max_input_length: int | None = Field(default=None, ge=1, le=2_000)
+    target_required: bool
+    targets: tuple[PublicActionTarget, ...] = Field(default=(), max_length=128)
+
+    @model_validator(mode="after")
+    def validate_input_shape(self) -> PublicActionAffordance:
+        if (self.input_kind is ActionInputKind.NONE) != (
+            self.max_input_length is None
+        ):
+            raise ValueError("action input length does not match its input kind")
+        if self.target_required and not self.targets:
+            raise ValueError("required action target list cannot be empty")
+        return self
+
+
+class PublicDecisionChoice(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    action_type: Literal[ActionType.CHOOSE] = ActionType.CHOOSE
+    choice_id: str
+    label: str
+    target_ids: tuple[str, ...] = Field(default=(), max_length=16)
+
+
+class PublicActionMode(StrEnum):
+    FREE_ACTIONS = "FREE_ACTIONS"
+    DECISION = "DECISION"
+    ENDED = "ENDED"
+
+
+class PublicActionAffordanceSet(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+    mode: PublicActionMode
+    actions: tuple[PublicActionAffordance, ...] = Field(default=(), max_length=16)
+    decision_id: str | None = None
+    choices: tuple[PublicDecisionChoice, ...] = Field(default=(), max_length=32)
+
+    @model_validator(mode="after")
+    def validate_mode_shape(self) -> PublicActionAffordanceSet:
+        if self.mode is PublicActionMode.DECISION:
+            valid = self.decision_id is not None and bool(self.choices) and not self.actions
+        elif self.mode is PublicActionMode.FREE_ACTIONS:
+            valid = self.decision_id is None and not self.choices
+        else:
+            valid = self.decision_id is None and not self.choices and not self.actions
+        if not valid:
+            raise ValueError("public action affordance mode has an invalid shape")
+        return self
 
 
 class PublicQuest(BaseModel):
@@ -236,6 +341,8 @@ class PlayerSessionView(BaseModel):
     narrative_frame: NarrativeFrame
     player_state: PlayerVisibleStateProjection
     player_memory: PlayerMemoryProjection
+    presentation: PublicScenarioPresentation
+    action_affordances: PublicActionAffordanceSet
     scenario_status: Literal["ACTIVE", "ENDED"]
     public_clocks: tuple[VisibleClock, ...] = Field(default=(), max_length=32)
     recent_narrative_texts: tuple[
@@ -256,6 +363,14 @@ class PlayerSessionView(BaseModel):
             raise ValueError("player session view projections do not share one authority")
         if (self.scenario_status == "ACTIVE") != (self.ending_id is None):
             raise ValueError("ending is visible only for an ended scenario")
+        if (self.scenario_status == "ACTIVE") != (
+            self.presentation.ending is None
+        ):
+            raise ValueError("ending presentation is visible only after settlement")
+        if (self.scenario_status == "ENDED") != (
+            self.action_affordances.mode is PublicActionMode.ENDED
+        ):
+            raise ValueError("ended scenario cannot expose action affordances")
         if sum(map(len, self.recent_narrative_texts)) > (
             MAX_VIEW_RECENT_NARRATIVE_CHARACTERS
         ) or sum(
@@ -282,6 +397,9 @@ class SessionService:
     )
     memory_projector: PlayerMemoryProjector = dataclass_field(
         default_factory=PlayerMemoryProjector
+    )
+    continue_policy: ScenarioContinuePolicy = dataclass_field(
+        default_factory=ScenarioContinuePolicy
     )
 
     def __post_init__(self) -> None:
@@ -313,6 +431,44 @@ class SessionService:
                 character_definition_id=character_definition_id,
                 scenario_id=scenario_id,
             )
+
+    def list_public_scenarios(self) -> PublicScenarioCatalog:
+        definitions = (
+            self.scenario_catalog.scenarios
+            if self.scenario_catalog is not None
+            else ()
+        )
+        scenarios: list[PublicScenarioDescription] = []
+        for definition in sorted(definitions, key=lambda item: item.scenario_id):
+            public = definition.public_client
+            if public is None:
+                continue
+            playable = tuple(
+                PublicPlayableCharacter(
+                    character_definition_id=item.character_definition_id,
+                    display_name=self.catalog.character(
+                        item.character_definition_id
+                    ).display_name,  # type: ignore[union-attr]
+                    description=item.description,
+                )
+                for item in sorted(
+                    public.playable_characters,
+                    key=lambda value: value.character_definition_id,
+                )
+            )
+            scenarios.append(
+                PublicScenarioDescription(
+                    scenario_id=definition.scenario_id,
+                    content_version=definition.content_version,
+                    title=public.title,
+                    hook=public.hook,
+                    playable_characters=playable,
+                    default_character_definition_id=(
+                        public.default_character_definition_id
+                    ),
+                )
+            )
+        return PublicScenarioCatalog(scenarios=tuple(scenarios))
 
     async def _create_once(
         self,
@@ -534,6 +690,19 @@ class SessionService:
                     scenario_content_version=definition.content_version,
                 )
                 projected = self._project(persisted, state)
+                ended = runtime.ending_status is not EndingStatus.ACTIVE
+                presentation = self._public_presentation(
+                    definition,
+                    phase_id=runtime.current_phase_id,
+                    ending_id=runtime.ending_id if ended else None,
+                )
+                action_affordances = self._public_action_affordances(
+                    state=state,
+                    definition=definition,
+                    frame=frame,
+                    visible_npcs=projected.visible_npcs,
+                    ended=ended,
+                )
             except (
                 InvalidScenarioDefinitionError,
                 SnapshotContentVersionMismatchError,
@@ -548,12 +717,13 @@ class SessionService:
             recent = await uow.narrative_jobs.recent_committed_texts(
                 session_id, limit=MAX_VIEW_RECENT_NARRATIVES
             )
-            ended = runtime.ending_status is not EndingStatus.ACTIVE
             return PlayerSessionView(
                 metadata=self._metadata(persisted),
                 narrative_frame=frame,
                 player_state=projected,
                 player_memory=projected.player_memory,
+                presentation=presentation,
+                action_affordances=action_affordances,
                 scenario_status="ENDED" if ended else "ACTIVE",
                 public_clocks=frame.player_visible_clocks,
                 recent_narrative_texts=self._bounded_recent_texts(recent),
@@ -752,6 +922,108 @@ class SessionService:
         if definition is None:
             raise InvalidScenarioDefinitionError(scenario_id)
         return definition
+
+    @staticmethod
+    def _public_presentation(
+        definition: ScenarioDefinition,
+        *,
+        phase_id: str,
+        ending_id: str | None,
+    ) -> PublicScenarioPresentation:
+        public = definition.public_client
+        if public is None:
+            raise InvalidScenarioDefinitionError(definition.scenario_id)
+        scene = next((item for item in public.scenes if item.phase_id == phase_id), None)
+        if scene is None:
+            raise InvalidScenarioDefinitionError(definition.scenario_id)
+        ending = None
+        if ending_id is not None:
+            declared = next(
+                (item for item in public.endings if item.ending_id == ending_id),
+                None,
+            )
+            if declared is None:
+                raise InvalidScenarioDefinitionError(definition.scenario_id)
+            ending = PublicEndingPresentation(
+                title=declared.title,
+                summary=declared.summary,
+            )
+        return PublicScenarioPresentation(
+            title=public.title,
+            scene_title=scene.title,
+            scene_summary=scene.summary,
+            ending=ending,
+        )
+
+    def _public_action_affordances(
+        self,
+        *,
+        state: GameState,
+        definition: ScenarioDefinition,
+        frame: NarrativeFrame,
+        visible_npcs: tuple[PublicNpc, ...],
+        ended: bool,
+    ) -> PublicActionAffordanceSet:
+        if ended:
+            return PublicActionAffordanceSet(mode=PublicActionMode.ENDED)
+        if frame.decision_required:
+            return PublicActionAffordanceSet(
+                mode=PublicActionMode.DECISION,
+                decision_id=frame.decision_id,
+                choices=tuple(
+                    PublicDecisionChoice(
+                        choice_id=item.action_id,
+                        label=item.label_hint,
+                        target_ids=item.target_ids,
+                    )
+                    for item in frame.suggested_actions
+                ),
+            )
+        public = definition.public_client
+        if public is None:
+            raise InvalidScenarioDefinitionError(definition.scenario_id)
+        labels = {item.action_type: item.label for item in public.actions}
+        targets = tuple(
+            PublicActionTarget(target_id=item.npc_id, display_name=item.display_name)
+            for item in visible_npcs
+            if item.npc_id in frame.visible_entities
+        )
+        available_by_type = {
+            item.action_type: item
+            for item in available_narrative_actions(
+                state=state,
+                definition=definition,
+                frame=frame,
+            )
+        }
+        if self.continue_policy.allows(state=state, frame=frame):
+            available_by_type[ActionType.CONTINUE] = NarrativeActionAvailability(
+                action_type=ActionType.CONTINUE,
+            )
+        actions: list[PublicActionAffordance] = []
+        for item in sorted(
+            available_by_type.values(), key=lambda value: value.action_type.value
+        ):
+            contract = InputContractPolicy.contract_for(item.action_type)
+            label = labels.get(item.action_type)
+            if contract is None or label is None:
+                raise InvalidScenarioDefinitionError(definition.scenario_id)
+            if contract.target_required and not targets:
+                continue
+            actions.append(
+                PublicActionAffordance(
+                    action_type=item.action_type,
+                    label=label,
+                    input_kind=contract.input_kind,
+                    max_input_length=contract.max_length,
+                    target_required=contract.target_required,
+                    targets=targets if contract.target_supported else (),
+                )
+            )
+        return PublicActionAffordanceSet(
+            mode=PublicActionMode.FREE_ACTIONS,
+            actions=tuple(actions),
+        )
 
     @staticmethod
     def _bounded_recent_texts(texts: tuple[str, ...]) -> tuple[str, ...]:

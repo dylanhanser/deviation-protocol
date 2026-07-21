@@ -19,6 +19,16 @@ class ContinuePolicyViolation(ValueError):
 class ScenarioContinuePolicy:
     """Authorize exactly one server-defined auto beat from locked authority."""
 
+    def allows(self, *, state: GameState, frame: NarrativeFrame) -> bool:
+        runtime = state.scenario_runtime
+        return bool(
+            runtime is not None
+            and runtime.ending_status is EndingStatus.ACTIVE
+            and runtime.current_decision_id is None
+            and not frame.decision_required
+            and frame.stop_condition == "CONTINUE"
+        )
+
     def validate(
         self,
         submission: ActionSubmission,

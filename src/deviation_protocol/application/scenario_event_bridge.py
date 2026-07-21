@@ -113,7 +113,7 @@ class ScenarioDecisionResponsePolicy:
             ),
             None,
         )
-        if declared is None or declared.action_type != selected.action_type:
+        if declared is None:
             raise ValueError("choice is not declared by the authoritative decision")
         validated = object.__new__(ValidatedDecisionResponse)
         object.__setattr__(validated, "decision_id", public_decision_id)
@@ -200,7 +200,6 @@ class TrustedScenarioEventIssuer:
         )
         if (
             declared is None
-            or declared.action_type != validated.selected_action.action_type
             or submission.choice_id != validated.selected_action.action_id
         ):
             raise ValueError("validated choice does not match authoritative content")
@@ -214,7 +213,7 @@ class TrustedScenarioEventIssuer:
                 event_type=event_type,
                 source=source.value,
                 decision_id=current_decision_id,
-                action_type=validated.selected_action.action_type,
+                action_type=declared.action_type,
                 mutable_fact_updates=tuple(
                     FactValueUpdate(fact_id=item.fact_id, value=item.value)
                     for item in declared.mutable_fact_updates
@@ -234,7 +233,7 @@ class TrustedScenarioEventIssuer:
                 "decision_id": current_decision_id,
                 "public_decision_id": validated.decision_id,
                 "selected_action_id": validated.selected_action.action_id,
-                "selected_action_type": validated.selected_action.action_type,
+                "selected_action_type": declared.action_type,
             },
         )
         return IssuedScenarioDecisionEvent(event, audit, declared.server_narrative_text)
@@ -288,10 +287,39 @@ def bind_public_decision_frame(
         scenario_content_version,
         frame.decision_id,
     )
-    payload = frame.model_dump(mode="json")
-    payload["frame_id"] = "frame.pending"
-    payload["decision_id"] = public_id
-    draft = NarrativeFrame.model_validate(payload)
+    draft = NarrativeFrame(
+        frame_id="frame.pending",
+        scenario_id=frame.scenario_id,
+        phase_id=frame.phase_id,
+        mode=frame.mode,
+        current_location_id=frame.current_location_id,
+        must_render_facts=frame.must_render_facts,
+        may_render_facts=frame.may_render_facts,
+        visible_entities=frame.visible_entities,
+        visible_clues=frame.visible_clues,
+        must_render_event_types=frame.must_render_event_types,
+        recent_verified_events=frame.recent_verified_events,
+        npc_knowledge=frame.npc_knowledge,
+        tone_hints=frame.tone_hints,
+        target_length=frame.target_length,
+        min_length=frame.min_length,
+        max_length=frame.max_length,
+        decision_required=True,
+        decision_id=public_id,
+        decision_reason=frame.decision_reason,
+        suggested_actions=tuple(
+            SuggestedAction(
+                action_id=item.action_id,
+                action_type="choice",
+                label_hint=item.label_hint,
+                target_ids=(),
+            )
+            for item in frame.suggested_actions
+        ),
+        allowed_custom_action_constraints=None,
+        stop_condition=frame.stop_condition,
+        player_visible_clocks=frame.player_visible_clocks,
+    )
     frame_seed = draft.model_dump(mode="json", exclude={"frame_id"})
     digest = hashlib.sha256(
         json.dumps(

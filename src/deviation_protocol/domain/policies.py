@@ -6,7 +6,12 @@ from enum import StrEnum
 import re
 from typing import Any, Iterable
 
-from deviation_protocol.domain.actions import ActionContext, ActionType
+from deviation_protocol.domain.actions import (
+    MAX_ACTION_DESCRIPTION_LENGTH,
+    MAX_ACTION_DIALOGUE_LENGTH,
+    ActionContext,
+    ActionType,
+)
 
 
 class PolicyOutcome(StrEnum):
@@ -78,7 +83,53 @@ class ContinueInputPolicy(ActionPolicy):
         return self.pass_decision()
 
 
+class ActionInputKind(StrEnum):
+    NONE = "NONE"
+    DESCRIPTION = "DESCRIPTION"
+    DIALOGUE = "DIALOGUE"
+
+
+@dataclass(frozen=True, slots=True)
+class ActionInputContract:
+    input_kind: ActionInputKind
+    max_length: int | None
+    target_supported: bool
+    target_required: bool
+
+
 class InputContractPolicy(ActionPolicy):
+    """Validate and describe the single authoritative public input contract."""
+
+    @staticmethod
+    def contract_for(action_type: ActionType) -> ActionInputContract | None:
+        if action_type is ActionType.CONTINUE:
+            return ActionInputContract(
+                input_kind=ActionInputKind.NONE,
+                max_length=None,
+                target_supported=False,
+                target_required=False,
+            )
+        if action_type is ActionType.TALK:
+            return ActionInputContract(
+                input_kind=ActionInputKind.DIALOGUE,
+                max_length=MAX_ACTION_DIALOGUE_LENGTH,
+                target_supported=True,
+                target_required=False,
+            )
+        if action_type in {
+            ActionType.CUSTOM,
+            ActionType.EXPLORE,
+            ActionType.OBSERVE,
+            ActionType.MOVE,
+        }:
+            return ActionInputContract(
+                input_kind=ActionInputKind.DESCRIPTION,
+                max_length=MAX_ACTION_DESCRIPTION_LENGTH,
+                target_supported=True,
+                target_required=False,
+            )
+        return None
+
     def evaluate(self, context: ActionContext) -> PolicyDecision:
         action = context.submission
         if action.action_type is ActionType.CHOOSE:
@@ -100,12 +151,26 @@ class InputContractPolicy(ActionPolicy):
                 "unexpected_structured_field",
                 "decision_id and choice_id are only valid for CHOOSE",
             )
-        requirements = {
-            ActionType.TALK: ("dialogue", action.dialogue),
-            ActionType.CUSTOM: ("description", action.description),
-            ActionType.EXPLORE: ("description", action.description),
-            ActionType.OBSERVE: ("description", action.description),
-            ActionType.MOVE: ("description", action.description),
+        public_contract = self.contract_for(action.action_type)
+        if (
+            public_contract is not None
+            and public_contract.input_kind is ActionInputKind.DIALOGUE
+            and not action.dialogue
+        ):
+            return self.reject(
+                "missing_required_field",
+                f"{action.action_type.value} requires dialogue",
+            )
+        if (
+            public_contract is not None
+            and public_contract.input_kind is ActionInputKind.DESCRIPTION
+            and not action.description
+        ):
+            return self.reject(
+                "missing_required_field",
+                f"{action.action_type.value} requires description",
+            )
+        structured_requirements = {
             ActionType.EQUIP: ("item_instance_id", action.item_instance_id),
             ActionType.UNEQUIP: ("item_instance_id", action.item_instance_id),
             ActionType.USE_ITEM: ("item_instance_id", action.item_instance_id),
@@ -113,7 +178,7 @@ class InputContractPolicy(ActionPolicy):
             ActionType.UPGRADE_SKILL: ("skill_definition_id", action.skill_definition_id),
             ActionType.USE_SKILL: ("skill_definition_id", action.skill_definition_id),
         }
-        required = requirements.get(action.action_type)
+        required = structured_requirements.get(action.action_type)
         if required and not required[1]:
             return self.reject("missing_required_field", f"{action.action_type.value} requires {required[0]}")
 

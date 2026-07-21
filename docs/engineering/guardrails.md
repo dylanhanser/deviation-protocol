@@ -203,6 +203,10 @@ Observed failure:
 - View snapshot-integrity failures exposed multiple internal classifications.
 - Value-level response scans found that key allowlists alone were insufficient
   to prove internal identifiers absent from nested text and views.
+- A decision Frame exposed definition-level action semantics and custom-action
+  constraints even though the public client must submit only bound choices.
+- Outcome-rule target qualification was used to advertise a player input target
+  as required even though the Gateway contract kept that field optional.
 
 Rule:
 
@@ -216,6 +220,13 @@ protocol behavior. Aggregate view endpoints map known snapshot-integrity
 failures to one stable public code without catching unrelated failures.
 Tests scan both keys and serialized public values across mutation, query,
 rejection, request-status, and ended-session responses.
+Public content discovery and current-scene/ending presentation use explicit
+versioned allowlist definitions, never a full domain-model dump. Public action
+affordances reuse authoritative action/outcome/continue policies. Input field
+support and requiredness come only from `InputContractPolicy`; outcome-rule
+intent constraints qualify specific results and never redefine the submission
+contract. Decision projection exposes generic choices and re-resolves their IDs
+server-side.
 
 Missing and unauthorized sessions use the same safe response.
 

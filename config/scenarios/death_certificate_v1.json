@@ -102,6 +102,95 @@
       "content_version": "death-certificate-1.1.0",
       "title": "死亡证明已签发",
       "summary": "一份提前生效的记录推动处置规程，调查者需要以证据阻止记录制造它所声称的结果。",
+      "public_client": {
+        "title": "死亡证明已签发",
+        "hook": "你还活着，但系统已经签发了你的死亡证明。必须在处置规程完成前证明记录错了。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.death_certificate.investigator",
+            "description": "以开放方式调查现场、记录与目击者。"
+          },
+          {
+            "character_definition_id": "character.profession.clinical",
+            "description": "擅长识别生命体征与临床矛盾。"
+          },
+          {
+            "character_definition_id": "character.profession.systems",
+            "description": "擅长追查系统顺序与自动规程。"
+          },
+          {
+            "character_definition_id": "character.profession.documents",
+            "description": "擅长核验文书权威与证据链。"
+          },
+          {
+            "character_definition_id": "character.profession.response",
+            "description": "擅长现场响应、脱险与降级冲突。"
+          }
+        ],
+        "default_character_definition_id": "character.death_certificate.investigator",
+        "scenes": [
+          {
+            "phase_id": "death_certificate.arrival_locked",
+            "title": "封闭抵达",
+            "summary": "在封闭接收室中回应迫近的处置程序。"
+          },
+          {
+            "phase_id": "death_certificate.life_disputed",
+            "title": "生命争议",
+            "summary": "让现场人员正视你仍然活着的事实。"
+          },
+          {
+            "phase_id": "death_certificate.disposal_escape",
+            "title": "处置脱离",
+            "summary": "在规程推进前离开封闭处置路线。"
+          },
+          {
+            "phase_id": "death_certificate.investigation",
+            "title": "交叉调查",
+            "summary": "调查记录、因果链与仍在运行的设施。"
+          },
+          {
+            "phase_id": "death_certificate.self_fulfilling_truth",
+            "title": "自证真相",
+            "summary": "把已验证的线索连接成可以公开质疑的因果链。"
+          },
+          {
+            "phase_id": "death_certificate.core_conflict",
+            "title": "核心冲突",
+            "summary": "在时间耗尽前决定如何终止记录驱动的规程。"
+          },
+          {
+            "phase_id": "death_certificate.resolution",
+            "title": "结算",
+            "summary": "查看这次调查最终留下的公开结果。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "death_certificate.ending.protocol_broken",
+            "title": "规程已中断",
+            "summary": "处置规程被阻止，你的生命状态获得了可验证的承认。"
+          },
+          {
+            "ending_id": "death_certificate.ending.deadline_reached",
+            "title": "记录成为现实",
+            "summary": "截止时刻到达，处置规程完成了记录所预告的结果。"
+          },
+          {
+            "ending_id": "death_certificate.ending.record_challenged",
+            "title": "记录已被质疑",
+            "summary": "证据链进入公开审查，死亡记录不再能够自行维持权威。"
+          }
+        ],
+        "actions": [
+          {"action_type": "CONTINUE", "label": "继续"},
+          {"action_type": "TALK", "label": "交谈"},
+          {"action_type": "CUSTOM", "label": "自由行动"},
+          {"action_type": "EXPLORE", "label": "探索"},
+          {"action_type": "OBSERVE", "label": "观察"},
+          {"action_type": "MOVE", "label": "移动"}
+        ]
+      },
       "initial_phase_id": "death_certificate.arrival_locked",
       "initial_location_id": "death_certificate.intake_room",
       "locations": [

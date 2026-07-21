@@ -11,7 +11,12 @@ from deviation_protocol.application.session_service import (
     PublicNarrativeRequestStatus,
     NarrativeRequestClientAction,
 )
-from deviation_protocol.domain.actions import ActionSubmission, ActionType
+from deviation_protocol.domain.actions import (
+    MAX_ACTION_DESCRIPTION_LENGTH,
+    MAX_ACTION_DIALOGUE_LENGTH,
+    ActionSubmission,
+    ActionType,
+)
 from deviation_protocol.domain.narrative import NarrativeFrame
 
 
@@ -66,8 +71,14 @@ class ActionRequest(StrictApiModel):
     action_type: ActionType
     target_ids: tuple[SafeId128, ...] = Field(default=(), max_length=16)
     tool_ids: tuple[SafeId128, ...] = Field(default=(), max_length=16)
-    description: Annotated[str, Field(strict=True, min_length=1, max_length=150)] | None = None
-    dialogue: Annotated[str, Field(strict=True, min_length=1, max_length=200)] | None = None
+    description: Annotated[
+        str,
+        Field(strict=True, min_length=1, max_length=MAX_ACTION_DESCRIPTION_LENGTH),
+    ] | None = None
+    dialogue: Annotated[
+        str,
+        Field(strict=True, min_length=1, max_length=MAX_ACTION_DIALOGUE_LENGTH),
+    ] | None = None
     decision_id: SafeId128 | None = None
     choice_id: SafeId128 | None = None
     item_instance_id: SafeId128 | None = None

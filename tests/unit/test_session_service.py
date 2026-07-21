@@ -301,13 +301,18 @@ async def test_create_scenario_builds_v3_runtime_and_safe_initial_frame(
     assert result.narrative_frame.decision_id == (
         "decision.6403b6c1ecc381356e375b4b717ba593"
     )
-    assert result.narrative_frame.frame_id == "frame.e48125f7ff8626d234613a03"
+    assert result.narrative_frame.frame_id == "frame.82f4a302af086d3f1d55b1e2"
+    assert result.narrative_frame.allowed_custom_action_constraints is None
+    assert all(
+        item.action_type == "choice" and not item.target_ids
+        for item in result.narrative_frame.suggested_actions
+    )
     assert hashlib.sha256(
         stable_json(result.narrative_frame.model_dump(mode="json"))
-    ).hexdigest() == "61bb717d26729aae8ef15a2ca073d286ff0e658887ee77ad619515aa36ce7a97"
+    ).hexdigest() == "5c417270d577f0b6a5c887e82426c439b42d01c4a70419a12903521ccae3eefd"
     assert hashlib.sha256(
         stable_json(result.model_dump(mode="json"))
-    ).hexdigest() == "9325ad2a205d916e649f9a199f43432c2e9c630ff0b434a462861c9af56890c1"
+    ).hexdigest() == "b40c79ee96369b21c615503892749438e2e06314ad923993d1f67ca5cdd8738e"
     projection = await service.get_visible_state(principal(), result.session_id)
     assert [(item.npc_id, item.npc_definition_id) for item in projection.visible_npcs] == [
         (

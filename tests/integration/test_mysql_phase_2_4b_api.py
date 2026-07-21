@@ -335,6 +335,12 @@ async def test_mysql_public_api_complete_happy_path_commits_ending_and_memory(
         )
         assert view_status == 200
         assert view["ending_id"] == "death_certificate.ending.protocol_broken"
+        assert view["presentation"]["ending"]["title"] == "规程已中断"
+        assert view["action_affordances"] == {
+            "mode": "ENDED",
+            "actions": [],
+            "choices": [],
+        }
         assert view["player_memory"]["scenarios"][0]["status"] == "COMPLETED"
 
         async with mysql_session_factory() as database:
@@ -502,6 +508,12 @@ async def test_mysql_deadline_path_rolls_back_then_deduplicates_and_completes(
         )
         assert view_status == 200
         assert view["ending_id"] == "death_certificate.ending.deadline_reached"
+        assert view["presentation"]["ending"]["title"] == "记录成为现实"
+        assert view["action_affordances"] == {
+            "mode": "ENDED",
+            "actions": [],
+            "choices": [],
+        }
         assert view["player_memory"]["scenarios"][0]["status"] == "COMPLETED"
         assert provider.calls == 7
     finally:

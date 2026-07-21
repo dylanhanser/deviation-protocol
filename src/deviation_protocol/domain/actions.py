@@ -10,6 +10,10 @@ import unicodedata
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
+MAX_ACTION_DESCRIPTION_LENGTH = 150
+MAX_ACTION_DIALOGUE_LENGTH = 200
+
+
 class ActionType(StrEnum):
     CONTINUE = "CONTINUE"
     CHOOSE = "CHOOSE"
@@ -52,8 +56,10 @@ class ActionSubmission(BaseModel):
     action_type: ActionType
     target_ids: tuple[str, ...] = ()
     tool_ids: tuple[str, ...] = ()
-    description: str | None = Field(default=None, max_length=150)
-    dialogue: str | None = Field(default=None, max_length=200)
+    description: str | None = Field(
+        default=None, max_length=MAX_ACTION_DESCRIPTION_LENGTH
+    )
+    dialogue: str | None = Field(default=None, max_length=MAX_ACTION_DIALOGUE_LENGTH)
     decision_id: str | None = Field(
         default=None,
         max_length=128,

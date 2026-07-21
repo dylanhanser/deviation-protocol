@@ -12,6 +12,7 @@ from deviation_protocol.domain.content import (
     ContentDefinitionError,
     DefinitionId,
 )
+from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.facts import FactKind, FactVisibility
 from deviation_protocol.domain.json_values import (
     canonical_json_key,
@@ -496,6 +497,63 @@ class EndingRuleDefinition(ScenarioDefinitionModel):
         return self
 
 
+class PublicPlayableCharacterDefinition(ScenarioDefinitionModel):
+    character_definition_id: DefinitionId
+    description: Annotated[str, Field(strict=True, min_length=1, max_length=300)]
+
+
+class PublicScenePresentationDefinition(ScenarioDefinitionModel):
+    phase_id: DefinitionId
+    title: Annotated[str, Field(strict=True, min_length=1, max_length=120)]
+    summary: Annotated[str, Field(strict=True, min_length=1, max_length=300)]
+
+
+class PublicEndingPresentationDefinition(ScenarioDefinitionModel):
+    ending_id: DefinitionId
+    title: Annotated[str, Field(strict=True, min_length=1, max_length=120)]
+    summary: Annotated[str, Field(strict=True, min_length=1, max_length=500)]
+
+
+class PublicActionPresentationDefinition(ScenarioDefinitionModel):
+    action_type: ActionType
+    label: Annotated[str, Field(strict=True, min_length=1, max_length=80)]
+
+
+class PublicClientScenarioDefinition(ScenarioDefinitionModel):
+    title: Annotated[str, Field(strict=True, min_length=1, max_length=120)]
+    hook: Annotated[str, Field(strict=True, min_length=1, max_length=300)]
+    playable_characters: tuple[PublicPlayableCharacterDefinition, ...]
+    default_character_definition_id: DefinitionId
+    scenes: tuple[PublicScenePresentationDefinition, ...]
+    endings: tuple[PublicEndingPresentationDefinition, ...]
+    actions: tuple[PublicActionPresentationDefinition, ...]
+
+    @model_validator(mode="after")
+    def validate_public_client_shape(self) -> PublicClientScenarioDefinition:
+        for label, values, maximum in (
+            (
+                "playable character",
+                tuple(item.character_definition_id for item in self.playable_characters),
+                16,
+            ),
+            ("scene", tuple(item.phase_id for item in self.scenes), 64),
+            ("ending", tuple(item.ending_id for item in self.endings), 64),
+            ("action", tuple(item.action_type.value for item in self.actions), 16),
+        ):
+            if not values:
+                raise ValueError(f"public client {label} collection cannot be empty")
+            if len(values) > maximum:
+                raise ValueError(
+                    f"public client {label} count exceeds limit {maximum}"
+                )
+            _reject_duplicates(values, f"public client {label}")
+        if self.default_character_definition_id not in {
+            item.character_definition_id for item in self.playable_characters
+        }:
+            raise ValueError("default public character is not playable")
+        return self
+
+
 class NarrativeLengthDefinition(ScenarioDefinitionModel):
     target: Annotated[int, Field(strict=True, ge=1, le=MAX_NARRATIVE_LENGTH)]
     minimum: Annotated[int, Field(strict=True, ge=1, le=MAX_NARRATIVE_LENGTH)]
@@ -533,6 +591,7 @@ class ScenarioDefinition(ScenarioDefinitionModel):
     narrative_length: NarrativeLengthDefinition
     narrative_outcome_rules: tuple[NarrativeOutcomeRuleDefinition, ...] = ()
     memory_rules: tuple[MemoryRuleDefinition, ...] = ()
+    public_client: PublicClientScenarioDefinition | None = None
 
     @model_validator(mode="before")
     @classmethod
@@ -574,6 +633,43 @@ class ScenarioDefinition(ScenarioDefinitionModel):
         )
         _reject_duplicates(self.available_profession_tags, "scenario profession tag")
         _reject_duplicates(self.story_item_definition_ids, "scenario story item")
+        if self.public_client is not None:
+            public = self.public_client
+            if {item.phase_id for item in public.scenes} != set(phases):
+                raise ContentDefinitionError(
+                    "public client scenes must exactly cover scenario phases"
+                )
+            ending_ids = {item.ending_id for item in self.endings}
+            if {item.ending_id for item in public.endings} != ending_ids:
+                raise ContentDefinitionError(
+                    "public client endings must exactly cover scenario endings"
+                )
+            required_action_types = {
+                ActionType.CONTINUE,
+                *(
+                    action_type
+                    for rule in self.narrative_outcome_rules
+                    for action_type in rule.intent.action_types
+                ),
+            }
+            public_progression_types = {
+                ActionType.CONTINUE,
+                ActionType.TALK,
+                ActionType.CUSTOM,
+                ActionType.EXPLORE,
+                ActionType.OBSERVE,
+                ActionType.MOVE,
+            }
+            if not required_action_types <= public_progression_types:
+                raise ContentDefinitionError(
+                    "public client scenario uses an unsupported progression action"
+                )
+            if not required_action_types <= {
+                item.action_type for item in public.actions
+            }:
+                raise ContentDefinitionError(
+                    "public client action labels do not cover scenario actions"
+                )
         if self.initial_phase_id not in phases:
             raise ContentDefinitionError("initial phase does not exist")
         if self.initial_location_id not in locations:
@@ -1147,6 +1243,26 @@ class ScenarioCatalog(ScenarioDefinitionModel):
                 available_character_tags,
                 f"scenario {scenario.scenario_id!r} profession tag",
             )
+            if scenario.public_client is not None:
+                characters = {
+                    item.definition_id: item
+                    for item in self.content_catalog.characters
+                }
+                _require_all(
+                    (
+                        item.character_definition_id
+                        for item in scenario.public_client.playable_characters
+                    ),
+                    characters,
+                    f"scenario {scenario.scenario_id!r} public character",
+                )
+                if any(
+                    "npc" in characters[item.character_definition_id].tags
+                    for item in scenario.public_client.playable_characters
+                ):
+                    raise ContentDefinitionError(
+                        "public playable character cannot be an NPC"
+                    )
             entity_ids = {item.npc_definition_id for item in scenario.npc_references}
             for location in scenario.locations:
                 _require_all(
