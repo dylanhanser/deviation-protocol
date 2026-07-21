@@ -207,6 +207,8 @@ Observed failure:
   constraints even though the public client must submit only bound choices.
 - Outcome-rule target qualification was used to advertise a player input target
   as required even though the Gateway contract kept that field optional.
+- OpenAPI omitted a real 202 action response and advertised FastAPI's default
+  validation body even though the public runtime returned `ErrorResponse`.
 
 Rule:
 
@@ -227,13 +229,16 @@ support and requiredness come only from `InputContractPolicy`; outcome-rule
 intent constraints qualify specific results and never redefine the submission
 contract. Decision projection exposes generic choices and re-resolves their IDs
 server-side.
+OpenAPI declares every real success status and the route-specific public error
+statuses using the same DTOs and error envelope returned at runtime; framework
+default validation schemas are not advertised as the public 422 contract.
 
 Missing and unauthorized sessions use the same safe response.
 
 Enforcement:
 
 - Exact top-level and nested public response allowlists
-- OpenAPI enum and snapshot-integrity API regressions
+- OpenAPI status/schema, enum and snapshot-integrity API regressions
 
 ## SCENE-001: Scenario logic remains data-driven and private
 

@@ -334,6 +334,8 @@ async def test_mysql_public_api_complete_happy_path_commits_ending_and_memory(
             app, "GET", f"/v1/sessions/{session_id}/view"
         )
         assert view_status == 200
+        assert view["scenario_status"] == "ENDED"
+        assert view["ending_status"] == "RESOLVED"
         assert view["ending_id"] == "death_certificate.ending.protocol_broken"
         assert view["presentation"]["ending"]["title"] == "规程已中断"
         assert view["action_affordances"] == {
@@ -507,6 +509,8 @@ async def test_mysql_deadline_path_rolls_back_then_deduplicates_and_completes(
             app, "GET", f"/v1/sessions/{session_id}/view"
         )
         assert view_status == 200
+        assert view["scenario_status"] == "ENDED"
+        assert view["ending_status"] == "FAILED"
         assert view["ending_id"] == "death_certificate.ending.deadline_reached"
         assert view["presentation"]["ending"]["title"] == "记录成为现实"
         assert view["action_affordances"] == {

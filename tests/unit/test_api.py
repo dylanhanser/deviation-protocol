@@ -14,6 +14,7 @@ from fastapi import FastAPI
 
 from deviation_protocol.api import main
 from deviation_protocol.api.dependencies import ApiServices, get_current_principal
+from deviation_protocol.api.schemas import ActionResponse
 from deviation_protocol.application.errors import (
     IdempotencyConflictError,
     SessionNotFoundError,
@@ -687,6 +688,8 @@ def test_non_continue_optional_payload_defaults_keep_existing_http_semantics(
         )
 
     assert response.status_code == 202
+    parsed = ActionResponse.model_validate(response.json())
+    assert parsed.narrative_pending is True
     assert [call[0] for call in service.calls] == ["owner"]
     assert len(orchestrator.submissions) == 1
 

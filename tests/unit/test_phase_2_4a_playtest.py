@@ -674,6 +674,7 @@ async def test_memory_repository_contract_reaches_first_followup_decision() -> N
     assert view_status == 200
     assert view["metadata"]["state_version"] == 1
     assert view["scenario_status"] == "ACTIVE"
+    assert view["ending_status"] is None
     assert "ending_id" not in view
     assert view["recent_narrative_texts"] == [opening["narrative_text"]]
     assert view["player_memory"] == view["player_state"]["player_memory"]

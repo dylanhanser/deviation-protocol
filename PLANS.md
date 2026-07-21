@@ -6,8 +6,8 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `8d4f100 feat: complete death certificate playthrough`
-- Latest completed phase: Phase 2.4b
+- Commit: `f855ce356506f790e44cfba2ecb281a9004884dd`
+- Latest completed phase: Phase 3.0
 - Repository status: clean
 
 ## Phase Status
@@ -21,6 +21,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 2.3b | Complete |
 | Phase 2.4a | Complete |
 | Phase 2.4b | Complete |
+| Phase 3.0 | Complete |
 | Player-facing Web Client Planning | Planned |
 
 ## Phase 2.4b

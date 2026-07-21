@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path as FilePath
-from typing import Annotated
+from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Path, Response, status
 
@@ -18,6 +18,7 @@ from deviation_protocol.api.schemas import (
     ActionRequest,
     ActionResponse,
     CreateSessionRequest,
+    ErrorResponse,
     NarrativeRequestStatusResponse,
 )
 from deviation_protocol.application.identity import RequestPrincipal
@@ -71,6 +72,25 @@ RequestPathId = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
     ),
 ]
+
+_PUBLIC_ERROR_DESCRIPTIONS = {
+    400: "Domain rule violation",
+    404: "Public resource not found",
+    409: "Request or session state conflict",
+    422: "Request validation failed",
+    500: "Internal server error",
+    503: "Narrative service unavailable",
+}
+
+
+def _public_error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
+    return {
+        status_code: {
+            "model": ErrorResponse,
+            "description": _PUBLIC_ERROR_DESCRIPTIONS[status_code],
+        }
+        for status_code in status_codes
+    }
 
 
 def build_default_services() -> ApiServices:
@@ -146,6 +166,7 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     @app.get(
         "/v1/scenarios",
         response_model=PublicScenarioCatalog,
+        responses=_public_error_responses(500),
         tags=["scenarios"],
     )
     async def list_scenarios(
@@ -157,6 +178,7 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         "/v1/sessions",
         response_model=SessionCreationResult,
         status_code=status.HTTP_201_CREATED,
+        responses=_public_error_responses(409, 422, 500),
         tags=["sessions"],
     )
     async def create_session(
@@ -202,6 +224,7 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         "/v1/sessions/{session_id}/view",
         response_model=PlayerSessionView,
         response_model_exclude_none=True,
+        responses=_public_error_responses(404, 409, 422, 500),
         tags=["sessions"],
     )
     async def get_session_view(
@@ -214,6 +237,7 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     @app.get(
         "/v1/sessions/{session_id}/requests/{client_request_id}",
         response_model=NarrativeRequestStatusResponse,
+        responses=_public_error_responses(404, 409, 422, 500),
         tags=["actions"],
     )
     async def get_narrative_request_status(
@@ -234,6 +258,13 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     @app.post(
         "/v1/sessions/{session_id}/actions",
         response_model=ActionResponse,
+        responses={
+            status.HTTP_202_ACCEPTED: {
+                "model": ActionResponse,
+                "description": "Narrative processing pending",
+            },
+            **_public_error_responses(400, 404, 409, 422, 500, 503),
+        },
         tags=["actions"],
     )
     async def submit_action(

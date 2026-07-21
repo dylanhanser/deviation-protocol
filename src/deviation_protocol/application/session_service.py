@@ -8,7 +8,14 @@ import secrets
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationError,
+    model_serializer,
+    model_validator,
+)
 
 from deviation_protocol.application.errors import (
     ConcurrentSessionCreateError,
@@ -344,6 +351,7 @@ class PlayerSessionView(BaseModel):
     presentation: PublicScenarioPresentation
     action_affordances: PublicActionAffordanceSet
     scenario_status: Literal["ACTIVE", "ENDED"]
+    ending_status: Literal["RESOLVED", "FAILED"] | None
     public_clocks: tuple[VisibleClock, ...] = Field(default=(), max_length=32)
     recent_narrative_texts: tuple[
         Annotated[str, Field(strict=True, min_length=1, max_length=10_000)], ...
@@ -363,6 +371,8 @@ class PlayerSessionView(BaseModel):
             raise ValueError("player session view projections do not share one authority")
         if (self.scenario_status == "ACTIVE") != (self.ending_id is None):
             raise ValueError("ending is visible only for an ended scenario")
+        if (self.scenario_status == "ACTIVE") != (self.ending_status is None):
+            raise ValueError("ending status is visible only for an ended scenario")
         if (self.scenario_status == "ACTIVE") != (
             self.presentation.ending is None
         ):
@@ -378,6 +388,14 @@ class PlayerSessionView(BaseModel):
         ) > MAX_VIEW_RECENT_NARRATIVE_UTF8_BYTES:
             raise ValueError("recent narrative texts exceed the public view budget")
         return self
+
+    @model_serializer(mode="wrap")
+    def serialize_view(self, handler: Any):
+        data = handler(self)
+        # The route excludes other None-valued presentation details for backward
+        # compatibility, but this public lifecycle discriminator is always present.
+        data["ending_status"] = self.ending_status
+        return data
 
 
 @dataclass(slots=True)
@@ -725,6 +743,7 @@ class SessionService:
                 presentation=presentation,
                 action_affordances=action_affordances,
                 scenario_status="ENDED" if ended else "ACTIVE",
+                ending_status=(runtime.ending_status.value if ended else None),
                 public_clocks=frame.player_visible_clocks,
                 recent_narrative_texts=self._bounded_recent_texts(recent),
                 ending_id=runtime.ending_id if ended else None,

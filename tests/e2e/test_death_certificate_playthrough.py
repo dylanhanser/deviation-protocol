@@ -592,7 +592,21 @@ async def test_complete_public_api_happy_path_reaches_resolved_ending(
     view_status, view, _ = await asgi_request(app, "GET", f"{SESSION_PATH}/view")
     assert view_status == 200
     assert view["scenario_status"] == "ENDED"
+    assert view["ending_status"] == "RESOLVED"
     assert view["ending_id"] == ending_id
+    assert set(view) == {
+        "metadata",
+        "narrative_frame",
+        "player_state",
+        "player_memory",
+        "presentation",
+        "action_affordances",
+        "scenario_status",
+        "ending_status",
+        "public_clocks",
+        "recent_narrative_texts",
+        "ending_id",
+    }
     assert view["action_affordances"] == {
         "mode": "ENDED",
         "actions": [],
@@ -618,6 +632,7 @@ async def test_complete_public_api_happy_path_reaches_resolved_ending(
         "death_certificate.fact.underground_patient_alive",
     } <= known_facts
     runtime = store.snapshots["playtest-session"].state["scenario_runtime"]
+    assert view["ending_status"] == runtime["ending_status"]
     assert runtime["completed_clue_group_ids"] == [
         "death_record_predates_diagnosis",
         "player_is_alive",
@@ -835,6 +850,7 @@ async def test_complete_public_api_deadline_path_reaches_failed_ending() -> None
     view_status, view, _ = await asgi_request(app, "GET", f"{SESSION_PATH}/view")
     assert view_status == 200
     assert view["scenario_status"] == "ENDED"
+    assert view["ending_status"] == "FAILED"
     assert view["ending_id"] == "death_certificate.ending.deadline_reached"
     assert view["presentation"]["ending"] == {
         "title": "记录成为现实",
@@ -847,6 +863,9 @@ async def test_complete_public_api_deadline_path_reaches_failed_ending() -> None
     }
     assert view["player_memory"]["scenarios"][0]["status"] == "COMPLETED"
     assert view["player_memory"]["scenarios"][0]["ending_id"] == view["ending_id"]
+    assert view["ending_status"] == store.snapshots["playtest-session"].state[
+        "scenario_runtime"
+    ]["ending_status"]
     assert provider.calls == 7
     assert all(chars <= 32_000 and bytes_ <= 64_000 for chars, bytes_ in provider.prompt_budgets)
     assert (

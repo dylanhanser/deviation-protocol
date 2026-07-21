@@ -13,6 +13,9 @@ knowledge, outcome rules or memory rules.
 `PlayerSessionView` now combines the validated snapshot projections with the
 current scene's public title/summary and deterministic action affordances. An
 ending title/summary is selected only after authoritative runtime settlement.
+The public `scenario_status` remains the two-value ACTIVE/ENDED lifecycle, while
+the always-present nullable `ending_status` projects only the authoritative
+runtime RESOLVED/FAILED classification for client settlement handling.
 Missing phase/ending presentation bindings fail through the existing
 `SNAPSHOT_INVALID` boundary. View construction remains read-only and never
 advances state, claims a job, acquires a lease or calls `NarrativeProvider`.

@@ -39,6 +39,13 @@ objects. A missing or inconsistent binding is handled as `SNAPSHOT_INVALID`.
 View reads do not advance the Director, claim a lease, invoke a Provider, or
 write sessions, snapshots, events, turn requests or narrative jobs.
 
+`scenario_status` remains the two-value page lifecycle (`ACTIVE` or `ENDED`).
+The always-present `ending_status` field supplies the settlement classification:
+it is `null` while ACTIVE, `RESOLVED` after a successful ending and `FAILED`
+after a failure ending. The value is projected only from the restored
+authoritative scenario runtime status. Clients must not infer success or
+failure from `ending_id`, ending presentation, narrative text or player memory.
+
 ## Action affordances
 
 `action_affordances.mode` has three states:
@@ -68,6 +75,21 @@ the versioned public content block. `CONTINUE` appears only when
 The affordance is a UI description, not a capability. `ActionGateway`, the
 decision/continue policies, locked state reload and narrative outcome policy
 remain final authority. Clients must handle a later rejection or stale view.
+
+## Response status and error contract
+
+`POST /v1/sessions/{session_id}/actions` returns an `ActionResponse` with 200
+when the request completes synchronously and with 202 when narrative work is
+pending. The client polls the existing request-status endpoint exactly as
+directed by that response; the status distinction does not change the action
+body or idempotency semantics.
+
+Public errors use the single `ErrorResponse` envelope containing only
+`error.error_code` and `error.message`. This includes request-validation 422
+responses; FastAPI's default validation body is not part of the public
+contract. OpenAPI declares the actual error statuses for each public route and
+describes public DTOs only. It must not expose scenario definitions, narrative
+jobs, receipts, Provider data or other internal models.
 
 ### Targets and TALK
 
@@ -100,7 +122,8 @@ event-sequence DTO.
 ## Verification boundary
 
 Contract tests enforce exact response keys, hidden-value scans, ACTIVE/ENDED
-ending visibility, decision/free/continue modes, safe targets, shared Gateway
-input contracts, ownership 404, `SNAPSHOT_INVALID`, read-only queries, OpenAPI
-model exclusions and absence of scenario-ID branches. Browser and MySQL tests
-use Scripted Providers; live DeepSeek remains opt-in and is not used here.
+ending visibility and RESOLVED/FAILED classification, decision/free/continue
+modes, safe targets, shared Gateway input contracts, ownership 404,
+`SNAPSHOT_INVALID`, read-only queries, OpenAPI response/error schemas and model
+exclusions, and absence of scenario-ID branches. Browser and MySQL tests use
+Scripted Providers; live DeepSeek remains opt-in and is not used here.

@@ -4,6 +4,8 @@
 
 首副本现在通过 `GET /v1/scenarios` 提供版本化公开标题、hook、可玩角色和默认角色；响应不包含 phase、ending、fact、clue、NPC secret 或规则定义。session View 额外提供当前场面的公开标题/摘要，以及仅在结算后出现的匹配 ending 标题/摘要。玩家界面不再需要解析 `death_certificate` 的内部 phase/ending ID。
 
+View 的 `scenario_status` 继续只表示 `ACTIVE/ENDED` 页面生命周期；稳定存在的 `ending_status` 在活动期为 `null`，并只从权威 runtime 状态投影结算后的 `RESOLVED/FAILED`。客户端不得从 ending ID、标题、摘要或叙事正文推断成败。
+
 View 的 `action_affordances` 明确区分 decision、自由行动和 ended。decision 只提供绑定当前状态版本的 `CHOOSE` choice；自由行动的 ActionType 来自现有 outcome 权威规则，输入字段/长度来自 Gateway 的 `InputContractPolicy`，CONTINUE 来自现有 continue policy，目标只列当前可见 runtime NPC。TALK 保持服务器现有的可选 target 语义。该描述不能绕过 Gateway、decision policy、NarrativeOutcomePolicy 或锁内重载，完整协议见 [`public_client_contract.md`](public_client_contract.md)。
 
 本阶段仍使用固定 `demo-dev-only` principal，只适合本地/测试环境；公开 Web 发布前必须另行实现服务端验证的访客身份与滥用控制。Phase 3.0 不包含 React/Vite、npm 依赖、公开部署、Electron、Tauri 或 Steamworks。

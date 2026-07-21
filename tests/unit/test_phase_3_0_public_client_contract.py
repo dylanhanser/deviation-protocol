@@ -7,8 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from deviation_protocol.application.action_gateway import ActionGateway, ActionRoute
+from deviation_protocol.application.session_service import PlayerSessionView
 from deviation_protocol.application.narrative_outcome_policy import (
     allowed_narrative_outcomes,
     available_narrative_actions,
@@ -171,9 +173,12 @@ async def test_active_view_projects_current_public_scene_and_is_read_only() -> N
         "presentation",
         "action_affordances",
         "scenario_status",
+        "ending_status",
         "public_clocks",
         "recent_narrative_texts",
     }
+    assert view["scenario_status"] == "ACTIVE"
+    assert view["ending_status"] is None
     assert view["presentation"] == {
         "title": "死亡证明已签发",
         "scene_title": "封闭抵达",
@@ -197,6 +202,39 @@ async def test_active_view_projects_current_public_scene_and_is_read_only() -> N
         store.turn_requests,
         store.jobs,
     )
+
+
+@pytest.mark.asyncio
+async def test_view_schema_rejects_impossible_ending_status_combinations() -> None:
+    app, _, _ = build_playtest()
+    await _create(app)
+    status, active_view, _ = await asgi_request(app, "GET", f"{SESSION_PATH}/view")
+    assert status == 200
+
+    for invalid_status in ("RESOLVED", "FAILED", "UNKNOWN"):
+        invalid_active = {**active_view, "ending_status": invalid_status}
+        with pytest.raises(ValidationError):
+            PlayerSessionView.model_validate(invalid_active)
+
+    ended_without_status = deepcopy(active_view)
+    ended_without_status.update(
+        {
+            "scenario_status": "ENDED",
+            "ending_status": None,
+            "ending_id": "ending.example",
+            "action_affordances": {
+                "mode": "ENDED",
+                "actions": [],
+                "choices": [],
+            },
+        }
+    )
+    ended_without_status["presentation"]["ending"] = {
+        "title": "Settlement",
+        "summary": "Settlement summary",
+    }
+    with pytest.raises(ValidationError):
+        PlayerSessionView.model_validate(ended_without_status)
 
 
 @pytest.mark.asyncio
@@ -490,6 +528,72 @@ def test_openapi_exposes_public_contract_without_internal_models() -> None:
     assert scenarios["responses"]["200"]["content"]["application/json"][
         "schema"
     ] == {"$ref": "#/components/schemas/PublicScenarioCatalog"}
+    view_schema = schema["components"]["schemas"]["PlayerSessionView"]
+    assert "ending_status" in view_schema["required"]
+    assert view_schema["properties"]["ending_status"] == {
+        "anyOf": [
+            {"type": "string", "enum": ["RESOLVED", "FAILED"]},
+            {"type": "null"},
+        ],
+        "title": "Ending Status",
+    }
+
+    public_operations = {
+        ("/v1/scenarios", "get"): ({"200", "500"}, {"500"}),
+        ("/v1/sessions", "post"): (
+            {"201", "409", "422", "500"},
+            {"409", "422", "500"},
+        ),
+        ("/v1/sessions/{session_id}/view", "get"): (
+            {"200", "404", "409", "422", "500"},
+            {"404", "409", "422", "500"},
+        ),
+        ("/v1/sessions/{session_id}/actions", "post"): (
+            {"200", "202", "400", "404", "409", "422", "500", "503"},
+            {"400", "404", "409", "422", "500", "503"},
+        ),
+        (
+            "/v1/sessions/{session_id}/requests/{client_request_id}",
+            "get",
+        ): (
+            {"200", "404", "409", "422", "500"},
+            {"404", "409", "422", "500"},
+        ),
+    }
+    for (path, method), (all_statuses, error_statuses) in public_operations.items():
+        responses = schema["paths"][path][method]["responses"]
+        assert set(responses) == all_statuses
+        for status_code in error_statuses:
+            assert responses[status_code]["content"]["application/json"][
+                "schema"
+            ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    action_responses = schema["paths"][
+        "/v1/sessions/{session_id}/actions"
+    ]["post"]["responses"]
+    for status_code in ("200", "202"):
+        assert action_responses[status_code]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/ActionResponse"}
+    assert "ErrorResponse" in schema["components"]["schemas"]
+    assert action_responses["422"]["content"]["application/json"][
+        "schema"
+    ] != {"$ref": "#/components/schemas/HTTPValidationError"}
+    assert schema["paths"]["/v1/sessions"]["post"]["responses"]["201"][
+        "content"
+    ]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/SessionCreationResult"
+    }
+    assert schema["paths"]["/v1/sessions/{session_id}/view"]["get"][
+        "responses"
+    ]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/PlayerSessionView"
+    }
+    assert schema["paths"][
+        "/v1/sessions/{session_id}/requests/{client_request_id}"
+    ]["get"]["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ] == {"$ref": "#/components/schemas/NarrativeRequestStatusResponse"}
     model_names = set(schema["components"]["schemas"])
     assert {
         "ScenarioDefinition",
