@@ -5,6 +5,11 @@ __pycache__/
 .ruff_cache/
 .venv/
 .env
+.env.*
+!.env.example
+node_modules/
+coverage/
+*.tsbuildinfo
 dist/
 build/
 *.egg-info/

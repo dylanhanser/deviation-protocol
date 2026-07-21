@@ -6,7 +6,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `f855ce356506f790e44cfba2ecb281a9004884dd`
+- Commit: `c473fc586219a126ff17002bd5f0c7dedaf6b5c5`
 - Latest completed phase: Phase 3.0
 - Repository status: clean
 
@@ -22,7 +22,8 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 2.4a | Complete |
 | Phase 2.4b | Complete |
 | Phase 3.0 | Complete |
-| Player-facing Web Client Planning | Planned |
+| Phase 3.1a | Implemented; awaiting independent audit |
+| Phase 3.1b and later | Not started |
 
 ## Phase 2.4b
 
@@ -34,14 +35,23 @@ Phase 2.4b completed the first-copy public API playthrough:
 - `deadline_reached` is a failure ending.
 - Deterministic end-to-end and MySQL routes cover the complete path.
 
+## Phase 3.1a
+
+The first player-facing Web batch is implemented but not yet independently
+audited or released. It adds:
+
+- an isolated React/Vite/TypeScript project under `web/`;
+- Zod-backed public DTOs and one public API client boundary;
+- scenario/role discovery, session creation, and manual full View reads;
+- MSW contract tests plus a minimal accessible verification page; and
+- no actions, polling, persistence recovery, authentication, or deployment.
+
 ## Next Step
 
-### Player-facing Web Client Planning
+Run an independent XHigh read-only review of Phase 3.1a and its verification
+evidence. Do not begin Phase 3.1b as part of that review. Later Web batches are
+expected to:
 
-This stage is planning only; implementation has not started. Its goals are to:
-
-- build a player interface on the stable public API;
-- display the `NarrativeFrame`, body text, public clock, decisions, and state;
 - support free input, `CONTINUE`, request polling, and reconnection recovery; and
 - avoid direct reads of snapshots or internal job state.
 

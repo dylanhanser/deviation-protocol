@@ -1,6 +1,6 @@
 # Deviation Protocol：AI 无限流文字游戏后端
 
-当前实现到 Phase 2.4b：`death_certificate` content version `death-certificate-1.1.0` 已有不依赖网络的完整公共 ASGI API playtest。成功路径从创建 session 经生命复核、disposal escape、三个调查线索组、self-fulfilling truth 和四个 rapid core decisions，可分别到达正式 `protocol_broken` 或 `record_challenged` ending；失败路径通过公开行动把 `predicted_death_deadline` 从 0 真实推进到 13 并进入 `deadline_reached`。三种 ending 都原子提交完成记忆，结束后 mutation 稳定拒绝。Web client 仍属于后续阶段。
+当前后端封板基线为 Phase 3.0；Phase 3.1a 已实现待独立审计的 React/Vite 前端基础与公开 API 适配层。`death_certificate` content version `death-certificate-1.1.0` 已有不依赖网络的完整公共 ASGI API playtest。成功路径从创建 session 经生命复核、disposal escape、三个调查线索组、self-fulfilling truth 和四个 rapid core decisions，可分别到达正式 `protocol_broken` 或 `record_challenged` ending；失败路径通过公开行动把 `predicted_death_deadline` 从 0 真实推进到 13 并进入 `deadline_reached`。三种 ending 都原子提交完成记忆，结束后 mutation 稳定拒绝。
 
 `CONTINUE` 是无载荷服务器协议：不接受正文、对话、目标、决策、物品、工具或技能字段；应用在 session 行锁内重载 snapshot 并重算安全 Frame，只有 ACTIVE、`stop_condition=CONTINUE` 且没有当前 decision 时才调用 StoryDirector 的无事件推进一次。它不调用 NarrativeProvider。服务器 `ScenarioAutoBeatAdvanced` 事件、可能生成的可信 scenario 事件、memory、snapshot、turn response 和 state version 在同一 UoW 原子提交；相同 `client_request_id` 的重放或并发请求只推进一次。
 
@@ -40,6 +40,30 @@ docs/                 # 架构说明
 ```
 
 依赖方向为 `api/infrastructure -> application -> domain`。领域层不导入 FastAPI、SQLAlchemy 或任何模型供应商 SDK。
+
+## Phase 3.1a Web 客户端
+
+`web/` 是独立的 React、Vite 与 TypeScript 工程。它使用 Zod 在运行时验证 Phase 3.0 公开 DTO，通过单一 API client 读取公开 scenario、创建 session，并从正式 `/view` endpoint 手动读取完整 `PlayerSessionView`。测试使用 MSW，不依赖真实后端、MySQL、网络或 Provider。本批不包含 action、polling、浏览器持久化恢复或部署。
+
+安装和验证：
+
+```powershell
+Set-Location .\web
+npm ci
+npm run lint
+npm run typecheck
+npm run test:run
+npm run build
+```
+
+本地开发时先在另一个终端按后端说明启动 FastAPI，再启动 Vite：
+
+```powershell
+Set-Location .\web
+npm run dev
+```
+
+默认浏览器 API base URL 为 `/api/`；Vite 的仅开发代理会转发到 `http://127.0.0.1:8000` 并移除 `/api` 前缀。需要其他地址时可从进程环境设置非敏感的 `VITE_API_BASE_URL`，或参考 `web/.env.example`。不要把凭据放入 Vite 变量；所有 `VITE_*` 值都会进入客户端构建。
 
 ## Windows 开发环境与验证
 

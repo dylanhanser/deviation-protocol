@@ -1,5 +1,24 @@
 # 第一阶段架构边界
 
+## Phase 3.1a Web public API adapter
+
+`web/` is an independent React/Vite/TypeScript client and depends only on the
+sealed Phase 3.0 HTTP contract. Components do not call `fetch` directly. A
+single client boundary owns base-URL resolution, path encoding, cancellation,
+JSON handling, exact success statuses, public `ErrorResponse` mapping and Zod
+runtime validation. Response schemas reject missing or incompatible contract
+fields while discarding harmless additive fields; TypeScript DTOs are inferred
+from those schemas.
+
+The minimal page discovers public scenarios and roles, creates a session, then
+reads the complete `PlayerSessionView` from the formal `/view` endpoint. It can
+also perform an explicit in-page View read by session ID. Suggested actions are
+display-only. The client never reads `/state` as a recovery substitute and does
+not parse opaque IDs or tokens. This batch has no action submission, polling,
+automatic retry, local/session storage, URL recovery, cross-tab coordination,
+authentication or deployment adapter. MSW provides the only API used by Web
+tests; unhandled requests fail the suite.
+
 ## Phase 3.0 Public Client Contract
 
 Phase 3.0 adds a read-only, explicitly allowlisted client contract without a
