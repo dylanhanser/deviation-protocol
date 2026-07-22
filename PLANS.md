@@ -6,7 +6,8 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Repository HEAD: `23a7cea8502569f769d3ee729f32057004824be6`
+- Repository HEAD and Phase 3.2 planning baseline:
+  `44258527c169170ee79540a130ac5e143211c748`
 - Phase 3.1c implementation baseline: `4da6791cf43070b15b0c619129ffb3c0b59e22b2`
 - Latest completed phase: Phase 3.1c
 - Repository baseline before this planning edit: clean, with `origin/main` at
@@ -27,6 +28,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
 | Phase 3.1b | Complete; third independent read-only audit `APPROVED`; the first audit's 3 findings and the second audit's 3 Major and 1 Minor findings are closed; committed and pushed (`b4352230ef0c9bc91a5bf78e69e88e0feab4908c`) |
 | Phase 3.1c | Complete; same-tab recovery boundary clarified (`a14a76d359d4aa777ed16ff239c2157c912e47dc`) and isolated-storage boundary covered (`4db377b4cdb195e2d05fbf9a67be1e0600cfba15`) |
+| Phase 3.2 | Specification frozen for review; implementation not started |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -59,7 +61,8 @@ earlier `CHANGES_REQUIRED` verdict are closed. The approved implementation was
 committed as `b4352230ef0c9bc91a5bf78e69e88e0feab4908c` (`feat(web): complete
 Phase 3.1b playable action loop`). Repository HEAD is the subsequent Phase 3.1b
 status-documentation commit `3d3181f7ea216003e582e3e658f6afda9cbbd852`.
-Phase 3.1c is approved/planned, but its implementation has not started.**
+At that Phase 3.1b completion baseline, Phase 3.1c was approved/planned but had
+not started; Phase 3.1c has since been completed as recorded below.**
 
 Phase 3.1b is a complete minimum playable action loop in one browser tab, with
 no persistence or reload recovery. A user can create a Session or manually load
@@ -286,6 +289,47 @@ Phase 3.1c is complete against the frozen boundary above:
     isolation, and the recovery-time UI action lock.
 12. Phase 3.1c requires no live DeepSeek, MySQL, network verification, or
     Alembic migration.
+
+## Phase 3.2 Deterministic Demo Environment
+
+**Status: specification frozen for review. Implementation has not started, the
+phase is not complete, and no implementation audit has been performed.**
+
+Phase 3.2 freezes a local-only, explicitly selected Demo composition that lets
+the existing Web action loop complete one meaningful `death_certificate` route
+without MySQL, DeepSeek, an API key, secrets, or any non-loopback network
+service. It reuses the sealed public API, DTOs, action-affordance authority and
+Phase 3.1c recovery/no-replay semantics. It does not make the normal
+`deviation_protocol.api.main:app` composition or the fixed `demo-dev-only`
+principal production-ready.
+
+The implementation is split for review atomicity:
+
+- **Phase 3.2a — Demo backend runtime:** an explicit demo-only composition
+  root, a process-local transactional in-memory adapter and a generic
+  deterministic `NarrativeProvider`, with a complete public-HTTP playthrough,
+  two-process deterministic replay whose test-only IPC trace proves the exact
+  private generator stream, and external-I/O denial evidence.
+- **Phase 3.2b — Web launch and playthrough:** one documented PowerShell launch
+  command, Demo-only Vite dotenv isolation, an unmistakable
+  ephemeral/non-production Web label, a full Web-loop regression to an ENDED
+  View, the separately bounded `scripts/smoke-demo.ps1` startup/proxy/sentinel
+  smoke with direct `publicScenarioCatalogSchema` validation and fail-closed
+  Windows `cmd.exe`/`npm.cmd` resolution plus validator ExitCode propagation,
+  and the frozen manual walkthrough. Phase 3.2b depends on a completed,
+  verified and independently approved Phase 3.2a; it cannot be claimed
+  complete in parallel with an unapproved Phase 3.2a. Phase 3.2 is complete
+  only after both subphases are separately completed, verified and
+  independently reviewed.
+
+The current `death_certificate` content is sufficient; no scenario, database
+seed, ORM model, schema or Alembic migration is planned. Demo state lives only
+for the backend process lifetime. Same-tab reload remains supported while that
+process lives; backend restart is ordinary session loss and follows the
+existing safe 404 recovery behavior. The exact frozen specification, including
+determinism, isolation, boundaries, test matrix, completion conditions and
+verification commands, is in
+[`docs/phase_3_2_deterministic_demo_environment.md`](docs/phase_3_2_deterministic_demo_environment.md).
 
 ## Deferred by Design
 
