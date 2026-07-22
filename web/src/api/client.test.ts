@@ -888,6 +888,46 @@ describe("public action and request-status contracts", () => {
     );
   });
 
+  it.each([
+    ["Session ID", "other-session", "request-status", "SESSION_ID"],
+    [
+      "client_request_id",
+      "session-public-1",
+      "other-request",
+      "CLIENT_REQUEST_ID",
+    ],
+  ] as const)(
+    "classifies a request-status %s mismatch separately from schema damage",
+    async (_label, responseSessionId, responseRequestId, identityMismatch) => {
+      server.use(
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/requests/request-status`,
+          () =>
+            HttpResponse.json({
+              session_id: responseSessionId,
+              client_request_id: responseRequestId,
+              status: "PENDING",
+              client_action: "POLL_SAME_REQUEST",
+              error_code: null,
+              retry_after_seconds: 2,
+              response: null,
+            }),
+        ),
+      );
+
+      await expect(
+        client().getNarrativeRequestStatus(
+          "session-public-1",
+          "request-status",
+        ),
+      ).rejects.toMatchObject({
+        kind: "identity-mismatch",
+        status: 200,
+        identityMismatch,
+      });
+    },
+  );
+
   it("validates every real request-status/client_action shape", () => {
     const committedResponse = committedActionResponseFixture("request-status");
     const identities = {

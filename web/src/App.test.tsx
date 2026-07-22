@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
+import { readSessionRecoveryRecord } from "./sessionRecovery";
 import {
   activeViewFixture,
   endedViewFixture,
@@ -30,6 +31,14 @@ function renderApp() {
       requestIdFactory={() => "web-create-ui-test"}
     />,
   );
+}
+
+function storedRecoveryRecord() {
+  const result = readSessionRecoveryRecord();
+  if (!result.ok) {
+    throw new Error(`unexpected storage failure: ${result.failure.operation}`);
+  }
+  return result.value;
 }
 
 describe("scenario discovery states", () => {
@@ -122,6 +131,10 @@ describe("session creation", () => {
       client_request_id: "web-create-ui-test",
       character_definition_id: "character.public.observer",
       scenario_id: "scenario.public-alpha",
+    });
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
     });
   });
 
@@ -253,6 +266,10 @@ describe("session creation", () => {
     ).toBeVisible();
     expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
     expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-2",
+    });
   });
 
   it("coordinates rapid create and manual submissions as one foreground operation", async () => {
@@ -339,6 +356,10 @@ describe("manual PlayerSessionView reads", () => {
     expect(await screen.findByText("长期记忆")).toBeVisible();
     expect(screen.getByText("当前公开正文")).toBeVisible();
     expect(readCount).toBe(1);
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
   });
 
   it("renders an ended session with ending_status and ending presentation", async () => {

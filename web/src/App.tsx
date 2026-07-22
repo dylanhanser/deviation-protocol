@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
 import { publicApiClient, type PublicApiClient } from "./api/client";
 import { ApiClientError, formatApiClientError } from "./api/errors";
@@ -11,6 +11,13 @@ import {
   type PublicPlayableActionType,
   type PublicScenarioDescription,
 } from "./api/schemas";
+import {
+  clearSessionRecoveryRecord,
+  readSessionRecoveryRecord,
+  writeSessionRecoveryRecord,
+  type SessionRecoveryRecord,
+  type SessionRecoveryStorageFailure,
+} from "./sessionRecovery";
 
 interface ActionIdentity {
   turnId: string;
@@ -49,9 +56,18 @@ interface ForegroundOperation {
   id: number;
 }
 
+interface RecoveryInterruption {
+  message: string;
+}
+
+interface RecoveryStorageFailureState {
+  failure: SessionRecoveryStorageFailure;
+}
+
 type ForegroundOperationKind =
   | "creating"
   | "reading"
+  | "recovering"
   | "submitting"
   | "pending"
   | "refreshing";
@@ -81,6 +97,14 @@ const REQUEST_FAILED_MESSAGE =
   "服务器报告 FAILED，并指示 DO_NOT_RETRY。客户端不会重新提交行动；请显式重新读取权威 View 后再继续。";
 const CONFIRMED_VIEW_UNAVAILABLE_MESSAGE =
   "行动已获服务器确认，但新的完整 PlayerSessionView 获取失败。保留的 View 已标记为 stale，不能继续行动；显式刷新只会重新读取 View，不会重放行动。";
+const RECOVERY_INTERRUPTED_MESSAGE =
+  "自动恢复已停止，行动保持锁定。只能手动重试安全 GET；客户端不会 POST、重放行动或生成新的 request ID。";
+const RECOVERY_NOT_FOUND_MESSAGE =
+  "已保存的同标签页恢复记录在服务器返回 404 后失效，现已清除。请创建 Session 或手动读取其他 Session。";
+const RECOVERY_IDENTITY_MISMATCH_MESSAGE =
+  "服务器返回的恢复身份与已保存记录不匹配，原恢复记录已失效并清除。请创建 Session 或手动读取其他 Session。";
+const RECOVERY_STORAGE_FAILURE_MESSAGE =
+  "本标签页 sessionStorage 无法安全访问或更新。Session、View 与行动控件已锁定；客户端不会 POST、重放行动或生成新的恢复身份。";
 
 function newOpaqueId(): string {
   return globalThis.crypto.randomUUID();
@@ -498,18 +522,111 @@ export default function App({
   const [scenarioError, setScenarioError] = useState<string | null>(null);
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
   const [selectedRoleId, setSelectedRoleId] = useState("");
+  const [initialRecoveryRead] = useState(() => readSessionRecoveryRecord());
+  const initialRecoveryRecord = initialRecoveryRead.ok
+    ? initialRecoveryRead.value
+    : null;
+  const [recoveryRecord, setRecoveryRecord] =
+    useState<SessionRecoveryRecord | null>(initialRecoveryRecord);
   const [foregroundOperation, setForegroundOperation] =
-    useState<ForegroundOperationKind | null>(null);
+    useState<ForegroundOperationKind | null>(
+      initialRecoveryRecord === null ? null : "recovering",
+    );
   const [manualSessionId, setManualSessionId] = useState("");
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
   const [createdSessionWithoutView, setCreatedSessionWithoutView] = useState<
     string | null
   >(null);
   const [operationError, setOperationError] = useState<string | null>(null);
+  const [recoveryInterruption, setRecoveryInterruption] =
+    useState<RecoveryInterruption | null>(null);
+  const [recoveryStorageFailure, setRecoveryStorageFailure] =
+    useState<RecoveryStorageFailureState | null>(
+      initialRecoveryRead.ok
+        ? null
+        : { failure: initialRecoveryRead.failure },
+    );
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const foregroundOperationRef = useRef<ForegroundOperation | null>(null);
   const operationGenerationRef = useRef(0);
   const loadedSessionRef = useRef<LoadedSession | null>(null);
+  const recoveryRecordRef = useRef<SessionRecoveryRecord | null>(
+    initialRecoveryRecord,
+  );
   const previousClientRef = useRef(client);
+
+  const invalidateForegroundOperation = useCallback(() => {
+    operationGenerationRef.current += 1;
+    const operation = foregroundOperationRef.current;
+    operation?.controller.abort();
+    foregroundOperationRef.current = null;
+    setForegroundOperation(null);
+  }, []);
+
+  const clearSessionUiState = useCallback(() => {
+    loadedSessionRef.current = null;
+    setLoadedSession(null);
+    setCreatedSessionWithoutView(null);
+    setManualSessionId("");
+    setOperationError(null);
+    setRecoveryInterruption(null);
+  }, []);
+
+  const enterRecoveryStorageFailure = useCallback(
+    (failure: SessionRecoveryStorageFailure) => {
+      invalidateForegroundOperation();
+      recoveryRecordRef.current = null;
+      setRecoveryRecord(null);
+      clearSessionUiState();
+      setRecoveryStorageFailure({ failure });
+    },
+    [clearSessionUiState, invalidateForegroundOperation],
+  );
+
+  const persistRecoveryRecord = useCallback(
+    (sessionId: string, confirmedPendingClientRequestId?: string): boolean => {
+      const result = writeSessionRecoveryRecord(
+        sessionId,
+        confirmedPendingClientRequestId,
+      );
+      if (!result.ok) {
+        enterRecoveryStorageFailure(result.failure);
+        return false;
+      }
+      recoveryRecordRef.current = result.value;
+      setRecoveryRecord(result.value);
+      return true;
+    },
+    [enterRecoveryStorageFailure],
+  );
+
+  const clearRecoveryForSessionTransition = useCallback((): boolean => {
+    const result = clearSessionRecoveryRecord();
+    if (!result.ok) {
+      enterRecoveryStorageFailure(result.failure);
+      return false;
+    }
+    recoveryRecordRef.current = null;
+    setRecoveryRecord(null);
+    loadedSessionRef.current = null;
+    setLoadedSession(null);
+    setRecoveryStorageFailure(null);
+    return true;
+  }, [enterRecoveryStorageFailure]);
+
+  const explicitlyAbandonSession = useCallback((): boolean => {
+    invalidateForegroundOperation();
+    const result = clearSessionRecoveryRecord();
+    recoveryRecordRef.current = null;
+    setRecoveryRecord(null);
+    clearSessionUiState();
+    if (!result.ok) {
+      setRecoveryStorageFailure({ failure: result.failure });
+      return false;
+    }
+    setRecoveryStorageFailure(null);
+    return true;
+  }, [clearSessionUiState, invalidateForegroundOperation]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -544,17 +661,15 @@ export default function App({
 
   useEffect(() => {
     if (previousClientRef.current !== client) {
-      operationGenerationRef.current += 1;
-      foregroundOperationRef.current?.controller.abort();
-      foregroundOperationRef.current = null;
-      setForegroundOperation(null);
+      invalidateForegroundOperation();
       loadedSessionRef.current = null;
       setLoadedSession(null);
       setCreatedSessionWithoutView(null);
       setOperationError(null);
+      setRecoveryInterruption(null);
       previousClientRef.current = client;
     }
-  }, [client]);
+  }, [client, invalidateForegroundOperation]);
 
   useEffect(() => {
     return () => {
@@ -564,6 +679,144 @@ export default function App({
       loadedSessionRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (recoveryStorageFailure !== null) {
+      return;
+    }
+    const record = recoveryRecordRef.current;
+    if (record === null) {
+      return;
+    }
+
+    const operation = {
+      controller: new AbortController(),
+      id: operationGenerationRef.current + 1,
+    };
+    operationGenerationRef.current = operation.id;
+    foregroundOperationRef.current = operation;
+
+    const isCurrent = () =>
+      foregroundOperationRef.current?.id === operation.id &&
+      !operation.controller.signal.aborted;
+
+    const transition = (kind: ForegroundOperationKind) => {
+      if (isCurrent()) {
+        setForegroundOperation(kind);
+      }
+    };
+
+    const readAndCommitAuthoritativeView = async () => {
+      transition("refreshing");
+      const restoredView = await client.getSessionView(
+        record.session_id,
+        operation.controller.signal,
+      );
+      if (!isCurrent()) {
+        return;
+      }
+      if (!persistRecoveryRecord(record.session_id)) {
+        return;
+      }
+      if (!isCurrent()) {
+        return;
+      }
+      const next = {
+        sessionId: record.session_id,
+        view: restoredView,
+        stale: null,
+      };
+      loadedSessionRef.current = next;
+      setLoadedSession(next);
+    };
+
+    void (async () => {
+      await Promise.resolve();
+      if (!isCurrent()) {
+        return;
+      }
+      loadedSessionRef.current = null;
+      setLoadedSession(null);
+      setCreatedSessionWithoutView(null);
+      setOperationError(null);
+      setRecoveryInterruption(null);
+      setManualSessionId(record.session_id);
+      setForegroundOperation(
+        record.client_request_id === undefined ? "recovering" : "pending",
+      );
+      try {
+        if (record.client_request_id !== undefined) {
+          transition("pending");
+          while (isCurrent()) {
+            const requestStatus = await client.getNarrativeRequestStatus(
+              record.session_id,
+              record.client_request_id,
+              operation.controller.signal,
+            );
+            if (!isCurrent()) {
+              return;
+            }
+            if (requestStatus.status === "PENDING") {
+              await pollWait(
+                requestStatus.retry_after_seconds * 1_000,
+                operation.controller.signal,
+              );
+              continue;
+            }
+            await readAndCommitAuthoritativeView();
+            return;
+          }
+          return;
+        }
+        await readAndCommitAuthoritativeView();
+      } catch (error: unknown) {
+        if (!isCurrent()) {
+          return;
+        }
+        if (
+          error instanceof ApiClientError &&
+          error.kind === "api" &&
+          error.status === 404
+        ) {
+          if (explicitlyAbandonSession()) {
+            setOperationError(RECOVERY_NOT_FOUND_MESSAGE);
+          }
+          return;
+        }
+        if (
+          error instanceof ApiClientError &&
+          error.kind === "identity-mismatch"
+        ) {
+          if (explicitlyAbandonSession()) {
+            setOperationError(RECOVERY_IDENTITY_MISMATCH_MESSAGE);
+          }
+          return;
+        }
+        setRecoveryInterruption({
+          message: `${RECOVERY_INTERRUPTED_MESSAGE} ${formatApiClientError(error)}`,
+        });
+      } finally {
+        if (foregroundOperationRef.current?.id === operation.id) {
+          foregroundOperationRef.current = null;
+          setForegroundOperation(null);
+        }
+      }
+    })();
+
+    return () => {
+      operation.controller.abort();
+      if (foregroundOperationRef.current?.id === operation.id) {
+        foregroundOperationRef.current = null;
+      }
+    };
+  }, [
+    client,
+    explicitlyAbandonSession,
+    persistRecoveryRecord,
+    pollWait,
+    recoveryAttempt,
+    recoveryStorageFailure,
+  ]);
 
   const selectedScenario = scenarios?.find(
     (scenario) => scenario.scenario_id === selectedScenarioId,
@@ -575,15 +828,17 @@ export default function App({
     setSelectedRoleId(scenario?.default_character_definition_id ?? "");
   }
 
-  function clearLoadedSession() {
-    loadedSessionRef.current = null;
-    setLoadedSession(null);
-  }
-
-  function commitLoadedSession(sessionId: string, view: PlayerSessionView) {
+  function commitLoadedSession(
+    sessionId: string,
+    view: PlayerSessionView,
+  ): boolean {
+    if (!persistRecoveryRecord(sessionId)) {
+      return false;
+    }
     const next = { sessionId, view, stale: null };
     loadedSessionRef.current = next;
     setLoadedSession(next);
+    return true;
   }
 
   function beginForegroundOperation(
@@ -593,6 +848,12 @@ export default function App({
     if (foregroundOperationRef.current !== null) {
       return null;
     }
+    if (recoveryStorageFailure !== null) {
+      return null;
+    }
+    if (options.clearSession && !clearRecoveryForSessionTransition()) {
+      return null;
+    }
     const operation = {
       controller: new AbortController(),
       id: operationGenerationRef.current + 1,
@@ -600,11 +861,9 @@ export default function App({
     operationGenerationRef.current = operation.id;
     foregroundOperationRef.current = operation;
     setForegroundOperation(kind);
-    if (options.clearSession) {
-      clearLoadedSession();
-    }
     setCreatedSessionWithoutView(null);
     setOperationError(null);
+    setRecoveryInterruption(null);
     return operation;
   }
 
@@ -671,6 +930,8 @@ export default function App({
     event.preventDefault();
     if (
       foregroundOperationRef.current !== null ||
+      recoveryInterruption !== null ||
+      recoveryStorageFailure !== null ||
       selectedScenario === undefined ||
       selectedRoleId === ""
     ) {
@@ -696,6 +957,9 @@ export default function App({
         return;
       }
       createdSessionId = created.session_id;
+      if (!persistRecoveryRecord(created.session_id)) {
+        return;
+      }
       setManualSessionId(created.session_id);
       const restoredView = await client.getSessionView(
         created.session_id,
@@ -720,14 +984,21 @@ export default function App({
 
   async function handleManualRead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (foregroundOperationRef.current !== null) {
+    if (
+      foregroundOperationRef.current !== null ||
+      recoveryInterruption !== null ||
+      recoveryStorageFailure !== null
+    ) {
       return;
     }
     const sessionId = manualSessionId.trim();
     const parsedSessionId = sessionPathIdSchema.safeParse(sessionId);
     if (!parsedSessionId.success) {
-      clearLoadedSession();
+      if (!clearRecoveryForSessionTransition()) {
+        return;
+      }
       setCreatedSessionWithoutView(null);
+      setRecoveryInterruption(null);
       setOperationError("Session ID 格式无效，请检查后重试。");
       return;
     }
@@ -761,6 +1032,7 @@ export default function App({
     if (
       current === null ||
       current.stale === null ||
+      recoveryStorageFailure !== null ||
       foregroundOperationRef.current !== null
     ) {
       return;
@@ -785,6 +1057,25 @@ export default function App({
     }
   }
 
+  function handleRecoveryRetry() {
+    if (
+      foregroundOperationRef.current !== null ||
+      recoveryInterruption === null ||
+      recoveryStorageFailure !== null
+    ) {
+      return;
+    }
+    setRecoveryAttempt((attempt) => attempt + 1);
+  }
+
+  function handleExplicitSessionClear() {
+    explicitlyAbandonSession();
+  }
+
+  function handleStorageFailureClearRetry() {
+    explicitlyAbandonSession();
+  }
+
   async function handleAction(intent: ActionIntent) {
     const current = loadedSessionRef.current;
     if (
@@ -792,6 +1083,7 @@ export default function App({
       current.stale !== null ||
       current.view.scenario_status !== "ACTIVE" ||
       current.view.action_affordances.mode === "ENDED" ||
+      recoveryStorageFailure !== null ||
       foregroundOperationRef.current !== null
     ) {
       return;
@@ -830,6 +1122,14 @@ export default function App({
 
       stage = "polling";
       transitionForegroundOperation(operation, "pending");
+      if (
+        !persistRecoveryRecord(
+        current.sessionId,
+        request.client_request_id,
+        )
+      ) {
+        return;
+      }
       while (isCurrentOperation(operation)) {
         const requestStatus = await client.getNarrativeRequestStatus(
           current.sessionId,
@@ -872,7 +1172,15 @@ export default function App({
       if (!isCurrentOperation(operation)) {
         return;
       }
-      if (stage === "posting" && isTransportUncertain(error)) {
+      if (
+        stage === "polling" &&
+        error instanceof ApiClientError &&
+        error.kind === "identity-mismatch"
+      ) {
+        if (explicitlyAbandonSession()) {
+          setOperationError(RECOVERY_IDENTITY_MISMATCH_MESSAGE);
+        }
+      } else if (stage === "posting" && isTransportUncertain(error)) {
         markCurrentViewStale(operation, current.sessionId, {
           kind: "transport-uncertain",
           message: TRANSPORT_UNCERTAIN_MESSAGE,
@@ -896,26 +1204,34 @@ export default function App({
   }
 
   const operationStatus =
-    foregroundOperation === "creating"
+    recoveryStorageFailure !== null
+      ? "sessionStorage 处于安全锁定状态；不能创建、读取或提交行动。"
+      : foregroundOperation === "creating"
       ? "正在创建 Session 并读取完整权威 View。"
       : foregroundOperation === "reading"
         ? "正在读取完整权威 View。"
-        : foregroundOperation === "submitting"
-          ? "正在提交行动；不会自动重发。"
-          : foregroundOperation === "pending"
-            ? "行动已返回 202，正在按 retry 指示检查同一 request。"
-            : foregroundOperation === "refreshing"
-              ? "正在重新读取完整权威 View。"
-              : loadedSession?.stale !== null && loadedSession !== null
-                ? "当前 View 可能 stale；行动保持禁用，等待显式刷新。"
-                : loadedSession?.view.scenario_status === "ENDED"
-                  ? "副本已结束；没有可执行行动。"
-                  : loadedSession !== null
-                    ? "空闲：当前 View 已确认，可以选择公开行动。"
-                    : "空闲：可以创建 Session 或手动读取已有 Session。";
+        : foregroundOperation === "recovering"
+          ? "正在恢复本标签页已验证的 Session；行动保持锁定。"
+          : foregroundOperation === "submitting"
+            ? "正在提交行动；不会自动重发。"
+            : foregroundOperation === "pending"
+              ? "正在按 retry 指示检查同一 confirmed-202 request。"
+              : foregroundOperation === "refreshing"
+                ? "正在重新读取完整权威 View。"
+                : recoveryInterruption !== null
+                  ? "自动恢复已暂停；行动保持锁定，只能手动重试安全 GET。"
+                  : loadedSession?.stale !== null && loadedSession !== null
+                    ? "当前 View 可能 stale；行动保持禁用，等待显式刷新。"
+                    : loadedSession?.view.scenario_status === "ENDED"
+                      ? "副本已结束；没有可执行行动。"
+                      : loadedSession !== null
+                        ? "空闲：当前 View 已确认，可以选择公开行动。"
+                        : "空闲：可以创建 Session 或手动读取已有 Session。";
 
   const actionDisabledReason =
-    foregroundOperation !== null
+    recoveryStorageFailure !== null
+      ? "sessionStorage 无法安全访问或更新"
+      : foregroundOperation !== null
       ? "前台操作正在进行"
       : loadedSession?.stale !== null && loadedSession !== null
         ? "当前 View 可能 stale，必须先显式刷新"
@@ -924,9 +1240,12 @@ export default function App({
   return (
     <main>
       <header className="hero">
-        <p className="eyebrow">Phase 3.1b</p>
+        <p className="eyebrow">Phase 3.1c</p>
         <h1>Deviation Protocol</h1>
-        <p>本地单标签页 minimum playable Demo；无持久化或 reload recovery。</p>
+        <p>
+          本地单标签页 minimum playable Demo；支持同标签页 reload 与
+          confirmed-pending request recovery。
+        </p>
       </header>
 
       <p className="operation-status" role="status" aria-live="polite">
@@ -944,7 +1263,13 @@ export default function App({
         {scenarios?.length === 0 ? <p>当前没有可公开游玩的副本。</p> : null}
         {scenarios !== null && scenarios.length > 0 ? (
           <form onSubmit={handleCreate}>
-            <fieldset disabled={foregroundOperation !== null}>
+            <fieldset
+              disabled={
+                foregroundOperation !== null ||
+                recoveryInterruption !== null ||
+                recoveryStorageFailure !== null
+              }
+            >
               <legend className="sr-only">创建 Session</legend>
               <label htmlFor="scenario">副本</label>
               <select
@@ -987,6 +1312,8 @@ export default function App({
                 type="submit"
                 disabled={
                   foregroundOperation !== null ||
+                  recoveryInterruption !== null ||
+                  recoveryStorageFailure !== null ||
                   selectedScenario === undefined ||
                   selectedRoleId === ""
                 }
@@ -1003,7 +1330,13 @@ export default function App({
       <section className="panel" aria-labelledby="restore-heading">
         <h2 id="restore-heading">手动读取已有 Session</h2>
         <form onSubmit={handleManualRead}>
-          <fieldset disabled={foregroundOperation !== null}>
+          <fieldset
+            disabled={
+              foregroundOperation !== null ||
+              recoveryInterruption !== null ||
+              recoveryStorageFailure !== null
+            }
+          >
             <legend className="sr-only">手动读取 Session</legend>
             <label htmlFor="session-id">Session ID</label>
             <input
@@ -1016,7 +1349,10 @@ export default function App({
             <button
               type="submit"
               disabled={
-                foregroundOperation !== null || manualSessionId.trim() === ""
+                foregroundOperation !== null ||
+                recoveryInterruption !== null ||
+                recoveryStorageFailure !== null ||
+                manualSessionId.trim() === ""
               }
             >
               {foregroundOperation === "reading"
@@ -1039,9 +1375,52 @@ export default function App({
           </p>
         ) : null}
         {operationError !== null ? <p role="alert">{operationError}</p> : null}
+        {recoveryStorageFailure === null &&
+        recoveryInterruption === null &&
+        recoveryRecord !== null ? (
+          <button type="button" onClick={handleExplicitSessionClear}>
+            清除本标签页 Session
+          </button>
+        ) : null}
       </div>
 
-      {loadedSession?.stale === null || loadedSession === null ? null : (
+      {recoveryInterruption === null ? null : (
+        <section
+          className="stale-warning"
+          role="alert"
+          aria-labelledby="recovery-interrupted-heading"
+        >
+          <h2 id="recovery-interrupted-heading">自动恢复已暂停</h2>
+          <p>{recoveryInterruption.message}</p>
+          <button type="button" onClick={handleRecoveryRetry}>
+            手动重试安全 GET
+          </button>
+          <button type="button" onClick={handleExplicitSessionClear}>
+            清除本标签页 Session
+          </button>
+        </section>
+      )}
+
+      {recoveryStorageFailure === null ? null : (
+        <section
+          className="stale-warning"
+          role="alert"
+          aria-labelledby="recovery-storage-failure-heading"
+        >
+          <h2 id="recovery-storage-failure-heading">
+            sessionStorage 安全锁定
+          </h2>
+          <p>{RECOVERY_STORAGE_FAILURE_MESSAGE}</p>
+          <p>失败边界：{recoveryStorageFailure.failure.operation}</p>
+          <button type="button" onClick={handleStorageFailureClearRetry}>
+            重试安全清除恢复记录
+          </button>
+        </section>
+      )}
+
+      {recoveryStorageFailure !== null ||
+      loadedSession?.stale === null ||
+      loadedSession === null ? null : (
         <section className="stale-warning" role="alert" aria-labelledby="stale-heading">
           <h2 id="stale-heading">View stale / 行动状态需要确认</h2>
           <p>{loadedSession.stale.message}</p>
@@ -1057,9 +1436,11 @@ export default function App({
         </section>
       )}
 
-      {loadedSession === null ? null : <ViewSummary loaded={loadedSession} />}
+      {recoveryStorageFailure !== null || loadedSession === null ? null : (
+        <ViewSummary loaded={loadedSession} />
+      )}
 
-      {loadedSession === null ? null : (
+      {recoveryStorageFailure !== null || loadedSession === null ? null : (
         <ActionPanel
           view={loadedSession.view}
           disabled={

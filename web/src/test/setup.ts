@@ -12,6 +12,7 @@ beforeAll(() => {
 afterEach(() => {
   server.resetHandlers();
   cleanup();
+  globalThis.sessionStorage.clear();
 });
 
 afterAll(() => {

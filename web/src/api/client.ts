@@ -2,7 +2,10 @@ import type { z } from "zod";
 
 import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
 import { ApiClientError } from "./errors";
-import type { InvalidResponseReason } from "./errors";
+import type {
+  InvalidResponseReason,
+  ResponseIdentityMismatch,
+} from "./errors";
 import {
   actionRequestSchema,
   actionResponseSchema,
@@ -52,6 +55,17 @@ function responseError(
     kind: "invalid-response",
     status,
     reason,
+  });
+}
+
+function responseIdentityMismatch(
+  status: number,
+  identityMismatch: ResponseIdentityMismatch,
+): ApiClientError {
+  return new ApiClientError("Server response identity does not match the request", {
+    kind: "identity-mismatch",
+    status,
+    identityMismatch,
   });
 }
 
@@ -171,11 +185,11 @@ export class PublicApiClient {
       200,
       narrativeRequestStatusResponseSchema,
     );
-    if (
-      status.session_id !== validatedSessionId ||
-      status.client_request_id !== validatedRequestId
-    ) {
-      throw responseError(200, "CONTRACT_MISMATCH");
+    if (status.session_id !== validatedSessionId) {
+      throw responseIdentityMismatch(200, "SESSION_ID");
+    }
+    if (status.client_request_id !== validatedRequestId) {
+      throw responseIdentityMismatch(200, "CLIENT_REQUEST_ID");
     }
     return status;
   }

@@ -11,8 +11,15 @@ import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
 
 import App from "./App";
-import { PublicApiClient } from "./api/client";
-import type { PlayerSessionView } from "./api/schemas";
+import {
+  PublicApiClient,
+  type PublicActionSubmissionResult,
+} from "./api/client";
+import type {
+  NarrativeRequestStatusResponse,
+  PlayerSessionView,
+} from "./api/schemas";
+import { readSessionRecoveryRecord } from "./sessionRecovery";
 import {
   activeViewFixture,
   committedActionResponseFixture,
@@ -53,12 +60,15 @@ function renderActionApp(
       turnId: string;
       clientRequestId: string;
     };
+    requestIdFactory?: () => string;
   } = {},
 ) {
   return render(
     <App
       client={options.client ?? testClient}
-      requestIdFactory={() => "opaque-create-request"}
+      requestIdFactory={
+        options.requestIdFactory ?? (() => "opaque-create-request")
+      }
       actionIdentityFactory={
         options.actionIdentityFactory ?? deterministicActionIdentityFactory()
       }
@@ -67,6 +77,14 @@ function renderActionApp(
         : { pollWait: options.pollWait })}
     />,
   );
+}
+
+function storedRecoveryRecord() {
+  const result = readSessionRecoveryRecord();
+  if (!result.ok) {
+    throw new Error(`unexpected storage failure: ${result.failure.operation}`);
+  }
+  return result.value;
 }
 
 async function loadSession(
@@ -653,6 +671,11 @@ describe("HTTP 202 request-status lifecycle", () => {
         ({ params }) => {
           statusReads += 1;
           observedStatusIds.push(String(params.requestId));
+          expect(storedRecoveryRecord()).toEqual({
+            version: 1,
+            session_id: "session-public-1",
+            client_request_id: "opaque-request-1",
+          });
           if (statusReads === 1) {
             return HttpResponse.json({
               session_id: "session-public-1",
@@ -697,6 +720,234 @@ describe("HTTP 202 request-status lifecycle", () => {
     expect(pollWait).toHaveBeenCalledTimes(1);
     expect(pollWait.mock.calls[0]?.[0]).toBe(2_000);
     expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
+  });
+
+  it.each([
+    ["Session ID", "other-session", "opaque-request-1"],
+    ["client request ID", "session-public-1", "other-request"],
+  ] as const)(
+    "abandons the same-page confirmed-202 identity after a %s mismatch",
+    async (_label, responseSessionId, responseRequestId) => {
+      let actionPosts = 0;
+      let statusReads = 0;
+      let viewReads = 0;
+      const statusGate = deferred<void>();
+      const statusStarted = deferred<void>();
+      const requestIdFactory = vi.fn(() => "must-not-be-created");
+      const actionIdentityFactory = vi.fn(() => ({
+        turnId: "opaque-turn-1",
+        clientRequestId: "opaque-request-1",
+      }));
+      server.use(
+        scenarioHandler(),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/view`,
+          () => {
+            viewReads += 1;
+            return HttpResponse.json(freeActionViewFixture(viewReads));
+          },
+        ),
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          () => {
+            actionPosts += 1;
+            return HttpResponse.json(
+              pendingActionResponseFixture("opaque-request-1"),
+              { status: 202 },
+            );
+          },
+        ),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,
+          async () => {
+            statusReads += 1;
+            expect(storedRecoveryRecord()).toEqual({
+              version: 1,
+              session_id: "session-public-1",
+              client_request_id: "opaque-request-1",
+            });
+            statusStarted.resolve();
+            await statusGate.promise;
+            return HttpResponse.json({
+              session_id: responseSessionId,
+              client_request_id: responseRequestId,
+              status: "PENDING",
+              client_action: "POLL_SAME_REQUEST",
+              error_code: null,
+              retry_after_seconds: 2,
+              response: null,
+            });
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      const rendered = renderActionApp({
+        actionIdentityFactory,
+        requestIdFactory,
+      });
+      await loadSession(user);
+
+      await user.click(screen.getByRole("button", { name: "提交继续" }));
+      await statusStarted.promise;
+      expect(storedRecoveryRecord()).toEqual({
+        version: 1,
+        session_id: "session-public-1",
+        client_request_id: "opaque-request-1",
+      });
+      statusGate.resolve();
+
+      expect(
+        await screen.findByText(/恢复身份与已保存记录不匹配/),
+      ).toBeVisible();
+      expect(storedRecoveryRecord()).toBeNull();
+      expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "当前可执行行动" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText(/pending-status-unknown|无法确认其最终 request status/),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("button", { name: "手动重试安全 GET" }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(1);
+      expect(viewReads).toBe(1);
+      expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+
+      rendered.unmount();
+      renderActionApp({ actionIdentityFactory, requestIdFactory });
+      await screen.findByRole("button", { name: "创建 Session" });
+      await act(async () => Promise.resolve());
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(1);
+      expect(viewReads).toBe(1);
+      expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+    },
+  );
+
+  it("keeps a same-page identity mismatch locked until its pending record is safely removed", async () => {
+    let actionPosts = 0;
+    let statusReads = 0;
+    let viewReads = 0;
+    let failRemove = false;
+    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "opaque-turn-1",
+      clientRequestId: "opaque-request-1",
+    }));
+    const originalRemoveItem = Storage.prototype.removeItem;
+    const removeItemSpy = vi
+      .spyOn(Storage.prototype, "removeItem")
+      .mockImplementation(function (this: Storage, key: string) {
+        if (failRemove) {
+          throw new DOMException("remove blocked", "SecurityError");
+        }
+        originalRemoveItem.call(this, key);
+      });
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          viewReads += 1;
+          return HttpResponse.json(freeActionViewFixture(viewReads));
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () => {
+          actionPosts += 1;
+          return HttpResponse.json(
+            pendingActionResponseFixture("opaque-request-1"),
+            { status: 202 },
+          );
+        },
+      ),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,
+        () => {
+          statusReads += 1;
+          expect(storedRecoveryRecord()).toEqual({
+            version: 1,
+            session_id: "session-public-1",
+            client_request_id: "opaque-request-1",
+          });
+          failRemove = true;
+          return HttpResponse.json({
+            session_id: "other-session",
+            client_request_id: "opaque-request-1",
+            status: "PENDING",
+            client_action: "POLL_SAME_REQUEST",
+            error_code: null,
+            retry_after_seconds: 2,
+            response: null,
+          });
+        },
+      ),
+    );
+    try {
+      const user = userEvent.setup();
+      renderActionApp({ actionIdentityFactory, requestIdFactory });
+      await loadSession(user);
+
+      await user.click(screen.getByRole("button", { name: "提交继续" }));
+
+      const storageAlert = (
+        await screen.findByRole("heading", { name: "sessionStorage 安全锁定" })
+      ).closest("section");
+      if (!(storageAlert instanceof HTMLElement)) {
+        throw new Error("storage safety alert must be rendered");
+      }
+      expect(storedRecoveryRecord()).toEqual({
+        version: 1,
+        session_id: "session-public-1",
+        client_request_id: "opaque-request-1",
+      });
+      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(
+        screen.queryByRole("heading", { name: "当前可执行行动" }),
+      ).not.toBeInTheDocument();
+      expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+      expect(within(storageAlert).getAllByRole("button")).toHaveLength(1);
+      expect(
+        within(storageAlert).getByRole("button", {
+          name: "重试安全清除恢复记录",
+        }),
+      ).toBeEnabled();
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(1);
+      expect(viewReads).toBe(1);
+      expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+
+      failRemove = false;
+      await user.click(
+        within(storageAlert).getByRole("button", {
+          name: "重试安全清除恢复记录",
+        }),
+      );
+
+      expect(storedRecoveryRecord()).toBeNull();
+      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(
+        screen.queryByRole("heading", { name: "sessionStorage 安全锁定" }),
+      ).not.toBeInTheDocument();
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(1);
+      expect(viewReads).toBe(1);
+      expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+    } finally {
+      removeItemSpy.mockRestore();
+    }
   });
 
   it("follows STALE/REFRESH_VIEW with a View GET and no action replay", async () => {
@@ -823,52 +1074,97 @@ describe("HTTP 202 request-status lifecycle", () => {
     },
   );
 
-  it("marks the View stale when a 202 request-status read fails and never re-POSTs", async () => {
-    let actionPosts = 0;
-    let statusReads = 0;
-    let viewReads = 0;
-    server.use(
-      scenarioHandler(),
-      http.get(
-        `${apiOrigin}/v1/sessions/session-public-1/view`,
-        () => {
-          viewReads += 1;
-          return HttpResponse.json(freeActionViewFixture());
-        },
-      ),
-      http.post(
-        `${apiOrigin}/v1/sessions/session-public-1/actions`,
-        () => {
-          actionPosts += 1;
-          return HttpResponse.json(
-            pendingActionResponseFixture("opaque-request-1"),
-            { status: 202 },
-          );
-        },
-      ),
-      http.get(
-        `${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,
-        () => {
-          statusReads += 1;
-          return HttpResponse.error();
-        },
-      ),
-    );
-    const user = userEvent.setup();
-    renderActionApp();
-    await loadSession(user);
+  it.each(["network", "invalid-response"] as const)(
+    "keeps pending recovery after a normal %s status failure and retries only safe GETs after reload",
+    async (failureKind) => {
+      let actionPosts = 0;
+      let statusReads = 0;
+      let viewReads = 0;
+      const requestIdFactory = vi.fn(() => "must-not-be-created");
+      const actionIdentityFactory = vi.fn(() => ({
+        turnId: "opaque-turn-1",
+        clientRequestId: "opaque-request-1",
+      }));
+      server.use(
+        scenarioHandler(),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/view`,
+          () => {
+            viewReads += 1;
+            return HttpResponse.json(freeActionViewFixture(viewReads));
+          },
+        ),
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          () => {
+            actionPosts += 1;
+            return HttpResponse.json(
+              pendingActionResponseFixture("opaque-request-1"),
+              { status: 202 },
+            );
+          },
+        ),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,
+          () => {
+            statusReads += 1;
+            if (statusReads === 1) {
+              return failureKind === "network"
+                ? HttpResponse.error()
+                : new HttpResponse('{"session_id":', {
+                    headers: { "Content-Type": "application/json" },
+                  });
+            }
+            return HttpResponse.json({
+              session_id: "session-public-1",
+              client_request_id: "opaque-request-1",
+              status: "COMMITTED",
+              client_action: "RESPONSE_AVAILABLE",
+              error_code: null,
+              retry_after_seconds: null,
+              response: committedActionResponseFixture("opaque-request-1", 2),
+            });
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      const rendered = renderActionApp({
+        actionIdentityFactory,
+        requestIdFactory,
+      });
+      await loadSession(user);
 
-    await user.click(screen.getByRole("button", { name: "提交继续" }));
+      await user.click(screen.getByRole("button", { name: "提交继续" }));
 
-    expect(
-      await screen.findByText("权威 View：可能 stale（pending-status-unknown）"),
-    ).toBeVisible();
-    expect(screen.getByText(/无法确认其最终 request status/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "提交继续" })).toBeDisabled();
-    expect(actionPosts).toBe(1);
-    expect(statusReads).toBe(1);
-    expect(viewReads).toBe(1);
-  });
+      expect(
+        await screen.findByText("权威 View：可能 stale（pending-status-unknown）"),
+      ).toBeVisible();
+      expect(screen.getByText(/无法确认其最终 request status/)).toBeVisible();
+      expect(screen.getByRole("button", { name: "提交继续" })).toBeDisabled();
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(1);
+      expect(viewReads).toBe(1);
+      expect(storedRecoveryRecord()).toEqual({
+        version: 1,
+        session_id: "session-public-1",
+        client_request_id: "opaque-request-1",
+      });
+
+      rendered.unmount();
+      renderActionApp({ actionIdentityFactory, requestIdFactory });
+      await screen.findByText("当前 Session：session-public-1");
+      expect(screen.getByText("权威 View：当前")).toBeVisible();
+      expect(actionPosts).toBe(1);
+      expect(statusReads).toBe(2);
+      expect(viewReads).toBe(2);
+      expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(storedRecoveryRecord()).toEqual({
+        version: 1,
+        session_id: "session-public-1",
+      });
+    },
+  );
 });
 
 describe("uncertain actions, stale Views and explicit refresh", () => {
@@ -1059,6 +1355,10 @@ describe("uncertain actions, stale Views and explicit refresh", () => {
     expect(screen.getByRole("button", { name: "提交继续" })).toBeDisabled();
     expect(actionPosts).toBe(1);
     expect(viewReads).toBe(1);
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
 
     await user.click(
       screen.getByRole("button", { name: "显式刷新当前权威 View" }),
@@ -1121,6 +1421,188 @@ describe("uncertain actions, stale Views and explicit refresh", () => {
 });
 
 describe("foreground lock, operation identity and cancellation", () => {
+  it("explicitly clears an in-flight action POST and isolates its late response", async () => {
+    const actionGate = deferred<PublicActionSubmissionResult>();
+    const actionStarted = deferred<void>();
+    let actionSignal: AbortSignal | undefined;
+    let actionPosts = 0;
+    let statusReads = 0;
+    let viewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "opaque-turn-1",
+      clientRequestId: "opaque-request-1",
+    }));
+    const client = {
+      listScenarios: async () => scenarioCatalogFixture,
+      getSessionView: async () => {
+        viewReads += 1;
+        return freeActionViewFixture(viewReads);
+      },
+      submitAction: async (
+        _sessionId: string,
+        _request: unknown,
+        signal?: AbortSignal,
+      ) => {
+        actionPosts += 1;
+        actionSignal = signal;
+        actionStarted.resolve();
+        return actionGate.promise;
+      },
+      getNarrativeRequestStatus: async () => {
+        statusReads += 1;
+        throw new Error("status must not be read");
+      },
+    } as unknown as PublicApiClient;
+    const user = userEvent.setup();
+    renderActionApp({ client, actionIdentityFactory });
+    await loadSession(user);
+
+    await user.click(screen.getByRole("button", { name: "提交继续" }));
+    await actionStarted.promise;
+    const clear = screen.getByRole("button", {
+      name: "清除本标签页 Session",
+    });
+    expect(clear).toBeEnabled();
+    await user.click(clear);
+
+    expect(actionSignal?.aborted).toBe(true);
+    expect(storedRecoveryRecord()).toBeNull();
+    expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "当前可执行行动" }),
+    ).not.toBeInTheDocument();
+
+    actionGate.resolve({
+      status: 200,
+      response: synchronousActionResponseFixture("opaque-request-1", 2),
+    });
+    await act(async () => Promise.resolve());
+    expect(actionPosts).toBe(1);
+    expect(statusReads).toBe(0);
+    expect(viewReads).toBe(1);
+    expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+  });
+
+  it("explicitly clears during retry wait and prevents another status poll", async () => {
+    const waitGate = deferred<void>();
+    const waitStarted = deferred<void>();
+    let operationSignal: AbortSignal | undefined;
+    let actionPosts = 0;
+    let statusReads = 0;
+    let viewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "opaque-turn-1",
+      clientRequestId: "opaque-request-1",
+    }));
+    const pendingStatus: NarrativeRequestStatusResponse = {
+      session_id: "session-public-1",
+      client_request_id: "opaque-request-1",
+      status: "PENDING",
+      client_action: "POLL_SAME_REQUEST",
+      error_code: null,
+      retry_after_seconds: 2,
+      response: null,
+    };
+    const client = {
+      listScenarios: async () => scenarioCatalogFixture,
+      getSessionView: async () => {
+        viewReads += 1;
+        return freeActionViewFixture(viewReads);
+      },
+      submitAction: async () => {
+        actionPosts += 1;
+        return {
+          status: 202,
+          response: pendingActionResponseFixture("opaque-request-1"),
+        } as const;
+      },
+      getNarrativeRequestStatus: async () => {
+        statusReads += 1;
+        return pendingStatus;
+      },
+    } as unknown as PublicApiClient;
+    const pollWait = (_milliseconds: number, signal: AbortSignal) => {
+      operationSignal = signal;
+      waitStarted.resolve();
+      return waitGate.promise;
+    };
+    const user = userEvent.setup();
+    renderActionApp({ client, pollWait, actionIdentityFactory });
+    await loadSession(user);
+
+    await user.click(screen.getByRole("button", { name: "提交继续" }));
+    await waitStarted.promise;
+    await user.click(
+      screen.getByRole("button", { name: "清除本标签页 Session" }),
+    );
+
+    expect(operationSignal?.aborted).toBe(true);
+    expect(storedRecoveryRecord()).toBeNull();
+    waitGate.resolve();
+    await act(async () => Promise.resolve());
+    expect(actionPosts).toBe(1);
+    expect(statusReads).toBe(1);
+    expect(viewReads).toBe(1);
+    expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole("heading", { name: "当前可执行行动" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("explicitly clears a post-action /view refresh and rejects its late View", async () => {
+    const refreshGate = deferred<PlayerSessionView>();
+    const refreshStarted = deferred<void>();
+    let refreshSignal: AbortSignal | undefined;
+    let actionPosts = 0;
+    let viewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "opaque-turn-1",
+      clientRequestId: "opaque-request-1",
+    }));
+    const client = {
+      listScenarios: async () => scenarioCatalogFixture,
+      getSessionView: async (_sessionId: string, signal?: AbortSignal) => {
+        viewReads += 1;
+        if (viewReads === 1) {
+          return freeActionViewFixture(1);
+        }
+        refreshSignal = signal;
+        refreshStarted.resolve();
+        return refreshGate.promise;
+      },
+      submitAction: async () => {
+        actionPosts += 1;
+        return {
+          status: 200,
+          response: synchronousActionResponseFixture("opaque-request-1", 2),
+        } as const;
+      },
+    } as unknown as PublicApiClient;
+    const user = userEvent.setup();
+    renderActionApp({ client, actionIdentityFactory });
+    await loadSession(user);
+
+    await user.click(screen.getByRole("button", { name: "提交继续" }));
+    await refreshStarted.promise;
+    await user.click(
+      screen.getByRole("button", { name: "清除本标签页 Session" }),
+    );
+
+    expect(refreshSignal?.aborted).toBe(true);
+    expect(storedRecoveryRecord()).toBeNull();
+    refreshGate.resolve(freeActionViewFixture(99));
+    await act(async () => Promise.resolve());
+    expect(actionPosts).toBe(1);
+    expect(viewReads).toBe(2);
+    expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("权威 View 已推进到版本 99。")).not.toBeInTheDocument();
+    expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "当前可执行行动" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("allows only one action POST and blocks create/manual read during submission", async () => {
     const gate = deferred<void>();
     let actionPosts = 0;
@@ -1246,6 +1728,10 @@ describe("foreground lock, operation identity and cancellation", () => {
       expect(
         screen.queryByText("当前 Session：old-session"),
       ).not.toBeInTheDocument();
+      expect(storedRecoveryRecord()).toEqual({
+        version: 1,
+        session_id: "new-session",
+      });
     },
   );
 

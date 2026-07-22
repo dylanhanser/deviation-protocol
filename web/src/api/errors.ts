@@ -2,8 +2,11 @@ export type ApiClientErrorKind =
   | "api"
   | "aborted"
   | "network"
+  | "identity-mismatch"
   | "invalid-response"
   | "configuration";
+
+export type ResponseIdentityMismatch = "SESSION_ID" | "CLIENT_REQUEST_ID";
 
 export type InvalidResponseReason =
   | "EMPTY_RESPONSE"
@@ -17,6 +20,7 @@ interface ApiClientErrorOptions {
   status?: number;
   errorCode?: string;
   reason?: InvalidResponseReason;
+  identityMismatch?: ResponseIdentityMismatch;
   cause?: unknown;
 }
 
@@ -25,6 +29,7 @@ export class ApiClientError extends Error {
   readonly status: number | undefined;
   readonly errorCode: string | undefined;
   readonly reason: InvalidResponseReason | undefined;
+  readonly identityMismatch: ResponseIdentityMismatch | undefined;
 
   constructor(message: string, options: ApiClientErrorOptions) {
     super(message, { cause: options.cause });
@@ -33,6 +38,7 @@ export class ApiClientError extends Error {
     this.status = options.status;
     this.errorCode = options.errorCode;
     this.reason = options.reason;
+    this.identityMismatch = options.identityMismatch;
   }
 }
 
@@ -53,6 +59,9 @@ export function formatApiClientError(error: unknown): string {
   }
   if (error.kind === "configuration") {
     return "公开 API 地址配置无效。";
+  }
+  if (error.kind === "identity-mismatch") {
+    return "服务器响应身份与请求不匹配。";
   }
   const status = error.status === undefined ? "" : `HTTP ${error.status} · `;
   return `${status}服务器响应不符合公开合同（${error.reason ?? "UNKNOWN"}）。`;
