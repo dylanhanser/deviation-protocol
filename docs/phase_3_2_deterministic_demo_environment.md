@@ -6,9 +6,22 @@ Status: **specification frozen for review**. Implementation has not started,
 Phase 3.2 is not complete, and this document records target behavior rather
 than current capability.
 
-The planning baseline is `main` at
-`44258527c169170ee79540a130ac5e143211c748`, with `origin/main` at the same
-commit and a clean index and worktree before this planning edit.
+The original planning baseline was `main` at
+`44258527c169170ee79540a130ac5e143211c748`. The approved Scheme A repair was
+performed against clean `main` and `origin/main` at
+`4623dd132883a01403b904518c76062fdf3416db`.
+
+### Scheme A amendment record
+
+On 2026-07-22 the specification owner approved Scheme A: keep the formal
+scenario, its beat-zero `DECISION` / `CHOOSE` behavior, the public affordance
+contract and Phase 3.1c unchanged, and repair only the Phase 3.2 test script and
+its derived expectations. The canonical replay below therefore begins with the
+real bound opening choice, moves the first Provider-backed `CUSTOM` to a later
+advertised free-action state, and re-derives the whole action, event, Provider,
+clock and generator stream. This amendment supersedes the earlier opening and
+trace derivation; it is not a parallel specification and does not authorize
+Phase 3.2a or Phase 3.2b implementation.
 
 Current repository evidence establishes the following boundary:
 
@@ -256,10 +269,10 @@ for `SEED`; type coercion is forbidden. Clock values use exactly
 `YYYY-MM-DDTHH:MM:SS+00:00`. A completion record has exactly:
 
 ```json
-{"protocol":"deviation-demo-generator-trace","version":1,"record_type":"COMPLETE","record_count":105,"last_global_ordinal":105}
+{"protocol":"deviation-demo-generator-trace","version":1,"record_type":"COMPLETE","record_count":94,"last_global_ordinal":94}
 ```
 
-The completion record occurs once, after all 105 generator records and only
+The completion record occurs once, after all 94 generator records and only
 after the parent has completed the final authoritative View request and sent
 the single `STOP\n` control frame. The parent flushes and closes its control
 writer immediately after that frame; the child requires that exact frame
@@ -279,21 +292,33 @@ contain no secret, environment value, request body or non-generator data.
 #### Frozen canonical event basis
 
 The section H path has 19 state-changing actions after Session creation. In
-order, the persisted event counts are `1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 5, 1, 3,
-1, 1, 1, 1, 1, 1`; Session creation adds `ScenarioStarted`, for 28 event IDs.
-The five Provider-backed actions are opening `CUSTOM`, clinical-recheck `TALK`,
-records `EXPLORE`, audit `EXPLORE` and patient `OBSERVE`. Each consumes six
-non-event clock calls plus one clock per persisted event, one job ID, one lease
-and one worker ID. Local actions consume one clock per persisted event; the
-final fourth core choice additionally consumes one clock and one job ID for the
-committed local-template settlement job. Reads, caller identities and the
-Provider itself consume none of these generator seams.
+order, the persisted event counts are `1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 4, 2, 2,
+1, 1, 1, 1, 1, 1`; Session creation adds `ScenarioStarted`, for 27 event IDs.
+The four Provider-backed actions are clinical-recheck `CUSTOM`, records
+`EXPLORE`, audit `EXPLORE` and patient `OBSERVE`. Opening `CHOOSE`, every
+`CONTINUE` and every later `CHOOSE` is local and invokes no Provider. Each
+Provider-backed action consumes six non-event clock calls plus one clock per
+persisted event, one job ID, one lease and one worker ID. Local actions consume
+one clock per persisted event; the final fourth core choice additionally
+consumes one clock and one job ID for the committed local-template settlement
+job. Reads, caller identities and the Provider itself consume none of these
+generator seams.
 
-The complete expected stream is therefore 105 generator records: 59 `CLOCK`,
-28 `EVENT_ID`, 6 `JOB_ID`, 5 `LEASE_TOKEN`, 5 `WORKER_ID`, 1 `SESSION_ID` and 1
-`SEED`. The stage label in the table is explanatory and is not a trace field.
+The investigation distribution is deliberate. The canonical beat-zero
+investigation action is the advertised local `CONTINUE`, so it advances the
+public deadline but not the private patient-stability clock. Audit therefore
+persists four events; route-two `CHOOSE` then crosses the private critical
+threshold and persists two; patient `OBSERVE` persists two and does not cross
+the later private failure threshold. No no-effect Narrative action is inserted
+to manufacture the previous distribution.
 
-#### Frozen complete expected generator trace
+The complete expected stream is therefore 94 generator records: 52 `CLOCK`,
+27 `EVENT_ID`, 5 `JOB_ID`, 4 `LEASE_TOKEN`, 4 `WORKER_ID`, 1 `SESSION_ID` and 1
+`SEED`. The clock subtotal is one Session-creation call, 26 action-event times,
+24 Provider lifecycle calls and one local-template job time. The stage label in
+the table is explanatory and is not a trace field.
+
+#### Frozen complete expected 94-record generator trace
 
 | Global | Category | Category ordinal | Expected raw value | Triggering canonical stage |
 | ---: | --- | ---: | --- | --- |
@@ -301,109 +326,98 @@ The complete expected stream is therefore 105 generator records: 59 `CLOCK`,
 | 2 | SESSION_ID | 1 | `demo-session-00000001` | Session creation: new Session |
 | 3 | SEED | 1 | `1` (JSON integer) | Session creation: `random_seed` |
 | 4 | EVENT_ID | 1 | `demo-event-00000001` | Session creation: `ScenarioStarted` |
-| 5 | CLOCK | 2 | `2000-01-01T00:00:01+00:00` | Opening `CUSTOM`: prepare job |
-| 6 | JOB_ID | 1 | `demo-job-00000001` | Opening `CUSTOM`: Provider job |
-| 7 | CLOCK | 3 | `2000-01-01T00:00:02+00:00` | Opening `CUSTOM`: claim |
-| 8 | LEASE_TOKEN | 1 | `demo-lease-000000000000000000001` | Opening `CUSTOM`: lease |
-| 9 | WORKER_ID | 1 | `demo-worker-00000001` | Opening `CUSTOM`: claim owner |
-| 10 | CLOCK | 4 | `2000-01-01T00:00:03+00:00` | Opening `CUSTOM`: store proposal |
-| 11 | CLOCK | 5 | `2000-01-01T00:00:04+00:00` | Opening `CUSTOM`: begin finalize |
-| 12 | CLOCK | 6 | `2000-01-01T00:00:05+00:00` | Opening `CUSTOM`: pre-persist lease check |
-| 13 | EVENT_ID | 2 | `demo-event-00000002` | Opening `CUSTOM`: event 1/1 |
-| 14 | CLOCK | 7 | `2000-01-01T00:00:06+00:00` | Opening `CUSTOM`: event 1/1 time |
-| 15 | CLOCK | 8 | `2000-01-01T00:00:07+00:00` | Opening `CUSTOM`: commit job |
-| 16 | CLOCK | 9 | `2000-01-01T00:00:08+00:00` | Recheck `TALK`: prepare job |
-| 17 | JOB_ID | 2 | `demo-job-00000002` | Recheck `TALK`: Provider job |
-| 18 | CLOCK | 10 | `2000-01-01T00:00:09+00:00` | Recheck `TALK`: claim |
-| 19 | LEASE_TOKEN | 2 | `demo-lease-000000000000000000002` | Recheck `TALK`: lease |
-| 20 | WORKER_ID | 2 | `demo-worker-00000002` | Recheck `TALK`: claim owner |
-| 21 | CLOCK | 11 | `2000-01-01T00:00:10+00:00` | Recheck `TALK`: store proposal |
-| 22 | CLOCK | 12 | `2000-01-01T00:00:11+00:00` | Recheck `TALK`: begin finalize |
-| 23 | CLOCK | 13 | `2000-01-01T00:00:12+00:00` | Recheck `TALK`: pre-persist lease check |
-| 24 | EVENT_ID | 3 | `demo-event-00000003` | Recheck `TALK`: event 1/2 |
-| 25 | CLOCK | 14 | `2000-01-01T00:00:13+00:00` | Recheck `TALK`: event 1/2 time |
-| 26 | EVENT_ID | 4 | `demo-event-00000004` | Recheck `TALK`: event 2/2 |
-| 27 | CLOCK | 15 | `2000-01-01T00:00:14+00:00` | Recheck `TALK`: event 2/2 time |
-| 28 | CLOCK | 16 | `2000-01-01T00:00:15+00:00` | Recheck `TALK`: commit job |
-| 29 | EVENT_ID | 5 | `demo-event-00000005` | Life `CONTINUE` 1: event 1/1 |
-| 30 | CLOCK | 17 | `2000-01-01T00:00:16+00:00` | Life `CONTINUE` 1: event time |
-| 31 | EVENT_ID | 6 | `demo-event-00000006` | Life `CONTINUE` 2: event 1/2 |
-| 32 | CLOCK | 18 | `2000-01-01T00:00:17+00:00` | Life `CONTINUE` 2: event 1/2 time |
-| 33 | EVENT_ID | 7 | `demo-event-00000007` | Life `CONTINUE` 2: event 2/2 |
-| 34 | CLOCK | 19 | `2000-01-01T00:00:18+00:00` | Life `CONTINUE` 2: event 2/2 time |
-| 35 | EVENT_ID | 8 | `demo-event-00000008` | Early-strategy `CHOOSE`: event |
-| 36 | CLOCK | 20 | `2000-01-01T00:00:19+00:00` | Early-strategy `CHOOSE`: event time |
-| 37 | EVENT_ID | 9 | `demo-event-00000009` | Escape `CONTINUE` 1: event |
-| 38 | CLOCK | 21 | `2000-01-01T00:00:20+00:00` | Escape `CONTINUE` 1: event time |
-| 39 | EVENT_ID | 10 | `demo-event-00000010` | Escape `CONTINUE` 2: event |
-| 40 | CLOCK | 22 | `2000-01-01T00:00:21+00:00` | Escape `CONTINUE` 2: event time |
-| 41 | EVENT_ID | 11 | `demo-event-00000011` | Investigation `CONTINUE`: event |
-| 42 | CLOCK | 23 | `2000-01-01T00:00:22+00:00` | Investigation `CONTINUE`: event time |
-| 43 | EVENT_ID | 12 | `demo-event-00000012` | Investigation-route `CHOOSE`: event |
-| 44 | CLOCK | 24 | `2000-01-01T00:00:23+00:00` | Investigation-route `CHOOSE`: event time |
-| 45 | CLOCK | 25 | `2000-01-01T00:00:24+00:00` | Records `EXPLORE`: prepare job |
-| 46 | JOB_ID | 3 | `demo-job-00000003` | Records `EXPLORE`: Provider job |
-| 47 | CLOCK | 26 | `2000-01-01T00:00:25+00:00` | Records `EXPLORE`: claim |
-| 48 | LEASE_TOKEN | 3 | `demo-lease-000000000000000000003` | Records `EXPLORE`: lease |
-| 49 | WORKER_ID | 3 | `demo-worker-00000003` | Records `EXPLORE`: claim owner |
-| 50 | CLOCK | 27 | `2000-01-01T00:00:26+00:00` | Records `EXPLORE`: store proposal |
-| 51 | CLOCK | 28 | `2000-01-01T00:00:27+00:00` | Records `EXPLORE`: begin finalize |
-| 52 | CLOCK | 29 | `2000-01-01T00:00:28+00:00` | Records `EXPLORE`: pre-persist lease check |
-| 53 | EVENT_ID | 13 | `demo-event-00000013` | Records `EXPLORE`: event 1/1 |
-| 54 | CLOCK | 30 | `2000-01-01T00:00:29+00:00` | Records `EXPLORE`: event time |
-| 55 | CLOCK | 31 | `2000-01-01T00:00:30+00:00` | Records `EXPLORE`: commit job |
-| 56 | CLOCK | 32 | `2000-01-01T00:00:31+00:00` | Audit `EXPLORE`: prepare job |
-| 57 | JOB_ID | 4 | `demo-job-00000004` | Audit `EXPLORE`: Provider job |
-| 58 | CLOCK | 33 | `2000-01-01T00:00:32+00:00` | Audit `EXPLORE`: claim |
-| 59 | LEASE_TOKEN | 4 | `demo-lease-000000000000000000004` | Audit `EXPLORE`: lease |
-| 60 | WORKER_ID | 4 | `demo-worker-00000004` | Audit `EXPLORE`: claim owner |
-| 61 | CLOCK | 34 | `2000-01-01T00:00:33+00:00` | Audit `EXPLORE`: store proposal |
-| 62 | CLOCK | 35 | `2000-01-01T00:00:34+00:00` | Audit `EXPLORE`: begin finalize |
-| 63 | CLOCK | 36 | `2000-01-01T00:00:35+00:00` | Audit `EXPLORE`: pre-persist lease check |
-| 64 | EVENT_ID | 14 | `demo-event-00000014` | Audit `EXPLORE`: event 1/5 |
-| 65 | CLOCK | 37 | `2000-01-01T00:00:36+00:00` | Audit `EXPLORE`: event 1/5 time |
-| 66 | EVENT_ID | 15 | `demo-event-00000015` | Audit `EXPLORE`: event 2/5 |
-| 67 | CLOCK | 38 | `2000-01-01T00:00:37+00:00` | Audit `EXPLORE`: event 2/5 time |
-| 68 | EVENT_ID | 16 | `demo-event-00000016` | Audit `EXPLORE`: event 3/5 |
-| 69 | CLOCK | 39 | `2000-01-01T00:00:38+00:00` | Audit `EXPLORE`: event 3/5 time |
-| 70 | EVENT_ID | 17 | `demo-event-00000017` | Audit `EXPLORE`: event 4/5 |
-| 71 | CLOCK | 40 | `2000-01-01T00:00:39+00:00` | Audit `EXPLORE`: event 4/5 time |
-| 72 | EVENT_ID | 18 | `demo-event-00000018` | Audit `EXPLORE`: event 5/5 |
-| 73 | CLOCK | 41 | `2000-01-01T00:00:40+00:00` | Audit `EXPLORE`: event 5/5 time |
-| 74 | CLOCK | 42 | `2000-01-01T00:00:41+00:00` | Audit `EXPLORE`: commit job |
-| 75 | EVENT_ID | 19 | `demo-event-00000019` | Investigation-evidence `CHOOSE`: event |
-| 76 | CLOCK | 43 | `2000-01-01T00:00:42+00:00` | Investigation-evidence `CHOOSE`: event time |
-| 77 | CLOCK | 44 | `2000-01-01T00:00:43+00:00` | Patient `OBSERVE`: prepare job |
-| 78 | JOB_ID | 5 | `demo-job-00000005` | Patient `OBSERVE`: Provider job |
-| 79 | CLOCK | 45 | `2000-01-01T00:00:44+00:00` | Patient `OBSERVE`: claim |
-| 80 | LEASE_TOKEN | 5 | `demo-lease-000000000000000000005` | Patient `OBSERVE`: lease |
-| 81 | WORKER_ID | 5 | `demo-worker-00000005` | Patient `OBSERVE`: claim owner |
-| 82 | CLOCK | 46 | `2000-01-01T00:00:45+00:00` | Patient `OBSERVE`: store proposal |
-| 83 | CLOCK | 47 | `2000-01-01T00:00:46+00:00` | Patient `OBSERVE`: begin finalize |
-| 84 | CLOCK | 48 | `2000-01-01T00:00:47+00:00` | Patient `OBSERVE`: pre-persist lease check |
-| 85 | EVENT_ID | 20 | `demo-event-00000020` | Patient `OBSERVE`: event 1/3 |
-| 86 | CLOCK | 49 | `2000-01-01T00:00:48+00:00` | Patient `OBSERVE`: event 1/3 time |
-| 87 | EVENT_ID | 21 | `demo-event-00000021` | Patient `OBSERVE`: event 2/3 |
-| 88 | CLOCK | 50 | `2000-01-01T00:00:49+00:00` | Patient `OBSERVE`: event 2/3 time |
-| 89 | EVENT_ID | 22 | `demo-event-00000022` | Patient `OBSERVE`: event 3/3 |
-| 90 | CLOCK | 51 | `2000-01-01T00:00:50+00:00` | Patient `OBSERVE`: event 3/3 time |
-| 91 | CLOCK | 52 | `2000-01-01T00:00:51+00:00` | Patient `OBSERVE`: commit job |
-| 92 | EVENT_ID | 23 | `demo-event-00000023` | Truth `CONTINUE` 1: event |
-| 93 | CLOCK | 53 | `2000-01-01T00:00:52+00:00` | Truth `CONTINUE` 1: event time |
-| 94 | EVENT_ID | 24 | `demo-event-00000024` | Truth `CONTINUE` 2: event |
-| 95 | CLOCK | 54 | `2000-01-01T00:00:53+00:00` | Truth `CONTINUE` 2: event time |
-| 96 | EVENT_ID | 25 | `demo-event-00000025` | Core `CHOOSE` 1: event |
-| 97 | CLOCK | 55 | `2000-01-01T00:00:54+00:00` | Core `CHOOSE` 1: event time |
-| 98 | EVENT_ID | 26 | `demo-event-00000026` | Core `CHOOSE` 2: event |
-| 99 | CLOCK | 56 | `2000-01-01T00:00:55+00:00` | Core `CHOOSE` 2: event time |
-| 100 | EVENT_ID | 27 | `demo-event-00000027` | Core `CHOOSE` 3: event |
-| 101 | CLOCK | 57 | `2000-01-01T00:00:56+00:00` | Core `CHOOSE` 3: event time |
-| 102 | EVENT_ID | 28 | `demo-event-00000028` | Core `CHOOSE` 4 settlement: event |
-| 103 | CLOCK | 58 | `2000-01-01T00:00:57+00:00` | Core `CHOOSE` 4 settlement: event time |
-| 104 | CLOCK | 59 | `2000-01-01T00:00:58+00:00` | Core `CHOOSE` 4: local-template job time |
-| 105 | JOB_ID | 6 | `demo-job-00000006` | Core `CHOOSE` 4: local-template settlement job |
+| 5 | EVENT_ID | 2 | `demo-event-00000002` | Opening `CHOOSE`: event 1/1 |
+| 6 | CLOCK | 2 | `2000-01-01T00:00:01+00:00` | Opening `CHOOSE`: event 1/1 time |
+| 7 | CLOCK | 3 | `2000-01-01T00:00:02+00:00` | Clinical recheck `CUSTOM`: prepare job |
+| 8 | JOB_ID | 1 | `demo-job-00000001` | Clinical recheck `CUSTOM`: Provider job |
+| 9 | CLOCK | 4 | `2000-01-01T00:00:03+00:00` | Clinical recheck `CUSTOM`: claim |
+| 10 | LEASE_TOKEN | 1 | `demo-lease-000000000000000000001` | Clinical recheck `CUSTOM`: lease |
+| 11 | WORKER_ID | 1 | `demo-worker-00000001` | Clinical recheck `CUSTOM`: claim owner |
+| 12 | CLOCK | 5 | `2000-01-01T00:00:04+00:00` | Clinical recheck `CUSTOM`: store proposal |
+| 13 | CLOCK | 6 | `2000-01-01T00:00:05+00:00` | Clinical recheck `CUSTOM`: begin finalize |
+| 14 | CLOCK | 7 | `2000-01-01T00:00:06+00:00` | Clinical recheck `CUSTOM`: pre-persist lease check |
+| 15 | EVENT_ID | 3 | `demo-event-00000003` | Clinical recheck `CUSTOM`: event 1/2 |
+| 16 | CLOCK | 8 | `2000-01-01T00:00:07+00:00` | Clinical recheck `CUSTOM`: event 1/2 time |
+| 17 | EVENT_ID | 4 | `demo-event-00000004` | Clinical recheck `CUSTOM`: event 2/2 |
+| 18 | CLOCK | 9 | `2000-01-01T00:00:08+00:00` | Clinical recheck `CUSTOM`: event 2/2 time |
+| 19 | CLOCK | 10 | `2000-01-01T00:00:09+00:00` | Clinical recheck `CUSTOM`: commit job |
+| 20 | EVENT_ID | 5 | `demo-event-00000005` | Life `CONTINUE` 1: event 1/1 |
+| 21 | CLOCK | 11 | `2000-01-01T00:00:10+00:00` | Life `CONTINUE` 1: event 1/1 time |
+| 22 | EVENT_ID | 6 | `demo-event-00000006` | Life `CONTINUE` 2: event 1/2 |
+| 23 | CLOCK | 12 | `2000-01-01T00:00:11+00:00` | Life `CONTINUE` 2: event 1/2 time |
+| 24 | EVENT_ID | 7 | `demo-event-00000007` | Life `CONTINUE` 2: event 2/2 |
+| 25 | CLOCK | 13 | `2000-01-01T00:00:12+00:00` | Life `CONTINUE` 2: event 2/2 time |
+| 26 | EVENT_ID | 8 | `demo-event-00000008` | Early-strategy `CHOOSE`: event 1/1 |
+| 27 | CLOCK | 14 | `2000-01-01T00:00:13+00:00` | Early-strategy `CHOOSE`: event 1/1 time |
+| 28 | EVENT_ID | 9 | `demo-event-00000009` | Escape `CONTINUE` 1: event 1/1 |
+| 29 | CLOCK | 15 | `2000-01-01T00:00:14+00:00` | Escape `CONTINUE` 1: event 1/1 time |
+| 30 | EVENT_ID | 10 | `demo-event-00000010` | Escape `CONTINUE` 2: event 1/1 |
+| 31 | CLOCK | 16 | `2000-01-01T00:00:15+00:00` | Escape `CONTINUE` 2: event 1/1 time |
+| 32 | EVENT_ID | 11 | `demo-event-00000011` | Investigation `CONTINUE`: event 1/1 |
+| 33 | CLOCK | 17 | `2000-01-01T00:00:16+00:00` | Investigation `CONTINUE`: event 1/1 time |
+| 34 | EVENT_ID | 12 | `demo-event-00000012` | Investigation-route-one `CHOOSE`: event 1/1 |
+| 35 | CLOCK | 18 | `2000-01-01T00:00:17+00:00` | Investigation-route-one `CHOOSE`: event 1/1 time |
+| 36 | CLOCK | 19 | `2000-01-01T00:00:18+00:00` | Records `EXPLORE`: prepare job |
+| 37 | JOB_ID | 2 | `demo-job-00000002` | Records `EXPLORE`: Provider job |
+| 38 | CLOCK | 20 | `2000-01-01T00:00:19+00:00` | Records `EXPLORE`: claim |
+| 39 | LEASE_TOKEN | 2 | `demo-lease-000000000000000000002` | Records `EXPLORE`: lease |
+| 40 | WORKER_ID | 2 | `demo-worker-00000002` | Records `EXPLORE`: claim owner |
+| 41 | CLOCK | 21 | `2000-01-01T00:00:20+00:00` | Records `EXPLORE`: store proposal |
+| 42 | CLOCK | 22 | `2000-01-01T00:00:21+00:00` | Records `EXPLORE`: begin finalize |
+| 43 | CLOCK | 23 | `2000-01-01T00:00:22+00:00` | Records `EXPLORE`: pre-persist lease check |
+| 44 | EVENT_ID | 13 | `demo-event-00000013` | Records `EXPLORE`: event 1/1 |
+| 45 | CLOCK | 24 | `2000-01-01T00:00:23+00:00` | Records `EXPLORE`: event 1/1 time |
+| 46 | CLOCK | 25 | `2000-01-01T00:00:24+00:00` | Records `EXPLORE`: commit job |
+| 47 | CLOCK | 26 | `2000-01-01T00:00:25+00:00` | Audit `EXPLORE`: prepare job |
+| 48 | JOB_ID | 3 | `demo-job-00000003` | Audit `EXPLORE`: Provider job |
+| 49 | CLOCK | 27 | `2000-01-01T00:00:26+00:00` | Audit `EXPLORE`: claim |
+| 50 | LEASE_TOKEN | 3 | `demo-lease-000000000000000000003` | Audit `EXPLORE`: lease |
+| 51 | WORKER_ID | 3 | `demo-worker-00000003` | Audit `EXPLORE`: claim owner |
+| 52 | CLOCK | 28 | `2000-01-01T00:00:27+00:00` | Audit `EXPLORE`: store proposal |
+| 53 | CLOCK | 29 | `2000-01-01T00:00:28+00:00` | Audit `EXPLORE`: begin finalize |
+| 54 | CLOCK | 30 | `2000-01-01T00:00:29+00:00` | Audit `EXPLORE`: pre-persist lease check |
+| 55 | EVENT_ID | 14 | `demo-event-00000014` | Audit `EXPLORE`: event 1/4 |
+| 56 | CLOCK | 31 | `2000-01-01T00:00:30+00:00` | Audit `EXPLORE`: event 1/4 time |
+| 57 | EVENT_ID | 15 | `demo-event-00000015` | Audit `EXPLORE`: event 2/4 |
+| 58 | CLOCK | 32 | `2000-01-01T00:00:31+00:00` | Audit `EXPLORE`: event 2/4 time |
+| 59 | EVENT_ID | 16 | `demo-event-00000016` | Audit `EXPLORE`: event 3/4 |
+| 60 | CLOCK | 33 | `2000-01-01T00:00:32+00:00` | Audit `EXPLORE`: event 3/4 time |
+| 61 | EVENT_ID | 17 | `demo-event-00000017` | Audit `EXPLORE`: event 4/4 |
+| 62 | CLOCK | 34 | `2000-01-01T00:00:33+00:00` | Audit `EXPLORE`: event 4/4 time |
+| 63 | CLOCK | 35 | `2000-01-01T00:00:34+00:00` | Audit `EXPLORE`: commit job |
+| 64 | EVENT_ID | 18 | `demo-event-00000018` | Investigation-route-two `CHOOSE`: event 1/2 |
+| 65 | CLOCK | 36 | `2000-01-01T00:00:35+00:00` | Investigation-route-two `CHOOSE`: event 1/2 time |
+| 66 | EVENT_ID | 19 | `demo-event-00000019` | Investigation-route-two `CHOOSE`: event 2/2 |
+| 67 | CLOCK | 37 | `2000-01-01T00:00:36+00:00` | Investigation-route-two `CHOOSE`: event 2/2 time |
+| 68 | CLOCK | 38 | `2000-01-01T00:00:37+00:00` | Patient `OBSERVE`: prepare job |
+| 69 | JOB_ID | 4 | `demo-job-00000004` | Patient `OBSERVE`: Provider job |
+| 70 | CLOCK | 39 | `2000-01-01T00:00:38+00:00` | Patient `OBSERVE`: claim |
+| 71 | LEASE_TOKEN | 4 | `demo-lease-000000000000000000004` | Patient `OBSERVE`: lease |
+| 72 | WORKER_ID | 4 | `demo-worker-00000004` | Patient `OBSERVE`: claim owner |
+| 73 | CLOCK | 40 | `2000-01-01T00:00:39+00:00` | Patient `OBSERVE`: store proposal |
+| 74 | CLOCK | 41 | `2000-01-01T00:00:40+00:00` | Patient `OBSERVE`: begin finalize |
+| 75 | CLOCK | 42 | `2000-01-01T00:00:41+00:00` | Patient `OBSERVE`: pre-persist lease check |
+| 76 | EVENT_ID | 20 | `demo-event-00000020` | Patient `OBSERVE`: event 1/2 |
+| 77 | CLOCK | 43 | `2000-01-01T00:00:42+00:00` | Patient `OBSERVE`: event 1/2 time |
+| 78 | EVENT_ID | 21 | `demo-event-00000021` | Patient `OBSERVE`: event 2/2 |
+| 79 | CLOCK | 44 | `2000-01-01T00:00:43+00:00` | Patient `OBSERVE`: event 2/2 time |
+| 80 | CLOCK | 45 | `2000-01-01T00:00:44+00:00` | Patient `OBSERVE`: commit job |
+| 81 | EVENT_ID | 22 | `demo-event-00000022` | Truth `CONTINUE` 1: event 1/1 |
+| 82 | CLOCK | 46 | `2000-01-01T00:00:45+00:00` | Truth `CONTINUE` 1: event 1/1 time |
+| 83 | EVENT_ID | 23 | `demo-event-00000023` | Truth `CONTINUE` 2: event 1/1 |
+| 84 | CLOCK | 47 | `2000-01-01T00:00:46+00:00` | Truth `CONTINUE` 2: event 1/1 time |
+| 85 | EVENT_ID | 24 | `demo-event-00000024` | Core `CHOOSE` 1: event 1/1 |
+| 86 | CLOCK | 48 | `2000-01-01T00:00:47+00:00` | Core `CHOOSE` 1: event 1/1 time |
+| 87 | EVENT_ID | 25 | `demo-event-00000025` | Core `CHOOSE` 2: event 1/1 |
+| 88 | CLOCK | 49 | `2000-01-01T00:00:48+00:00` | Core `CHOOSE` 2: event 1/1 time |
+| 89 | EVENT_ID | 26 | `demo-event-00000026` | Core `CHOOSE` 3: event 1/1 |
+| 90 | CLOCK | 50 | `2000-01-01T00:00:49+00:00` | Core `CHOOSE` 3: event 1/1 time |
+| 91 | EVENT_ID | 27 | `demo-event-00000027` | Core `CHOOSE` 4 settlement: event 1/1 |
+| 92 | CLOCK | 51 | `2000-01-01T00:00:50+00:00` | Core `CHOOSE` 4 settlement: event 1/1 time |
+| 93 | CLOCK | 52 | `2000-01-01T00:00:51+00:00` | Core `CHOOSE` 4: local-template job time |
+| 94 | JOB_ID | 5 | `demo-job-00000005` | Core `CHOOSE` 4: local-template settlement job |
 
-For each child, the parsed 105-record generator sequence must equal this table
+For each child, the parsed 94-record generator sequence must equal this table
 exactly and the two parsed child sequences must equal one another exactly. No
 caller-identity normalization applies to trace data, and no API-private category
 may be removed or ignored. HTTP status/body comparison and both trace
@@ -889,33 +903,152 @@ requirement.
 
 No new scenario content is required. The frozen path reuses
 `death_certificate` / `death-certificate-1.1.0` with
-`character.death_certificate.investigator` and follows only current public
-affordances:
+`character.death_certificate.investigator` and follows only the latest
+authoritative public affordance.
 
-1. Create the Session and submit `CUSTOM`: `我有规律地移动手指，发出可复核的生命信号`.
-2. Submit `TALK`: `请协调员复核我的连续回应和生命体征`.
-3. Submit the advertised `CONTINUE` actions until the early strategy decision,
-   then select the first displayed choice.
-4. Continue through disposal escape to the investigation decision and select
-   the first displayed choice, which opens the records route through trusted
-   scenario content.
-5. In the records room submit `EXPLORE`:
-   `沿记录与档案审计路径核对签发时间`.
-6. Submit `EXPLORE`: `核对日志时间顺序以及规程反馈`, then select the first
-   displayed investigation choice.
-7. In the observation level submit `OBSERVE`:
-   `复核地下患者的生命体征与连续监测历史`.
-8. Submit advertised `CONTINUE` actions through self-fulfilling truth, then
-   select the first displayed choice in each of the four rapid core decisions.
-9. Read a new authoritative View and verify `scenario_status=ENDED`,
-   `ending_status=RESOLVED`, ending `protocol_broken`, completed scenario
-   memory, and `action_affordances.mode=ENDED` with no controls.
+### Opening contract and canonical choice
 
-“Until” in steps 3 and 8 means follow the current authoritative affordance on
-each refreshed View; it does not authorize automatic CONTINUE or hard-coded
-phase inspection in the Web client. The automated canonical replay records the
-exact expected number and order of requests so a content/cadence change fails
-review instead of silently changing the Demo.
+Session creation starts `death_certificate.arrival_locked` at beat 0 with a
+`DECISION` Frame. The authoritative `/view` has
+`action_affordances.mode=DECISION`, an empty `actions` tuple, the current bound
+public `decision_id`, and exactly these choices in this order. The internal
+declared action type is re-resolved by the server; every public item itself is
+`action_type=CHOOSE` with empty `target_ids`.
+
+| Stable choice ID | Display text | Internal declared type | Actual trusted effect if selected |
+| --- | --- | --- | --- |
+| `death_certificate.action.move_fingers_rhythmically` | 有规律地移动仍可控制的手指 | `physical_response` | Persist one `ScenarioDecisionSelected`, advance hidden `security_alert` from 0 to 1, resolve `immediate_survival`, and enter `life_disputed` beat 0. |
+| `death_certificate.action.interfere_pulse_oximeter` | 干扰指夹式血氧传感器 | `physical_response` | The same transition and hidden clock advance, with this distinct selected action ID. |
+| `death_certificate.action.adjust_breathing_signal` | 调整呼吸制造可识别生命信号 | `respond` | The same transition and hidden clock advance, with this distinct selected action ID/type. |
+| `death_certificate.action.observe_quietly` | 保持安静并获取现场信息 | `observe` | The same transition and hidden clock advance, with this distinct selected action ID/type. |
+
+None of the four choice events discovers a clue, records an NPC-alive
+acknowledgement, writes accepted narrative text, creates a Narrative job or
+invokes a Provider. The unique canonical choice is
+`death_certificate.action.move_fingers_rhythmically`: it is a real beat-zero
+choice and is the only option that directly preserves the earlier script's
+rhythmic-finger life-signal intent. It is selected for that reason, not because
+it is first in the list.
+
+The action POST copies the current bound public `decision_id` and uses that
+stable `choice_id`; it contains no description, dialogue, target, tool or other
+payload. Although the global HTTP schema can parse other action shapes, the
+Phase 3.1c Web client renders only these choice buttons in this View and its
+public-contract-compliant path cannot originate a non-advertised `CUSTOM` at
+opening. The canonical Provider-backed `CUSTOM` therefore appears only after
+action 1 has produced the state-version-1 `FREE_ACTIONS` View, as action 2.
+
+### Frozen affordance sequence
+
+Every range below is read from a new authoritative `/view`; no client infers a
+control from prose or internal phase state.
+
+| State version | Frame / affordance mode | Exact advertised controls |
+| ---: | --- | --- |
+| 0 | `DECISION` / `DECISION` | The four opening choices above; no free actions. |
+| 1-3 | `FLOW` / `FREE_ACTIONS` | `CONTINUE`, `CUSTOM`, `EXPLORE`, `OBSERVE`, `TALK`. |
+| 4 | `DECISION` / `DECISION` | `death_certificate.action.prove_vitals`, `death_certificate.action.seek_records`. |
+| 5-6 | `FLOW` / `FREE_ACTIONS` | `CONTINUE`, `CUSTOM`, `EXPLORE`, `MOVE`, `OBSERVE`. |
+| 7 | `FLOW` / `FREE_ACTIONS` | `CONTINUE`, `CUSTOM`, `EXPLORE`, `OBSERVE`, `TALK`. |
+| 8 | `DECISION` / `DECISION` | `death_certificate.action.inspect_archive`, `death_certificate.action.trace_protocol`. |
+| 9-10 | `FLOW` / `FREE_ACTIONS` | `CONTINUE`, `CUSTOM`, `EXPLORE`, `OBSERVE`, `TALK`. |
+| 11 | `DECISION` / `DECISION` | `death_certificate.action.open_observation`, `death_certificate.action.secure_audit`. |
+| 12-14 | `FLOW` / `FREE_ACTIONS` | `CONTINUE`, `CUSTOM`, `EXPLORE`, `OBSERVE`, `TALK`. |
+| 15 | `RAPID_DECISION` / `DECISION` | `death_certificate.action.pause_protocol`, `death_certificate.action.protect_patient`. |
+| 16 | `RAPID_DECISION` / `DECISION` | `death_certificate.action.ask_coordinator`, `death_certificate.action.ask_custodian`. |
+| 17 | `RAPID_DECISION` / `DECISION` | `death_certificate.action.public_override`, `death_certificate.action.controlled_audit`. |
+| 18 | `RAPID_DECISION` / `DECISION` | `death_certificate.action.final_suspend`, `death_certificate.action.final_disclose`. |
+| 19 | `SETTLEMENT` / `ENDED` | No actions and no choices. |
+
+### Frozen canonical action sequence
+
+Each `CHOOSE` uses the current View's bound public `decision_id`; the table
+freezes the definition window and stable choice ID rather than hard-coding a
+session/version-bound token. Each successful POST is followed by a complete
+authoritative `/view` read before the next action.
+
+| # | Submitted action and exact semantic payload | Resulting phase / beat | Public clocks `disposal/deadline` | State version |
+| ---: | --- | --- | --- | ---: |
+| 0 | Create Session for `death_certificate` and `character.death_certificate.investigator`. | `arrival_locked` / 0, opening decision | `0/0` | 0 |
+| 1 | `CHOOSE` `immediate_survival` -> `death_certificate.action.move_fingers_rhythmically`. | `life_disputed` / 0, `FLOW` | `0/0` | 1 |
+| 2 | Provider-backed `CUSTOM`, `description="请协调员复核我的连续回应和生命体征"`. | `life_disputed` / 1, `FLOW` | `1/0` | 2 |
+| 3 | Payload-free `CONTINUE`. | `life_disputed` / 2, `FLOW` | `2/1` | 3 |
+| 4 | Payload-free `CONTINUE`. | `life_disputed` / 3, early-strategy decision | `3/2` | 4 |
+| 5 | `CHOOSE` `early_strategy` -> `death_certificate.action.prove_vitals`. | `disposal_escape` / 0, `FLOW` | `4/2` | 5 |
+| 6 | Payload-free `CONTINUE`. | `disposal_escape` / 1, `FLOW` | `4/3` | 6 |
+| 7 | Payload-free `CONTINUE`. | `investigation` / 0, `FLOW` | `4/4` | 7 |
+| 8 | Payload-free `CONTINUE`. | `investigation` / 1, route-one decision | `4/5` | 8 |
+| 9 | `CHOOSE` `investigation_route_one` -> `death_certificate.action.inspect_archive`. | `investigation` / 2 in `records_room`, `FLOW` | `4/6` | 9 |
+| 10 | Provider-backed `EXPLORE`, `description="沿记录与档案审计路径核对签发时间"`. | `investigation` / 3, `FLOW` | `4/7` | 10 |
+| 11 | Provider-backed `EXPLORE`, `description="核对日志时间顺序以及规程反馈"`. | `investigation` / 4, route-two decision | `4/8` | 11 |
+| 12 | `CHOOSE` `investigation_route_two` -> `death_certificate.action.open_observation`. | `investigation` / 5 in `observation_level`, `FLOW` | `4/9` | 12 |
+| 13 | Provider-backed `OBSERVE`, `description="复核地下患者的生命体征与连续监测历史"`. | `self_fulfilling_truth` / 0, `FLOW` | `4/10` | 13 |
+| 14 | Payload-free `CONTINUE`. | `self_fulfilling_truth` / 1, `FLOW` | `4/11` | 14 |
+| 15 | Payload-free `CONTINUE`. | `core_conflict` / 0, rapid core-one decision | `4/12` | 15 |
+| 16 | `CHOOSE` `core_one` -> `death_certificate.action.pause_protocol`. | `core_conflict` / 1, rapid core-two decision | `4/12` | 16 |
+| 17 | `CHOOSE` `core_two` -> `death_certificate.action.ask_coordinator`. | `core_conflict` / 2, rapid core-three decision | `4/12` | 17 |
+| 18 | `CHOOSE` `core_three` -> `death_certificate.action.public_override`. | `core_conflict` / 3, rapid core-four decision | `4/12` | 18 |
+| 19 | `CHOOSE` `core_four` -> `death_certificate.action.final_suspend`. | `resolution` / 0, `SETTLEMENT` / `ENDED` | `4/12` | 19 |
+
+The first and only canonical Provider-backed `CUSTOM` is action 2, after the
+opening choice has produced a real `FREE_ACTIONS` View. The same clinical text
+matches the declared `life_disputed_clinical_recheck` rule for `CUSTOM`, so this
+retains meaningful custom-action and Provider coverage without adding a
+no-effect action or preserving the invalid opening POST. The four Provider
+invocations, in order, are actions 2, 10, 11 and 13.
+
+### Frozen event, job and final-state accounting
+
+Within a row, persisted events retain the displayed order. A
+`RuntimeGenerated(x)` entry means a persisted `ScenarioRuntimeEventGenerated`
+whose `scenario_event_type` is `x`.
+
+| Action | Persisted events in order | Cumulative events including creation | Cumulative jobs | Provider invocation |
+| ---: | --- | ---: | ---: | --- |
+| create | `ScenarioStarted` | 1 | 0 | none |
+| 1 | `ScenarioDecisionSelected` | 2 | 0 | none |
+| 2 | `NarrativeOutcomeAccepted`, `RuntimeGenerated(clue_group.player_alive.completed)` | 4 | 1 | 1, clinical `CUSTOM` |
+| 3 | `ScenarioAutoBeatAdvanced` | 5 | 1 | none |
+| 4 | `ScenarioAutoBeatAdvanced`, `RuntimeGenerated(disposal.protocol.accelerated)` | 7 | 1 | none |
+| 5 | `ScenarioDecisionSelected` | 8 | 1 | none |
+| 6 | `ScenarioAutoBeatAdvanced` | 9 | 1 | none |
+| 7 | `ScenarioAutoBeatAdvanced` | 10 | 1 | none |
+| 8 | `ScenarioAutoBeatAdvanced` | 11 | 1 | none |
+| 9 | `ScenarioDecisionSelected` | 12 | 1 | none |
+| 10 | `NarrativeOutcomeAccepted` | 13 | 2 | 2, records `EXPLORE` |
+| 11 | `NarrativeOutcomeAccepted`, `RuntimeGenerated(deadline.critical)`, `RuntimeGenerated(clue_group.record_order.completed)`, `RuntimeGenerated(clue_group.causation.completed)` | 17 | 3 | 3, audit `EXPLORE` |
+| 12 | `ScenarioDecisionSelected`, `RuntimeGenerated(patient.stability.critical)` | 19 | 3 | none |
+| 13 | `NarrativeOutcomeAccepted`, `RuntimeGenerated(clue_group.patient_alive.completed)` | 21 | 4 | 4, patient `OBSERVE` |
+| 14 | `ScenarioAutoBeatAdvanced` | 22 | 4 | none |
+| 15 | `ScenarioAutoBeatAdvanced` | 23 | 4 | none |
+| 16 | `ScenarioDecisionSelected` | 24 | 4 | none |
+| 17 | `ScenarioDecisionSelected` | 25 | 4 | none |
+| 18 | `ScenarioDecisionSelected` | 26 | 4 | none |
+| 19 | `ScenarioDecisionSelected` carrying `core.conflict.resolved` | 27 | 5 | none; job 5 is the attempt-zero local settlement template |
+
+The final authoritative View must have `scenario_status=ENDED`,
+`ending_status=RESOLVED`, ending
+`death_certificate.ending.protocol_broken`, completed scenario memory and
+`action_affordances.mode=ENDED` with no controls. It has state version 19,
+public clocks `disposal_protocol=4` and `predicted_death_deadline=12`, private
+clocks `security_alert=1` and `underground_patient_stability=5`, four completed
+clue groups, 27 persisted events, four Provider jobs plus one local-template
+job, and five recent committed narrative texts in order: clinical, records,
+audit, patient and settlement. The bounded public memory has one completed
+scenario record, two NPC records, two significant experiences and 11 known
+public facts; removing the old opening Narrative outcome removes its duplicate
+public-discovery experience but not the later authoritative alive fact or NPC
+acknowledgement.
+
+The exact replay uses the ordered action bodies above. Identical-identity runs
+compare every HTTP status and canonical response, including versions, bound
+decision tokens, public clocks, accepted texts, memory and ending. The separate
+browser-equivalence acceptance changes only the already frozen caller-owned
+identity sequences and applies only the section C whitelist. Neither replay
+normalizes server IDs, decision/choice IDs, events, clocks, prose, memory or the
+ending. The 3.2a backend replay and the later 3.2b Web regression/manual
+walkthrough must use this same path; 3.2b may click only the controls in the
+affordance sequence above.
 
 ## I. Test matrix
 
@@ -925,11 +1058,11 @@ review instead of silently changing the Demo.
 | Provider selection/error | Stable first-candidate/first-result/reference behavior and deterministic Unicode-code-point length clamping; every row in the frozen failure table asserts its one exception, HTTP result, status result, terminal/idempotency record, unchanged View/state, zero fallback and zero external Provider calls. |
 | Demo composition isolation | Import/build succeeds without database or DeepSeek variables; normal `main:app` does not select Demo; Demo build does not call database engine/settings/DeepSeek constructors or read `.env`. |
 | In-memory contract | Initial create/replay conflict, ownership, detached reads, per-session locking, event sequence/receipt binding, turn idempotency, narrative-job CAS/fencing, recent text ordering, rollback and optimistic conflict match current ports. Every mutation has a regression test. |
-| Exact cross-process determinism | `tests/e2e/test_demo_cross_process_replay.py` starts two clean, single-worker backend OS processes with `PYTHONHASHSEED=1` and `2`, empty stores and reset generators; each test-only child bootstrap reports actual seam consumption over its own explicitly inherited IPC pipes. The command asserts every canonical HTTP status/body, each strict 105-record trace against the frozen table, both traces against each other, completion/EOF and child/control lifecycle. HTTP or trace failure is fatal; two in-process app/ASGI transports are insufficient. |
+| Exact cross-process determinism | `tests/e2e/test_demo_cross_process_replay.py` starts two clean, single-worker backend OS processes with `PYTHONHASHSEED=1` and `2`, empty stores and reset generators; each test-only child bootstrap reports actual seam consumption over its own explicitly inherited IPC pipes. The command asserts every canonical HTTP status/body, each strict 94-record trace against the frozen table, both traces against each other, completion/EOF and child/control lifecycle. HTTP or trace failure is fatal; two in-process app/ASGI transports are insufficient. |
 | Caller-identity equivalence | A second two-process replay uses different create/action identity sequences, applies only the exact whitelist and bijective token algorithm in section C, and requires every normalized canonical gameplay response to match. Internal Session/event IDs and clocks remain compared. |
-| Complete API path | Use only public endpoints from scenario discovery and Session creation through every action and final `/view`; assert the expected Provider call count, clocks, versions, memory, ending, no hidden fields and no post-ending mutation. |
+| Complete API path | Use only public endpoints from scenario discovery and Session creation through the 19 actions and final `/view` in section H. Assert opening `CHOOSE`, the first Provider-backed `CUSTOM` at action 2, four Provider invocations, 27 persisted events, five total jobs, state versions 0 through 19, the exact public/private clock progression, five recent texts, final memory/ending, no hidden fields and no post-ending mutation. |
 | No external I/O | Complete the public path with non-loopback sockets denied and database/DeepSeek constructors trapped; assert zero calls and no credentials required. Loopback ASGI/test transport is allowed. |
-| Web complete loop | One React/MSW regression drives the real App controls from create through all canonical affordance transitions to an ENDED View, verifies the Demo banner, and asserts every POST body comes only from the displayed affordance. |
+| Web complete loop | One React/MSW regression drives the real App controls through the exact section H path: its first POST clicks `death_certificate.action.move_fingers_rhythmically` as `CHOOSE`, action 2 uses the advertised `CUSTOM`, every later stable choice ID matches the table, and the final refreshed View is ENDED. It verifies the Demo banner and asserts every POST body comes only from the displayed affordance. |
 | Vite dotenv isolation | Demo mode resolves `envDir: false` while ordinary modes retain current behavior. The fail-closed sentinel acceptance proves a unique `VITE_*` value in the smoke-created `.env.deterministic-demo.local` reaches neither Vite configuration, client modules/bundle, page nor observable response, and cleanup removes only that file. |
 | Startup/proxy | `pwsh -NoProfile -File .\scripts\smoke-demo.ps1` starts its own sanitized backend/Web children, enforces the 60-second default total timeout, reaches the scenarios API only through the Vite proxy, requires HTTP 200 and exact response bytes in an owned create-new file, and passes only that absolute path through the validator environment. On Windows it fail-closed resolves an absolute `cmd.exe` from process `ComSpec`, enumerates all Application `npm.cmd` results and requires `$npmCommands.Count -eq 1`; zero, multiple or exceptional resolutions are fatal. It then starts exactly that unique validated absolute `FileInfo.FullName` through `cmd.exe /d /s /c` with the frozen `Arguments`, absolute Web working directory and no dynamic response data in the command. Asynchronous handlers continuously drain diagnostic stdout/stderr; only validator `ExitCode=0` proves direct `publicScenarioCatalogSchema` success. Invalid UTF-8/JSON/schema, command resolution/start/timeout/nonzero/ExitCode failure, label/sentinel/lifecycle failure or owned cleanup failure is nonzero, and timeout termination is limited to process trees the smoke created. |
 | Recovery preservation | Existing Phase 3.1c suite remains unchanged and passing; added coverage proves same-tab reload works while the Demo process lives and backend restart produces safe 404 invalidation with zero action POSTs. |
@@ -954,12 +1087,16 @@ Phase 3.2 may be marked complete only when all of the following are true:
    existing dependencies and no database/DeepSeek settings, key or secret.
 3. The dedicated Demo composition is the only way to select Demo Provider and
    storage; the normal application never falls back to either.
-4. The canonical browser walkthrough reaches the frozen RESOLVED ending using
-   only current public affordances and authoritative View refreshes.
+4. The canonical browser walkthrough follows all 19 section H actions using
+   only current public affordances and authoritative View refreshes. Its first
+   POST is the bound `CHOOSE` for
+   `death_certificate.action.move_fingers_rhythmically`, its first
+   Provider-backed `CUSTOM` is action 2, and it reaches the frozen RESOLVED
+   ending with exactly four Provider invocations.
 5. The exact command in section K passes the two independent backend OS-process
    replays, including different fixed hash seeds, per-response canonical
    comparison, caller-identity whitelist acceptance, and each child's actual
-   test-only IPC trace. Each trace exactly matches the frozen 105-record table,
+   test-only IPC trace. Each trace exactly matches the frozen 94-record table,
    both traces match one another, and completion/EOF/control/child lifecycle is
    valid. Any HTTP, trace or lifecycle difference is fatal. Two apps in one
    Python process do not satisfy it.
@@ -1018,7 +1155,7 @@ git diff --cached --name-only
 The cross-process test above is the unique executable canonical replay command;
 it must spawn the two backend OS processes itself and return nonzero for any
 HTTP status/canonical JSON difference, either child trace differing from the
-frozen sequence, the child traces differing from one another, malformed or
+frozen 94-record sequence, the child traces differing from one another, malformed or
 incomplete trace data, or child/IPC lifecycle failure. The smoke command above
 is the unique bounded startup/proxy/sentinel/schema-validation command. On
 Windows it must use the frozen absolute `ComSpec` `cmd.exe`, enumerate all
@@ -1062,9 +1199,10 @@ defined by the repository workflow.
 
 ## M. Guardrail impact
 
-Guardrail impact: **None**. This planning task confirms no new defect and does
-not add or update a reusable guardrail. Future implementation is governed by
-existing ENV-001, ENV-002, DB-001, AUTH-001, STATE-001, API-001, SCENE-001,
+Guardrail impact: **None**. This specification repair does not establish or
+change a reusable engineering or safety rule. Future implementation is
+governed by existing ENV-001, ENV-002, DB-001, AUTH-001, STATE-001, API-001,
+SCENE-001,
 MODEL-001, MODEL-002 and PLAY-001. Any confirmed implementation defect that
 creates or changes a reusable rule must update the matching guardrail and add a
 regression in that implementation change.
