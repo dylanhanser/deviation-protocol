@@ -6,9 +6,11 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `b4352230ef0c9bc91a5bf78e69e88e0feab4908c`
+- Repository HEAD: `3d3181f7ea216003e582e3e658f6afda9cbbd852`
+- Approved Phase 3.1b implementation baseline: `b4352230ef0c9bc91a5bf78e69e88e0feab4908c`
 - Latest completed phase: Phase 3.1b
-- Committed baseline status: clean
+- Repository baseline before this planning edit: clean, with `origin/main` at
+  Repository HEAD
 
 ## Phase Status
 
@@ -24,6 +26,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 3.0 | Complete |
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
 | Phase 3.1b | Complete; third independent read-only audit `APPROVED`; the first audit's 3 findings and the second audit's 3 Major and 1 Minor findings are closed; committed and pushed (`b4352230ef0c9bc91a5bf78e69e88e0feab4908c`) |
+| Phase 3.1c | Approved/planned; implementation not started; not complete; implementation audit not yet performed |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -54,8 +57,9 @@ with no new Critical, Major, or Minor findings. The first audit's 3 findings
 remain closed, and all 3 Major and 1 Minor findings from the second audit's
 earlier `CHANGES_REQUIRED` verdict are closed. The approved implementation was
 committed as `b4352230ef0c9bc91a5bf78e69e88e0feab4908c` (`feat(web): complete
-Phase 3.1b playable action loop`) and is synchronized with `origin/main`. No
-later phase has started.**
+Phase 3.1b playable action loop`). Repository HEAD is the subsequent Phase 3.1b
+status-documentation commit `3d3181f7ea216003e582e3e658f6afda9cbbd852`.
+Phase 3.1c is approved/planned, but its implementation has not started.**
 
 Phase 3.1b is a complete minimum playable action loop in one browser tab, with
 no persistence or reload recovery. A user can create a Session or manually load
@@ -144,10 +148,129 @@ action loop locally in one browser tab, without persistence or reload recovery.
 It is not a publicly deployable, stable external-playtest,
 reconnection-capable, or production-ready release.
 
-Later work must still address reload/reconnection/pending recovery; guest
-identity, authentication, and abuse controls; deployment, base URL, and
-production CORS; an available Provider or deterministic demo environment; and
-external-playtest usability and recovery flows.
+Approved Phase 3.1c is planned to address only same-tab reload and recovery of
+requests already confirmed pending by the server. Later work must still address
+general reconnection; guest identity, authentication, and abuse controls;
+deployment, base URL, and production CORS; an available Provider or
+deterministic demo environment; and external-playtest usability and recovery
+flows.
+
+## Phase 3.1c
+
+**Status: approved/planned. Implementation has not started, the phase is not
+complete, and no implementation audit has been performed.**
+
+The formally approved direction is **Web same-tab reload and
+confirmed-pending-request recovery**. It adds a bounded client recovery loop to
+the existing Web Demo without changing the public API, Python backend, ORM,
+database schema, or Alembic migrations.
+
+### Frozen Goal and Persistence Boundary
+
+- Recovery is promised only after a reload in the same browser tab and uses
+  `sessionStorage`. Browser-close or browser-restart recovery, cross-tab
+  coordination, and general network reconnection are not supported.
+- A persistence record contains only a version number, the opaque Session ID of
+  a previously verified Session, and, optionally, the `client_request_id` of a
+  request for which the server already returned HTTP 202. A POST with no
+  confirmed 202 is transport-uncertain and is not recovered as a pending
+  request.
+- The client does not persist a View, affordances, an action payload, action or
+  user input, a response body, narrative output, or any other copy of server
+  state.
+- Every final state is read again from the authoritative
+  `GET /v1/sessions/{session_id}/view`. Recovery never treats cached data or a
+  request-status response as a complete View and never displays an old or
+  unconfirmed affordance.
+- No startup or recovery path automatically posts or replays an action, and no
+  path automatically generates or substitutes a new `client_request_id`.
+- There is no arbitrary client TTL. A valid record remains until the tab is
+  closed, the user explicitly clears it, or the user creates or switches to a
+  different Session.
+
+### Frozen Recovery Semantics
+
+- With no confirmed pending request, startup restores state by reading the
+  authoritative `/view` for the recorded Session ID.
+- With a confirmed pending request, the UI stays action-locked, renders no
+  cached affordance, and queries request status using exactly the recorded
+  Session ID and `client_request_id`. It emits no action POST.
+- `PENDING` with `POLL_SAME_REQUEST` continues querying the same request,
+  strictly honors the server's `retry_after_seconds`, and creates no new
+  request ID.
+- `COMMITTED` with `RESPONSE_AVAILABLE` reads the complete authoritative
+  `/view`; the request-status response is not used as a View.
+- `STALE` with `REFRESH_VIEW` reads the complete authoritative `/view` and does
+  not replay the action.
+- `FAILED` with `DO_NOT_RETRY` and `OUTCOME_UNKNOWN` with `DO_NOT_RETRY` never
+  cause a POST. They may perform a controlled authoritative `/view` GET and
+  continue to reuse Phase 3.1b's existing stale, uncertain, and
+  confirmed-view-unavailable rules without inventing new server lifecycle
+  semantics.
+- A network error, damaged response, or result that cannot be parsed safely
+  during request-status or other recovery work stops automatic recovery, keeps
+  actions locked, and permits only a user-triggered retry of a safe GET. It
+  never causes an automatic POST.
+- A 404 from a recovery endpoint invalidates the persisted record. The client
+  creates no action controls and safely returns to the initial Session/scenario
+  UI.
+- Persisted data is validated before use. A corrupt record, invalid shape,
+  unsupported version, or Session/request identity mismatch is cleared
+  directly.
+- Creating a new Session, switching Sessions, writing or clearing a pending
+  request, and committing an authoritative View remain atomic with respect to
+  the current client state.
+- Recovery reuses the existing foreground operation lock, generation/token,
+  and `AbortController` protections so obsolete work cannot commit after an
+  invalidation, Session switch, or unmount.
+
+### Explicit Out of Scope
+
+- Recovery of a transport-uncertain POST; automatic action retry or repost;
+  and automatic replacement of an old request ID with a new one.
+- General network reconnection, long-running background recovery, recovery
+  after browser close or restart, `localStorage`, URL-persisted state, and
+  cross-tab synchronization.
+- Guest identity, authentication, abuse controls, deployment or hosting,
+  production CORS, and a formal external playtest.
+- A deterministic local Demo Provider, DeepSeek Provider changes, visual
+  redesign or animation, and action or chat history.
+- Any public API, Python backend, ORM, database schema, database, or Alembic
+  migration change.
+
+A deterministic local Demo Provider remains only an unnumbered candidate for
+later work; it is not part of Phase 3.1c.
+
+### Future Acceptance Boundary
+
+These are requirements for the future implementation and audit. This planning
+change does not claim that they have been run, satisfied, or approved:
+
+1. After reload, an ACTIVE or ENDED Session is restored only through its
+   authoritative `/view`.
+2. A request already confirmed with HTTP 202 resumes status polling with
+   exactly the same Session ID and `client_request_id`.
+3. Every startup and reload recovery path has an action POST count of zero.
+4. Web regressions cover every existing request-status state/instruction branch.
+5. Corrupt, tampered, expired, unsupported, or identity-mismatched persistence
+   records cannot produce action controls.
+6. No old affordance flashes while recovery is in progress.
+7. Session switches and obsolete asynchronous responses cannot commit into the
+   new current Session.
+8. After a network error or damaged response, the user can retry only a safe
+   GET manually; no automatic POST occurs.
+9. Tests explicitly prove that transport-uncertain POST recovery, cross-tab
+   recovery, and recovery after browser close or restart are unsupported.
+10. After implementation, the intended verification set is `npm run lint`,
+    `npm run typecheck`, `npm run test:run`, `npm run build`,
+    `.\scripts\verify.ps1 -Mode Offline`, `git diff --check`, and a modified-file
+    scope inspection.
+11. After implementation, an independent read-only audit checks no action
+    replay, authoritative View use, persisted-data validation,
+    operation/Session races, stale-response isolation, and the recovery-time UI
+    action lock.
+12. Phase 3.1c requires no live DeepSeek, MySQL, network verification, or
+    Alembic migration.
 
 ## Deferred by Design
 
