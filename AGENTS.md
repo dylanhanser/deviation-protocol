@@ -11,6 +11,22 @@
 - Do not install project dependencies globally.
 - If `.venv` is missing or broken, stop and report it instead of silently recreating it.
 
+## Sandbox escalation
+
+- If an in-scope command or verification is blocked specifically by the Codex sandbox, immediately request permission to rerun the exact operation outside the sandbox with a concise justification.
+- Do not expand a sandbox denial into a lengthy diagnostic or workaround process before requesting escalation.
+- First verify the exact command and target path. Escalation does not authorize broader access, destructive actions, unrelated changes, or an expansion of task scope.
+- If escalation is unavailable or denied, report that immediately.
+- If the same operation still fails outside the sandbox, diagnose the underlying operating-system permission, ACL, file-lock, or test failure normally.
+
+## Git publishing
+
+- Codex may create local commits only when explicitly authorized.
+- Codex must never push this repository.
+- All pushes are performed by the user.
+- GitHub or GitHub CLI authentication must not be treated as a prerequisite for creating an explicitly authorized local commit.
+- Do not run `gh auth status`, `gh auth login`, or other GitHub-authentication commands unless the user explicitly requests them for a separate task.
+
 ## Security and persistence
 
 - Never read, commit, or print secrets from `.env`.
