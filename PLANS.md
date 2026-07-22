@@ -6,8 +6,8 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `c3cc91759064bc8538f76c54105113f1e53a1558`
-- Latest completed phase: Phase 3.1a
+- Commit: `b4352230ef0c9bc91a5bf78e69e88e0feab4908c`
+- Latest completed phase: Phase 3.1b
 - Committed baseline status: clean
 
 ## Phase Status
@@ -23,7 +23,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 2.4b | Complete |
 | Phase 3.0 | Complete |
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
-| Phase 3.1b | Second independent read-only audit returned `CHANGES_REQUIRED`; its 3 Major and 1 Minor findings are repaired and verified locally; awaiting a new independent read-only review; not approved, committed, or pushed |
+| Phase 3.1b | Complete; third independent read-only audit `APPROVED`; the first audit's 3 findings and the second audit's 3 Major and 1 Minor findings are closed; committed and pushed (`b4352230ef0c9bc91a5bf78e69e88e0feab4908c`) |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -49,10 +49,13 @@ pushed at `43bf83dcaccf9e7400965f863f545ee1043beacf`. It adds:
 
 ## Phase 3.1b
 
-**Status: the second independent read-only audit returned `CHANGES_REQUIRED`;
-its 3 Major and 1 Minor findings are repaired and verified locally. Phase 3.1b
-is not approved and remains awaiting a new independent read-only review; not
-committed or pushed.**
+**Status: complete. The third independent read-only audit returned `APPROVED`
+with no new Critical, Major, or Minor findings. The first audit's 3 findings
+remain closed, and all 3 Major and 1 Minor findings from the second audit's
+earlier `CHANGES_REQUIRED` verdict are closed. The approved implementation was
+committed as `b4352230ef0c9bc91a5bf78e69e88e0feab4908c` (`feat(web): complete
+Phase 3.1b playable action loop`) and is synchronized with `origin/main`. No
+later phase has started.**
 
 Phase 3.1b is a complete minimum playable action loop in one browser tab, with
 no persistence or reload recovery. A user can create a Session or manually load
@@ -136,9 +139,9 @@ state.
 
 ### Minimum Playable Claim and Later Boundary
 
-When complete, Phase 3.1b may be called a minimum playable Demo that completes
-the public action loop locally in one browser tab, without persistence or reload
-recovery. It is not a publicly deployable, stable external-playtest,
+Phase 3.1b is complete as a minimum playable Demo that completes the public
+action loop locally in one browser tab, without persistence or reload recovery.
+It is not a publicly deployable, stable external-playtest,
 reconnection-capable, or production-ready release.
 
 Later work must still address reload/reconnection/pending recovery; guest
