@@ -252,8 +252,12 @@ change does not claim that they have been run, satisfied, or approved:
    exactly the same Session ID and `client_request_id`.
 3. Every startup and reload recovery path has an action POST count of zero.
 4. Web regressions cover every existing request-status state/instruction branch.
-5. Corrupt, tampered, expired, unsupported, or identity-mismatched persistence
-   records cannot produce action controls.
+5. A missing persistence record means there is nothing to recover; it is not an
+   expired record. Corrupt, tampered, unsupported, or identity-mismatched
+   records cannot produce action controls and retain their existing safe
+   handling. Time-expired records are not applicable to Phase 3.1c: the frozen
+   record has no time field or client TTL, so this phase neither implements nor
+   tests time-expiry recognition.
 6. No old affordance flashes while recovery is in progress.
 7. Session switches and obsolete asynchronous responses cannot commit into the
    new current Session.
