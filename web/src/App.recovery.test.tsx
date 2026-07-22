@@ -184,6 +184,69 @@ async function expectCurrentViewVersion(sessionId: string, stateVersion: number)
 }
 
 describe("same-tab Session reload recovery", () => {
+  it("does not recover a prior pending identity from an isolated tab/sessionStorage or a new browsing session without that record", async () => {
+    const priorStorage = new FaultInjectingStorage();
+    priorStorage.setItem(
+      SESSION_RECOVERY_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        session_id: "old-session",
+        client_request_id: "old-request",
+      }),
+    );
+    const isolatedStorage = new FaultInjectingStorage();
+    const restoreStorage = installSessionStorage(isolatedStorage);
+    let oldStatusReads = 0;
+    let oldViewReads = 0;
+    let posts = 0;
+    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const actionIdentityFactory = vi.fn(deterministicActionIdentityFactory);
+    server.use(
+      scenarioHandler(),
+      ...postGuards(() => {
+        posts += 1;
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/old-session/requests/old-request`,
+        () => {
+          oldStatusReads += 1;
+          return HttpResponse.json({}, { status: 500 });
+        },
+      ),
+      http.get(`${apiOrigin}/v1/sessions/old-session/view`, () => {
+        oldViewReads += 1;
+        return HttpResponse.json(freeActionViewFixture());
+      }),
+    );
+
+    try {
+      // Independent Storage objects model only the observable storage boundary;
+      // they do not simulate browser-process shutdown, restart, or tab restore.
+      renderRecoveryApp({ requestIdFactory, actionIdentityFactory });
+
+      await waitFor(() =>
+        expect(
+          screen.getByRole("button", { name: "创建 Session" }),
+        ).toBeEnabled(),
+      );
+      expect(priorStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).not.toBeNull();
+      expect(isolatedStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBeNull();
+      expect(oldStatusReads).toBe(0);
+      expect(oldViewReads).toBe(0);
+      expect(posts).toBe(0);
+      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(actionIdentityFactory).not.toHaveBeenCalled();
+      expect(screen.queryByText("当前 Session：old-session")).not.toBeInTheDocument();
+      expect(screen.queryByText(/confirmed-202 request/)).not.toBeInTheDocument();
+      expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "当前可执行行动" }),
+      ).not.toBeInTheDocument();
+    } finally {
+      restoreStorage();
+    }
+  });
+
   it("restores once under the production-consistent StrictMode wrapper", async () => {
     seedRecoveryRecord("session-public-1");
     let viewReads = 0;
