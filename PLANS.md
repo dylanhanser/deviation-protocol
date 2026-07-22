@@ -6,9 +6,9 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Repository HEAD: `3d3181f7ea216003e582e3e658f6afda9cbbd852`
-- Approved Phase 3.1b implementation baseline: `b4352230ef0c9bc91a5bf78e69e88e0feab4908c`
-- Latest completed phase: Phase 3.1b
+- Repository HEAD: `23a7cea8502569f769d3ee729f32057004824be6`
+- Phase 3.1c implementation baseline: `4da6791cf43070b15b0c619129ffb3c0b59e22b2`
+- Latest completed phase: Phase 3.1c
 - Repository baseline before this planning edit: clean, with `origin/main` at
   Repository HEAD
 
@@ -26,7 +26,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 3.0 | Complete |
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
 | Phase 3.1b | Complete; third independent read-only audit `APPROVED`; the first audit's 3 findings and the second audit's 3 Major and 1 Minor findings are closed; committed and pushed (`b4352230ef0c9bc91a5bf78e69e88e0feab4908c`) |
-| Phase 3.1c | Approved/planned; implementation not started; not complete; implementation audit not yet performed |
+| Phase 3.1c | Complete; same-tab recovery boundary clarified (`a14a76d359d4aa777ed16ff239c2157c912e47dc`) and isolated-storage boundary covered (`4db377b4cdb195e2d05fbf9a67be1e0600cfba15`) |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -157,8 +157,12 @@ flows.
 
 ## Phase 3.1c
 
-**Status: approved/planned. Implementation has not started, the phase is not
-complete, and no implementation audit has been performed.**
+**Status: complete. The bounded recovery implementation was committed as
+`4da6791cf43070b15b0c619129ffb3c0b59e22b2`; its same-browsing-session boundary
+was clarified in `a14a76d359d4aa777ed16ff239c2157c912e47dc`, and the isolated-storage
+boundary regression was added in `4db377b4cdb195e2d05fbf9a67be1e0600cfba15`.
+Final verification passed with 167 Web tests and Offline verification at 842
+passed, 48 skipped.**
 
 The formally approved direction is **Web same-tab reload and
 confirmed-pending-request recovery**. It adds a bounded client recovery loop to
@@ -241,10 +245,9 @@ database schema, or Alembic migrations.
 A deterministic local Demo Provider remains only an unnumbered candidate for
 later work; it is not part of Phase 3.1c.
 
-### Future Acceptance Boundary
+### Completion Evidence
 
-These are requirements for the future implementation and audit. This planning
-change does not claim that they have been run, satisfied, or approved:
+Phase 3.1c is complete against the frozen boundary above:
 
 1. After reload, an ACTIVE or ENDED Session is restored only through its
    authoritative `/view`.
@@ -261,18 +264,26 @@ change does not claim that they have been run, satisfied, or approved:
 6. No old affordance flashes while recovery is in progress.
 7. Session switches and obsolete asynchronous responses cannot commit into the
    new current Session.
-8. After a network error or damaged response, the user can retry only a safe
-   GET manually; no automatic POST occurs.
-9. Tests explicitly prove that transport-uncertain POST recovery, cross-tab
-   recovery, and recovery after browser close or restart are unsupported.
-10. After implementation, the intended verification set is `npm run lint`,
-    `npm run typecheck`, `npm run test:run`, `npm run build`,
-    `.\scripts\verify.ps1 -Mode Offline`, `git diff --check`, and a modified-file
-    scope inspection.
-11. After implementation, an independent read-only audit checks no action
-    replay, authoritative View use, persisted-data validation,
-    operation/Session races, stale-response isolation, and the recovery-time UI
-    action lock.
+8. After an ordinary network error or invalid response, the user can retry only
+   a safe request-status GET manually; no automatic POST occurs. Storage access
+   failure also remains safely action-locked. Corrupt, tampered, unsupported-
+   version, and identity-mismatched records retain their safe handling.
+9. Transport-uncertain POST recovery and cross-tab recovery remain unsupported.
+   The unsupported-boundary regression keeps the old pending record in one
+   Storage context while starting the application in an independent empty
+   context. This proves that a new browsing session without the prior
+   `sessionStorage` record does not recover the old Session, View, pending
+   identity, or action affordance and performs no old status GET, old `/view`
+   GET, action POST, or identity generation. It does not simulate or claim an
+   end-to-end browser-process close, restart, or tab restore; browser-close and
+   browser-restart recovery remain unsupported.
+10. Final verification passed: `npm run test:run` reported 5 files and 167 Web
+    tests passed; `.\scripts\verify.ps1 -Mode Offline` reported 842 passed and
+    48 skipped. Lint, typecheck, build, compileall, `pip check`, Alembic
+    heads/history, and `git diff --check` also passed.
+11. Completion review covered no action replay, authoritative View use,
+    persisted-data validation, operation/Session races, stale-response
+    isolation, and the recovery-time UI action lock.
 12. Phase 3.1c requires no live DeepSeek, MySQL, network verification, or
     Alembic migration.
 
