@@ -3,13 +3,22 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { PublicApiClient } from "./client";
 import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
-import { playerSessionViewSchema } from "./schemas";
+import {
+  actionRequestSchema,
+  actionResponseSchema,
+  narrativeRequestStatusResponseSchema,
+  playerSessionViewSchema,
+} from "./schemas";
 import {
   activeViewFixture,
+  committedActionResponseFixture,
   endedViewFixture,
   errorFixture,
+  freeActionViewFixture,
+  pendingActionResponseFixture,
   scenarioCatalogFixture,
   sessionCreationFixture,
+  synchronousActionResponseFixture,
 } from "../test/fixtures";
 import { server } from "../test/server";
 
@@ -17,6 +26,47 @@ const apiOrigin = "http://api.test";
 
 function client(baseUrl = `${apiOrigin}/`) {
   return new PublicApiClient({ baseUrl });
+}
+
+function actionResponseWithFactIds(
+  mustFactIds: string[],
+  mayFactIds: string[],
+  clientRequestId = "request-fact-uniqueness",
+) {
+  const response = synchronousActionResponseFixture(clientRequestId);
+  if (response.narrative_frame === null) {
+    throw new Error("action response fixture must contain one NarrativeFrame");
+  }
+  return {
+    ...response,
+    narrative_frame: {
+      ...response.narrative_frame,
+      must_render_facts: mustFactIds.map((factId, index) => ({
+        fact_id: factId,
+        value: { source: "must", index },
+      })),
+      may_render_facts: mayFactIds.map((factId, index) => ({
+        fact_id: factId,
+        value: { source: "may", index },
+      })),
+    },
+  };
+}
+
+function localQueryActionResponse(
+  feedbackParameters: Record<string, unknown>,
+  localQueryResult: Record<string, unknown>,
+  clientRequestId = "request-local-query-json",
+) {
+  return {
+    ...synchronousActionResponseFixture(clientRequestId),
+    result_code: "STATUS_INSPECTED",
+    feedback_code: "STATUS_INSPECTED",
+    feedback_parameters: feedbackParameters,
+    state_changed: false,
+    narrative_text: null,
+    local_query_result: localQueryResult,
+  };
 }
 
 afterEach(() => {
@@ -133,21 +183,190 @@ describe("public API response contracts", () => {
         HttpResponse.json({
           ...scenarioCatalogFixture,
           future_public_hint: "safe additive field",
+          scenarios: scenarioCatalogFixture.scenarios.map((scenario) => ({
+            ...scenario,
+            future_scenario_hint: "safe nested additive field",
+            playable_characters: scenario.playable_characters.map((role) => ({
+              ...role,
+              future_role_hint: "safe nested additive field",
+            })),
+          })),
         }),
       ),
     );
 
     const result = await client().listScenarios();
     expect(result).not.toHaveProperty("future_public_hint");
+    expect(result.scenarios[0]).not.toHaveProperty("future_scenario_hint");
+    expect(result.scenarios[0]?.playable_characters[0]).not.toHaveProperty(
+      "future_role_hint",
+    );
   });
 
   it("allows harmless added PlayerSessionView fields without exposing them", () => {
     const result = playerSessionViewSchema.parse({
       ...activeViewFixture,
       future_public_hint: "safe additive field",
+      narrative_frame: {
+        ...activeViewFixture.narrative_frame,
+        future_frame_hint: "safe nested additive field",
+      },
     });
 
     expect(result).not.toHaveProperty("future_public_hint");
+    expect(result.narrative_frame).not.toHaveProperty("future_frame_hint");
+  });
+
+  it.each([
+    ["affordance set", "set"],
+    ["action item", "action"],
+    ["target item", "target"],
+    ["choice item", "choice"],
+  ] as const)(
+    "accepts and strips a harmless additive field on the %s through getSessionView",
+    async (_label, layer) => {
+      const sourceView =
+        layer === "choice" ? activeViewFixture : freeActionViewFixture();
+      let responseBody;
+      if (layer === "set") {
+        responseBody = {
+          ...sourceView,
+          action_affordances: {
+            ...sourceView.action_affordances,
+            future_affordance_hint: "safe additive field",
+          },
+        };
+      } else if (layer === "action") {
+        const freeView = freeActionViewFixture();
+        responseBody = {
+          ...freeView,
+          action_affordances: {
+            ...freeView.action_affordances,
+            actions: freeView.action_affordances.actions.map((action) =>
+              action.action_type === "TALK"
+                ? { ...action, future_action_hint: "safe additive field" }
+                : action,
+            ),
+          },
+        };
+      } else if (layer === "target") {
+        const freeView = freeActionViewFixture();
+        responseBody = {
+          ...freeView,
+          action_affordances: {
+            ...freeView.action_affordances,
+            actions: freeView.action_affordances.actions.map((action) =>
+              action.action_type === "TALK"
+                ? {
+                    ...action,
+                    targets: action.targets.map((target) => ({
+                      ...target,
+                      future_target_hint: "safe additive field",
+                    })),
+                  }
+                : action,
+            ),
+          },
+        };
+      } else {
+        responseBody = {
+          ...activeViewFixture,
+          action_affordances: {
+            ...activeViewFixture.action_affordances,
+            choices: activeViewFixture.action_affordances.choices.map(
+              (choice) => ({
+                ...choice,
+                future_choice_hint: "safe additive field",
+              }),
+            ),
+          },
+        };
+      }
+      server.use(
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () =>
+          HttpResponse.json(responseBody),
+        ),
+      );
+
+      const view = await client().getSessionView("session-public-1");
+
+      expect(view.action_affordances.mode).toBe(
+        layer === "choice" ? "DECISION" : "FREE_ACTIONS",
+      );
+      const talk = view.action_affordances.actions.find(
+        (action) => action.action_type === "TALK",
+      );
+      if (layer === "set") {
+        expect(view.action_affordances).not.toHaveProperty(
+          "future_affordance_hint",
+        );
+      } else if (layer === "action") {
+        expect(talk?.action_type).toBe("TALK");
+        expect(talk).not.toHaveProperty("future_action_hint");
+      } else if (layer === "target") {
+        expect(talk?.targets[0]?.target_id).toBe("npc.public.guide");
+        expect(talk?.targets[0]).not.toHaveProperty("future_target_hint");
+      } else {
+        expect(view.action_affordances.choices[0]?.choice_id).toBe(
+          "choice.public.inspect-light",
+        );
+        expect(view.action_affordances.choices[0]).not.toHaveProperty(
+          "future_choice_hint",
+        );
+      }
+    },
+  );
+
+  it.each([
+    ["must_render_facts internally", ["fact.same", "fact.same"], []],
+    ["may_render_facts internally", [], ["fact.same", "fact.same"]],
+    ["must_render_facts and may_render_facts", ["fact.same"], ["fact.same"]],
+  ] as const)("rejects repeated fact IDs across %s", (_label, mustIds, mayIds) => {
+    expect(
+      actionResponseSchema.safeParse(
+        actionResponseWithFactIds([...mustIds], [...mayIds]),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("accepts distinct fact IDs across must_render_facts and may_render_facts", () => {
+    expect(
+      actionResponseSchema.safeParse(
+        actionResponseWithFactIds(
+          ["fact.must.one", "fact.must.two"],
+          ["fact.may.one", "fact.may.two"],
+        ),
+      ).success,
+    ).toBe(true);
+  });
+
+  it("rejects repeated NarrativeFrame fact IDs through getSessionView", async () => {
+    const view = freeActionViewFixture();
+    server.use(
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () =>
+        HttpResponse.json({
+          ...view,
+          narrative_frame: {
+            ...view.narrative_frame,
+            must_render_facts: [
+              { fact_id: "fact.repeated", value: "must" },
+            ],
+            may_render_facts: [
+              { fact_id: "fact.repeated", value: "may" },
+            ],
+          },
+        }),
+      ),
+    );
+
+    await expect(
+      client().getSessionView("session-public-1"),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+      message: "Server response does not match the public contract",
+    });
   });
 
   it("rejects a STARTED memory record that carries an ending_id", () => {
@@ -195,6 +414,106 @@ describe("public API response contracts", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it("rejects an action affordance target that is not visible in the authoritative View", () => {
+    const view = freeActionViewFixture();
+    const result = playerSessionViewSchema.safeParse({
+      ...view,
+      action_affordances: {
+        ...view.action_affordances,
+        actions: view.action_affordances.actions.map((action) =>
+          action.action_type === "TALK"
+            ? {
+                ...action,
+                targets: [
+                  {
+                    target_id: "npc.hidden.not-public",
+                    display_name: "隐藏目标",
+                  },
+                ],
+              }
+            : action,
+        ),
+      },
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it.each([
+    [
+      "mode payload",
+      () => {
+        const view = freeActionViewFixture();
+        return {
+          ...view,
+          action_affordances: {
+            ...view.action_affordances,
+            decision_id: "decision.not-allowed-in-free-mode",
+          },
+        };
+      },
+    ],
+    [
+      "action input contract",
+      () => {
+        const view = freeActionViewFixture();
+        return {
+          ...view,
+          action_affordances: {
+            ...view.action_affordances,
+            actions: view.action_affordances.actions.map((action) =>
+              action.action_type === "TALK"
+                ? { ...action, input_kind: "DESCRIPTION" }
+                : action,
+            ),
+          },
+        };
+      },
+    ],
+    [
+      "duplicate target IDs",
+      () => {
+        const view = freeActionViewFixture();
+        const talk = view.action_affordances.actions.find(
+          (action) => action.action_type === "TALK",
+        );
+        const target = talk?.targets[0];
+        if (target === undefined) {
+          throw new Error("free action fixture must contain one TALK target");
+        }
+        return {
+          ...view,
+          action_affordances: {
+            ...view.action_affordances,
+            actions: view.action_affordances.actions.map((action) =>
+              action.action_type === "TALK"
+                ? { ...action, targets: [target, target] }
+                : action,
+            ),
+          },
+        };
+      },
+    ],
+    [
+      "duplicate choice IDs",
+      () => {
+        const choice = activeViewFixture.action_affordances.choices[0];
+        if (choice === undefined) {
+          throw new Error("decision fixture must contain one public choice");
+        }
+        return {
+          ...activeViewFixture,
+          action_affordances: {
+            ...activeViewFixture.action_affordances,
+            choices: [choice, choice],
+          },
+        };
+      },
+    ],
+  ] as const)("continues to reject an invalid affordance %s", (_label, makeView) => {
+    expect(playerSessionViewSchema.safeParse(makeView()).success).toBe(false);
   });
 
   it("sends the exact session creation method, URL, headers and JSON body", async () => {
@@ -257,7 +576,17 @@ describe("public API response contracts", () => {
     server.use(
       http.get(`${apiOrigin}/v1/sessions/:sessionId/view`, ({ request }) => {
         observedPath = new URL(request.url).pathname;
-        return HttpResponse.json(activeViewFixture);
+        return HttpResponse.json({
+          ...activeViewFixture,
+          metadata: {
+            ...activeViewFixture.metadata,
+            session_id: "session:public.one",
+          },
+          player_state: {
+            ...activeViewFixture.player_state,
+            session_id: "session:public.one",
+          },
+        });
       }),
     );
 
@@ -401,5 +730,877 @@ describe("public API response contracts", () => {
       kind: "aborted",
     });
     expect(requestCount).toBe(1);
+  });
+});
+
+describe("public action and request-status contracts", () => {
+  it("posts an exact payload-free CONTINUE and distinguishes HTTP 200", async () => {
+    let observedMethod = "";
+    let observedUrl = "";
+    let observedAccept = "";
+    let observedContentType = "";
+    let observedBody: unknown;
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          observedMethod = request.method;
+          observedUrl = request.url;
+          observedAccept = request.headers.get("accept") ?? "";
+          observedContentType = request.headers.get("content-type") ?? "";
+          observedBody = await request.json();
+          return HttpResponse.json(
+            synchronousActionResponseFixture("opaque:request.one"),
+          );
+        },
+      ),
+    );
+    const request = {
+      turn_id: "opaque:turn.one",
+      client_request_id: "opaque:request.one",
+      action_type: "CONTINUE" as const,
+    };
+
+    const result = await client().submitAction("session-public-1", request);
+
+    expect(result.status).toBe(200);
+    expect(result.response.client_request_id).toBe("opaque:request.one");
+    expect(observedMethod).toBe("POST");
+    expect(observedUrl).toBe(
+      `${apiOrigin}/v1/sessions/session-public-1/actions`,
+    );
+    expect(observedAccept).toBe("application/json");
+    expect(observedContentType).toBe("application/json");
+    expect(observedBody).toEqual(request);
+  });
+
+  it("distinguishes HTTP 202 without changing the action body", async () => {
+    let observedBody: unknown;
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          observedBody = await request.json();
+          return HttpResponse.json(
+            pendingActionResponseFixture("request-pending-1"),
+            { status: 202 },
+          );
+        },
+      ),
+    );
+    const request = {
+      turn_id: "turn-pending-1",
+      client_request_id: "request-pending-1",
+      action_type: "TALK" as const,
+      dialogue: "请复核公开信号",
+    };
+
+    await expect(
+      client().submitAction("session-public-1", request),
+    ).resolves.toEqual({
+      status: 202,
+      response: pendingActionResponseFixture("request-pending-1"),
+    });
+    expect(observedBody).toEqual(request);
+  });
+
+  it.each([
+    {
+      label: "TALK/DIALOGUE with an optional visible target",
+      request: {
+        turn_id: "turn-talk",
+        client_request_id: "request-talk",
+        action_type: "TALK" as const,
+        dialogue: "请说明当前公开情况",
+        target_ids: ["npc.public.guide"],
+      },
+    },
+    {
+      label: "DESCRIPTION without a target",
+      request: {
+        turn_id: "turn-observe",
+        client_request_id: "request-observe",
+        action_type: "OBSERVE" as const,
+        description: "观察公开信号",
+      },
+    },
+    {
+      label: "CHOOSE with only decision and choice",
+      request: {
+        turn_id: "turn-choice",
+        client_request_id: "request-choice",
+        action_type: "CHOOSE" as const,
+        decision_id: "decision.public.bound-token",
+        choice_id: "choice.public.inspect-light",
+      },
+    },
+  ])("sends $label fields exactly", async ({ request }) => {
+    let observedBody: unknown;
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request: httpRequest }) => {
+          observedBody = await httpRequest.json();
+          return HttpResponse.json(
+            synchronousActionResponseFixture(request.client_request_id),
+          );
+        },
+      ),
+    );
+
+    await client().submitAction("session-public-1", request);
+
+    expect(observedBody).toEqual(request);
+  });
+
+  it("reads request status with the same opaque session and request IDs", async () => {
+    let observedMethod = "";
+    let observedPath = "";
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/:sessionId/requests/:requestId`,
+        ({ request }) => {
+          observedMethod = request.method;
+          observedPath = new URL(request.url).pathname;
+          return HttpResponse.json({
+            session_id: "session:opaque.one",
+            client_request_id: "request:opaque.one",
+            status: "PENDING",
+            client_action: "POLL_SAME_REQUEST",
+            error_code: null,
+            retry_after_seconds: 2,
+            response: null,
+          });
+        },
+      ),
+    );
+
+    const status = await client().getNarrativeRequestStatus(
+      "session:opaque.one",
+      "request:opaque.one",
+    );
+
+    expect(status.session_id).toBe("session:opaque.one");
+    expect(status.client_request_id).toBe("request:opaque.one");
+    expect(observedMethod).toBe("GET");
+    expect(observedPath).toBe(
+      "/v1/sessions/session%3Aopaque.one/requests/request%3Aopaque.one",
+    );
+  });
+
+  it("validates every real request-status/client_action shape", () => {
+    const committedResponse = committedActionResponseFixture("request-status");
+    const identities = {
+      session_id: "session-public-1",
+      client_request_id: "request-status",
+    };
+    const validStatuses = [
+      {
+        ...identities,
+        status: "PENDING",
+        client_action: "POLL_SAME_REQUEST",
+        error_code: null,
+        retry_after_seconds: 2,
+        response: null,
+      },
+      {
+        ...identities,
+        status: "COMMITTED",
+        client_action: "RESPONSE_AVAILABLE",
+        error_code: null,
+        retry_after_seconds: null,
+        response: committedResponse,
+      },
+      {
+        ...identities,
+        status: "STALE",
+        client_action: "REFRESH_VIEW",
+        error_code: "NARRATIVE_REQUEST_STALE",
+        retry_after_seconds: null,
+        response: null,
+      },
+      {
+        ...identities,
+        status: "OUTCOME_UNKNOWN",
+        client_action: "DO_NOT_RETRY",
+        error_code: "NARRATIVE_OUTCOME_UNKNOWN",
+        retry_after_seconds: null,
+        response: null,
+      },
+      {
+        ...identities,
+        status: "FAILED",
+        client_action: "DO_NOT_RETRY",
+        error_code: "NARRATIVE_REQUEST_FAILED",
+        retry_after_seconds: null,
+        response: null,
+      },
+    ];
+
+    for (const status of validStatuses) {
+      expect(narrativeRequestStatusResponseSchema.safeParse(status).success).toBe(
+        true,
+      );
+    }
+  });
+
+  it.each([
+    {
+      turn_id: "turn-invalid",
+      client_request_id: "request-invalid",
+      action_type: "CONTINUE",
+      target_ids: [],
+    },
+    {
+      turn_id: "turn-invalid",
+      client_request_id: "request-invalid",
+      action_type: "TALK",
+      description: "wrong field",
+    },
+    {
+      turn_id: "turn-invalid",
+      client_request_id: "request-invalid",
+      action_type: "OBSERVE",
+      dialogue: "wrong field",
+    },
+    {
+      turn_id: "turn-invalid",
+      client_request_id: "request-invalid",
+      action_type: "TALK",
+      dialogue: "包含换行\n的对话",
+    },
+    {
+      turn_id: "turn-invalid",
+      client_request_id: "request-invalid",
+      action_type: "CHOOSE",
+      decision_id: "decision.public.bound-token",
+      choice_id: "choice.public.inspect-light",
+      target_ids: ["npc.public.guide"],
+    },
+  ])("rejects an illegal action DTO %#", (request) => {
+    expect(actionRequestSchema.safeParse(request).success).toBe(false);
+  });
+
+  it("applies action text limits by Unicode character like the public API", () => {
+    const request = {
+      turn_id: "turn-unicode-length",
+      client_request_id: "request-unicode-length",
+      action_type: "OBSERVE",
+    } as const;
+
+    expect(
+      actionRequestSchema.safeParse({
+        ...request,
+        description: "😀".repeat(150),
+      }).success,
+    ).toBe(true);
+    expect(
+      actionRequestSchema.safeParse({
+        ...request,
+        description: "😀".repeat(151),
+      }).success,
+    ).toBe(false);
+  });
+
+  it.each([200, 202] as const)(
+    "classifies HTTP %i with repeated NarrativeFrame fact IDs as a safe invalid response",
+    async (status) => {
+      const requestId = `request-duplicate-facts-${status}`;
+      const baseResponse =
+        status === 200
+          ? actionResponseWithFactIds(
+              ["fact.repeated"],
+              ["fact.repeated"],
+              requestId,
+            )
+          : {
+              ...pendingActionResponseFixture(requestId),
+              narrative_frame: actionResponseWithFactIds(
+                ["fact.repeated"],
+                ["fact.repeated"],
+                requestId,
+              ).narrative_frame,
+            };
+      server.use(
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          () => HttpResponse.json(baseResponse, { status }),
+        ),
+      );
+
+      let capturedError: Error | null = null;
+      try {
+        await client().submitAction("session-public-1", {
+          turn_id: `turn-duplicate-facts-${status}`,
+          client_request_id: requestId,
+          action_type: "CONTINUE",
+        });
+      } catch (error: unknown) {
+        if (error instanceof Error) {
+          capturedError = error;
+        }
+      }
+
+      expect(capturedError).toMatchObject({
+        kind: "invalid-response",
+        status,
+        reason: "CONTRACT_MISMATCH",
+        message: "Server response does not match the public contract",
+      });
+      expect(capturedError?.message).not.toContain("fact.repeated");
+      expect(capturedError?.message).not.toMatch(/zod|stack|narrative frame/i);
+    },
+  );
+
+  it("rejects repeated NarrativeFrame fact IDs inside COMMITTED request status", async () => {
+    const requestId = "request-status-duplicate-facts";
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/${requestId}`,
+        () =>
+          HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: requestId,
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: {
+              ...committedActionResponseFixture(requestId),
+              narrative_frame: actionResponseWithFactIds(
+                ["fact.repeated"],
+                ["fact.repeated"],
+                requestId,
+              ).narrative_frame,
+            },
+          }),
+      ),
+    );
+
+    await expect(
+      client().getNarrativeRequestStatus("session-public-1", requestId),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+    });
+  });
+
+  it("accepts public lowercase result and feedback code strings and still rejects non-strings", () => {
+    const response = synchronousActionResponseFixture("request-lowercase-codes");
+
+    expect(
+      actionResponseSchema.safeParse({
+        ...response,
+        result_code: "scenario.auto_beat_advanced",
+        feedback_code: "scenario feedback available",
+      }).success,
+    ).toBe(true);
+    expect(
+      actionResponseSchema.safeParse({ ...response, result_code: 7 }).success,
+    ).toBe(false);
+    expect(
+      actionResponseSchema.safeParse({ ...response, feedback_code: false })
+        .success,
+    ).toBe(false);
+  });
+
+  it("accepts lowercase public code strings through an HTTP 200 action response", async () => {
+    const requestId = "request-http-lowercase-codes";
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json({
+            ...synchronousActionResponseFixture(requestId),
+            result_code: "scenario.auto_beat_advanced",
+            feedback_code: "scenario feedback available",
+          }),
+      ),
+    );
+
+    await expect(
+      client().submitAction("session-public-1", {
+        turn_id: "turn-http-lowercase-codes",
+        client_request_id: requestId,
+        action_type: "CONTINUE",
+      }),
+    ).resolves.toMatchObject({
+      status: 200,
+      response: {
+        result_code: "scenario.auto_beat_advanced",
+        feedback_code: "scenario feedback available",
+      },
+    });
+  });
+
+  it("accepts lowercase public code strings inside COMMITTED request status", async () => {
+    const requestId = "request-status-lowercase-codes";
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/${requestId}`,
+        () =>
+          HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: requestId,
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: {
+              ...committedActionResponseFixture(requestId),
+              result_code: "narrative.outcome_committed",
+              feedback_code: "narrative committed",
+            },
+          }),
+      ),
+    );
+
+    await expect(
+      client().getNarrativeRequestStatus("session-public-1", requestId),
+    ).resolves.toMatchObject({
+      status: "COMMITTED",
+      response: {
+        result_code: "narrative.outcome_committed",
+        feedback_code: "narrative committed",
+      },
+    });
+  });
+
+  it.each([
+    ["same object key order", { a: 1, b: 2 }, { a: 1, b: 2 }, true],
+    ["different object key order", { a: 1, b: 2 }, { b: 2, a: 1 }, true],
+    [
+      "different nested object key order",
+      { outer: { a: 1, b: { x: true, y: null } } },
+      { outer: { b: { y: null, x: true }, a: 1 } },
+      true,
+    ],
+    ["same array order", { values: [1, 2, 3] }, { values: [1, 2, 3] }, true],
+    ["different array order", { values: [1, 2, 3] }, { values: [3, 2, 1] }, false],
+    ["missing object key", { a: 1, b: 2 }, { a: 1 }, false],
+    ["different value", { a: 1, b: 2 }, { a: 1, b: 3 }, false],
+  ] as const)(
+    "compares local query JSON by semantic value for %s",
+    (_label, feedbackParameters, localQueryResult, expected) => {
+      expect(
+        actionResponseSchema.safeParse(
+          localQueryActionResponse(
+            { ...feedbackParameters },
+            { ...localQueryResult },
+          ),
+        ).success,
+      ).toBe(expected);
+    },
+  );
+
+  it("accepts an HTTP 200 local-query DTO whose JSON object keys are reordered", async () => {
+    const requestId = "request-http-reordered-json";
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json(
+            localQueryActionResponse(
+              { first: 1, nested: { alpha: true, beta: [1, 2] } },
+              { nested: { beta: [1, 2], alpha: true }, first: 1 },
+              requestId,
+            ),
+          ),
+      ),
+    );
+
+    await expect(
+      client().submitAction("session-public-1", {
+        turn_id: "turn-http-reordered-json",
+        client_request_id: requestId,
+        action_type: "CONTINUE",
+      }),
+    ).resolves.toMatchObject({ status: 200 });
+  });
+
+  it("accepts reordered local-query JSON inside a COMMITTED request status", async () => {
+    const requestId = "request-status-reordered-json";
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/${requestId}`,
+        () =>
+          HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: requestId,
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: localQueryActionResponse(
+              { dynamic_a: 1, dynamic_b: { left: true, right: false } },
+              { dynamic_b: { right: false, left: true }, dynamic_a: 1 },
+              requestId,
+            ),
+          }),
+      ),
+    );
+
+    const result = await client().getNarrativeRequestStatus(
+      "session-public-1",
+      requestId,
+    );
+
+    expect(result.status).toBe("COMMITTED");
+    if (result.status === "COMMITTED") {
+      expect(result.response.feedback_parameters).toEqual({
+        dynamic_a: 1,
+        dynamic_b: { left: true, right: false },
+      });
+      expect(result.response.local_query_result).toEqual({
+        dynamic_b: { right: false, left: true },
+        dynamic_a: 1,
+      });
+    }
+  });
+
+  it("rejects unknown fields throughout an ActionResponse NarrativeFrame instead of stripping them", async () => {
+    const baseResponse = synchronousActionResponseFixture("request-strict-frame");
+    const frame = baseResponse.narrative_frame;
+    const suggestedAction =
+      activeViewFixture.narrative_frame.suggested_actions[0];
+    if (frame === null || suggestedAction === undefined) {
+      throw new Error("strict response fixtures must contain nested Frame objects");
+    }
+    const invalidResponses = [
+      {
+        label: "ActionResponse top level",
+        response: { ...baseResponse, future_action_field: "must reject" },
+      },
+      {
+        label: "NarrativeFrame direct field",
+        response: {
+          ...baseResponse,
+          narrative_frame: { ...frame, future_frame_field: "must reject" },
+        },
+      },
+      {
+        label: "RenderableFact array item",
+        response: {
+          ...baseResponse,
+          narrative_frame: {
+            ...frame,
+            must_render_facts: [
+              {
+                fact_id: "fact.public.signal",
+                value: { arbitrary_public_json: { remains_allowed: true } },
+                future_fact_metadata: "must reject",
+              },
+            ],
+          },
+        },
+      },
+      {
+        label: "SuggestedAction array item",
+        response: {
+          ...baseResponse,
+          narrative_frame: {
+            ...activeViewFixture.narrative_frame,
+            suggested_actions: [
+              { ...suggestedAction, future_action_hint: "must reject" },
+            ],
+          },
+        },
+      },
+      {
+        label: "VisibleClock array item",
+        response: {
+          ...baseResponse,
+          narrative_frame: {
+            ...frame,
+            player_visible_clocks: [
+              {
+                clock_id: "clock.public.tide",
+                value: 2,
+                maximum: 8,
+                future_clock_metadata: "must reject",
+              },
+            ],
+          },
+        },
+      },
+    ];
+
+    for (const invalid of invalidResponses) {
+      server.use(
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          () => HttpResponse.json(invalid.response),
+        ),
+      );
+
+      await expect(
+        client().submitAction("session-public-1", {
+          turn_id: "turn-strict-frame",
+          client_request_id: "request-strict-frame",
+          action_type: "CONTINUE",
+        }),
+        invalid.label,
+      ).rejects.toMatchObject({
+        kind: "invalid-response",
+        status: 200,
+        reason: "CONTRACT_MISMATCH",
+      });
+    }
+  });
+
+  it("rejects a recursively invalid ActionResponse inside COMMITTED request status", async () => {
+    const response = committedActionResponseFixture("request-strict-status");
+    const frame = response.narrative_frame;
+    if (frame === null) {
+      throw new Error("committed response fixture must contain one Frame");
+    }
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/request-strict-status`,
+        () =>
+          HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: "request-strict-status",
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: {
+              ...response,
+              narrative_frame: {
+                ...frame,
+                npc_knowledge: [
+                  {
+                    npc_id: "npc.public.guide",
+                    npc_definition_id: "npc.definition.guide",
+                    known_facts: [],
+                    future_npc_metadata: "must reject",
+                  },
+                ],
+              },
+            },
+          }),
+      ),
+    );
+
+    await expect(
+      client().getNarrativeRequestStatus(
+        "session-public-1",
+        "request-strict-status",
+      ),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+    });
+  });
+
+  it("preserves arbitrary JSON where the Python response contract explicitly allows it", async () => {
+    const response = synchronousActionResponseFixture("request-json-values");
+    const frame = response.narrative_frame;
+    if (frame === null) {
+      throw new Error("response fixture must contain one Frame");
+    }
+    const allowedJson = {
+      extension_key: { nested_key: [true, 3, "public value"] },
+    };
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json({
+            ...response,
+            feedback_parameters: allowedJson,
+            narrative_frame: {
+              ...frame,
+              must_render_facts: [
+                { fact_id: "fact.public.signal", value: allowedJson },
+              ],
+            },
+          }),
+      ),
+    );
+
+    const result = await client().submitAction("session-public-1", {
+      turn_id: "turn-json-values",
+      client_request_id: "request-json-values",
+      action_type: "CONTINUE",
+    });
+
+    expect(result.response.feedback_parameters).toEqual(allowedJson);
+    expect(result.response.narrative_frame?.must_render_facts[0]?.value).toEqual(
+      allowedJson,
+    );
+  });
+
+  it.each([
+    ["10,000 BMP code points", "界".repeat(10_000), true],
+    ["10,001 BMP code points", "界".repeat(10_001), false],
+    ["6,000 astral code points", "😀".repeat(6_000), true],
+    ["10,000 astral code points", "😀".repeat(10_000), true],
+    ["10,001 astral code points", "😀".repeat(10_001), false],
+  ] as const)(
+    "validates ActionResponse narrative_text by Python Unicode code points at %s",
+    (_label, narrativeText, expected) => {
+      const result = actionResponseSchema.safeParse({
+        ...committedActionResponseFixture("request-unicode-response"),
+        narrative_text: narrativeText,
+      });
+
+      expect(result.success).toBe(expected);
+    },
+  );
+
+  it("uses the same code-point boundary for COMMITTED request-status responses", () => {
+    const status = (narrativeText: string) => ({
+      session_id: "session-public-1",
+      client_request_id: "request-unicode-status",
+      status: "COMMITTED",
+      client_action: "RESPONSE_AVAILABLE",
+      error_code: null,
+      retry_after_seconds: null,
+      response: {
+        ...committedActionResponseFixture("request-unicode-status"),
+        narrative_text: narrativeText,
+      },
+    });
+
+    expect(
+      narrativeRequestStatusResponseSchema.safeParse(
+        status("😀".repeat(10_000)),
+      ).success,
+    ).toBe(true);
+    expect(
+      narrativeRequestStatusResponseSchema.safeParse(
+        status("😀".repeat(10_001)),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("validates NarrativeFrame label_hint by its 160-code-point Python limit", () => {
+    const suggestedAction =
+      activeViewFixture.narrative_frame.suggested_actions[0];
+    if (suggestedAction === undefined) {
+      throw new Error("active view fixture must contain one suggested action");
+    }
+    const responseWithLabel = (labelHint: string) => ({
+      ...synchronousActionResponseFixture("request-frame-label"),
+      narrative_frame: {
+        ...activeViewFixture.narrative_frame,
+        suggested_actions: [
+          { ...suggestedAction, label_hint: labelHint },
+        ],
+      },
+    });
+
+    expect(
+      actionResponseSchema.safeParse(responseWithLabel("😀".repeat(160))).success,
+    ).toBe(true);
+    expect(
+      actionResponseSchema.safeParse(responseWithLabel("😀".repeat(161))).success,
+    ).toBe(false);
+  });
+
+  it("applies PlayerSessionView character and UTF-8 budgets independently", () => {
+    const viewWithTexts = (recentNarrativeTexts: string[]) => ({
+      ...freeActionViewFixture(),
+      recent_narrative_texts: recentNarrativeTexts,
+    });
+    const tenThousandCodePoints = `😀${"a".repeat(9_999)}`;
+
+    expect(
+      playerSessionViewSchema.safeParse(
+        viewWithTexts([tenThousandCodePoints, "b".repeat(2_000)]),
+      ).success,
+    ).toBe(true);
+    expect(
+      playerSessionViewSchema.safeParse(
+        viewWithTexts([tenThousandCodePoints, "b".repeat(2_001)]),
+      ).success,
+    ).toBe(false);
+    expect(
+      playerSessionViewSchema.safeParse(
+        viewWithTexts(["😀".repeat(6_000)]),
+      ).success,
+    ).toBe(true);
+    expect(
+      playerSessionViewSchema.safeParse(
+        viewWithTexts(["😀".repeat(6_001)]),
+      ).success,
+    ).toBe(false);
+  });
+
+  it("rejects illegal action responses and status combinations", async () => {
+    expect(
+      actionResponseSchema.safeParse({
+        ...pendingActionResponseFixture("request-invalid-response"),
+        narrative_pending: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      actionResponseSchema.safeParse({
+        ...synchronousActionResponseFixture("request-extra"),
+        action_id: "invented-action-id",
+      }).success,
+    ).toBe(false);
+    expect(
+      narrativeRequestStatusResponseSchema.safeParse({
+        session_id: "session-public-1",
+        client_request_id: "request-status",
+        status: "PENDING",
+        client_action: "REFRESH_VIEW",
+        error_code: null,
+        retry_after_seconds: 2,
+        response: null,
+      }).success,
+    ).toBe(false);
+    expect(
+      narrativeRequestStatusResponseSchema.safeParse({
+        session_id: "session-public-1",
+        client_request_id: "request-status",
+        status: "RETRYING",
+        client_action: "POLL_SAME_REQUEST",
+        error_code: null,
+        retry_after_seconds: 2,
+        response: null,
+      }).success,
+    ).toBe(false);
+
+    server.use(
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json(
+            pendingActionResponseFixture("different-request"),
+            { status: 202 },
+          ),
+      ),
+    );
+    await expect(
+      client().submitAction("session-public-1", {
+        turn_id: "turn-mismatch",
+        client_request_id: "request-mismatch",
+        action_type: "TALK",
+        dialogue: "检查绑定",
+      }),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      reason: "CONTRACT_MISMATCH",
+    });
+  });
+
+  it("rejects a committed status whose nested response has another identity", () => {
+    expect(
+      narrativeRequestStatusResponseSchema.safeParse({
+        session_id: "session-public-1",
+        client_request_id: "request-status",
+        status: "COMMITTED",
+        client_action: "RESPONSE_AVAILABLE",
+        error_code: null,
+        retry_after_seconds: null,
+        response: committedActionResponseFixture("another-request"),
+      }).success,
+    ).toBe(false);
   });
 });

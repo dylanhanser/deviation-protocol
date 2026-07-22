@@ -1,4 +1,5 @@
 import type {
+  ActionResponse,
   PlayerMemoryProjection,
   PlayerSessionView,
   PublicScenarioCatalog,
@@ -148,6 +149,143 @@ export const activeViewFixture: PlayerSessionView = {
   public_clocks: activeFrame.player_visible_clocks,
   recent_narrative_texts: ["雾中的灯塔连续闪了三次。"],
 };
+
+export function freeActionViewFixture(
+  stateVersion = 1,
+): PlayerSessionView {
+  const freeFrame = {
+    ...activeFrame,
+    frame_id: `frame.public-alpha.free-${stateVersion}`,
+    mode: "FLOW" as const,
+    decision_required: false,
+    decision_id: undefined,
+    decision_reason: undefined,
+    suggested_actions: [],
+    stop_condition: "CONTINUE" as const,
+  };
+  return {
+    ...activeViewFixture,
+    metadata: {
+      ...metadata,
+      state_version: stateVersion,
+      updated_at: "2026-07-21T10:05:00Z",
+    },
+    narrative_frame: freeFrame,
+    player_state: {
+      ...activeViewFixture.player_state,
+      state_version: stateVersion,
+    },
+    action_affordances: {
+      mode: "FREE_ACTIONS",
+      actions: [
+        {
+          action_type: "CONTINUE",
+          label: "继续",
+          input_kind: "NONE",
+          target_required: false,
+          targets: [],
+        },
+        {
+          action_type: "TALK",
+          label: "交谈",
+          input_kind: "DIALOGUE",
+          max_input_length: 200,
+          target_required: false,
+          targets: [
+            { target_id: "npc.public.guide", display_name: "引航员" },
+          ],
+        },
+        ...(["CUSTOM", "EXPLORE", "OBSERVE", "MOVE"] as const).map(
+          (actionType) => ({
+            action_type: actionType,
+            label: {
+              CUSTOM: "自由行动",
+              EXPLORE: "探索",
+              OBSERVE: "观察",
+              MOVE: "移动",
+            }[actionType],
+            input_kind: "DESCRIPTION" as const,
+            max_input_length: 150,
+            target_required: false,
+            targets: [
+              { target_id: "npc.public.guide", display_name: "引航员" },
+            ],
+          }),
+        ),
+      ],
+      choices: [],
+    },
+    recent_narrative_texts: [
+      ...activeViewFixture.recent_narrative_texts,
+      `权威 View 已推进到版本 ${stateVersion}。`,
+    ],
+  };
+}
+
+export function synchronousActionResponseFixture(
+  clientRequestId = "action-request-1",
+  stateVersion = 1,
+): ActionResponse {
+  return {
+    session_id: "session-public-1",
+    client_request_id: clientRequestId,
+    resolution_kind: "RESOLVED_LOCAL",
+    result_code: "SCENARIO_AUTO_BEAT_ADVANCED",
+    feedback_code: "SCENARIO_AUTO_BEAT_ADVANCED",
+    feedback_parameters: {},
+    resulting_state_version: stateVersion,
+    state_changed: true,
+    narrative_required: false,
+    narrative_pending: false,
+    narrative_frame: freeActionViewFixture(stateVersion).narrative_frame,
+    narrative_text: "服务器完成了一个确定性推进。",
+    narrative_status: null,
+    local_query_result: null,
+  };
+}
+
+export function pendingActionResponseFixture(
+  clientRequestId = "action-request-1",
+): ActionResponse {
+  return {
+    session_id: "session-public-1",
+    client_request_id: clientRequestId,
+    resolution_kind: "NARRATIVE_REQUIRED",
+    result_code: "VALIDATED_INTENT_REQUIRES_NARRATIVE",
+    feedback_code: "NARRATIVE_REQUIRED",
+    feedback_parameters: {},
+    resulting_state_version: 0,
+    state_changed: false,
+    narrative_required: true,
+    narrative_pending: true,
+    narrative_frame: freeActionViewFixture().narrative_frame,
+    narrative_text: null,
+    narrative_status: "PENDING",
+    local_query_result: null,
+  };
+}
+
+export function committedActionResponseFixture(
+  clientRequestId = "action-request-1",
+  stateVersion = 1,
+): ActionResponse {
+  return {
+    session_id: "session-public-1",
+    client_request_id: clientRequestId,
+    resolution_kind: "NARRATIVE_COMMITTED",
+    result_code: "NARRATIVE_OUTCOME_COMMITTED",
+    feedback_code: "NARRATIVE_COMMITTED",
+    feedback_parameters: {},
+    resulting_state_version: stateVersion,
+    state_changed: true,
+    narrative_required: true,
+    narrative_pending: false,
+    narrative_frame: freeActionViewFixture(stateVersion).narrative_frame,
+    narrative_text: "服务器接受了已验证的公开叙事结果。",
+    narrative_status: "COMMITTED",
+    local_query_result: null,
+  };
+}
 
 export function endedViewFixture(
   endingStatus: "RESOLVED" | "FAILED" = "RESOLVED",

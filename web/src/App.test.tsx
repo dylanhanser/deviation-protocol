@@ -42,7 +42,10 @@ describe("scenario discovery states", () => {
     );
 
     renderApp();
-    expect(screen.getByRole("status")).toHaveTextContent("正在加载公开副本");
+    expect(screen.getByText("正在加载公开副本…")).toHaveAttribute(
+      "role",
+      "status",
+    );
     expect(await screen.findByLabelText("副本")).toHaveValue(
       "scenario.public-alpha",
     );
@@ -110,7 +113,9 @@ describe("session creation", () => {
     ).toBeVisible();
     expect(screen.getByRole("heading", { name: "雾港回声", level: 2 })).toBeVisible();
     expect(screen.getByText(/停止条件：/)).toHaveTextContent("AWAIT_PLAYER");
-    expect(screen.getByText("检查灯塔信号")).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "检查灯塔信号" }),
+    ).toBeVisible();
     expect(screen.getByText("公开玩家状态")).toBeVisible();
     expect(screen.getByText("clock.public.tide：2 / 8")).toBeVisible();
     expect(creationBody).toEqual({

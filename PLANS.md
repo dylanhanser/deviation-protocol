@@ -6,7 +6,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Commit: `43bf83dcaccf9e7400965f863f545ee1043beacf`
+- Commit: `c3cc91759064bc8538f76c54105113f1e53a1558`
 - Latest completed phase: Phase 3.1a
 - Committed baseline status: clean
 
@@ -23,7 +23,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 2.4b | Complete |
 | Phase 3.0 | Complete |
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
-| Phase 3.1b | Scope sealed; implementation not started |
+| Phase 3.1b | Second independent read-only audit returned `CHANGES_REQUIRED`; its 3 Major and 1 Minor findings are repaired and verified locally; awaiting a new independent read-only review; not approved, committed, or pushed |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -49,7 +49,10 @@ pushed at `43bf83dcaccf9e7400965f863f545ee1043beacf`. It adds:
 
 ## Phase 3.1b
 
-**Status: scope sealed; implementation not started.**
+**Status: the second independent read-only audit returned `CHANGES_REQUIRED`;
+its 3 Major and 1 Minor findings are repaired and verified locally. Phase 3.1b
+is not approved and remains awaiting a new independent read-only review; not
+committed or pushed.**
 
 Phase 3.1b is a complete minimum playable action loop in one browser tab, with
 no persistence or reload recovery. A user can create a Session or manually load
