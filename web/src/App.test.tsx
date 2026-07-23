@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, delay, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
@@ -40,6 +40,47 @@ function storedRecoveryRecord() {
   }
   return result.value;
 }
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("mode presentation", () => {
+  const warning =
+    "Deterministic Demo  local only  temporary data  not a production Provider";
+
+  it("shows the exact warning only in deterministic-demo mode", async () => {
+    vi.stubEnv("VITE_APP_MODE", "deterministic-demo");
+    server.use(scenarioHandler());
+
+    const rendered = renderApp();
+
+    await screen.findByLabelText("副本");
+    expect(
+      rendered.container.querySelector(".demo-warning")?.textContent,
+    ).toBe(warning);
+  });
+
+  it.each([undefined, "development", "production", "unknown-ordinary"])(
+    "does not claim deterministic Provider activation for %s mode",
+    async (mode) => {
+      if (mode === undefined) {
+        vi.stubEnv("VITE_APP_MODE", "");
+      } else {
+        vi.stubEnv("VITE_APP_MODE", mode);
+      }
+      server.use(scenarioHandler());
+
+      const rendered = renderApp();
+
+      await screen.findByLabelText("副本");
+      expect(rendered.container.querySelector(".demo-warning")).toBeNull();
+      expect(rendered.container).not.toHaveTextContent(
+        "not a production Provider",
+      );
+    },
+  );
+});
 
 describe("scenario discovery states", () => {
   it("renders loading and then the successful public catalog", async () => {

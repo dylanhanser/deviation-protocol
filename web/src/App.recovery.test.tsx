@@ -269,6 +269,76 @@ describe("same-tab Session reload recovery", () => {
     expect(posts).toBe(0);
   });
 
+  it("reloads the same tab from the still-live Demo process by authoritative GET only", async () => {
+    seedRecoveryRecord("session-public-1");
+    let viewReads = 0;
+    let posts = 0;
+    server.use(
+      scenarioHandler(),
+      ...postGuards(() => {
+        posts += 1;
+      }),
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
+        viewReads += 1;
+        return HttpResponse.json(freeActionViewFixture(12));
+      }),
+    );
+
+    const firstPage = renderRecoveryApp();
+    await expectCurrentViewVersion("session-public-1", 12);
+    firstPage.unmount();
+
+    renderRecoveryApp();
+    await expectCurrentViewVersion("session-public-1", 12);
+
+    expect(viewReads).toBe(2);
+    expect(posts).toBe(0);
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
+  });
+
+  it("invalidates same-tab Demo recovery after backend restart loses process state", async () => {
+    seedRecoveryRecord("session-public-1");
+    let posts = 0;
+    server.use(
+      scenarioHandler(),
+      ...postGuards(() => {
+        posts += 1;
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => HttpResponse.json(freeActionViewFixture(12)),
+      ),
+    );
+
+    const livePage = renderRecoveryApp();
+    await expectCurrentViewVersion("session-public-1", 12);
+    livePage.unmount();
+
+    server.use(
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () =>
+          HttpResponse.json(
+            errorFixture("SESSION_NOT_FOUND", "Session was not found"),
+            { status: 404 },
+          ),
+      ),
+    );
+    renderRecoveryApp();
+
+    expect(
+      await screen.findByText(/恢复记录在服务器返回 404 后失效/),
+    ).toBeVisible();
+    expect(storedRecoveryRecord()).toBeNull();
+    expect(posts).toBe(0);
+    expect(
+      screen.queryByRole("heading", { name: "当前可执行行动" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("keeps affordances absent until an ACTIVE Session is restored through authoritative /view", async () => {
     seedRecoveryRecord("session-public-1");
     const viewGate = deferred<void>();

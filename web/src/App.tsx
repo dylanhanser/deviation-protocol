@@ -105,6 +105,8 @@ const RECOVERY_IDENTITY_MISMATCH_MESSAGE =
   "服务器返回的恢复身份与已保存记录不匹配，原恢复记录已失效并清除。请创建 Session 或手动读取其他 Session。";
 const RECOVERY_STORAGE_FAILURE_MESSAGE =
   "本标签页 sessionStorage 无法安全访问或更新。Session、View 与行动控件已锁定；客户端不会 POST、重放行动或生成新的恢复身份。";
+const DETERMINISTIC_DEMO_WARNING =
+  "Deterministic Demo  local only  temporary data  not a production Provider";
 
 function newOpaqueId(): string {
   return globalThis.crypto.randomUUID();
@@ -1236,16 +1238,18 @@ export default function App({
       : loadedSession?.stale !== null && loadedSession !== null
         ? "当前 View 可能 stale，必须先显式刷新"
         : null;
+  const isDeterministicDemo =
+    import.meta.env.VITE_APP_MODE === "deterministic-demo";
 
   return (
     <main>
       <header className="hero">
-        <p className="eyebrow">Phase 3.1c</p>
+        <p className="eyebrow">Public Web Client</p>
         <h1>Deviation Protocol</h1>
-        <p>
-          本地单标签页 minimum playable Demo；支持同标签页 reload 与
-          confirmed-pending request recovery。
-        </p>
+        <p>所有行动控件均来自最新的权威 action_affordances。</p>
+        {isDeterministicDemo ? (
+          <p className="demo-warning">{DETERMINISTIC_DEMO_WARNING}</p>
+        ) : null}
       </header>
 
       <p className="operation-status" role="status" aria-live="polite">

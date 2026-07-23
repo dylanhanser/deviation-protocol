@@ -39,6 +39,48 @@ state lasts only for that backend process. Cross-process replay tests exercise
 fresh OS processes and compare the complete public path plus the private
 test-only generator trace.
 
+## Phase 3.2b local Demo Web boundary
+
+Phase 3.2b adds a local launch and Web presentation layer over the unchanged
+Phase 3.2a Demo API composition:
+
+- Vite mode `deterministic-demo` alone resolves `envDir: false`, so it loads no
+  dotenv files; ordinary and unknown modes retain Vite's default behavior.
+- `VITE_APP_MODE=deterministic-demo` controls only the exact visible
+  local/temporary/non-production warning. It is not a Provider selector,
+  security boundary, backend composition switch, or public mode choice.
+- `scripts/start-demo.ps1` launches
+  `deviation_protocol.api.demo:app` as one no-reload worker on
+  `127.0.0.1:8000` and Vite on `127.0.0.1:5173`, after fail-fast prerequisite,
+  environment, executable, and port checks. It installs nothing and terminates
+  only the child process trees it owns.
+- `scripts/smoke-demo.ps1` is a separate finite validation entry point. It
+  starts its own loopback children, verifies the Vite proxy, executes the
+  existing jsdom/React test stack after clearing independent ambient
+  `VITE_APP_MODE` inheritance and then conditionally copying the launched Web
+  child's effective value to require the exact rendered warning, verifies
+  dotenv sentinel absence and a temporary Demo-mode build, and validates the
+  public scenario response through a one-test Node Vitest validator that
+  directly imports `publicScenarioCatalogSchema`. App source bytes are not
+  warning presentation evidence.
+- The React/MSW canonical regression creates the public scenario and default
+  investigator through rendered controls, submits exactly the frozen 19-action
+  path, asserts the exact catalog hook and all five character presentations,
+  reads and asserts every rendered scene and decision presentation from a
+  complete authoritative View after every action, and reaches the exact
+  `death_certificate.ending.protocol_broken` presentation at state version 19.
+  Added recovery regressions preserve GET-only same-tab restoration and safe
+  404 invalidation with zero action replay.
+
+Demo storage remains process-local and temporary. Normal MySQL/DeepSeek
+composition, public API/schema shapes, Provider authority, and Phase 3.1c
+recovery semantics are unchanged. Automated verification and the bounded smoke
+passed. Controlled manual acceptance passed the canonical 19-action browser
+walkthrough to version 19 and `ENDED`, same-tab recovery after backend restart,
+Ctrl+C launcher shutdown, and final owned-process and port cleanup. Phase 3.2b
+and Phase 3.2 are complete; this deterministic local Demo acceptance does not
+establish production readiness or implement later final-product systems.
+
 ## Current public action composition
 
 `SessionService` derives `action_affordances` from the current locked/validated

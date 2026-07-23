@@ -27,7 +27,10 @@ The current implementation includes:
   replay;
 - bounded deterministic player memory; and
 - the complete public `death_certificate` vertical slice with success and
-  deadline-failure endings.
+  deadline-failure endings; and
+- the current Phase 3.2b local Demo Web layer, including deterministic-Demo
+  dotenv isolation, explicit local/temporary/non-production presentation, the
+  canonical 19-action Web regression, one-command launcher, and bounded smoke.
 
 ### Phase 3.2a deterministic Demo backend
 
@@ -60,12 +63,46 @@ remain Deferred.
 The historical specification and implementation evidence are in
 [Phase 3.2 Deterministic Demo Environment](docs/phase_3_2_deterministic_demo_environment.md).
 
+### Phase 3.2b local Demo Web
+
+Phase 3.2b is implemented, verified, accepted, and closed. Automated
+verification and the bounded smoke passed; controlled manual acceptance passed
+the canonical 19-action browser walkthrough to version 19 and `ENDED`,
+same-tab recovery after backend restart, Ctrl+C launcher shutdown, and final
+owned-process and port cleanup. Phase 3.2 is complete.
+
+With existing Python and Web dependencies, start the long-running local Demo:
+
+```powershell
+pwsh -NoProfile -File .\scripts\start-demo.ps1
+```
+
+The launcher starts the dedicated Demo backend at `127.0.0.1:8000` and Vite at
+`127.0.0.1:5173`. It installs nothing and opens no browser. The page labels this
+mode as a deterministic, local-only Demo with temporary data and explicitly
+states that it is not a production Provider. State survives a same-tab reload
+only while that backend process remains alive; restarting it intentionally
+loses the process-local state and the client safely invalidates the missing
+Session without replaying an action.
+
+Run the finite startup/proxy/schema/sentinel/build smoke separately:
+
+```powershell
+pwsh -NoProfile -File .\scripts\smoke-demo.ps1
+```
+
+The smoke remains loopback-only, writes its Vite build to an owned temporary
+directory rather than `web/dist`, directly reuses the production public
+scenario Zod schema, executes the existing jsdom/React test stack to require the
+exact rendered Demo warning under the Web child's effective Demo-mode value,
+and cleans only resources it created. It does not treat the warning literal in
+`App.tsx` source bytes as rendering evidence.
+
+This acceptance applies to the deterministic local Demo vertical slice. It does
+not establish production readiness or implement later final-product systems.
+
 ## Planned or accepted design — not implemented
 
-- **Phase 3.2b — Demo Web and Full Playable Walkthrough:** planned, not started.
-  It retains the Demo Web/Vite mode, launcher, label, smoke validation, full Web
-  regression, and manual browser-playthrough scope. Phase 3.2 as a whole remains
-  incomplete.
 - **Phase 3.3 — Run Protocol and Difficulty/World Profiles:** approved product
   design, not implemented. See
   [Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md).

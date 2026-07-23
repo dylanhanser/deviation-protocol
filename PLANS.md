@@ -17,13 +17,13 @@ documents.
 
 - Branch: `main`
 - Repository HEAD and `origin/main`:
-  `f1fd5e2cd07d342e852430e9352f64b84014c88e`
+  `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
 - Ahead/behind: `0/0`
-- Latest completed subphase: **Phase 3.2a**
+- Latest completed subphase: **Phase 3.2b**
 - Phase 3.2a authoritative commit:
   `f1fd5e2cd07d342e852430e9352f64b84014c88e`
-- Phase 3.2b: **planned, not started**
-- Phase 3.2 as a whole: **incomplete**
+- Phase 3.2b: **implemented, verified, accepted, and closed**
+- Phase 3.2 as a whole: **implemented and complete**
 
 ## Phase status
 
@@ -39,12 +39,12 @@ documents.
 | Phase 3.1b | Implemented and complete | [Public client contract](docs/public_client_contract.md) |
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.2b | **Planned phase — not started** | [Phase 3.2 specification](docs/phase_3_2_deterministic_demo_environment.md) |
+| Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.3 | **Approved product design — not implemented** | [Run Protocol, difficulty, and world profiles](docs/run_protocol.md) |
 | Phase 3.4 | **Approved product design — not implemented** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — not implemented** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 
-## Implemented baseline through Phase 3.2a
+## Implemented baseline through Phase 3.2b
 
 The implemented engine and public application boundary include:
 
@@ -63,7 +63,12 @@ The implemented engine and public application boundary include:
 - the isolated Phase 3.2a Demo backend runtime: deterministic Provider,
   process-local transactional persistence, independent composition root,
   deterministic IDs/seeds/logical clock, exact two-process replay evidence, and
-  external-I/O denial evidence.
+  external-I/O denial evidence; and
+- the Phase 3.2b local Web layer: Demo-only Vite
+  dotenv isolation, conditional local/temporary/non-production presentation,
+  exact 19-action React/MSW regression, same-tab Demo recovery regressions,
+  one-command launcher, direct production-Zod catalog validator, and bounded
+  startup/proxy/sentinel/build smoke.
 
 `death_certificate_v1` is the canonical current Demo and vertical-slice
 scenario. This is not a permanent product decision that it must be the first
@@ -88,23 +93,45 @@ Implementation and evidence are recorded in
 
 ### Phase 3.2b — Demo Web and Full Playable Walkthrough
 
-Status: **Planned phase — not started.**
+Status: **Implemented, verified, accepted, and closed.**
 
-Its existing scope remains:
+The implementation provides:
 
 - Demo Web/Vite mode and dotenv isolation;
 - one PowerShell launcher for the local Demo;
 - an unmistakable local-only, temporary, non-production label;
 - the full Web-loop regression through the canonical complete path;
-- bounded startup/proxy/sentinel/schema smoke validation; and
-- the complete manual browser walkthrough.
+- bounded startup/proxy/sentinel/schema/build validation; and
+- preserved same-tab recovery with safe missing-Session invalidation after a
+  backend restart.
+
+The supported local commands are:
+
+```powershell
+pwsh -NoProfile -File .\scripts\start-demo.ps1
+pwsh -NoProfile -File .\scripts\smoke-demo.ps1
+```
+
+The launcher binds both children to loopback and uses the isolated Demo
+composition. Demo state is process-local and temporary. The bounded smoke
+creates only owned temporary build/response data plus a create-new dotenv
+sentinel, validates the proxied scenario catalog through the production Web
+schema, executes the exact-warning React presentation probe with the effective
+mode copied from the launched Web child, and cleans its owned resources.
+
+The 2026-07-23 correction round passed the Offline verifier, all Web commands,
+the exact cross-process replay, the focused executable PowerShell lifecycle
+suite, and the corrected bounded smoke. The subsequent controlled manual
+acceptance passed the canonical 19-action browser walkthrough to version 19 and
+`ENDED`, same-tab recovery after backend restart, Ctrl+C launcher shutdown, and
+final owned-process and port cleanup.
 
 Phase 3.2b reuses the Phase 3.2a backend and existing public client contract.
 It does not own Run Protocol, difficulty/world profiles, relationship or
 residence systems, production commercial routing, quotas, or billing.
 
-Phase 3.2 remains incomplete until Phase 3.2b is implemented, verified,
-documented, independently reviewed, and closed.
+Phase 3.2b and Phase 3.2 are complete. This deterministic local Demo acceptance
+does not establish production readiness or implement later final-product work.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 

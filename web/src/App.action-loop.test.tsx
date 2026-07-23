@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import {
@@ -34,6 +34,48 @@ import { server } from "./test/server";
 
 const apiOrigin = "http://action-ui.test";
 const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
+const exactDemoWarning =
+  "Deterministic Demo  local only  temporary data  not a production Provider";
+const canonicalScenarioCatalog = {
+  scenarios: [
+    {
+      scenario_id: "death_certificate",
+      content_version: "death-certificate-1.1.0",
+      title: "死亡证明已签发",
+      hook: "你还活着，但系统已经签发了你的死亡证明。必须在处置规程完成前证明记录错了。",
+      playable_characters: [
+        {
+          character_definition_id:
+            "character.death_certificate.investigator",
+          display_name: "调查者",
+          description: "以开放方式调查现场、记录与目击者。",
+        },
+        {
+          character_definition_id: "character.profession.clinical",
+          display_name: "临床背景调查者",
+          description: "擅长识别生命体征与临床矛盾。",
+        },
+        {
+          character_definition_id: "character.profession.documents",
+          display_name: "文书调查者",
+          description: "擅长核验文书权威与证据链。",
+        },
+        {
+          character_definition_id: "character.profession.response",
+          display_name: "现场响应调查者",
+          description: "擅长现场响应、脱险与降级冲突。",
+        },
+        {
+          character_definition_id: "character.profession.systems",
+          display_name: "系统分析调查者",
+          description: "擅长追查系统顺序与自动规程。",
+        },
+      ],
+      default_character_definition_id:
+        "character.death_certificate.investigator",
+    },
+  ],
+};
 
 function scenarioHandler() {
   return http.get(`${apiOrigin}/v1/scenarios`, () =>
@@ -127,7 +169,936 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+const canonicalChoiceSets: Record<
+  number,
+  Array<{ choice_id: string; label: string }>
+> = {
+  0: [
+    {
+      choice_id: "death_certificate.action.move_fingers_rhythmically",
+      label: "有规律地移动仍可控制的手指",
+    },
+    {
+      choice_id: "death_certificate.action.interfere_pulse_oximeter",
+      label: "干扰指夹式血氧传感器",
+    },
+    {
+      choice_id: "death_certificate.action.adjust_breathing_signal",
+      label: "调整呼吸制造可识别生命信号",
+    },
+    {
+      choice_id: "death_certificate.action.observe_quietly",
+      label: "保持安静并获取现场信息",
+    },
+  ],
+  4: [
+    {
+      choice_id: "death_certificate.action.prove_vitals",
+      label: "要求复核生命指标",
+    },
+    {
+      choice_id: "death_certificate.action.seek_records",
+      label: "转向签发记录来源",
+    },
+  ],
+  8: [
+    {
+      choice_id: "death_certificate.action.inspect_archive",
+      label: "核对档案时间与签发链",
+    },
+    {
+      choice_id: "death_certificate.action.trace_protocol",
+      label: "追踪处置规程的触发来源",
+    },
+  ],
+  11: [
+    {
+      choice_id: "death_certificate.action.open_observation",
+      label: "进入地下观察层核验对象",
+    },
+    {
+      choice_id: "death_certificate.action.secure_audit",
+      label: "保存可追溯审计证据",
+    },
+  ],
+  15: [
+    {
+      choice_id: "death_certificate.action.pause_protocol",
+      label: "争取暂停处置规程",
+    },
+    {
+      choice_id: "death_certificate.action.protect_patient",
+      label: "优先稳定观察对象",
+    },
+  ],
+  16: [
+    {
+      choice_id: "death_certificate.action.ask_coordinator",
+      label: "要求协调员承担复核责任",
+    },
+    {
+      choice_id: "death_certificate.action.ask_custodian",
+      label: "要求保管员冻结记录链",
+    },
+  ],
+  17: [
+    {
+      choice_id: "death_certificate.action.public_override",
+      label: "公开推翻错误记录",
+    },
+    {
+      choice_id: "death_certificate.action.controlled_audit",
+      label: "以受控审计保留制度证据",
+    },
+  ],
+  18: [
+    {
+      choice_id: "death_certificate.action.final_suspend",
+      label: "执行最终暂停",
+    },
+    {
+      choice_id: "death_certificate.action.final_disclose",
+      label: "执行最终披露",
+    },
+  ],
+};
+
+const canonicalFreeActionTypes: Record<
+  number,
+  Array<"CONTINUE" | "CUSTOM" | "EXPLORE" | "OBSERVE" | "TALK" | "MOVE">
+> = {
+  1: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  2: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  3: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  5: ["CONTINUE", "CUSTOM", "EXPLORE", "MOVE", "OBSERVE"],
+  6: ["CONTINUE", "CUSTOM", "EXPLORE", "MOVE", "OBSERVE"],
+  7: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  9: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  10: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  12: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  13: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+  14: ["CONTINUE", "CUSTOM", "EXPLORE", "OBSERVE", "TALK"],
+};
+
+const canonicalClockValues = [
+  [0, 0],
+  [0, 0],
+  [1, 0],
+  [2, 1],
+  [3, 2],
+  [4, 2],
+  [4, 3],
+  [4, 4],
+  [4, 5],
+  [4, 6],
+  [4, 7],
+  [4, 8],
+  [4, 9],
+  [4, 10],
+  [4, 11],
+  [4, 12],
+  [4, 12],
+  [4, 12],
+  [4, 12],
+  [4, 12],
+] as const;
+
+function canonicalPhase(version: number): string {
+  if (version === 0) return "death_certificate.arrival_locked";
+  if (version <= 4) return "death_certificate.life_disputed";
+  if (version <= 6) return "death_certificate.disposal_escape";
+  if (version <= 12) return "death_certificate.investigation";
+  if (version <= 14) return "death_certificate.self_fulfilling_truth";
+  if (version <= 18) return "death_certificate.core_conflict";
+  return "death_certificate.resolution";
+}
+
+const canonicalScenePresentation: Record<
+  string,
+  { title: string; summary: string }
+> = {
+  "death_certificate.arrival_locked": {
+    title: "封闭抵达",
+    summary: "在封闭接收室中回应迫近的处置程序。",
+  },
+  "death_certificate.life_disputed": {
+    title: "生命争议",
+    summary: "让现场人员正视你仍然活着的事实。",
+  },
+  "death_certificate.disposal_escape": {
+    title: "处置脱离",
+    summary: "在规程推进前离开封闭处置路线。",
+  },
+  "death_certificate.investigation": {
+    title: "交叉调查",
+    summary: "调查记录、因果链与仍在运行的设施。",
+  },
+  "death_certificate.self_fulfilling_truth": {
+    title: "自证真相",
+    summary: "把已验证的线索连接成可以公开质疑的因果链。",
+  },
+  "death_certificate.core_conflict": {
+    title: "核心冲突",
+    summary: "在时间耗尽前决定如何终止记录驱动的规程。",
+  },
+  "death_certificate.resolution": {
+    title: "结算",
+    summary: "查看这次调查最终留下的公开结果。",
+  },
+};
+
+function canonicalLocation(version: number): string {
+  if (version <= 4) return "death_certificate.intake_room";
+  if (version <= 8) return "death_certificate.service_corridor";
+  if (version <= 10) return "death_certificate.records_room";
+  if (version <= 14) return "death_certificate.observation_level";
+  return "death_certificate.control_room";
+}
+
+function canonicalActionLabel(
+  actionType: "CONTINUE" | "CUSTOM" | "EXPLORE" | "OBSERVE" | "TALK" | "MOVE",
+): string {
+  return {
+    CONTINUE: "继续",
+    CUSTOM: "自由行动",
+    EXPLORE: "探索",
+    OBSERVE: "观察",
+    TALK: "交谈",
+    MOVE: "移动",
+  }[actionType];
+}
+
+function canonicalView(version: number): PlayerSessionView {
+  const choices = canonicalChoiceSets[version] ?? [];
+  const freeActionTypes = canonicalFreeActionTypes[version] ?? [];
+  const ended = version === 19;
+  const rapid = version >= 15 && version <= 18;
+  const decision = choices.length > 0;
+  const decisionId = `death_certificate.decision.bound.${version}`;
+  const phaseId = canonicalPhase(version);
+  const scene = canonicalScenePresentation[phaseId]!;
+  const [disposal, deadline] = canonicalClockValues[version]!;
+  const clocks = [
+    {
+      clock_id: "disposal_protocol",
+      value: disposal,
+      maximum: 12,
+    },
+    {
+      clock_id: "predicted_death_deadline",
+      value: deadline,
+      maximum: 13,
+    },
+  ];
+  const frame = {
+    ...activeViewFixture.narrative_frame,
+    frame_id: `death_certificate.frame.${version}`,
+    scenario_id: "death_certificate",
+    phase_id: phaseId,
+    mode: ended
+      ? ("SETTLEMENT" as const)
+      : rapid
+        ? ("RAPID_DECISION" as const)
+        : decision
+          ? ("DECISION" as const)
+          : ("FLOW" as const),
+    current_location_id: canonicalLocation(version),
+    decision_required: decision,
+    ...(decision
+      ? {
+          decision_id: decisionId,
+          decision_reason: rapid
+            ? ("TIME_CRITICAL" as const)
+            : ("PLAYER_DIRECT_RESPONSE" as const),
+          suggested_actions: choices.map((choice) => ({
+            action_id: choice.choice_id,
+            action_type: "choice" as const,
+            label_hint: choice.label,
+            target_ids: [],
+          })),
+        }
+      : {
+          decision_id: undefined,
+          decision_reason: undefined,
+          suggested_actions: [],
+        }),
+    stop_condition: ended
+      ? ("SCENARIO_ENDED" as const)
+      : decision
+        ? ("AWAIT_PLAYER" as const)
+        : ("CONTINUE" as const),
+    player_visible_clocks: clocks,
+  };
+  const actionAffordances: PlayerSessionView["action_affordances"] = ended
+    ? { mode: "ENDED", actions: [], choices: [] }
+    : decision
+      ? {
+          mode: "DECISION",
+          actions: [],
+          decision_id: decisionId,
+          choices: choices.map((choice) => ({
+            action_type: "CHOOSE",
+            choice_id: choice.choice_id,
+            label: choice.label,
+            target_ids: [],
+          })),
+        }
+      : {
+          mode: "FREE_ACTIONS",
+          actions: freeActionTypes.map((actionType) => ({
+            action_type: actionType,
+            label: canonicalActionLabel(actionType),
+            input_kind:
+              actionType === "CONTINUE"
+                ? ("NONE" as const)
+                : actionType === "TALK"
+                  ? ("DIALOGUE" as const)
+                  : ("DESCRIPTION" as const),
+            ...(actionType === "CONTINUE"
+              ? {}
+              : {
+                  max_input_length: actionType === "TALK" ? 200 : 150,
+                }),
+            target_required: false,
+            targets: [],
+          })),
+          choices: [],
+        };
+  const phase = ended ? "ENDED" : "AWAITING_ACTION";
+  return {
+    ...activeViewFixture,
+    metadata: {
+      ...activeViewFixture.metadata,
+      phase,
+      state_version: version,
+      content_version: "death-certificate-1.1.0",
+      character_definition_id: "character.death_certificate.investigator",
+      character_display_name: "调查者",
+      updated_at: `2026-07-23T00:00:${String(version).padStart(2, "0")}Z`,
+    },
+    narrative_frame: frame,
+    player_state: {
+      ...activeViewFixture.player_state,
+      phase,
+      state_version: version,
+      content_version: "death-certificate-1.1.0",
+      character_definition_id: "character.death_certificate.investigator",
+      player_memory: activeViewFixture.player_memory,
+    },
+    presentation: {
+      title: "死亡证明已签发",
+      scene_title: scene.title,
+      scene_summary: scene.summary,
+      ...(ended
+        ? {
+            ending: {
+              title: "规程已中断",
+              summary:
+                "处置规程被阻止，你的生命状态获得了可验证的承认。",
+            },
+          }
+        : {}),
+    },
+    action_affordances: actionAffordances,
+    scenario_status: ended ? "ENDED" : "ACTIVE",
+    ending_status: ended ? "RESOLVED" : null,
+    public_clocks: clocks,
+    recent_narrative_texts: [`完整权威 View 版本 ${version}`],
+    ...(ended
+      ? { ending_id: "death_certificate.ending.protocol_broken" }
+      : { ending_id: undefined }),
+  };
+}
+
+function assertCanonicalDecisionPresentation(
+  view: PlayerSessionView,
+  version: number,
+): void {
+  const expectedChoices = canonicalChoiceSets[version];
+  if (expectedChoices === undefined) {
+    return;
+  }
+  expect(view.action_affordances).toEqual({
+    mode: "DECISION",
+    actions: [],
+    decision_id: `death_certificate.decision.bound.${version}`,
+    choices: expectedChoices.map((choice) => ({
+      action_type: "CHOOSE",
+      choice_id: choice.choice_id,
+      label: choice.label,
+      target_ids: [],
+    })),
+  });
+  expect(view.narrative_frame.suggested_actions).toEqual(
+    expectedChoices.map((choice) => ({
+      action_id: choice.choice_id,
+      action_type: "choice",
+      label_hint: choice.label,
+      target_ids: [],
+    })),
+  );
+}
+
+function assertExactDemoWarning(container: HTMLElement): void {
+  const warnings = Array.from(container.querySelectorAll(".demo-warning"));
+  if (warnings.length !== 1 || warnings[0]?.textContent !== exactDemoWarning) {
+    throw new Error("the exact deterministic Demo warning was not rendered");
+  }
+}
+
+function assertRenderedScenarioCatalogPresentation(
+  container: HTMLElement,
+): void {
+  const scenarioCopy = container.querySelector(".scenario-copy");
+  const roleSelect = container.querySelector("#role");
+  if (
+    !(scenarioCopy instanceof HTMLElement) ||
+    !(roleSelect instanceof HTMLSelectElement)
+  ) {
+    throw new Error("the public scenario catalog was not rendered");
+  }
+
+  expect(
+    within(scenarioCopy).getByRole("heading", { name: "死亡证明已签发" }),
+  ).toBeVisible();
+  expect(
+    within(scenarioCopy).getByText(
+      "你还活着，但系统已经签发了你的死亡证明。必须在处置规程完成前证明记录错了。",
+    ),
+  ).toBeVisible();
+  expect(roleSelect.value).toBe(
+    "character.death_certificate.investigator",
+  );
+  expect(
+    Array.from(roleSelect.options, (option) => ({
+      value: option.value,
+      presentation: option.textContent,
+    })),
+  ).toEqual([
+    {
+      value: "character.death_certificate.investigator",
+      presentation: "调查者 — 以开放方式调查现场、记录与目击者。",
+    },
+    {
+      value: "character.profession.clinical",
+      presentation: "临床背景调查者 — 擅长识别生命体征与临床矛盾。",
+    },
+    {
+      value: "character.profession.documents",
+      presentation: "文书调查者 — 擅长核验文书权威与证据链。",
+    },
+    {
+      value: "character.profession.response",
+      presentation: "现场响应调查者 — 擅长现场响应、脱险与降级冲突。",
+    },
+    {
+      value: "character.profession.systems",
+      presentation: "系统分析调查者 — 擅长追查系统顺序与自动规程。",
+    },
+  ]);
+}
+
+function readRenderedCanonicalPresentation(container: HTMLElement) {
+  const view = container.querySelector(".view-summary");
+  if (!(view instanceof HTMLElement)) {
+    throw new Error("the authoritative View presentation was not rendered");
+  }
+  return {
+    scenarioTitle: view.querySelector("#session-view-heading")?.textContent,
+    sceneTitle: view.querySelector("#scene-heading")?.textContent,
+    sceneSummary: view.querySelector("#session-view-heading + p")?.textContent,
+    choiceLabels: Array.from(
+      container.querySelectorAll(".decision-choices button"),
+      (button) => button.textContent,
+    ),
+    endingTitle: view.querySelector("#ending-heading")?.textContent ?? null,
+    endingSummary:
+      view.querySelector("#ending-heading + p")?.textContent ?? null,
+  };
+}
+
+function assertRenderedCanonicalPresentation(
+  container: HTMLElement,
+  version: number,
+): void {
+  const scene = canonicalScenePresentation[canonicalPhase(version)]!;
+  expect(readRenderedCanonicalPresentation(container)).toEqual({
+    scenarioTitle: "死亡证明已签发",
+    sceneTitle: `当前场景：${scene.title}`,
+    sceneSummary: scene.summary,
+    choiceLabels: (canonicalChoiceSets[version] ?? []).map(
+      (choice) => choice.label,
+    ),
+    endingTitle: version === 19 ? "规程已中断" : null,
+    endingSummary:
+      version === 19
+        ? "处置规程被阻止，你的生命状态获得了可验证的承认。"
+        : null,
+  });
+}
+
 describe("action_affordances and synchronous lifecycle", () => {
+  const presentationProbe =
+    import.meta.env.VITE_DEVIATION_DEMO_PRESENTATION_PROBE === "1" ? it : it.skip;
+
+  presentationProbe(
+    "renders the exact deterministic Demo warning from the effective Vite mode",
+    () => {
+      server.use(scenarioHandler());
+      const rendered = renderActionApp();
+      assertExactDemoWarning(rendered.container);
+    },
+  );
+
+  it("rejects the exact-warning presentation contract when Demo mode is absent", () => {
+    vi.stubEnv("VITE_APP_MODE", "production");
+    server.use(scenarioHandler());
+    const rendered = renderActionApp();
+    expect(() => assertExactDemoWarning(rendered.container)).toThrow(
+      "the exact deterministic Demo warning was not rendered",
+    );
+  });
+
+  it("rejects the exact-warning presentation contract when rendering is suppressed", () => {
+    vi.stubEnv("VITE_APP_MODE", "deterministic-demo");
+    server.use(scenarioHandler());
+    const rendered = renderActionApp();
+    rendered.container.querySelector(".demo-warning")?.remove();
+    expect(() => assertExactDemoWarning(rendered.container)).toThrow(
+      "the exact deterministic Demo warning was not rendered",
+    );
+  });
+
+  it("rejects a version-4 choice divergence served and rendered by App", async () => {
+    let currentVersion = 0;
+    const viewVersions: number[] = [];
+    server.use(
+      http.get(`${apiOrigin}/v1/scenarios`, () =>
+        HttpResponse.json(canonicalScenarioCatalog),
+      ),
+      http.post(`${apiOrigin}/v1/sessions`, () => {
+        const initial = canonicalView(0);
+        return HttpResponse.json(
+          {
+            ...initial.metadata,
+            scenario_id: "death_certificate",
+            narrative_frame: initial.narrative_frame,
+          },
+          { status: 201 },
+        );
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const view = canonicalView(currentVersion);
+          if (
+            currentVersion === 4 &&
+            view.action_affordances.mode === "DECISION"
+          ) {
+            view.action_affordances.choices[0] = {
+              ...view.action_affordances.choices[0]!,
+              label: "证明生命体征",
+            };
+          }
+          viewVersions.push(currentVersion);
+          return HttpResponse.json(view);
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          currentVersion += 1;
+          const clientRequestId = body.client_request_id as string;
+          return HttpResponse.json(
+            currentVersion === 2
+              ? committedActionResponseFixture(
+                  clientRequestId,
+                  currentVersion,
+                )
+              : synchronousActionResponseFixture(
+                  clientRequestId,
+                  currentVersion,
+                ),
+          );
+        },
+      ),
+    );
+
+    const user = userEvent.setup();
+    const rendered = renderActionApp();
+    await screen.findByLabelText("副本");
+    await user.click(screen.getByRole("button", { name: "创建 Session" }));
+    await waitFor(() => expect(viewVersions).toEqual([0]));
+    await user.click(
+      screen.getByRole("button", {
+        name: "有规律地移动仍可控制的手指",
+      }),
+    );
+    await waitFor(() => expect(viewVersions).toEqual([0, 1]));
+
+    const customForm = actionForm("提交自由行动");
+    await user.type(
+      within(customForm).getByLabelText("行动描述"),
+      "请协调员复核我的连续回应和生命体征",
+    );
+    await user.click(
+      within(customForm).getByRole("button", { name: "提交自由行动" }),
+    );
+    await waitFor(() => expect(viewVersions).toEqual([0, 1, 2]));
+    for (const expectedVersion of [3, 4]) {
+      await user.click(screen.getByRole("button", { name: "提交继续" }));
+      await waitFor(() =>
+        expect(viewVersions.at(-1)).toBe(expectedVersion),
+      );
+    }
+
+    expect(
+      await screen.findByRole("button", { name: "证明生命体征" }),
+    ).toBeVisible();
+    expect(() =>
+      assertRenderedCanonicalPresentation(rendered.container, 4),
+    ).toThrow();
+  });
+
+  it("completes the canonical deterministic Demo path through 19 displayed actions and authoritative Views", async () => {
+    vi.stubEnv("VITE_APP_MODE", "deterministic-demo");
+    const expectedActions = [
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.0",
+        choice_id: "death_certificate.action.move_fingers_rhythmically",
+      },
+      {
+        action_type: "CUSTOM",
+        description: "请协调员复核我的连续回应和生命体征",
+      },
+      { action_type: "CONTINUE" },
+      { action_type: "CONTINUE" },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.4",
+        choice_id: "death_certificate.action.prove_vitals",
+      },
+      { action_type: "CONTINUE" },
+      { action_type: "CONTINUE" },
+      { action_type: "CONTINUE" },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.8",
+        choice_id: "death_certificate.action.inspect_archive",
+      },
+      {
+        action_type: "EXPLORE",
+        description: "沿记录与档案审计路径核对签发时间",
+      },
+      {
+        action_type: "EXPLORE",
+        description: "核对日志时间顺序以及规程反馈",
+      },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.11",
+        choice_id: "death_certificate.action.open_observation",
+      },
+      {
+        action_type: "OBSERVE",
+        description: "复核地下患者的生命体征与连续监测历史",
+      },
+      { action_type: "CONTINUE" },
+      { action_type: "CONTINUE" },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.15",
+        choice_id: "death_certificate.action.pause_protocol",
+      },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.16",
+        choice_id: "death_certificate.action.ask_coordinator",
+      },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.17",
+        choice_id: "death_certificate.action.public_override",
+      },
+      {
+        action_type: "CHOOSE",
+        decision_id: "death_certificate.decision.bound.18",
+        choice_id: "death_certificate.action.final_suspend",
+      },
+    ] as const;
+    const submittedBodies: Array<Record<string, unknown>> = [];
+    const viewVersions: number[] = [];
+    const servedViews: PlayerSessionView[] = [];
+    let currentVersion = 0;
+    let creationBody: unknown;
+
+    server.use(
+      http.get(`${apiOrigin}/v1/scenarios`, () =>
+        HttpResponse.json(canonicalScenarioCatalog),
+      ),
+      http.post(`${apiOrigin}/v1/sessions`, async ({ request }) => {
+        creationBody = await request.json();
+        const initial = canonicalView(0);
+        return HttpResponse.json(
+          {
+            ...initial.metadata,
+            scenario_id: "death_certificate",
+            narrative_frame: initial.narrative_frame,
+          },
+          { status: 201 },
+        );
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const view = canonicalView(currentVersion);
+          viewVersions.push(view.metadata.state_version);
+          servedViews.push(view);
+          return HttpResponse.json(view);
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          const body = (await request.json()) as Record<string, unknown>;
+          const expected = expectedActions[currentVersion]!;
+          const displayed = canonicalView(currentVersion).action_affordances;
+          const actionType = body.action_type;
+          const commonKeys = ["action_type", "client_request_id", "turn_id"];
+
+          expect(actionType).toBe(expected.action_type);
+          if (actionType === "CHOOSE") {
+            expect(displayed.mode).toBe("DECISION");
+            expect(displayed.decision_id).toBe(body.decision_id);
+            expect(
+              displayed.choices.some(
+                (choice) => choice.choice_id === body.choice_id,
+              ),
+            ).toBe(true);
+            expect(Object.keys(body).sort()).toEqual(
+              [...commonKeys, "choice_id", "decision_id"].sort(),
+            );
+          } else {
+            expect(displayed.mode).toBe("FREE_ACTIONS");
+            const affordance = displayed.actions.find(
+              (action) => action.action_type === actionType,
+            );
+            expect(affordance).toBeDefined();
+            expect(Object.keys(body).sort()).toEqual(
+              actionType === "CONTINUE"
+                ? commonKeys.sort()
+                : [...commonKeys, "description"].sort(),
+            );
+          }
+
+          submittedBodies.push(body);
+          currentVersion += 1;
+          const clientRequestId = body.client_request_id as string;
+          const providerBacked = [2, 10, 11, 13].includes(currentVersion);
+          return HttpResponse.json(
+            providerBacked
+              ? committedActionResponseFixture(
+                  clientRequestId,
+                  currentVersion,
+                )
+              : synchronousActionResponseFixture(
+                  clientRequestId,
+                  currentVersion,
+                ),
+          );
+        },
+      ),
+    );
+
+    const user = userEvent.setup();
+    const rendered = renderActionApp();
+    expect(await screen.findByLabelText("副本")).toHaveValue(
+      "death_certificate",
+    );
+    expect(screen.getByLabelText("角色")).toHaveValue(
+      "character.death_certificate.investigator",
+    );
+    assertRenderedScenarioCatalogPresentation(rendered.container);
+    expect(
+      rendered.container.querySelector(".demo-warning")?.textContent,
+    ).toBe(exactDemoWarning);
+
+    await user.click(screen.getByRole("button", { name: "创建 Session" }));
+    await waitFor(() => expect(viewVersions).toEqual([0]));
+    await waitFor(() =>
+      assertRenderedCanonicalPresentation(rendered.container, 0),
+    );
+    assertCanonicalDecisionPresentation(servedViews.at(-1)!, 0);
+    for (const choice of canonicalChoiceSets[0]!) {
+      expect(screen.getByRole("button", { name: choice.label })).toBeVisible();
+    }
+    expect(creationBody).toEqual({
+      client_request_id: "opaque-create-request",
+      character_definition_id: "character.death_certificate.investigator",
+      scenario_id: "death_certificate",
+    });
+
+    async function submitAndAwaitView(
+      actionNumber: number,
+      submit: () => Promise<void>,
+    ) {
+      await submit();
+      await waitFor(() =>
+        expect(viewVersions).toHaveLength(actionNumber + 1),
+      );
+      expect(viewVersions.at(-1)).toBe(actionNumber);
+      await waitFor(() =>
+        assertRenderedCanonicalPresentation(rendered.container, actionNumber),
+      );
+      assertCanonicalDecisionPresentation(servedViews.at(-1)!, actionNumber);
+      for (const choice of canonicalChoiceSets[actionNumber] ?? []) {
+        expect(screen.getByRole("button", { name: choice.label })).toBeVisible();
+      }
+    }
+
+    const choiceLabels = [
+      "有规律地移动仍可控制的手指",
+      "要求复核生命指标",
+      "核对档案时间与签发链",
+      "进入地下观察层核验对象",
+      "争取暂停处置规程",
+      "要求协调员承担复核责任",
+      "公开推翻错误记录",
+      "执行最终暂停",
+    ];
+    let choiceIndex = 0;
+    await submitAndAwaitView(1, () =>
+      user.click(
+        screen.getByRole("button", { name: choiceLabels[choiceIndex++]! }),
+      ),
+    );
+
+    const customForm = actionForm("提交自由行动");
+    await user.type(
+      within(customForm).getByLabelText("行动描述"),
+      "请协调员复核我的连续回应和生命体征",
+    );
+    await submitAndAwaitView(2, () =>
+      user.click(
+        within(customForm).getByRole("button", { name: "提交自由行动" }),
+      ),
+    );
+    for (const actionNumber of [3, 4]) {
+      await submitAndAwaitView(actionNumber, () =>
+        user.click(screen.getByRole("button", { name: "提交继续" })),
+      );
+    }
+    await submitAndAwaitView(5, () =>
+      user.click(
+        screen.getByRole("button", { name: choiceLabels[choiceIndex++]! }),
+      ),
+    );
+    for (const actionNumber of [6, 7, 8]) {
+      await submitAndAwaitView(actionNumber, () =>
+        user.click(screen.getByRole("button", { name: "提交继续" })),
+      );
+    }
+    await submitAndAwaitView(9, () =>
+      user.click(
+        screen.getByRole("button", { name: choiceLabels[choiceIndex++]! }),
+      ),
+    );
+
+    const firstExploreForm = actionForm("提交探索");
+    await user.type(
+      within(firstExploreForm).getByLabelText("行动描述"),
+      "沿记录与档案审计路径核对签发时间",
+    );
+    await submitAndAwaitView(10, () =>
+      user.click(
+        within(firstExploreForm).getByRole("button", { name: "提交探索" }),
+      ),
+    );
+    const secondExploreForm = actionForm("提交探索");
+    await user.clear(within(secondExploreForm).getByLabelText("行动描述"));
+    await user.type(
+      within(secondExploreForm).getByLabelText("行动描述"),
+      "核对日志时间顺序以及规程反馈",
+    );
+    await submitAndAwaitView(11, () =>
+      user.click(
+        within(secondExploreForm).getByRole("button", { name: "提交探索" }),
+      ),
+    );
+    await submitAndAwaitView(12, () =>
+      user.click(
+        screen.getByRole("button", { name: choiceLabels[choiceIndex++]! }),
+      ),
+    );
+
+    const observeForm = actionForm("提交观察");
+    await user.type(
+      within(observeForm).getByLabelText("行动描述"),
+      "复核地下患者的生命体征与连续监测历史",
+    );
+    await submitAndAwaitView(13, () =>
+      user.click(
+        within(observeForm).getByRole("button", { name: "提交观察" }),
+      ),
+    );
+    for (const actionNumber of [14, 15]) {
+      await submitAndAwaitView(actionNumber, () =>
+        user.click(screen.getByRole("button", { name: "提交继续" })),
+      );
+    }
+    for (const actionNumber of [16, 17, 18, 19]) {
+      await submitAndAwaitView(actionNumber, () =>
+        user.click(
+          screen.getByRole("button", {
+            name: choiceLabels[choiceIndex++]!,
+          }),
+        ),
+      );
+    }
+
+    expect(submittedBodies).toEqual(
+      expectedActions.map((expected, index) => ({
+        turn_id: `opaque-turn-${index + 1}`,
+        client_request_id: `opaque-request-${index + 1}`,
+        ...expected,
+      })),
+    );
+    expect(viewVersions).toEqual(
+      Array.from({ length: 20 }, (_, version) => version),
+    );
+    expect(screen.getByText("ENDED")).toBeVisible();
+    expect(screen.getByText("RESOLVED")).toBeVisible();
+    expect(
+      screen.getByText(
+        "Ending ID：death_certificate.ending.protocol_broken",
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("heading", { name: "规程已中断" }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(
+        "处置规程被阻止，你的生命状态获得了可验证的承认。",
+      ),
+    ).toBeVisible();
+    expect(screen.getByText("disposal_protocol：4 / 12")).toBeVisible();
+    expect(
+      screen.getByText("predicted_death_deadline：12 / 13"),
+    ).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "当前可执行行动" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "执行最终暂停" }),
+    ).not.toBeInTheDocument();
+  });
+
   it("renders and submits every current FREE_ACTIONS contract with only allowed inputs and targets", async () => {
     const actionBodies: Array<Record<string, unknown>> = [];
     let viewVersion = 1;

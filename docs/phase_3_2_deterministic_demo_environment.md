@@ -2,15 +2,25 @@
 
 ## Frozen status and evidence baseline
 
-Status: **Phase 3.2a is implemented, verified, committed, and closed. It was
-committed as `f1fd5e2cd07d342e852430e9352f64b84014c88e`. Phase 3.2b has not
-started, and Phase 3.2 as a whole remains incomplete.**
+Status: **Phase 3.2a is implemented, verified, committed, and closed at
+`f1fd5e2cd07d342e852430e9352f64b84014c88e`. Phase 3.2b is implemented in
+the current change set, verified, accepted, and closed. Its controlled manual
+browser walkthrough and final launcher/recovery/cleanup observations passed and
+are recorded below. Phase 3.2 as a whole is implemented and complete.**
 
 This document is the historical Phase 3.2 specification and implementation
 evidence record. Sections describing Phase 3.2a requirements are satisfied
-historical acceptance boundaries. Sections describing the launcher, Demo Web,
-startup/proxy smoke, and browser walkthrough remain planned Phase 3.2b work,
-not current capability.
+historical acceptance boundaries. The launcher, Demo Web, startup/proxy smoke,
+schema validator, and automated walkthrough regression described below are now
+implemented Phase 3.2b capability. Future-tense wording retained inside the
+frozen contract records its original acceptance form; the current evidence
+record in this section controls implementation status. The controlled manual
+browser walkthrough and final acceptance checks passed and are recorded.
+
+The repository baseline for this Phase 3.2b implementation round was clean
+`main` and `origin/main` at
+`a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`, ahead/behind `0/0`, with an
+empty index and no modified or untracked files.
 
 The original planning baseline was `main` at
 `44258527c169170ee79540a130ac5e143211c748`. The approved Scheme A repair was
@@ -40,7 +50,8 @@ Current repository evidence establishes the following boundary:
   settings are valid; otherwise Narrative actions fail through the existing
   not-configured boundary, and it has no Demo fallback. Closed Phase 3.2a
   provides only the separate
-  `deviation_protocol.api.demo:app`; the Phase 3.2b launcher has not started.
+  `deviation_protocol.api.demo:app`; Phase 3.2b now launches that entry point
+  explicitly without changing normal composition.
 - `NarrativeProvider` is already a supplier-neutral application Protocol.
   `ScriptedOpeningProvider` and `BlockingScriptedProvider` prove deterministic,
   no-network playthroughs, but they are test-local, contain scenario-copy
@@ -64,7 +75,7 @@ features.
    The test-local scripted Providers remain behavior oracles only.
 2. **API versus mode selection:** the Demo reuses the complete formal public
    HTTP contract without DTO/schema changes. Mode selection occurs only through
-   a dedicated composition root and, in Phase 3.2b, its planned launcher, never
+   a dedicated composition root and the Phase 3.2b launcher, never
    through public input or a default fallback.
 3. **Persistence:** process-lifetime server persistence is required so the
    existing Session/action/recovery loop works. Because MySQL is a network
@@ -111,14 +122,15 @@ failure surfaces:
    composition, transactional process-local storage, deterministic Provider,
    public-HTTP happy path, cross-process determinism proof, and external-I/O
    denial proof.
-2. **Phase 3.2b — Web launch and playthrough.** Add the single-command process
-   launcher, Demo-only Vite dotenv isolation, Web Demo label, full Web-loop
-   regression, the separately bounded startup/proxy/sentinel smoke,
-   documentation and manual walkthrough.
+2. **Phase 3.2b — Web launch and playthrough.** Implemented, verified, accepted,
+   and closed: single-command process launcher, Demo-only Vite dotenv
+   isolation, Web Demo label, full Web-loop regression, separately bounded
+   startup/proxy/sentinel/schema/build smoke, and documentation. The controlled
+   manual browser walkthrough has passed and is recorded below.
 
-Phase 3.2b depends on the now-closed Phase 3.2a. Neither subphase alone permits
-a Phase 3.2 completion claim; Phase 3.2 is complete only after both subphases
-are separately implemented, verified, documented, and independently reviewed.
+Phase 3.2b depends on the closed Phase 3.2a. Both subphases are separately
+implemented, verified, documented, accepted, and closed, so Phase 3.2 is
+complete.
 
 ## B. User-observable behavior
 
@@ -528,8 +540,8 @@ silent fallback:
   printing their values. Environment sanitization alone is not evidence that
   Vite did not read dotenv files.
 - Phase 3.2b changes `web/vite.config.ts` so only Vite mode
-  `deterministic-demo` resolves `envDir: false`: the planned conditional is
-  equivalent to `envDir: mode === "deterministic-demo" ? false : undefined`.
+  `deterministic-demo` resolves `envDir: false` through exactly
+  `envDir: mode === "deterministic-demo" ? false : undefined`.
   Vite 8.1.5's current contract types `envDir` as `string | false`, and its
   `getEnvFilesForMode` returns no `.env`, `.env.local`, `.env.<mode>` or
   `.env.<mode>.local` paths when false. All other modes retain the current
@@ -570,19 +582,17 @@ The original allowlist prediction describes the closed Phase 3.2a
 implementation: the Demo composition/provider/store under
 `src/deviation_protocol/`, their focused unit tests,
 `tests/e2e/test_demo_cross_process_replay.py`, and its test-only
-`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. Phase 3.2b
-remains planned, not-started work and is expected to
-modify `web/vite.config.ts`, `web/package.json`, the minimum
-existing Web presentation/test files, add
+`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. Phase 3.2b now
+modifies `web/vite.config.ts`, `web/package.json`, the minimum existing Web
+presentation/test files, adds
 `web/vitest.scenario-validator.config.ts` and
-`web/tools/validate-public-scenario-catalog.validation.ts`, and add
+`web/tools/validate-public-scenario-catalog.validation.ts`, and adds
 `scripts/start-demo.ps1` plus `scripts/smoke-demo.ps1` and their focused script
-tests. The future `scripts/smoke-demo.ps1` owns the fail-closed Windows
+tests. `scripts/smoke-demo.ps1` owns the fail-closed Windows
 `cmd.exe` resolution and unique `npm.cmd` resolution, bounded validator process
-and exit-code propagation specified below; these are planned behavior, not
-current files or capability. The helper imports the existing public Zod schema;
-it does not add or copy a runtime contract. No API DTO/schema, Provider
-Protocol, ORM or migration file is predicted to change.
+and exit-code propagation specified below. The helper imports the existing
+public Zod schema; it does not add or copy a runtime contract. No API DTO/schema,
+Provider Protocol, ORM or migration file changes.
 
 ### Out of scope
 
@@ -698,9 +708,10 @@ The bounded smoke creates exactly one unique `VITE_*` sentinel in
 (PowerShell/.NET `FileMode.CreateNew` or equivalent). If that path already
 exists it fails closed without reading, printing, copying or overwriting it. In
 a `finally` block it removes only the sentinel file it created. It starts Demo
-Web and proves the unique value is absent from resolved
-Vite configuration, served client modules, the rendered page and observable
-proxy/API responses. It also creates one unique script-owned temporary
+Web and, together with the focused Vite-configuration test, proves the unique
+value is absent from resolved Vite configuration, served HTML and client
+modules, the client bundle, and observable proxy/API responses. It also creates
+one unique script-owned temporary
 workspace, writes the Demo-mode Vite build only to a build subdirectory there,
 proves the sentinel is absent from that client bundle, and deletes the workspace
 in `finally`; it never uses or overwrites the normal `web/dist`. The same
@@ -722,8 +733,9 @@ starts one Demo backend and one Demo Vite child, waits under the single total
 timeout, then requests the actual public scenarios API through
 `http://127.0.0.1:<web-port>/api/v1/scenarios`, never directly from the backend.
 It must verify HTTP 200, a JSON response body, full validation by the current
-`publicScenarioCatalogSchema` from `web/src/api/schemas.ts`, the exact Demo-mode
-label on the Web page, and the dotenv sentinel absence described above. Merely
+`publicScenarioCatalogSchema` from `web/src/api/schemas.ts`, an executable
+jsdom/React observation of the exact Demo-mode label, and the dotenv sentinel
+absence described above. Merely
 parsing JSON, checking the top-level type, checking for `scenarios`, or checking
 for a non-empty array is insufficient. Direct schema reuse validates every
 current nested `publicScenarioDescriptionSchema` and
@@ -731,7 +743,19 @@ current nested `publicScenarioDescriptionSchema` and
 character-membership refinement; the smoke must not replace it with a weaker
 PowerShell subset.
 
-Phase 3.2b adds the future Web-owned files
+The warning observation does not search `App.tsx` source bytes. The smoke runs
+the existing `App.action-loop.test.tsx` presentation probe through the local
+Vitest/jsdom/React stack. Its probe `ProcessStartInfo` first removes any
+independently inherited `VITE_APP_MODE` without emitting function output, then
+conditionally copies only the exact value present in the launched Web child's
+`ProcessStartInfo.Environment`. It injects no default or expected Demo value.
+The probe requires exactly one rendered `.demo-warning` with text
+`Deterministic Demo  local only  temporary data  not a production Provider`.
+A missing, ordinary, unknown or wrong Web-child mode, or a suppressed or
+text-divergent conditional element, makes the probe nonzero. This is automated
+rendered-component integration evidence, not a manual browser walkthrough.
+
+Phase 3.2b adds the Web-owned files
 `web/vitest.scenario-validator.config.ts` and
 `web/tools/validate-public-scenario-catalog.validation.ts`, plus the
 `validate:scenario-catalog` script in `web/package.json`. The dedicated Vitest
@@ -1071,9 +1095,9 @@ affordance sequence above.
 | Caller-identity equivalence | A second two-process replay uses different create/action identity sequences, applies only the exact whitelist and bijective token algorithm in section C, and requires every normalized canonical gameplay response to match. Internal Session/event IDs and clocks remain compared. |
 | Complete API path | Use only public endpoints from scenario discovery and Session creation through the 19 actions and final `/view` in section H. Assert opening `CHOOSE`, the first Provider-backed `CUSTOM` at action 2, four Provider invocations, 27 persisted events, five total jobs, state versions 0 through 19, the exact public/private clock progression, five recent texts, final memory/ending, no hidden fields and no post-ending mutation. |
 | No external I/O | Complete the public path with non-loopback sockets denied and database/DeepSeek constructors trapped; assert zero calls and no credentials required. Loopback ASGI/test transport is allowed. |
-| Web complete loop | One React/MSW regression drives the real App controls through the exact section H path: its first POST clicks `death_certificate.action.move_fingers_rhythmically` as `CHOOSE`, action 2 uses the advertised `CUSTOM`, every later stable choice ID matches the table, and the final refreshed View is ENDED. It verifies the Demo banner and asserts every POST body comes only from the displayed affordance. |
+| Web complete loop | One React/MSW regression drives the real App controls through the exact section H path: its first POST clicks `death_certificate.action.move_fingers_rhythmically` as `CHOOSE`, action 2 uses the advertised `CUSTOM`, every later stable choice ID matches the table, and the final refreshed View is ENDED. It verifies the Demo banner, exact rendered catalog hook, all five character names/descriptions and default investigator ID, every rendered scene title/summary, all eight decision Views and every exact choice label, and the exact ending title/summary through the DOM. Every POST body still comes only from the displayed affordance. A separate rendered-client regression serves the version-4 label `证明生命体征`, drives App normally to that View, and proves the DOM-based canonical assertion rejects it. |
 | Vite dotenv isolation | Demo mode resolves `envDir: false` while ordinary modes retain current behavior. The fail-closed sentinel acceptance proves a unique `VITE_*` value in the smoke-created `.env.deterministic-demo.local` reaches neither Vite configuration, client modules/bundle, page nor observable response, and cleanup removes only that file. |
-| Startup/proxy | `pwsh -NoProfile -File .\scripts\smoke-demo.ps1` starts its own sanitized backend/Web children, enforces the 60-second default total timeout, reaches the scenarios API only through the Vite proxy, requires HTTP 200 and exact response bytes in an owned create-new file, and passes only that absolute path through the validator environment. On Windows it fail-closed resolves an absolute `cmd.exe` from process `ComSpec`, enumerates all Application `npm.cmd` results and requires `$npmCommands.Count -eq 1`; zero, multiple or exceptional resolutions are fatal. It then starts exactly that unique validated absolute `FileInfo.FullName` through `cmd.exe /d /s /c` with the frozen `Arguments`, absolute Web working directory and no dynamic response data in the command. Asynchronous handlers continuously drain diagnostic stdout/stderr; only validator `ExitCode=0` proves direct `publicScenarioCatalogSchema` success. Invalid UTF-8/JSON/schema, command resolution/start/timeout/nonzero/ExitCode failure, label/sentinel/lifecycle failure or owned cleanup failure is nonzero, and timeout termination is limited to process trees the smoke created. |
+| Startup/proxy | `pwsh -NoProfile -File .\scripts\smoke-demo.ps1` starts its own sanitized backend/Web children, enforces the 60-second default total timeout, reaches the scenarios API only through the Vite proxy, requires HTTP 200 and exact response bytes in an owned create-new file, and passes only that absolute path through the validator environment. Its exact-warning jsdom/React probe first removes independently inherited `VITE_APP_MODE`, then conditionally copies only the launched Web child's effective value; missing, wrong or absent/exact-text-divergent rendered-warning cases are nonzero, while exact `deterministic-demo` passes. On Windows it fail-closed resolves an absolute `cmd.exe` from process `ComSpec`, enumerates all Application `npm.cmd` results and requires `$npmCommands.Count -eq 1`; zero, multiple or exceptional resolutions are fatal. It then starts exactly that unique validated absolute `FileInfo.FullName` through `cmd.exe /d /s /c` with the frozen `Arguments`, absolute Web working directory and no dynamic response data in the command. Asynchronous handlers continuously drain diagnostic stdout/stderr; only validator `ExitCode=0` proves direct `publicScenarioCatalogSchema` success. Invalid UTF-8/JSON/schema, command resolution/start/timeout/nonzero/ExitCode failure, label/sentinel/lifecycle failure or owned cleanup failure is nonzero, and timeout termination is limited to process trees the smoke created. |
 | Recovery preservation | Existing Phase 3.1c suite remains unchanged and passing; added coverage proves same-tab reload works while the Demo process lives and backend restart produces safe 404 invalidation with zero action POSTs. |
 | Failure boundary | Provider failure, malformed public input, stale/duplicate identities, storage rollback and ended-session action rejection keep the last committed View/state and expose only existing public errors. |
 | Mode labeling | Demo launch always shows local-only/temporary/non-production wording; normal Web builds do not falsely claim the deterministic Provider is active. |
@@ -1138,9 +1162,9 @@ Phase 3.2 may be marked complete only when all of the following are true:
 ## K. Verification commands by subphase
 
 Phase 3.2a closed with the Offline suite and exact cross-process replay command
-below as implementation evidence. Phase 3.2b has not started; the smoke and Web
-commands remain its planned verification boundary. Neither subphase uses a live
-Provider or MySQL. From the repository root:
+below as implementation evidence. Phase 3.2b now implements the smoke and Web
+commands as its current automated verification boundary. Neither subphase uses
+a live Provider or MySQL. From the repository root:
 
 ```powershell
 .\scripts\verify.ps1 -Mode Offline
@@ -1191,6 +1215,80 @@ must still run compileall, unit/integration tests that do not require MySQL,
 dependency checks, offline Alembic heads/history and Git checks as currently
 defined by the repository workflow.
 
+### Phase 3.2b correction-round evidence
+
+On 2026-07-23, against the clean baseline
+`a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`, the independent-audit correction
+round produced this evidence:
+
+- the focused action-loop run passed 31 tests with the smoke-only presentation
+  probe intentionally skipped outside its explicit effective-mode invocation;
+- the focused executable PowerShell lifecycle suite passed 37 tests, including
+  production-helper executions for ambient expected mode plus missing
+  Web-child key, wrong Web-child mode and exact Demo mode;
+- `.\scripts\verify.ps1 -Mode Offline` passed with 1,062 tests and 48 expected
+  MySQL/live skips, plus compileall, `pip check`, offline Alembic heads/history,
+  and Git diff checks;
+- `npm run lint`, `npm run typecheck`, `npm run test:run` (184 passed plus one
+  intentionally dormant smoke-only probe), and `npm run build` passed;
+- the exact cross-process replay passed all 104 cases;
+- `pwsh -NoProfile -File .\scripts\smoke-demo.ps1` passed the loopback
+  startup, proxy, direct production-Zod schema validation, exact rendered Demo
+  warning probe, dotenv sentinel isolation, owned temporary build, and owned
+  cleanup checks;
+  and
+- no MySQL, live Provider, dependency installation, external network, ORM,
+  Alembic, public API, production Zod schema, or scenario-canon change was used.
+
+This correction round did not itself run the long-running launcher or a
+browser, so those manual checks were still pending at that checkpoint. They
+were subsequently completed by the controlled manual acceptance recorded
+below; the correction-round automated evidence must not be mistaken for the
+later manual evidence.
+
+### Phase 3.2b controlled manual acceptance evidence
+
+On 2026-07-23, a fresh manual acceptance session re-executed the complete
+browser route rather than reusing the temporary Session from an earlier
+interrupted attempt around canonical action 17. That intermediate attempt is
+not acceptance evidence for the successful fresh session below.
+
+Phase 3.2b manual browser walkthrough passed.
+
+The accepted browser/gameplay evidence covers the exact local-only,
+temporary-data, non-production presentation; the public scenario catalog and
+all five character presentations; normal Session creation; every authoritative
+View and action in the section H actions 1-19 route; GET-only same-tab recovery
+at version 9 with no action replay; the complete action-17 refreshed View;
+actions 18 and 19; and the exact `ENDED` / `RESOLVED` ending titled
+`规程已中断`, with no action controls remaining. It also covers safe
+backend-restart invalidation: the old Session returned 404, the same-tab record
+was cleared, no Session or action POST was replayed, and the initial UI returned
+without old controls.
+
+The final shutdown observation was completed later as a separately authorized,
+isolated recheck; it did not use the browser-walkthrough launcher instance. The
+recheck launched the documented command in a fresh persistent interactive
+terminal, opened no browser, and created no Session. After both loopback
+services returned HTTP 200, terminal focus and the absence of selection/input
+interception were confirmed. One Ctrl+C then caused immediate normal shutdown,
+with no second interrupt, failure message, forced termination, residual owned
+process, occupied port, or unrelated abnormal behavior. The earlier first-key
+observation had not confirmed delivery to the launcher and established no
+launcher implementation defect.
+
+Final checks found ports 8000 and 5173 free, no repository-owned Demo process,
+no smoke sentinel, no `web/dist`, HEAD and `origin/main` both at
+`a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`, ahead/behind `0/0`, an empty
+index, the same eleven modified and six untracked paths, and a passing
+`git diff --check`. No repository or Git publication operation occurred during
+the walkthrough or isolated shutdown recheck.
+
+Controlled manual evidence and final commit-readiness acceptance have now been
+recorded. Phase 3.2b is implemented, verified, accepted, and closed, and Phase
+3.2 is complete. This deterministic local Demo acceptance does not establish
+production readiness or implement later final-product systems.
+
 ## L. Explicitly deferred
 
 Run Protocol and difficulty/world profiles, NPC Relationship and Temporary
@@ -1214,11 +1312,16 @@ not part of Phase 3.2b.
 
 ## M. Guardrail impact
 
-Guardrail impact: **AUTH-002 updated.** The confirmed Phase 3.2a follow-up
-defects add enforcement evidence for rejection at the production entry before
-lock/snapshot work and for non-exposure of the guard/capability combination;
-the required AUTH-002 invariant is unchanged. Future implementation is governed
-by existing ENV-001, ENV-002, DB-001, AUTH-001, AUTH-002, STATE-001, API-001,
-SCENE-001, MODEL-001, MODEL-002 and PLAY-001. Any confirmed implementation
-defect that creates or changes a reusable rule must update the matching
-guardrail and add a regression in that implementation change.
+Manual local Demo acceptance evidence only; no implementation or
+production-contract change. Added or updated guardrail IDs: None.
+
+Phase 3.2b implementation-round Guardrail impact: **None.** No confirmed
+Phase 3.2b defect created or changed a reusable engineering or safety rule.
+
+Historical Phase 3.2a Guardrail impact: **AUTH-002 updated.** The confirmed
+Phase 3.2a follow-up defects added enforcement evidence for rejection at the
+production entry before lock/snapshot work and for non-exposure of the
+guard/capability combination; the required AUTH-002 invariant was unchanged.
+Current implementation remains governed by existing ENV-001, ENV-002, DB-001,
+AUTH-001, AUTH-002, STATE-001, API-001, SCENE-001, MODEL-001, MODEL-002 and
+PLAY-001.
