@@ -21,9 +21,10 @@
 
 ## Git publishing
 
-- Codex may create local commits only when explicitly authorized.
+- Codex may create a local commit only when the user explicitly authorizes that
+  exact commit operation.
 - Codex must never push this repository.
-- All pushes are performed by the user.
+- The user performs every push manually.
 - GitHub or GitHub CLI authentication must not be treated as a prerequisite for creating an explicitly authorized local commit.
 - Do not run `gh auth status`, `gh auth login`, or other GitHub-authentication commands unless the user explicitly requests them for a separate task.
 
@@ -49,6 +50,9 @@
 ## Verification and issue recording
 
 - After changes, run the full tests, `compileall`, and relevant Alembic checks.
+- Before independent audit, describing a phase as complete, or requesting
+  authorization to commit, complete the canonical documentation-synchronization
+  checklist in `docs/engineering/codex_workflow.md`.
 - Add a regression test for every confirmed defect.
 - When a confirmed defect establishes or changes a reusable engineering or safety rule, update `docs/engineering/guardrails.md` in the same change.
 - When a confirmed failure concerns Codex sessions, environment setup, review procedure, or Git handoff, update `docs/engineering/codex_workflow.md`.

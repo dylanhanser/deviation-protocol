@@ -1,4 +1,59 @@
-# NarrativeProvider 边界（Phase 2.4b）
+# NarrativeProvider 边界
+
+## Current Provider concepts
+
+`NarrativeProvider` is the supplier-neutral application interface. Its current
+responsibility is deliberately narrow: receive one validated, bounded
+`NarrativeRequest`; return one untrusted narrative proposal and safe Provider
+metadata; and release its own resources through `aclose()`. It does not choose
+the Provider route, own credentials, authorize outcomes, mutate state, or
+persist a completion.
+
+Normal `deviation_protocol.api.main:app` composition configures the
+infrastructure `DeepSeekNarrativeProvider` only when valid server-side DeepSeek
+settings exist. Otherwise Narrative work reaches the existing explicit
+not-configured boundary. The adapter renders the application request through
+the current versioned style profile, calls the configured DeepSeek model, and
+parses the response as an untrusted proposal. Normal composition never silently
+falls back to the deterministic Demo Provider.
+
+Phase 3.2a implements `DeterministicDemoNarrativeProvider` only in the
+independent `deviation_protocol.api.demo:app` composition. It is a pure,
+secrets-free function of the validated request and remains behind the normal
+validator, outcome policy, trusted issuer, and StoryDirector. It is isolated
+from normal Provider configuration and from any future commercial
+distribution.
+
+Provider selection and narrative authority are separate:
+
+- a Provider or model channel selects where candidate prose is generated;
+- the model narrates confirmed state and results;
+- the engine and trusted server policies own objective mechanics, resources,
+  facts, clocks, relationship progression, permanent state, and canon; and
+- style settings change presentation only and cannot rewrite established
+  facts.
+
+## Future Provider and narrative controls
+
+Phase 4.0's accepted design introduces a self-controlled **Production
+Distribution Gateway** for explicit player-selected Provider/model channels,
+server-side credentials, quota, metering, rate limiting, and abuse control.
+That network component is not the application `NarrativeProvider` interface and
+is not implemented. Its canonical decision is
+[ADR 0001](decisions/0001-production-provider-distribution.md).
+
+Phase 3.3's approved [Run Protocol design](run_protocol.md) will add structured,
+versioned presentation controls after engine-owned difficulty, character, and
+permitted pre-game overrides are resolved. No `RUN_PROTOCOL` block exists in
+the implemented prompt today.
+
+Phase 3.4's approved
+[NPC Relationship and Temporary Residence design](npc_relationship_residence.md)
+will permit bounded residence conversation under engine authority. Residence
+mode is not implemented. Future relationship dialogue may express established
+personality and confirmed shared memories, but it cannot independently upgrade
+relationships, create permanent promises, reveal major secrets, or change
+canon.
 
 ## Phase 2.4b public playtest boundary
 

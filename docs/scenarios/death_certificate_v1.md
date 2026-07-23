@@ -2,9 +2,21 @@
 
 当前生产 content version 为 `death-certificate-1.1.0`。版本 1.1 补齐公共 API 的完整可达 outcome 路径，不改变核心真相或七阶段结构。
 
+本场景是当前规范 Demo 与可玩垂直切片场景。这不构成其必须成为正式产品首个世界的永久决定。未来 run 开始时的入口世界只会从明确创作且符合资格的小集合中选择；本场景是否属于该集合以及世界顺序须按
+[`Run Protocol`](../run_protocol.md) 的 Phase 3.3 设计实现。当前没有生产入口世界选择实现。
+
 ## 内容与版权边界
 
 本规格及 `config/scenarios/death_certificate_v1.json` 是原创副本设计，只描述机器可读的事实、规则和短标签。它不包含参考小说原文、人物、世界观、剧情、怪物、装备、技能、专有名词、系统提示、备注或笑话，也不提供最终文学叙事。未来叙事提供者只能根据安全 `NarrativeFrame` 渲染原创文本。
+
+## 权威与后续设计边界
+
+本场景定义由场景作者拥有的 setting、角色、固定事实、规则与可用内容。未来
+[`Run Protocol`](../run_protocol.md) 选择可以改变已确认状态与结果的呈现方式，但不能在没有引擎授权变化时改写本场景事实。叙事风格、世界难度和客观结果保持不同权威。
+
+关系氛围只是一层呈现，不等同于客观关系进展。当前场景没有实现 NPC residence mode。未来
+[`NPC Relationship and Temporary Residence`](../npc_relationship_residence.md)
+资格必须由明确的游戏设计或引擎状态定义，模型不能临时发明资格、关系阶段、永久承诺、重大秘密或 canon 变化。
 
 ## 核心命题
 

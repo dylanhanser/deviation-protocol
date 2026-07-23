@@ -234,9 +234,38 @@ Guardrail impact:
 `None` is appropriate only when no confirmed issue created or changed a
 reusable rule.
 
+## Canonical documentation-synchronization checklist
+
+Complete this checklist before an independent audit, before describing a phase
+as complete, and before requesting authorization to commit:
+
+1. Identify every code, behavior, interface, test, and phase-status change.
+2. Identify the canonical document that owns each changed fact or decision.
+3. Update implementation documentation during the same work round.
+4. Keep code, tests, `PLANS.md`, phase documentation, and applicable guardrails
+   consistent.
+5. Record new constraints, decisions, limitations, and verification evidence.
+6. Distinguish **Implemented**, **Accepted design**, **Deferred**, and
+   **Planned phase**.
+7. Check whether a confirmed failure requires a guardrail update.
+8. Do not add speculative guardrails without a confirmed failure and an
+   enforcement mechanism.
+9. Check documentation coverage before independent audit.
+10. Do not describe a phase as complete while required documentation is
+    missing.
+11. Run applicable documentation validation and Git diff checks.
+12. Verify that no unrelated file entered the change inventory.
+13. Request commit authorization only after implementation, tests, and
+    documentation agree.
+14. Commit only with explicit user authorization for that exact commit
+    operation.
+15. Never push; the user performs every push manually.
+
 ## Git handoff
 
-Codex does not stage, commit, or push unless explicitly authorized.
+Codex does not stage unless explicitly authorized. Codex may create a local
+commit only when the user explicitly authorizes that exact commit operation.
+Codex never pushes; the user performs every push manually.
 
 Before user commit:
 

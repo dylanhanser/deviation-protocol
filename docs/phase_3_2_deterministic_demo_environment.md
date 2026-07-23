@@ -2,15 +2,15 @@
 
 ## Frozen status and evidence baseline
 
-Status: **Phase 3.2a is implemented locally but is not independently approved
-or committed. Its latest authorization-entry ordering and public authority
-encapsulation corrections still require a fresh independent read-only audit.
-Phase 3.2b has not started, and Phase 3.2 as a whole remains incomplete.** This
-document continues to freeze the acceptance boundary for both subphases without
-claiming approval.
+Status: **Phase 3.2a is implemented, verified, committed, and closed. It was
+committed as `f1fd5e2cd07d342e852430e9352f64b84014c88e`. Phase 3.2b has not
+started, and Phase 3.2 as a whole remains incomplete.**
 
-The current local review object is based on repository `main` and `origin/main`
-at `269bd0b5e9a70467fa5fa7a10419107c205d4e15`.
+This document is the historical Phase 3.2 specification and implementation
+evidence record. Sections describing Phase 3.2a requirements are satisfied
+historical acceptance boundaries. Sections describing the launcher, Demo Web,
+startup/proxy smoke, and browser walkthrough remain planned Phase 3.2b work,
+not current capability.
 
 The original planning baseline was `main` at
 `44258527c169170ee79540a130ac5e143211c748`. The approved Scheme A repair was
@@ -38,32 +38,30 @@ Current repository evidence establishes the following boundary:
 - `deviation_protocol.api.main:app` currently requires `DATABASE_URL` for its
   MySQL engine. It injects `DeepSeekNarrativeProvider` only when DeepSeek
   settings are valid; otherwise Narrative actions fail through the existing
-  not-configured boundary, and it has no Demo fallback. The uncommitted local
-  Phase 3.2a review object provides only the separate
+  not-configured boundary, and it has no Demo fallback. Closed Phase 3.2a
+  provides only the separate
   `deviation_protocol.api.demo:app`; the Phase 3.2b launcher has not started.
 - `NarrativeProvider` is already a supplier-neutral application Protocol.
   `ScriptedOpeningProvider` and `BlockingScriptedProvider` prove deterministic,
   no-network playthroughs, but they are test-local, contain scenario-copy
-  branches, and are not reusable runtime Providers. The uncommitted local
-  Phase 3.2a implementation instead adds its own generic Demo Provider.
+  branches, and are not reusable runtime Providers. Phase 3.2a implements its
+  own generic Demo Provider.
 - The public ASGI and MySQL playtests already prove that
   `death-certificate-1.1.0` can reach `protocol_broken` and
   `record_challenged`, or fail at `deadline_reached`, through public endpoints.
 - The test-local `MemoryStore`/`MemoryUnitOfWork` proves that the existing
   Repository ports can be backed in memory, but it is a fixture, not supported
-  application persistence or a launchable environment. The local Phase 3.2a
-  review object adds a separate Demo-named process store rather than importing
-  that fixture.
+  application persistence or a launchable environment. Phase 3.2a implements a
+  separate Demo-named process store rather than importing that fixture.
 
 Nothing in this specification relabels those test assets as current runtime
 features.
 
 ## Frozen architecture answers
 
-1. **Reusable Provider:** the uncommitted local Phase 3.2a review object adds a
-   generic implementation of the existing Protocol without importing test
-   code or branching on scenario copy. It is not yet independently approved;
-   the test-local scripted Providers remain behavior oracles only.
+1. **Reusable Provider:** Phase 3.2a implements a generic implementation of the
+   existing Protocol without importing test code or branching on scenario copy.
+   The test-local scripted Providers remain behavior oracles only.
 2. **API versus mode selection:** the Demo reuses the complete formal public
    HTTP contract without DTO/schema changes. Mode selection occurs only through
    a dedicated composition root and, in Phase 3.2b, its planned launcher, never
@@ -109,19 +107,18 @@ The implementation is split into two reviewable subphases because the
 transactional in-memory adapter and the Web/startup integration have different
 failure surfaces:
 
-1. **Phase 3.2a — Demo backend runtime.** Add the isolated composition,
-   transactional process-local storage, deterministic Provider, public-HTTP
-   happy path, cross-process determinism proof and external-I/O denial proof.
+1. **Phase 3.2a — Demo backend runtime.** Implemented and closed: isolated
+   composition, transactional process-local storage, deterministic Provider,
+   public-HTTP happy path, cross-process determinism proof, and external-I/O
+   denial proof.
 2. **Phase 3.2b — Web launch and playthrough.** Add the single-command process
    launcher, Demo-only Vite dotenv isolation, Web Demo label, full Web-loop
    regression, the separately bounded startup/proxy/sentinel smoke,
    documentation and manual walkthrough.
 
-Phase 3.2b depends on a completed, verified and independently approved Phase
-3.2a. It must not be implemented or claimed complete in parallel with an
-unapproved Phase 3.2a. Neither subphase alone permits a Phase 3.2 completion
-claim; Phase 3.2 is complete only after both subphases are separately
-implemented, verified and independently reviewed.
+Phase 3.2b depends on the now-closed Phase 3.2a. Neither subphase alone permits
+a Phase 3.2 completion claim; Phase 3.2 is complete only after both subphases
+are separately implemented, verified, documented, and independently reviewed.
 
 ## B. User-observable behavior
 
@@ -211,7 +208,7 @@ unit test.
 
 #### Test-only private generator trace composition and IPC
 
-The trace exists only in the uncommitted local
+The trace exists only in the Phase 3.2a
 `tests/e2e/test_demo_cross_process_replay.py` harness and its
 `tests/e2e/support/demo_replay_child.py` child bootstrap. The bootstrap builds
 the Demo services with trace-capable wrappers around the real generator and
@@ -512,7 +509,7 @@ the gameplay result.
 The Demo is selected by composition root, not by a request field and not by a
 silent fallback:
 
-- The locally implemented Phase 3.2a backend entry point is the dedicated module
+- The implemented Phase 3.2a backend entry point is the dedicated module
   `deviation_protocol.api.demo:app`, built by injecting Demo services into the
   existing `create_app(services=...)` factory.
 - `deviation_protocol.api.main:app` remains the normal MySQL/DeepSeek
@@ -569,12 +566,12 @@ Direct import and tests of the Demo composition must likewise avoid
 
 ### Implementation file boundary
 
-The original allowlist prediction now describes the uncommitted local Phase
-3.2a review object: the Demo composition/provider/store under
+The original allowlist prediction describes the closed Phase 3.2a
+implementation: the Demo composition/provider/store under
 `src/deviation_protocol/`, their focused unit tests,
 `tests/e2e/test_demo_cross_process_replay.py`, and its test-only
-`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. It does not
-claim independent approval. Phase 3.2b remains future work and is expected to
+`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. Phase 3.2b
+remains planned, not-started work and is expected to
 modify `web/vite.config.ts`, `web/package.json`, the minimum
 existing Web presentation/test files, add
 `web/vitest.scenario-validator.config.ts` and
@@ -1091,10 +1088,9 @@ boundaries.
 
 Phase 3.2 may be marked complete only when all of the following are true:
 
-1. Phase 3.2a is implemented, verified and independently approved before Phase
-   3.2b can be claimed complete; 3.2b is then separately implemented, verified
-   and independently approved. An unapproved 3.2a cannot run in parallel with
-   a 3.2b completion claim.
+1. Phase 3.2a is implemented, verified, committed, and closed. Phase 3.2b must
+   be separately implemented, verified, documented, and independently approved
+   before either Phase 3.2b or Phase 3.2 can be claimed complete.
 2. The single launch command works from a clean supported checkout with
    existing dependencies and no database/DeepSeek settings, key or secret.
 3. The dedicated Demo composition is the only way to select Demo Provider and
@@ -1139,10 +1135,12 @@ Phase 3.2 may be marked complete only when all of the following are true:
     successful, and an independent read-only audit returns `APPROVED` with no
     unresolved Critical, Major or Minor findings.
 
-## K. Verification commands for the future implementation
+## K. Verification commands by subphase
 
-Normal implementation and review use no live Provider or MySQL. From the
-repository root:
+Phase 3.2a closed with the Offline suite and exact cross-process replay command
+below as implementation evidence. Phase 3.2b has not started; the smoke and Web
+commands remain its planned verification boundary. Neither subphase uses a live
+Provider or MySQL. From the repository root:
 
 ```powershell
 .\scripts\verify.ps1 -Mode Offline
@@ -1194,6 +1192,11 @@ dependency checks, offline Alembic heads/history and Git checks as currently
 defined by the repository workflow.
 
 ## L. Explicitly deferred
+
+Run Protocol and difficulty/world profiles, NPC Relationship and Temporary
+Residence, and production Provider distribution belong to Phases 3.3, 3.4, and
+4.0 respectively. They were not prerequisites for closing Phase 3.2a and are
+not part of Phase 3.2b.
 
 - Any production or remotely reachable Provider mode.
 - Durable Demo data, reset/admin endpoints, shared sessions, multiple users,

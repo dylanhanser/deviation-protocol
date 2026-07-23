@@ -1,4 +1,131 @@
-# 第一阶段架构边界
+# Deviation Protocol Architecture
+
+This document describes implemented architecture first. Sections named for
+earlier phases preserve the implementation history of those boundaries; they
+do not make later accepted designs current capabilities.
+
+## Current composition roots and Provider boundaries
+
+`NarrativeProvider` is the supplier-neutral application-layer interface. It
+accepts a validated `NarrativeRequest`, returns an
+`UntrustedNarrativeProposal`, and can be closed asynchronously. The interface is
+not a network gateway, Provider selector, or source of narrative authority.
+
+The normal composition root is `deviation_protocol.api.main:app`.
+`build_default_services()` loads the current scenario/content catalog, creates
+the MySQL/SQLAlchemy Unit of Work, and configures
+`DeepSeekNarrativeProvider` when valid server-side DeepSeek settings are
+available. Without valid settings, normal composition has no narrative
+Provider and follows the existing explicit not-configured failure boundary. It
+does not fall back to the deterministic Demo Provider. The current configured
+adapter supports one server-selected DeepSeek model; players do not select a
+Provider/model route.
+
+The Phase 3.2a Demo has an independent composition root,
+`deviation_protocol.api.demo:app`, built by `build_demo_runtime()`. It injects:
+
+- `DeterministicDemoNarrativeProvider`;
+- `DemoProcessStore`, a process-local transactional implementation of the
+  existing persistence ports;
+- deterministic Session/event/job/lease/worker ID sequences, Session seeds,
+  and one shared logical UTC clock; and
+- `CanonicalDemoNarrativeTurnOrchestrator`, which preserves the normal
+  validation, outcome-policy, issuer, StoryDirector, and public API authority
+  chain.
+
+The Demo composition does not create a database engine, read Provider
+credentials, call DeepSeek, or serve as a normal-composition fallback. Demo
+state lasts only for that backend process. Cross-process replay tests exercise
+fresh OS processes and compare the complete public path plus the private
+test-only generator trace.
+
+## Current public action composition
+
+`SessionService` derives `action_affordances` from the current locked/validated
+state, `NarrativeFrame`, `InputContractPolicy`,
+`available_narrative_actions()`, and `ScenarioContinuePolicy`:
+
+- an active decision produces only bound public `CHOOSE` choices;
+- a free-action state produces only currently authorized action types, input
+  contracts, and visible runtime-NPC targets; and
+- an ended state produces no action controls.
+
+Affordances are a public UI projection, not a second capability. Submission is
+still revalidated through the Gateway, decision/continue policies, narrative
+outcome policy, and locked authoritative state. The current public contract is
+documented in [`public_client_contract.md`](public_client_contract.md).
+
+## Current narrative authority
+
+The model narrates confirmed state and proposes bounded outcomes. The engine
+and trusted server policies own objective mechanics, resources, facts, clocks,
+betrayal or death outcomes, relationship state, and permanent canon. A
+versioned style profile controls prose hints only; it cannot change established
+facts or authorize state mutation. Accepted public text with fixed semantic
+meaning comes from trusted server templates.
+
+## Future-design boundaries
+
+These designs are accepted or approved for later phases and are not
+implemented:
+
+- Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles:
+  [`run_protocol.md`](run_protocol.md).
+- Phase 3.4 owns NPC relationship progression and temporary residence:
+  [`npc_relationship_residence.md`](npc_relationship_residence.md).
+- Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider
+  Distribution Gateway**) and explicit Provider/model distribution:
+  [`ADR 0001`](decisions/0001-production-provider-distribution.md).
+
+Current architecture does not implement player-selectable multi-Provider
+routing, commercial quota or billing, a frozen `RUN_PROTOCOL` input,
+difficulty/world profiles, NPC residence mode, or unrestricted daily AI chat.
+The future selected Provider/model channel remains distinct from both the
+application `NarrativeProvider` abstraction and the future Production
+Distribution Gateway.
+
+## Phase 3.1c Web same-tab recovery contract
+
+Phase 3.1c implements only same-tab reload recovery for a previously verified
+Session and for a request that the server already confirmed as pending with
+HTTP 202. Its strict, versioned `sessionStorage` record contains the opaque
+`session_id` and, only for such a confirmed pending request, an optional
+`client_request_id`. It stores no View, affordance, action payload, player
+input, response body, narrative output, or other server-state copy.
+
+There is no client TTL or timestamp. A valid record remains until the tab is
+closed, the player explicitly clears it, or the player creates or switches to
+another Session. A missing record means there is nothing to recover; it is not
+treated as an expired record.
+
+On startup, a record without a pending request restores only by reading the
+complete authoritative `/view`. A record with a confirmed pending request
+keeps actions locked, renders no cached affordance, and queries request status
+with exactly the stored Session and request IDs. `PENDING` /
+`POLL_SAME_REQUEST` polls that same request and honors
+`retry_after_seconds`; `COMMITTED` / `RESPONSE_AVAILABLE` and `STALE` /
+`REFRESH_VIEW` read the complete authoritative `/view`. `FAILED` or
+`OUTCOME_UNKNOWN` with `DO_NOT_RETRY` never causes a POST and may use only a
+controlled authoritative View read under the existing stale and uncertain
+result rules. No recovery path replays an action, substitutes a request ID, or
+treats request status as a complete View.
+
+Recovery fails closed. A network error, malformed response, or unsafe result
+stops automatic recovery, keeps actions locked, and permits only a
+player-triggered retry of a safe GET. A recovery-endpoint 404 invalidates the
+record and returns to the initial Session/scenario UI without action controls.
+Corrupt, unsupported-version, or identity-mismatched records are cleared
+before use. Storage-access or mutation failure remains action-locked. The
+foreground-operation lock, operation generation/token, and `AbortController`
+prevent obsolete recovery work from committing after invalidation, Session
+switch, or unmount.
+
+Transport-uncertain POST recovery, automatic action retry, browser-close or
+browser-restart recovery, cross-tab coordination, `localStorage`, URL state,
+general reconnection, and long-running background recovery are unsupported.
+Authentication, abuse controls, deployment/hosting, production CORS, Provider
+changes, and any public API, backend, ORM, database, schema, or migration
+change remain outside Phase 3.1c and require future work.
 
 ## Phase 3.1a Web public API adapter
 
