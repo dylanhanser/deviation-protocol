@@ -172,6 +172,73 @@ Enforcement:
 - Receipt construction, tamper, cross-binding, and ordinary-string tests
 - Declarative memory-rule authority tests
 
+## AUTH-002: Async call allowances are task-bound and transaction-single-use
+
+Observed failure:
+
+- A Demo Provider allowance stored a mutable authorization object in a
+  `ContextVar`. A child asyncio task inherited that context and retained access
+  to the same allowance.
+- The allowance was marked only after the wrapped Provider returned, so
+  repeated or concurrent use could execute the implementation more than once;
+  failure or cancellation also left the allowance reusable.
+- The originating task could enter authorization again, consume an inner
+  allowance, then reset that inner context and restore the still-unused outer
+  allowance, executing the Provider twice in one narrative transaction.
+- A nested authorization call eagerly evaluated its checkpoint argument before
+  the active-authorization check, so rejected nesting still read and validated
+  a snapshot before failing closed.
+- The authority gate exposed its wrapped Provider through a public property.
+
+Rule:
+
+- A context-local allowance for an external or authoritative call must bind to
+  the originating asyncio task as well as its transaction identities.
+- Inherited context alone never authorizes a child task.
+- The one-call limit applies to the complete authorized narrative transaction,
+  not to each individual authorization-state object. Nested or re-entrant
+  authorization must reject before checkpoint or snapshot computation and
+  validation, authorization-object construction, or any context set/reset.
+  Authorization entry accepts those inputs lazily so Python call-site argument
+  evaluation cannot bypass this ordering. Rejection must leave the outer
+  authorization exactly as it was, whether unused or consumed.
+- Check and consume the allowance synchronously before validation can yield or
+  the wrapped implementation can run. Never restore a consumed allowance after
+  validation failure, implementation failure, or cancellation.
+- Durable resume may finalize already validated work without another Provider
+  call, but it must not mint or restore a call allowance. Provider progress is
+  staged only after the consumed call returned and remains part of the atomic
+  gameplay commit; rollback does not advance it.
+- Repeated and concurrent attempts fail before the wrapped implementation, and
+  an authority gate does not expose that implementation through a public
+  attribute or property.
+
+Enforcement:
+
+- Direct Demo Provider guard owner-task, nested/re-entrant, inherited-task,
+  zero-checkpoint-work ordering, outer-state preservation, concurrent-use,
+  validation-failure,
+  Provider-failure, cancellation, resume/progress, and public-surface tests
+- Production-composed `handle()` regressions use thin test-only delegates over
+  the real sequence lock, injected Demo UoW factory and UoW, Demo session and
+  turn-request repositories, and their durable in-memory lock, request, and
+  snapshot mappings. For same-task same-session, same-task cross-session,
+  post-consumption, inherited child-task, and eight-concurrent-inherited
+  nesting, direct recorder deltas prove zero sequence-lock lookup/acquire-await/
+  acquisition; UoW factory invocation/construction/entry; durable turn-lock
+  method, mapping lookup, acquire-await, and acquisition; committed-request
+  repository lookup and mapping read; latest-snapshot repository retrieval and
+  stored-snapshot mapping read; state/checkpoint work and validation;
+  authorization construction; context set/reset; and Provider execution. Store
+  equality is used only for the separate atomicity assertion.
+- The same regressions prove that rejection preserves an unused allowance for
+  exactly one use, never restores a consumed allowance, leaves outer cleanup
+  intact, and permits a later independent transaction.
+- Static production-object-graph and historical-bypass regressions prove that
+  public interfaces expose neither the guard/capability combination nor a
+  minting alias or wrapped Provider, and that one request remains limited to one
+  underlying Provider call across the complete transaction and idempotent retry.
+
 ## STATE-001: Authoritative state and candidates stay isolated
 
 Observed failure:

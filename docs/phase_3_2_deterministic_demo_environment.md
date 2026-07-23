@@ -2,9 +2,15 @@
 
 ## Frozen status and evidence baseline
 
-Status: **specification frozen for review**. Implementation has not started,
-Phase 3.2 is not complete, and this document records target behavior rather
-than current capability.
+Status: **Phase 3.2a is implemented locally but is not independently approved
+or committed. Its latest authorization-entry ordering and public authority
+encapsulation corrections still require a fresh independent read-only audit.
+Phase 3.2b has not started, and Phase 3.2 as a whole remains incomplete.** This
+document continues to freeze the acceptance boundary for both subphases without
+claiming approval.
+
+The current local review object is based on repository `main` and `origin/main`
+at `269bd0b5e9a70467fa5fa7a10419107c205d4e15`.
 
 The original planning baseline was `main` at
 `44258527c169170ee79540a130ac5e143211c748`. The approved Scheme A repair was
@@ -20,8 +26,8 @@ its derived expectations. The canonical replay below therefore begins with the
 real bound opening choice, moves the first Provider-backed `CUSTOM` to a later
 advertised free-action state, and re-derives the whole action, event, Provider,
 clock and generator stream. This amendment supersedes the earlier opening and
-trace derivation; it is not a parallel specification and does not authorize
-Phase 3.2a or Phase 3.2b implementation.
+trace derivation; it is not a parallel specification and, at the time it was
+recorded, did not itself authorize Phase 3.2a or Phase 3.2b implementation.
 
 Current repository evidence establishes the following boundary:
 
@@ -32,31 +38,36 @@ Current repository evidence establishes the following boundary:
 - `deviation_protocol.api.main:app` currently requires `DATABASE_URL` for its
   MySQL engine. It injects `DeepSeekNarrativeProvider` only when DeepSeek
   settings are valid; otherwise Narrative actions fail through the existing
-  not-configured boundary. There is no runnable Demo mode.
+  not-configured boundary, and it has no Demo fallback. The uncommitted local
+  Phase 3.2a review object provides only the separate
+  `deviation_protocol.api.demo:app`; the Phase 3.2b launcher has not started.
 - `NarrativeProvider` is already a supplier-neutral application Protocol.
   `ScriptedOpeningProvider` and `BlockingScriptedProvider` prove deterministic,
   no-network playthroughs, but they are test-local, contain scenario-copy
-  branches, and are not reusable runtime Providers.
+  branches, and are not reusable runtime Providers. The uncommitted local
+  Phase 3.2a implementation instead adds its own generic Demo Provider.
 - The public ASGI and MySQL playtests already prove that
   `death-certificate-1.1.0` can reach `protocol_broken` and
   `record_challenged`, or fail at `deadline_reached`, through public endpoints.
 - The test-local `MemoryStore`/`MemoryUnitOfWork` proves that the existing
   Repository ports can be backed in memory, but it is a fixture, not supported
-  application persistence or a launchable environment.
+  application persistence or a launchable environment. The local Phase 3.2a
+  review object adds a separate Demo-named process store rather than importing
+  that fixture.
 
 Nothing in this specification relabels those test assets as current runtime
 features.
 
 ## Frozen architecture answers
 
-1. **Reusable Provider:** no supported runtime deterministic/fake Provider
-   exists. The test-local scripted Providers are behavior oracles only; Phase
-   3.2a adds a generic implementation of the existing Protocol without
-   importing test code or branching on scenario copy.
+1. **Reusable Provider:** the uncommitted local Phase 3.2a review object adds a
+   generic implementation of the existing Protocol without importing test
+   code or branching on scenario copy. It is not yet independently approved;
+   the test-local scripted Providers remain behavior oracles only.
 2. **API versus mode selection:** the Demo reuses the complete formal public
    HTTP contract without DTO/schema changes. Mode selection occurs only through
-   a dedicated composition root and launcher, never through public input or a
-   default fallback.
+   a dedicated composition root and, in Phase 3.2b, its planned launcher, never
+   through public input or a default fallback.
 3. **Persistence:** process-lifetime server persistence is required so the
    existing Session/action/recovery loop works. Because MySQL is a network
    service requiring configuration, the Demo uses a new in-process adapter for
@@ -200,7 +211,7 @@ unit test.
 
 #### Test-only private generator trace composition and IPC
 
-The trace exists only in the future
+The trace exists only in the uncommitted local
 `tests/e2e/test_demo_cross_process_replay.py` harness and its
 `tests/e2e/support/demo_replay_child.py` child bootstrap. The bootstrap builds
 the Demo services with trace-capable wrappers around the real generator and
@@ -501,7 +512,7 @@ the gameplay result.
 The Demo is selected by composition root, not by a request field and not by a
 silent fallback:
 
-- The backend entry point is the dedicated future module
+- The locally implemented Phase 3.2a backend entry point is the dedicated module
   `deviation_protocol.api.demo:app`, built by injecting Demo services into the
   existing `create_app(services=...)` factory.
 - `deviation_protocol.api.main:app` remains the normal MySQL/DeepSeek
@@ -556,14 +567,15 @@ Direct import and tests of the Demo composition must likewise avoid
   safe failure boundaries.
 - Preservation tests for the Phase 3.1c same-tab and no-replay contract.
 
-### Planned implementation file prediction
+### Implementation file boundary
 
-This is a future allowlist prediction, not evidence that files exist or were
-changed in this planning repair. Phase 3.2a is expected to add the Demo
-composition/provider/store under `src/deviation_protocol/`, their focused unit
-tests, `tests/e2e/test_demo_cross_process_replay.py`, and its test-only
-`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. Phase 3.2b is
-expected to modify `web/vite.config.ts`, `web/package.json`, the minimum
+The original allowlist prediction now describes the uncommitted local Phase
+3.2a review object: the Demo composition/provider/store under
+`src/deviation_protocol/`, their focused unit tests,
+`tests/e2e/test_demo_cross_process_replay.py`, and its test-only
+`tests/e2e/support/demo_replay_child.py` IPC/bootstrap support. It does not
+claim independent approval. Phase 3.2b remains future work and is expected to
+modify `web/vite.config.ts`, `web/package.json`, the minimum
 existing Web presentation/test files, add
 `web/vitest.scenario-validator.config.ts` and
 `web/tools/validate-public-scenario-catalog.validation.ts`, and add
@@ -1199,10 +1211,11 @@ defined by the repository workflow.
 
 ## M. Guardrail impact
 
-Guardrail impact: **None**. This specification repair does not establish or
-change a reusable engineering or safety rule. Future implementation is
-governed by existing ENV-001, ENV-002, DB-001, AUTH-001, STATE-001, API-001,
-SCENE-001,
-MODEL-001, MODEL-002 and PLAY-001. Any confirmed implementation defect that
-creates or changes a reusable rule must update the matching guardrail and add a
-regression in that implementation change.
+Guardrail impact: **AUTH-002 updated.** The confirmed Phase 3.2a follow-up
+defects add enforcement evidence for rejection at the production entry before
+lock/snapshot work and for non-exposure of the guard/capability combination;
+the required AUTH-002 invariant is unchanged. Future implementation is governed
+by existing ENV-001, ENV-002, DB-001, AUTH-001, AUTH-002, STATE-001, API-001,
+SCENE-001, MODEL-001, MODEL-002 and PLAY-001. Any confirmed implementation
+defect that creates or changes a reusable rule must update the matching
+guardrail and add a regression in that implementation change.

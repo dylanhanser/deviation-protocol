@@ -6,12 +6,13 @@ and intentional deferrals. Detailed design remains in its owning documents.
 ## Current Baseline
 
 - Branch: `main`
-- Repository HEAD and Phase 3.2 planning baseline:
+- Repository HEAD: `269bd0b5e9a70467fa5fa7a10419107c205d4e15`
+- Original Phase 3.2 planning baseline:
   `44258527c169170ee79540a130ac5e143211c748`
 - Phase 3.1c implementation baseline: `4da6791cf43070b15b0c619129ffb3c0b59e22b2`
 - Latest completed phase: Phase 3.1c
-- Repository baseline before this planning edit: clean, with `origin/main` at
-  Repository HEAD
+- `origin/main` matches Repository HEAD; Phase 3.2a remains an uncommitted local
+  review object
 
 ## Phase Status
 
@@ -28,7 +29,7 @@ and intentional deferrals. Detailed design remains in its owning documents.
 | Phase 3.1a | Complete; independently audited and pushed (`43bf83dcaccf9e7400965f863f545ee1043beacf`) |
 | Phase 3.1b | Complete; third independent read-only audit `APPROVED`; the first audit's 3 findings and the second audit's 3 Major and 1 Minor findings are closed; committed and pushed (`b4352230ef0c9bc91a5bf78e69e88e0feab4908c`) |
 | Phase 3.1c | Complete; same-tab recovery boundary clarified (`a14a76d359d4aa777ed16ff239c2157c912e47dc`) and isolated-storage boundary covered (`4db377b4cdb195e2d05fbf9a67be1e0600cfba15`) |
-| Phase 3.2 | Specification frozen for review; implementation not started |
+| Phase 3.2 | Phase 3.2a implemented locally but not approved or committed; fresh independent read-only audit required; Phase 3.2b not started; phase incomplete |
 | Later phases | Not started |
 
 ## Phase 2.4b
@@ -292,8 +293,13 @@ Phase 3.1c is complete against the frozen boundary above:
 
 ## Phase 3.2 Deterministic Demo Environment
 
-**Status: specification frozen for review. Implementation has not started, the
-phase is not complete, and no implementation audit has been performed.**
+**Status: Phase 3.2a is implemented locally but is not approved or committed.
+The second independent audit returned `CHANGES_REQUIRED`; its earlier findings
+and the subsequent Demo Provider authorization findings, including the
+nested/re-entrant follow-up, have been corrected locally. This complete
+follow-up, including the latest authorization-entry ordering and public
+authority encapsulation corrections, still requires a fresh independent
+read-only audit. Phase 3.2b has not started, and Phase 3.2 remains incomplete.**
 
 Phase 3.2 freezes a local-only, explicitly selected Demo composition that lets
 the existing Web action loop complete one meaningful `death_certificate` route
