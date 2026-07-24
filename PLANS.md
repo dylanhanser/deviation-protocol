@@ -16,9 +16,11 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Repository HEAD and `origin/main`:
-  `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
+- Repository HEAD and local `origin/main`:
+  `65f4593be411e8d4c577bfcdade3f3a5f06c71bb`
 - Ahead/behind: `0/0`
+- Phase 3.2b historical implementation baseline:
+  `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
 - Latest completed subphase: **Phase 3.2b**
 - Phase 3.2a authoritative commit:
   `f1fd5e2cd07d342e852430e9352f64b84014c88e`
@@ -133,6 +135,25 @@ residence systems, production commercial routing, quotas, or billing.
 Phase 3.2b and Phase 3.2 are complete. This deterministic local Demo acceptance
 does not establish production readiness or implement later final-product work.
 
+## Cross-phase final narrative experience design
+
+Status: **Approved and frozen canonical cross-phase product specification —
+not implemented; third independent read-only review passed.**
+
+The canonical product-level authority for the reading-first final experience,
+persistent player character, NPC importance and golden long-term memory,
+multi-genre and cross-scenario continuity, generalized narrative conflict, and
+their model/server authority boundary is
+[Final Narrative Experience and Long-Term Systems](docs/final_narrative_experience.md).
+It preserves the deterministic Demo as a validation fixture and records a
+bounded future implementation sequence without assigning implementation status
+to any deferred system.
+
+The structured player-character contract is the next planned specification
+task and may begin only after this approved closeout has been committed and
+pushed. This closeout does not begin that contract or any runtime implementation
+and does not reopen Phase 3.2b.
+
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
 Status: **Approved product design — not implemented.**
@@ -189,9 +210,9 @@ The canonical decision is
   regional availability policy, and key-pool policy.
 - Memory rebuild and compaction.
 - Scenario replay and `scenario_run_id`.
-- Cross-scenario NPC identity.
+- Exact cross-scenario NPC identity and compatibility schema.
 - `DeviationEvaluator`.
-- Combat.
+- Generalized conflict/combat schema, resolution rules, and implementation.
 - Worker, queue, or distributed orchestration.
 
 ## Stable implemented authority decisions
@@ -220,6 +241,8 @@ manually.
 ## Document ownership
 
 - Project status and roadmap: `PLANS.md`.
+- Final player experience and cross-phase long-term system direction:
+  [`docs/final_narrative_experience.md`](docs/final_narrative_experience.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:
