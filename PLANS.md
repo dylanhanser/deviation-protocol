@@ -16,9 +16,9 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Local `origin/main` and parent of this controlled closeout commit:
-  `78b24923a8ed0417875f2d1d8e0cbb2834eb8a83`
-- Ahead/behind after this controlled local closeout: `1/0`
+- Local `origin/main` and `HEAD` at the start of this controlled planning task:
+  `f988a95baa3ae1b69183c872a5b98cfd96abd88e`
+- Ahead/behind at the start of this controlled planning task: `0/0`
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -178,6 +178,18 @@ implementation behavior, made no additional product decision, and did not
 push. Approval and freeze do not authorize runtime work. Implementation
 requires a separately approved downstream implementation plan and task.
 
+The
+[structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md)
+translates that approved and frozen product contract into proposed
+repository-specific implementation work. The plan is **approved, frozen, and
+unimplemented** following the completed independent review and correction
+process. The plan-level independent-review gate is closed; approval and freeze
+do not authorize runtime work. The safest next possible stage is a separately
+scoped and explicitly authorized implementation task under the frozen plan and
+its phase-specific prerequisites and stop conditions. Phase 3.2b remains
+closed, and both the final narrative experience and structured player-character
+product specifications remain approved, frozen, and unimplemented.
+
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
 Status: **Approved product design — not implemented.**
@@ -267,6 +279,9 @@ manually.
 - Project status and roadmap: `PLANS.md`.
 - Final player experience and cross-phase long-term system direction:
   [`docs/final_narrative_experience.md`](docs/final_narrative_experience.md).
+- Approved and frozen, unimplemented downstream structured player-character
+  implementation plan:
+  [`docs/structured_player_character_implementation_plan.md`](docs/structured_player_character_implementation_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:
