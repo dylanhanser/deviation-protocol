@@ -16,9 +16,10 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Repository HEAD and local `origin/main`:
-  `65f4593be411e8d4c577bfcdade3f3a5f06c71bb`
-- Ahead/behind: `0/0`
+- Local `origin/main` and parent of this controlled closeout commit:
+  `78b24923a8ed0417875f2d1d8e0cbb2834eb8a83`
+- Ahead/behind after this controlled local closeout: `1/0`
+- Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
 - Latest completed subphase: **Phase 3.2b**
@@ -149,10 +150,33 @@ It preserves the deterministic Demo as a validation fixture and records a
 bounded future implementation sequence without assigning implementation status
 to any deferred system.
 
-The structured player-character contract is the next planned specification
-task and may begin only after this approved closeout has been committed and
-pushed. This closeout does not begin that contract or any runtime implementation
-and does not reopen Phase 3.2b.
+The approved final narrative experience specification remains frozen and not
+implemented. Phase 3.2b remains closed.
+
+The
+[structured player-character contract](docs/structured_player_character_contract.md)
+is an **approved and frozen structured player-character product specification —
+not implemented.** Its first independent read-only review found one HIGH issue
+concerning stable same-story-line identity continuity, one MEDIUM issue
+concerning permanent `player_character_id` non-reuse, and one MEDIUM issue
+concerning `controller_binding` lifecycle presence. The first controlled
+correction addressed those three issues locally. The first independent
+re-review confirmed that all three original findings were closed but found one
+new MEDIUM omission concerning silent applicable-version switching at scenario
+and Run-authorized later-world boundaries. The second controlled correction
+addressed that omission locally without selecting pinned, floating,
+checkpointed, or other revision-following behavior.
+
+The second fresh independent read-only review confirmed that all four
+historical findings were closed, found no new HIGH, MEDIUM, or LOW issue
+requiring correction, and returned
+`APPROVED_STRUCTURED_PLAYER_CHARACTER_CONTRACT`. This separate controlled
+documentation closeout then recorded the earned approval and frozen status and
+created the local documentation commit. It was not an independent review,
+changed no runtime, database, migration, Provider, public-client, API, or other
+implementation behavior, made no additional product decision, and did not
+push. Approval and freeze do not authorize runtime work. Implementation
+requires a separately approved downstream implementation plan and task.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
