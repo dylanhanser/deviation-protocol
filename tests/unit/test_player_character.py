@@ -27,6 +27,7 @@ from deviation_protocol.domain.player_character import (
     PlayerCharacterId,
     PlayerCharacterLifecycle,
     PlayerCharacterMutationKind,
+    PlayerCharacterOperationId,
     PlayerCharacterRevision,
     PlayerCharacterSubjectRef,
     PlayerDeclaredText,
@@ -258,6 +259,50 @@ def test_identity_domains_remain_distinct_even_for_equal_storage_text() -> None:
     assert character_id != controller_binding
     assert character_id != source
     assert controller_binding != source
+
+
+@pytest.mark.parametrize(
+    ("reference_type", "prefix"),
+    (
+        pytest.param(PlayerCharacterId, "Pc", id="player-character-id"),
+        pytest.param(ControllerBindingRef, "Binding", id="controller-binding"),
+        pytest.param(
+            PlayerCharacterOperationId,
+            "Operation",
+            id="player-character-operation-id",
+        ),
+        pytest.param(AuthoritySourceRef, "Source", id="authority-source"),
+    ),
+)
+def test_opaque_identifier_types_validate_and_preserve_exact_input(
+    reference_type: type[
+        PlayerCharacterId
+        | ControllerBindingRef
+        | PlayerCharacterOperationId
+        | AuthoritySourceRef
+    ],
+    prefix: str,
+) -> None:
+    with pytest.raises(ValidationError, match="bounded opaque identifier"):
+        reference_type(value=f"{prefix}.MiXeD-\u212a")
+
+    exact_identifier = f"{prefix}.MiXeD-K"
+    accepted = reference_type(value=exact_identifier)
+    assert accepted.value == exact_identifier
+    assert accepted.value.encode("utf-8") == exact_identifier.encode("utf-8")
+
+    maximum_identifier = f"K{'a' * 126}Z"
+    assert reference_type(value=maximum_identifier).value == maximum_identifier
+    for invalid in (
+        "",
+        f"K{'a' * 127}Z",
+        f"{prefix} whitespace",
+        f"{prefix}.control\x00",
+    ):
+        with pytest.raises(ValidationError):
+            reference_type(value=invalid)
+    with pytest.raises(ValidationError):
+        reference_type(value=1)
 
 
 def test_complete_record_requires_binding_empty_development_and_matching_provenance() -> None:

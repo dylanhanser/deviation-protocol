@@ -502,7 +502,14 @@ def validate_stored_creation_success_receipt(
     value: StoredCreationSuccessReceipt | Mapping[str, Any] | str | bytes,
 ) -> StoredCreationSuccessReceipt:
     return StoredCreationSuccessReceipt.model_validate_json(
-        _stored_receipt_json_bytes(value)
+        _stored_receipt_json_bytes(
+            value,
+            opaque_reference_fields=(
+                (("key", "controller_binding", "value"), ControllerBindingRef),
+                (("key", "operation_id", "value"), PlayerCharacterOperationId),
+                (("result", "player_character_id", "value"), PlayerCharacterId),
+            ),
+        )
     )
 
 
@@ -510,17 +517,45 @@ def validate_stored_mutation_success_receipt(
     value: StoredMutationSuccessReceipt | Mapping[str, Any] | str | bytes,
 ) -> StoredMutationSuccessReceipt:
     return StoredMutationSuccessReceipt.model_validate_json(
-        _stored_receipt_json_bytes(value)
+        _stored_receipt_json_bytes(
+            value,
+            opaque_reference_fields=(
+                (("key", "player_character_id", "value"), PlayerCharacterId),
+                (("key", "operation_id", "value"), PlayerCharacterOperationId),
+                (("result", "player_character_id", "value"), PlayerCharacterId),
+            ),
+        )
     )
+
+
+_OpaqueReceiptReferenceType: TypeAlias = type[
+    ControllerBindingRef | PlayerCharacterId | PlayerCharacterOperationId
+]
+_OpaqueReceiptReferenceField: TypeAlias = tuple[
+    tuple[str, ...],
+    _OpaqueReceiptReferenceType,
+]
+_MISSING_RECEIPT_VALUE = object()
 
 
 def _stored_receipt_json_bytes(
     value: BaseModel | Mapping[str, Any] | str | bytes,
+    *,
+    opaque_reference_fields: tuple[_OpaqueReceiptReferenceField, ...],
 ) -> bytes:
     if isinstance(value, BaseModel):
+        _validate_original_receipt_opaque_references(
+            value,
+            opaque_reference_fields=opaque_reference_fields,
+        )
         encoded = canonical_character_operation_bytes(value)
     elif isinstance(value, Mapping):
-        encoded = canonical_character_operation_bytes(value)
+        snapshot = _snapshot_receipt_mapping(value)
+        _validate_original_receipt_opaque_references(
+            snapshot,
+            opaque_reference_fields=opaque_reference_fields,
+        )
+        encoded = canonical_character_operation_bytes(snapshot)
     elif isinstance(value, (str, bytes)):
         try:
             decoded = json.loads(
@@ -533,12 +568,60 @@ def _stored_receipt_json_bytes(
             raise ValueError("stored receipt must be valid strict JSON") from None
         if not isinstance(decoded, Mapping):
             raise TypeError("stored receipt JSON must be an object")
+        _validate_original_receipt_opaque_references(
+            decoded,
+            opaque_reference_fields=opaque_reference_fields,
+        )
         encoded = canonical_character_operation_bytes(decoded)
     else:
         raise TypeError("stored receipt must be a strict JSON object or JSON bytes")
     if len(encoded) > MAX_STORED_CHARACTER_RECEIPT_CANONICAL_BYTES:
         raise ValueError("stored character receipt exceeds the Phase 1 byte bound")
     return encoded
+
+
+def _snapshot_receipt_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
+    """Materialize untrusted mappings once before validation and canonicalization."""
+
+    snapshot: dict[str, Any] = {}
+    for key, nested in value.items():
+        if key in snapshot:
+            raise ValueError("stored receipt mapping contains a duplicate object key")
+        snapshot[key] = _snapshot_receipt_value(nested)
+    return snapshot
+
+
+def _snapshot_receipt_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return _snapshot_receipt_mapping(value)
+    if isinstance(value, list):
+        return [_snapshot_receipt_value(item) for item in value]
+    if isinstance(value, tuple):
+        return tuple(_snapshot_receipt_value(item) for item in value)
+    return value
+
+
+def _validate_original_receipt_opaque_references(
+    value: BaseModel | Mapping[str, Any],
+    *,
+    opaque_reference_fields: tuple[_OpaqueReceiptReferenceField, ...],
+) -> None:
+    for path, reference_type in opaque_reference_fields:
+        current: Any = value
+        for field_name in path:
+            if isinstance(current, BaseModel):
+                current = current.__dict__.get(
+                    field_name,
+                    _MISSING_RECEIPT_VALUE,
+                )
+            elif isinstance(current, Mapping):
+                current = current.get(field_name, _MISSING_RECEIPT_VALUE)
+            else:
+                current = _MISSING_RECEIPT_VALUE
+            if current is _MISSING_RECEIPT_VALUE:
+                break
+        if current is not _MISSING_RECEIPT_VALUE:
+            reference_type(value=current)
 
 
 def _strict_json_object(pairs: list[tuple[str, Any]]) -> dict[str, Any]:

@@ -218,10 +218,9 @@ class _OpaqueReference(_StrictFrozenModel):
     @field_validator("value")
     @classmethod
     def validate_value(cls, value: str) -> str:
-        normalized = unicodedata.normalize("NFC", value)
-        if not _OPAQUE_REF.fullmatch(normalized):
+        if not _OPAQUE_REF.fullmatch(value):
             raise ValueError("reference must be a bounded opaque identifier")
-        return normalized
+        return value
 
     def __str__(self) -> str:
         return self.value

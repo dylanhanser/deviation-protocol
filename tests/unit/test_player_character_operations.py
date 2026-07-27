@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from collections.abc import Mapping
+from copy import deepcopy
+import json
+
 from pydantic import ValidationError
 import pytest
 
@@ -445,6 +449,126 @@ def mutation_result(
         resulting_revision=PlayerCharacterRevision(value=resulting_revision),
         resulting_lifecycle=lifecycle,
     )
+
+
+def stored_creation_receipt_payload() -> dict[str, object]:
+    receipt = build_creation_success_receipt(
+        key=CreationReceiptKey(
+            controller_binding=ControllerBindingRef(
+                value="Binding.MiXeD-K",
+            ),
+            operation_namespace=CharacterOperationNamespace.CREATE_V1,
+            operation_id=operation_id("Operation.MiXeD-K"),
+        ),
+        fingerprint=creation_fingerprint(creation_command())[1],
+        result=CreationSuccessResult(
+            result_schema_version=CREATION_RESULT_SCHEMA_VERSION,
+            player_character_id=character_id("Pc.MiXeD-K"),
+            contract_version=PlayerCharacterContractVersion.V1,
+            resulting_revision=PlayerCharacterRevision(value=1),
+            resulting_lifecycle=PlayerCharacterLifecycle.ACTIVE,
+        ),
+    )
+    return receipt.model_dump(mode="json")
+
+
+def stored_mutation_receipt_payload() -> dict[str, object]:
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=character_id("Pc.MiXeD-K"),
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id("Operation.MiXeD-K"),
+        ),
+        fingerprint=mutation_fingerprint(
+            mutation_command(PlayerCharacterMutationKind.RETIRE),
+            operation_id=operation_id(),
+        )[1],
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=character_id("Pc.MiXeD-K"),
+            contract_version=PlayerCharacterContractVersion.V1,
+            command_kind=PlayerCharacterMutationKind.RETIRE,
+            command_result=MutationCommandResult.RETIRED,
+            resulting_revision=PlayerCharacterRevision(value=8),
+            resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+        ),
+    )
+    return receipt.model_dump(mode="json")
+
+
+def nested_value(value, path: tuple[str, ...]):
+    current = value
+    for field_name in path:
+        if isinstance(current, dict):
+            current = current[field_name]
+        else:
+            current = getattr(current, field_name)
+    return current
+
+
+def replace_nested_value(
+    value: dict[str, object],
+    path: tuple[str, ...],
+    replacement: str,
+) -> None:
+    current = value
+    for field_name in path[:-1]:
+        current = current[field_name]  # type: ignore[assignment,index]
+    current[path[-1]] = replacement  # type: ignore[index]
+
+
+class SplitViewReceiptMapping(Mapping[str, object]):
+    """Exposes one view through ``get`` and another through ``items``."""
+
+    def __init__(
+        self,
+        *,
+        prevalidation_view: dict[str, object],
+        canonicalization_view: dict[str, object],
+    ) -> None:
+        self._prevalidation_view = prevalidation_view
+        self._canonicalization_view = canonicalization_view
+
+    def __getitem__(self, key: str) -> object:
+        return self._canonicalization_view[key]
+
+    def __iter__(self):
+        return iter(self._canonicalization_view)
+
+    def __len__(self) -> int:
+        return len(self._canonicalization_view)
+
+    def get(self, key: str, default: object = None) -> object:
+        return self._prevalidation_view.get(key, default)
+
+    def items(self):
+        return self._canonicalization_view.items()
+
+
+class SingleObservationReceiptMapping(Mapping[str, object]):
+    """Rejects reads other than one top-level ``items`` materialization."""
+
+    def __init__(self, value: dict[str, object]) -> None:
+        self._value = value
+        self.items_calls = 0
+
+    def __getitem__(self, key: str) -> object:
+        raise AssertionError("receipt reconstruction must not read __getitem__")
+
+    def __iter__(self):
+        raise AssertionError("receipt reconstruction must not iterate the source mapping")
+
+    def __len__(self) -> int:
+        raise AssertionError("receipt reconstruction must not measure the source mapping")
+
+    def get(self, key: str, default: object = None) -> object:
+        raise AssertionError("receipt reconstruction must not read get")
+
+    def items(self):
+        self.items_calls += 1
+        if self.items_calls > 1:
+            raise AssertionError("receipt reconstruction must materialize once")
+        return self._value.items()
 
 
 def test_canonical_serializer_defines_all_supported_scalar_sequence_and_object_behavior() -> None:
@@ -1034,6 +1158,247 @@ def test_stored_success_receipts_round_trip_strict_json_and_reject_unknown_field
         validate_stored_creation_success_receipt(
             serialized.replace('"command_kind":"CREATE"', '"unexpected":1.5', 1)
         )
+    for invalid_constant in ("NaN", "Infinity", "-Infinity"):
+        with pytest.raises(ValueError, match="constant"):
+            validate_stored_creation_success_receipt(
+                serialized.replace(
+                    '"command_kind":"CREATE"',
+                    f'"unexpected":{invalid_constant}',
+                    1,
+                )
+            )
+    with pytest.raises(ValueError, match="valid strict JSON"):
+        validate_stored_creation_success_receipt(
+            serialized.encode("utf-8") + b"\xff"
+        )
+    with pytest.raises(ValueError, match="byte bound"):
+        validate_stored_creation_success_receipt(
+            b'{"padding":"' + (b"x" * 65_536) + b'"}'
+        )
+    missing_key = dict(creation_payload)
+    missing_key.pop("key")
+    with pytest.raises(ValidationError):
+        validate_stored_creation_success_receipt(missing_key)
+    with pytest.raises(ValidationError, match="bindings are inconsistent"):
+        validate_stored_creation_success_receipt(
+            {**creation_payload, "command_kind": "RETIRE"}
+        )
+
+
+@pytest.mark.parametrize(
+    "entry_point",
+    ("mapping", "strict-json-bytes"),
+    ids=("mapping", "strict-json-bytes"),
+)
+@pytest.mark.parametrize(
+    ("receipt_payload", "validator", "identifier_path"),
+    (
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("key", "controller_binding", "value"),
+            id="creation-key-controller-binding-controller-binding-ref",
+        ),
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("key", "operation_id", "value"),
+            id="creation-key-operation-id-player-character-operation-id",
+        ),
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("result", "player_character_id", "value"),
+            id="creation-result-player-character-id-player-character-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("key", "player_character_id", "value"),
+            id="mutation-key-player-character-id-player-character-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("key", "operation_id", "value"),
+            id="mutation-key-operation-id-player-character-operation-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("result", "player_character_id", "value"),
+            id="mutation-result-player-character-id-player-character-id",
+        ),
+    ),
+)
+def test_stored_receipt_identifiers_validate_original_input_before_normalization(
+    receipt_payload,
+    validator,
+    identifier_path: tuple[str, ...],
+    entry_point: str,
+) -> None:
+    invalid_payload = receipt_payload()
+    exact_ascii = nested_value(invalid_payload, identifier_path)
+    assert isinstance(exact_ascii, str)
+    assert exact_ascii.endswith("K")
+    invalid_original = f"{exact_ascii[:-1]}\u212a"
+    replace_nested_value(
+        invalid_payload,
+        identifier_path,
+        invalid_original,
+    )
+    invalid_input = (
+        invalid_payload
+        if entry_point == "mapping"
+        else json.dumps(
+            invalid_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    if isinstance(invalid_input, bytes):
+        assert invalid_original.encode("utf-8") in invalid_input
+        assert invalid_original.encode("utf-8") != exact_ascii.encode("utf-8")
+    else:
+        assert nested_value(invalid_input, identifier_path) == invalid_original
+
+    with pytest.raises(ValidationError, match="bounded opaque identifier"):
+        validator(invalid_input)
+
+    accepted_payload = receipt_payload()
+    accepted_original = nested_value(accepted_payload, identifier_path)
+    accepted_input = (
+        accepted_payload
+        if entry_point == "mapping"
+        else json.dumps(
+            accepted_payload,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    )
+    reconstructed = validator(accepted_input)
+    exposed = nested_value(reconstructed, identifier_path)
+    assert exposed == accepted_original
+    assert exposed.encode("utf-8") == accepted_original.encode("utf-8")
+
+
+@pytest.mark.parametrize(
+    ("receipt_payload", "validator", "identifier_path"),
+    (
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("key", "controller_binding", "value"),
+            id="creation-controller-binding",
+        ),
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("key", "operation_id", "value"),
+            id="creation-operation-id",
+        ),
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("result", "player_character_id", "value"),
+            id="creation-result-player-character-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("key", "player_character_id", "value"),
+            id="mutation-key-player-character-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("key", "operation_id", "value"),
+            id="mutation-operation-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("result", "player_character_id", "value"),
+            id="mutation-result-player-character-id",
+        ),
+    ),
+)
+def test_stored_receipt_mapping_snapshot_rejects_split_view_identifiers(
+    receipt_payload,
+    validator,
+    identifier_path: tuple[str, ...],
+) -> None:
+    prevalidation_view = receipt_payload()
+    canonicalization_view = deepcopy(prevalidation_view)
+    exact_ascii = nested_value(prevalidation_view, identifier_path)
+    assert isinstance(exact_ascii, str)
+    invalid_original = f"{exact_ascii[:-1]}\u212a"
+    replace_nested_value(
+        canonicalization_view,
+        identifier_path,
+        invalid_original,
+    )
+    split_view = SplitViewReceiptMapping(
+        prevalidation_view=prevalidation_view,
+        canonicalization_view=canonicalization_view,
+    )
+
+    with pytest.raises(ValidationError, match="bounded opaque identifier"):
+        validator(split_view)
+
+
+def test_stored_receipt_mapping_snapshot_recursively_materializes_nested_mappings() -> None:
+    prevalidation_view = stored_creation_receipt_payload()
+    canonicalization_view = deepcopy(prevalidation_view)
+    replace_nested_value(
+        canonicalization_view,
+        ("key", "operation_id", "value"),
+        "Operation.MiXeD-\u212a",
+    )
+    nested_split_view = SplitViewReceiptMapping(
+        prevalidation_view=prevalidation_view["key"],  # type: ignore[arg-type]
+        canonicalization_view=canonicalization_view["key"],  # type: ignore[arg-type]
+    )
+    payload = dict(prevalidation_view)
+    payload["key"] = nested_split_view
+
+    with pytest.raises(ValidationError, match="bounded opaque identifier"):
+        validate_stored_creation_success_receipt(payload)
+
+
+@pytest.mark.parametrize(
+    ("receipt_payload", "validator", "identifier_path"),
+    (
+        pytest.param(
+            stored_creation_receipt_payload,
+            validate_stored_creation_success_receipt,
+            ("key", "operation_id", "value"),
+            id="creation-operation-id",
+        ),
+        pytest.param(
+            stored_mutation_receipt_payload,
+            validate_stored_mutation_success_receipt,
+            ("key", "player_character_id", "value"),
+            id="mutation-player-character-id",
+        ),
+    ),
+)
+def test_stored_receipt_mapping_is_materialized_once_and_preserves_ascii_values(
+    receipt_payload,
+    validator,
+    identifier_path: tuple[str, ...],
+) -> None:
+    source = SingleObservationReceiptMapping(receipt_payload())
+
+    reconstructed = validator(source)
+
+    exposed = nested_value(reconstructed, identifier_path)
+    assert isinstance(exposed, str)
+    assert exposed.endswith("MiXeD-K")
+    assert exposed.encode("utf-8") == exposed.encode("ascii")
+    assert source.items_calls == 1
 
 
 def test_unique_race_recovery_requires_rollback_and_never_repeats_creation() -> None:
