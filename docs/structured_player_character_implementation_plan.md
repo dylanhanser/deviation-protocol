@@ -2,8 +2,11 @@
 
 ## 1. Status
 
-Status: **Approved and frozen downstream implementation plan — unimplemented,
-unstaged, uncommitted, and unpushed.**
+Status: **Approved and frozen downstream implementation plan — Phase 1 has
+passed fresh independent read-only acceptance for the exact nine-path
+candidate; Phases 2–7 remain unimplemented and blocked pending separate
+explicit authorization. Phase 1 acceptance does not itself authorize a local
+commit or publication; push remains user-controlled.**
 
 The pre-correction draft received one fresh independent read-only review. That
 review identified five accepted findings, `SPCIP-001` through `SPCIP-005`; the
@@ -19,7 +22,9 @@ this frozen plan requires a new controlled amendment and review process.
 The
 [structured player-character contract](structured_player_character_contract.md)
 and [final narrative experience](final_narrative_experience.md) remain approved
-and frozen product specifications and remain unimplemented. Phase 3.2b remains
+and frozen product specifications. Only the pure Phase 1 domain and
+character-operation protocol foundation is implemented locally; the complete
+product specifications remain only partially implemented. Phase 3.2b remains
 closed.
 
 ## 2. Purpose
@@ -82,12 +87,15 @@ No `T` proposal in this plan changes a product rule. Any proposal found to
 have material product consequences becomes `U` and is a stop condition rather
 than an implementation default.
 
-## 4. Non-implementation statement
+## 4. Implementation status boundary
 
-This approved and frozen document remains planning material only. Its approval
-and freeze change no runtime,
-database, migration, schema, domain model, repository, service, API, Provider,
-client, frontend, test, or production behavior. It does not reopen Phase 3.2b.
+This approved and frozen document remains the substantive design authority.
+The separately authorized Phase 1 implementation adds only pure domain models,
+independent policies, deterministic character-operation serialization and
+receipt semantics, and offline unit/golden-vector tests. It changes no
+database, migration, schema, repository, Unit of Work, production service,
+API, Provider, client, frontend, Demo, Session request/action, Run/story-line,
+or production behavior. It does not reopen Phase 3.2b.
 
 File names, table names, data types, endpoint shapes, and phase boundaries below
 are proposed implementation inventory. They are not authority to edit those
@@ -669,6 +677,15 @@ token with equality and successor checks (`A`). The domain API must still use a
 distinct `PlayerCharacterRevision` type, not an integer shared with Session
 state.
 
+The Phase 1 implementation uses positive canonical signed 64-bit revisions,
+from `1` through `9223372036854775807`. The maximum remains readable as an
+existing canonical revision but cannot produce a successor. A transition that
+would require `9223372036854775808` rejects before command fingerprint bytes,
+receipt lookup, successful policy/result construction, receipt validation, or
+stored-success disclosure. A valid `9223372036854775806` to
+`9223372036854775807` transition and its exact stored-result replay remain
+supported.
+
 Cross-Run concurrency remains deferred. The first slice must nevertheless be
 safe for concurrent commands against the one canonical record: only one
 matching expected revision may commit; all losers refresh from the last
@@ -689,6 +706,12 @@ Every create/read-modify-write path must:
 - preserve unknown canonical fields losslessly only under a separately
   supported read-only compatibility rule; and
 - prevent older writers from dropping fields.
+
+Phase 1 defensive revalidation inspects the complete actual state of every
+already-instantiated strict Pydantic model recursively, including instance
+fields and Pydantic extra, private, and fields-set bookkeeping. It rejects
+unknown or malformed source state before any model dump and never establishes
+validity by dumping and reconstructing a possibly lossy copy.
 
 The first version should fail closed on unknown stored fields rather than claim
 additive compatibility not yet implemented. No ORM JSON dictionary is mutated
@@ -1078,16 +1101,18 @@ Mutation transaction:
 
 1. lock the current character and authorize its exact stored controller
    binding;
-2. look up the exact
+2. validate the complete typed operation and reject an unrepresentable revision
+   successor;
+3. look up the exact
    `(player_character_id, player-character.mutate/v1, operation_id)` scope and
    handle validated exact replay/conflict before expected-revision evaluation;
-3. verify context/reference/expected revision for a new operation;
-4. validate complete candidate;
-5. compare-and-swap current record;
-6. insert revision/provenance and the accepted successful mutation receipt
+4. verify context/reference/expected revision for a new operation;
+5. validate complete candidate;
+6. compare-and-swap current record;
+7. insert revision/provenance and the accepted successful mutation receipt
    with its exact fingerprint and privacy-safe result envelope;
-7. apply any in-scope continuity effect owned by the same transaction; and
-8. commit once.
+8. apply any in-scope continuity effect owned by the same transaction; and
+9. commit once.
 
 Any failure rolls back. Repository methods never commit. The `UnitOfWork` port
 must expose a character repository and operation repository in both MySQL and
@@ -1202,11 +1227,17 @@ contextual state. Rejections have no first-slice character receipt.
 
 ## 24. Implementation phases
 
-Every phase below is proposed, incomplete, unauthorized for implementation by
-this plan, and independently reviewable. A phase may begin only after the plan
-gate in section 31 and a separate scoped implementation task.
+Phase 1 was separately authorized and has passed fresh independent read-only
+acceptance for the exact nine-path candidate. Every later phase remains
+proposed, incomplete, and unauthorized for implementation. A later phase may
+begin only after its prerequisites, the gate in section 31, and a separate
+scoped implementation task.
 
 ### Phase 1 — Domain envelope, identity types, and policies
+
+Status: **Implemented locally and independently accepted for the exact
+nine-path candidate. This acceptance does not authorize Phase 2 or a public
+activation.**
 
 Scope:
 
@@ -1477,6 +1508,7 @@ changes a reusable rule.
 | --- | --- | --- |
 | Canonical creation | Domain + persistence/integration | Complete v1 record, active lifecycle, binding, initial revision, provenance commit atomically |
 | Every supported optional declaration slot | Domain unit | Parameterized coverage for name/code name, preferred address, adult identity/gender expression, broad adult age presentation, broad appearance direction, bounded distinguishing features, outward presentation, inward tendency, reality anchor, custom values, and internal-thought narration preference; no unapproved field is accepted |
+| More than 64 distinguishing features within the declaration envelope | Domain + application unit | A fixed 65-feature declaration remains below 65,536 canonical UTF-8 bytes and passes direct declaration, complete-record, creation-command, fingerprint, receipt-protocol, and creation-policy validation without a replacement item-count ceiling |
 | Omitted versus explicitly absent | Domain unit + persistence/integration | Every supported optional slot preserves unset/omitted separately from an explicitly absent declaration through validation, snapshot/row serialization, and reload |
 | Explicitly absent versus intentionally undecided | Domain unit + persistence/integration | The two states remain unequal and round-trip without defaulting or reinterpretation wherever intentionally undecided is permitted |
 | Adult-only age presentation | Domain unit + application/service | Every admitted age representation proves adult presentation; every non-adult or unprovable representation rejects before allocation or mutation |
@@ -1716,17 +1748,21 @@ plan:
     documentation plan;
 19. classifies product decisions, technical choices, deferrals, and exclusions
     truthfully; and
-20. remains unimplemented, unstaged, uncommitted, and unpushed.
+20. was unimplemented, unstaged, uncommitted, and unpushed when the plan was
+    approved and frozen.
 
 Runtime acceptance for later implementation is phase-specific and cannot be
 earned by approval of this document alone.
 
 ## 31. Approval and implementation gate
 
-The plan-level independent-review and correction gate is closed. The next
-possible work is a separately scoped and explicitly authorized implementation
-task for one reviewed phase, subject to that phase's prerequisites and stop
-conditions.
+The plan-level independent-review and correction gate is closed. The separately
+authorized Phase 1 implementation passed fresh independent read-only
+acceptance for the exact nine-path candidate after the third correction round.
+
+Phase 2 remains blocked pending separate explicit authorization. Phase 1
+acceptance does not authorize persistence, public activation, or any Phase 2
+work.
 
 No phase is approved, frozen, started, or completed by being listed here.
 Approval of the frozen product contract is not implementation authorization.
@@ -1757,3 +1793,55 @@ deployment, or work outside a separately authorized phase.
   frozen, and unimplemented; it closed the plan-level independent-review gate,
   selected no deferred product decision, and did not begin implementation,
   stage, commit, or push.
+- 2026-07-24: A separately authorized controlled task implemented only Phase 1
+  locally: the pure canonical record envelope and identity types, independent
+  lifecycle policies, distinct successful creation/mutation receipt
+  namespaces and keys, deterministic canonical JSON/SHA-256 protocol,
+  privacy-safe result envelopes, authorization/replay/conflict decisions,
+  later-persistence ordering/atomicity requirements, bounded retention
+  boundary, and fixed offline golden vectors. Phase 1 remains unaccepted and
+  unclosed pending a fresh independent read-only review. Phase 2 and every
+  later phase remain blocked and unimplemented. No migration, database receipt
+  schema/repository, production service/transaction wiring, public route,
+  Provider integration, frontend flow, Demo change, Run/story-line activation,
+  staging, commit, or push occurred.
+- 2026-07-24: A narrowly scoped correction locally addressed the fresh
+  independent review's applicable-reference fingerprint, complete-record
+  provenance/lifecycle/authority validation, and declaration-envelope findings.
+  It refreshed the affected fixed mutation vectors and reran offline
+  verification. Phase 1 remains unaccepted pending a new independent read-only
+  review; Phase 2 and later phases remain blocked. No persistence, migration,
+  public route, Provider, Run activation, or frontend behavior was added.
+- 2026-07-27: A second narrowly scoped correction locally addressed all four
+  blocking scenarios from the next independent review: bypass-corrupted
+  applicable references, forged success replay for unavailable operations,
+  bypass-corrupted nested/current records at public Phase 1 boundaries, and
+  declaration-envelope limit ownership at the exact 65,536-byte boundary.
+  Focused Phase 1 tests, the affected Session/orchestrator selection,
+  `compileall`, the complete isolated Offline verifier, and `git diff --check`
+  were rerun successfully.
+  Phase 1 remains unaccepted and unclosed pending a fresh independent read-only
+  acceptance review. The complete plan remains partially implemented; Phase 2
+  and later phases remain blocked. No persistence, migration, public route,
+  Provider, Run/story-line activation, frontend behavior, staging, commit, or
+  push was added or performed.
+- 2026-07-27: This third narrow correction locally addressed the next
+  independent review's three blocking findings: lossy dump/reconstruction of
+  bypass-injected unknown Pydantic state, revision-successor overflow beyond
+  the canonical signed 64-bit domain, and missing fixed regression proof for a
+  valid 65-feature creation. Focused and repository Offline verification were
+  rerun. At that point Phase 1 remained unaccepted pending a fresh independent
+  read-only acceptance review; the complete plan remained partially
+  implemented, and Phase 2 and later phases remained blocked. No persistence,
+  migration, public route, Provider, Run/story-line activation, frontend
+  behavior, staging, commit, or push was added or performed.
+- 2026-07-27: A fresh independent read-only review returned
+  `APPROVED_STRUCTURED_PLAYER_CHARACTER_PHASE_1` for the exact nine-path Phase
+  1 candidate. The review confirmed closure of all prior findings, including
+  complete actual-state validation, signed-64-bit revision handling, and the
+  fixed 65-feature proof. It accepted only the pure Phase 1 foundation; the
+  complete plan remains partially implemented, and Phase 2 and later phases
+  remain blocked pending separate explicit authorization. No persistence,
+  public API, frontend, Run activation, Provider integration, or public
+  activation was accepted or introduced. This acceptance does not authorize a
+  push, which remains user-controlled.

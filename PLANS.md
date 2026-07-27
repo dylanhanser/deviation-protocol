@@ -156,7 +156,10 @@ implemented. Phase 3.2b remains closed.
 The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
-not implemented.** Its first independent read-only review found one HIGH issue
+partially implemented only by the local Phase 1 pure domain/protocol
+foundation. Phase 1 has passed fresh independent read-only acceptance for the
+exact nine-path candidate and is accepted; the overall implementation plan
+remains only partially implemented.** Its first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
 concerning permanent `player_character_id` non-reuse, and one MEDIUM issue
 concerning `controller_binding` lifecycle presence. The first controlled
@@ -181,14 +184,16 @@ requires a separately approved downstream implementation plan and task.
 The
 [structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md)
 translates that approved and frozen product contract into proposed
-repository-specific implementation work. The plan is **approved, frozen, and
-unimplemented** following the completed independent review and correction
-process. The plan-level independent-review gate is closed; approval and freeze
-do not authorize runtime work. The safest next possible stage is a separately
-scoped and explicitly authorized implementation task under the frozen plan and
-its phase-specific prerequisites and stop conditions. Phase 3.2b remains
-closed, and both the final narrative experience and structured player-character
-product specifications remain approved, frozen, and unimplemented.
+repository-specific implementation work. The plan is **approved and frozen;
+Phase 1 has passed fresh independent read-only acceptance for the exact
+nine-path candidate, closing the prior blocking findings through the third
+correction round.** The complete plan remains partially implemented. Phase 2
+receipt persistence/schema and every later phase remain blocked and
+unimplemented pending separate explicit authorization.
+There is no database receipt schema, canonical character persistence,
+public/runtime route, Provider integration, frontend flow, or Run/story-line
+activation. Phase 1 acceptance does not authorize Phase 2. Publication or push
+remains a separate user-controlled action. Phase 3.2b remains closed.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
@@ -279,8 +284,8 @@ manually.
 - Project status and roadmap: `PLANS.md`.
 - Final player experience and cross-phase long-term system direction:
   [`docs/final_narrative_experience.md`](docs/final_narrative_experience.md).
-- Approved and frozen, unimplemented downstream structured player-character
-  implementation plan:
+- Approved and frozen, partially implemented downstream structured
+  player-character implementation plan:
   [`docs/structured_player_character_implementation_plan.md`](docs/structured_player_character_implementation_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).

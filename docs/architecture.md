@@ -4,6 +4,73 @@ This document describes implemented architecture first. Sections named for
 earlier phases preserve the implementation history of those boundaries; they
 do not make later accepted designs current capabilities.
 
+## Structured player-character Phase 1 pure foundation
+
+The approved and frozen structured player-character plan now has a Phase 1
+pure foundation that passed fresh independent read-only acceptance for the
+exact nine-path candidate. This acceptance applies only to Phase 1; the
+complete plan remains partially implemented.
+
+`domain.player_character` owns distinct player-character, controller-binding,
+operation, revision, contract, applicable-reference, and subject-reference
+types; the complete strict v1 record envelope; four-state optional
+declarations for every approved slot; adult-only proof; player-expression or
+confirmation authority for subjective state; empty first-slice development;
+and no unowned story-line binding or narration default. Complete-record
+validation fail-closes on the admitted creation, retirement, and final-death
+provenance/lifecycle/authority combinations and applies one lossless aggregate
+65,536-byte canonical UTF-8 declaration envelope without field-specific text
+or collection limits. A fixed 65-feature creation regression proves that the
+former arbitrary 64-item ceiling remains absent. Exposed creation,
+complete-record, reference, command, receipt, and policy boundaries recursively
+inspect exact instance fields plus Pydantic extra, private, and fields-set
+state, then revalidate the original instance without first dumping, repairing,
+coercing, defaulting, or dropping source state. An already-instantiated
+Pydantic object is therefore not treated as proof of validity.
+`domain.player_character_policies` owns independent pure creation, retirement,
+reactivation, final-death, and authorized-continuity-return policies.
+Retirement and trusted final death produce detached, fully revalidated
+successor records. Reactivation and return from death fail closed because the
+required Run/continuity authorities do not exist and cannot have a Phase 1
+success-result representation.
+
+`application.player_character_operations` owns the separate
+`player-character.create/v1` and `player-character.mutate/v1` receipt
+namespaces and their non-interchangeable keys. It defines NFC UTF-8 canonical
+JSON, sorted normalized object keys, ordered sequences, no floats or ambiguous
+values, signed-integer and total-byte bounds, SHA-256 fingerprints, strict
+privacy-safe stored success results, exact replay and deterministic mismatch
+decisions, authorization-before-disclosure behavior, and the required
+creation/mutation/unique-race transaction order for later persistence. Mutation
+fingerprints bind the same typed applicable reference supplied to policy
+evaluation; the reference selects no following or migration behavior.
+Player-character revisions use the positive canonical signed 64-bit domain.
+Revision `9223372036854775807` remains a readable existing revision, but it has
+no representable successor: direct policy and operation processing reject that
+transition before fingerprint serialization, receipt lookup, success-result
+construction, or stored-success disclosure. A valid transition from
+`9223372036854775806` to `9223372036854775807` and its exact replay remain
+supported.
+Mutation replay revalidates the complete current record before lookup and
+checks the stored result against its key, fingerprint, command, subject,
+contract, revision, lifecycle, provenance-mutation, and authority semantics;
+unavailable operations and semantically impossible receipts disclose no stored
+success. The 65,536-byte limit belongs only to the complete canonical
+declaration envelope. Creation fingerprint serialization remains deterministic
+and binds all required operational metadata without applying that declaration
+ceiling to the larger command.
+Checked-in unit vectors fix the exact canonical bytes and fingerprints for
+creation and every Phase 1 mutation command.
+
+This is a pure protocol/domain foundation only. It adds no Alembic revision,
+ORM row, receipt table or repository, Unit of Work port, ID issuer, controller
+resolver, canonical persistence, production transaction wiring, public route,
+projection, frontend, Provider integration, Demo behavior, Session
+request/action behavior, or Run/story-line binding. Phase 2 receipt persistence
+and schema remain blocked pending separate explicit authorization. The complete
+frozen implementation plan remains only partially implemented. This acceptance
+does not authorize publication or push.
+
 ## Current composition roots and Provider boundaries
 
 `NarrativeProvider` is the supplier-neutral application-layer interface. It
