@@ -156,7 +156,8 @@ implemented. Phase 3.2b remains closed.
 The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
-partially implemented only by the local Phase 1 pure domain/protocol
+partially implemented only by the committed and pushed Phase 1 pure
+domain/protocol
 foundation. Phase 1 has passed fresh independent read-only acceptance for the
 exact nine-path candidate and is accepted; the overall implementation plan
 remains only partially implemented.** Its first independent read-only review found one HIGH issue
@@ -187,9 +188,15 @@ translates that approved and frozen product contract into proposed
 repository-specific implementation work. The plan is **approved and frozen;
 Phase 1 has passed fresh independent read-only acceptance for the exact
 nine-path candidate, closing the prior blocking findings through the third
-correction round.** The complete plan remains partially implemented. Phase 2
+correction round, and Phase 1 is committed and pushed at
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`.** The complete plan remains
+partially implemented. Phase 2
 receipt persistence/schema and every later phase remain blocked and
-unimplemented pending separate explicit authorization.
+unimplemented. A concrete Phase 2 MySQL persistence-boundary amendment has
+been drafted as a technical-prerequisite review candidate; it is not accepted,
+frozen, or implementation authorization. Phase 2 remains blocked pending a
+fresh independent read-only acceptance of that exact documentation candidate
+and separate explicit user authorization.
 There is no database receipt schema, canonical character persistence,
 public/runtime route, Provider integration, frontend flow, or Run/story-line
 activation. Phase 1 acceptance does not authorize Phase 2. Publication or push

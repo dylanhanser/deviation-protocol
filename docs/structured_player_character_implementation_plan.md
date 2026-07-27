@@ -4,9 +4,15 @@
 
 Status: **Approved and frozen downstream implementation plan — Phase 1 has
 passed fresh independent read-only acceptance for the exact nine-path
-candidate; Phases 2–7 remain unimplemented and blocked pending separate
-explicit authorization. Phase 1 acceptance does not itself authorize a local
-commit or publication; push remains user-controlled.**
+candidate and is committed and pushed at
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`; Phases 2–7 remain unimplemented
+and blocked pending separate explicit authorization.**
+
+The concrete Phase 2 persistence design in section 20 is a
+technical-prerequisite amendment and **review candidate awaiting fresh
+independent acceptance**. It is not yet an accepted or frozen amendment and
+does not authorize Phase 2 implementation. Phase 2 remains unimplemented and
+blocked pending that review and separate explicit user authorization.
 
 The pre-correction draft received one fresh independent read-only review. That
 review identified five accepted findings, `SPCIP-001` through `SPCIP-005`; the
@@ -23,9 +29,9 @@ The
 [structured player-character contract](structured_player_character_contract.md)
 and [final narrative experience](final_narrative_experience.md) remain approved
 and frozen product specifications. Only the pure Phase 1 domain and
-character-operation protocol foundation is implemented locally; the complete
-product specifications remain only partially implemented. Phase 3.2b remains
-closed.
+character-operation protocol foundation is implemented, accepted, committed,
+and pushed; the complete product specifications remain only partially
+implemented. Phase 3.2b remains closed.
 
 ## 2. Purpose
 
@@ -90,7 +96,7 @@ than an implementation default.
 ## 4. Implementation status boundary
 
 This approved and frozen document remains the substantive design authority.
-The separately authorized Phase 1 implementation adds only pure domain models,
+The separately authorized Phase 1 implementation added only pure domain models,
 independent policies, deterministic character-operation serialization and
 receipt semantics, and offline unit/golden-vector tests. It changes no
 database, migration, schema, repository, Unit of Work, production service,
@@ -517,10 +523,11 @@ allowlist is specified in section 18.
 
 The trusted `PlayerCharacterIdIssuer` must allocate a fresh opaque,
 domain-qualified identifier. The caller cannot propose, restore, or select the
-ID. Exact syntax, maximum length, and random/monotonic generation algorithm are
-technical decisions with privacy and indexing consequences and remain `U`
-until migration review; they must be opaque, non-meaningful, and collision
-checked.
+ID. Accepted Phase 1 fixes the syntax to its 1–128-character opaque-reference
+alphabet, and the section 20 review candidate fixes its database
+representation. The production entropy source and random/monotonic issuance
+algorithm remain unresolved; they must produce opaque, non-meaningful,
+collision-checked values within that accepted envelope.
 
 The proposed persistence invariant (`T`) separates ever-issued identity from
 the mutable current record:
@@ -534,11 +541,11 @@ the mutable current record:
 - migration downgrade/recovery must never make a formerly issued ID eligible
   for allocation.
 
-This allocation ledger is proposed because a mutable or archived record alone
-cannot prove non-reuse after record absence. If reviewers choose a single-table
-design, they must demonstrate equivalent permanent allocation history and no
-hard-delete/reuse path. Database uniqueness is necessary but not sufficient if
-rows can disappear.
+This allocation ledger is required by the section 20 review candidate because
+a mutable or archived record alone cannot prove non-reuse after record
+absence. A single-table alternative would be a new technical amendment
+requiring fresh review; it is not an implementation-session choice. Database
+uniqueness is necessary but not sufficient if rows can disappear.
 
 Restoration of the same canonical record, if ever authorized, must locate the
 existing allocation and preserve the ID. The first slice implements no
@@ -560,8 +567,10 @@ development principal. The minimum compatible boundary is therefore:
 - a `ControllerBindingResolver` application port receives the authenticated
   `RequestPrincipal` from trusted middleware/composition;
 - it returns a distinct opaque `ControllerBindingRef`;
-- a private binding registry may map trusted authentication scheme plus
-  controller subject to that opaque reference;
+- Phase 2's private registry stores only that opaque binding reference; any
+  future trusted authentication-scheme/subject mapping belongs to the Phase 3
+  resolver design and must not select transfer, shared-control, or account
+  semantics silently;
 - the canonical record stores only the binding reference, not client-submitted
   authority; and
 - authorization re-resolves the current principal and exact-matches the stored
@@ -1018,107 +1027,444 @@ prohibition/subject interface; it must not add golden-memory storage.
 
 ### Proposed ownership and schema sequence
 
-One new linear Alembic revision is proposed with
-`down_revision = "20260719_0003"`, the directly verified current head. Its new
-revision identifier, file name, and exact column types remain subject to
-migration review. The proposed logical tables are:
+Status of this subsection: **technical-prerequisite review candidate awaiting
+fresh independent acceptance; not frozen and not implementation
+authorization.**
 
-| Logical table | Purpose | Key constraints |
+Once this candidate has been independently accepted and Phase 2 has been
+separately authorized, one new linear Alembic revision may directly revise
+`20260719_0003`, the current head inspected for this amendment. Phase 2 has
+exactly six persisted record families:
+
+| Record family | Proposed table | Logical responsibility |
 | --- | --- | --- |
-| controller-binding registry | Private opaque binding resolved from trusted authentication subject | Unique trusted authority/subject mapping; no public lookup; no unbind/delete path |
-| player-character identity allocations | Append-only record of every issued ID | Permanent primary/unique ID; no cascade/delete/reuse path |
-| current player-character records | Current complete canonical aggregate | One row per allocated ID; required version/revision/binding/lifecycle; strict validated payload groups |
-| player-character revision history | Provenance-bearing committed revisions | Unique character/revision; prior/result sequence; immutable after insert |
-| successful character creation receipts | Exact creation replay/conflict/recovery boundary before a character ID exists | Unique `(controller_binding, operation_namespace, operation_id)`; exact fingerprint and stored safe creation result |
-| successful character mutation receipts | Exact mutation replay/conflict/recovery boundary | Unique `(player_character_id, operation_namespace, operation_id)`; exact fingerprint, command/result binding, and stored safe mutation result |
-| Run/consumer character binding, Phase 4 only | Run-owned persistence of exact character ID plus applicable contract/revision reference | One continuous story line has exactly one active character binding at a time; exact reference preservation; no boundary-driven switch; exact location waits for the Run owner |
+| Controller-binding reference registry | `player_character_controller_bindings` | Record one already trusted opaque `ControllerBindingRef` so character rows and creation receipts can reference it atomically; it is not an authentication-subject mapping or resolver |
+| Permanent identity allocations | `player_character_id_allocations` | Append-only ledger of every successfully issued `PlayerCharacterId`, preserving permanent non-reuse independently of the mutable current row |
+| Current canonical records | `player_character_current` | One complete validated `CanonicalPlayerCharacter` at its current revision |
+| Immutable revision history | `player_character_revisions` | One complete provenance-bearing canonical record for every committed revision |
+| Successful creation receipts | `player_character_creation_receipts` | Durable exact replay/conflict result for `player-character.create/v1` under its controller-owned scope |
+| Successful mutation receipts | `player_character_mutation_receipts` | Durable exact replay/conflict result for `player-character.mutate/v1` under its character-owned scope |
 
-The controller, allocation, current-record, history, and successful-receipt
-tables are the proposed Phase 2 revision. The Run/consumer row is inventory for
-Phase 4 only and is not part of that revision. If the real Run/line owner later
-needs schema work, Phase 4 must propose a separately reviewed migration after
-the then-current head; this plan does not name its table, columns, revision,
-or replacement/lifecycle mechanics.
+There is no seventh Phase 2 Run, Session, account, story-line, consumer,
+applicable-reference, rejected-operation, pending-operation, archive, or
+deletion record. The future Run/consumer character binding remains Phase 4
+inventory only. No concrete Run or account parent schema exists, so Phase 2
+must not fabricate one or add a foreign key to `game_sessions`. A later
+Run-owning migration must choose its table and enforce the frozen
+one-active-character-per-story-line direction without changing these six
+families or silently selecting a reference-following policy.
 
-Exact table and column names are `T`, not product authority. Exact identifier
-length, collation, binary/text form, JSON normalization, enum/check-constraint
-representation, and timestamp precision are `U` until the repository's MySQL
-and Alembic review. The schema must preserve domain distinctions even if
-multiple references use `VARCHAR`.
+Within this boundary, the controller binding owns a creation receipt; the
+stable player-character identity is the mutation receipt owner, subject, and
+target; namespace plus operation ID supplies command/idempotency identity;
+expected/resulting revisions bind the mutation; and provenance supplies its
+trusted source reference. The canonical mutation fingerprint additionally
+binds the exact `ApplicableCharacterReference` and typed confirmation/evidence
+defined by Phase 1. Account and Run identities are not required for these
+Phase 1 operations and therefore have no Phase 2 column or fabricated parent.
+The natural receipt scope keys are the authoritative private receipt
+identities; no public receipt ID or surrogate is introduced.
 
-At minimum the migration must enforce:
+#### Physical type, serialization, and timestamp conventions
 
-- unique permanent identity allocation;
-- one current record per identity;
-- non-null controller binding on every lifecycle state;
-- non-null supported contract version, record revision, lifecycle, and
-  canonical continuity storage required by the selected logical layout;
-- non-null exact applicable character ID/contract/revision values on every
-  Phase 4 Run/consumer binding, without making the canonical record row own a
-  consumer-specific policy;
-- unique `(player_character_id, record_revision)` history;
-- immutable identity linkage without delete cascade;
-- distinct successful creation- and mutation-receipt uniqueness in the exact
-  scopes defined in section 15, with no rejected-operation receipt schema;
-- foreign keys that cannot erase allocation/history through Session cleanup;
-  and
-- justified indexes for exact controller-authorized lookup and revision CAS,
-  without adding name/prose identity lookups.
+All six tables use InnoDB, table default character set `utf8mb4`, and table
+default collation `utf8mb4_bin`. Every opaque external/domain reference
+(`player_character_id`, `controller_binding`, `operation_id`, and
+`source_reference`) uses `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin`.
+Every one is non-empty, uses the accepted Phase 1
+`[A-Za-z0-9][A-Za-z0-9_.:-]*` alphabet, and is at most 128 characters/bytes.
+The adapter validates that rule both before writes and after reads. Because the
+admitted alphabet is ASCII, this representation is a one-byte-per-character,
+byte-stable round trip. MySQL performs no trimming, Unicode normalization,
+case folding, semantic parsing, or identifier generation; values that differ
+only by ASCII case remain distinct. The syntax and length come from the
+accepted Phase 1 value objects and do not select a production issuance
+algorithm.
 
-MySQL constraints do not replace complete domain validation. If MySQL version
-or SQLAlchemy cannot enforce the lifecycle closed set reliably in the chosen
-representation, strict domain/ORM validation plus a safe database constraint
-strategy must be documented and tested rather than assumed.
+Closed protocol/version/kind tokens use the explicitly sized ASCII
+`ascii_bin` columns below. Canonical SHA-256 fingerprints use `BINARY(32)`,
+never text or a collation; the adapter converts exactly between those digest
+bytes and Phase 1's 64-character lowercase hexadecimal value. Reconstructed
+hex must match the canonical lowercase form. Fingerprints are compared only
+after scope-key lookup and are not separately indexed.
 
-The separate Phase 4 binding migration, if required by the real Run/line
-design, must add a database backstop for the frozen
-one-active-character-per-story-line invariant. If no exact constraint strategy
-can be chosen from the approved owner and transaction model, Phase 4 stops
-before schema or service integration.
+`record_canonical` is the exact output of
+`canonical_character_operation_bytes(CanonicalPlayerCharacter)` and
+`receipt_canonical` is the exact output for the corresponding
+`StoredCreationSuccessReceipt` or `StoredMutationSuccessReceipt`. They use
+`MEDIUMBLOB` (physical maximum 16,777,215 bytes), not MySQL `JSON`, text, or a
+collation. Binary storage avoids MySQL JSON normalization or textual
+reserialization and preserves exact canonical bytes. The declaration data is
+embedded in `record_canonical` as the ordered `character_core` and
+`narration_preferences` members. Their four-state tags preserve omitted,
+explicitly absent, declared, and intentionally undecided values; ordered
+feature/custom-value collections keep their accepted order. Phase 1 defines no
+additional per-field text or collection ceiling, so Phase 2 adds none. Before
+any write and after every read, the adapter must:
 
-Server-issued UTC `created_at` and `updated_at` fields are a supported
-repository convention and may be included as technical audit metadata. They
-must not establish identity, revision order, confirmation, lifecycle, or
-continuity. Revision/provenance remains the authoritative mutation history.
+1. strictly parse one UTF-8 JSON object with duplicate keys, floats,
+   non-standard constants, invalid Unicode, out-of-range integers, and unknown
+   fields rejected;
+2. reconstruct and run the reused Phase 1 complete model validation;
+3. recompute the canonical bytes and require byte-for-byte equality with the
+   stored blob;
+4. recompute `canonical_player_declaration_bytes` from the reconstructed
+   groups and enforce its aggregate 65,536-byte maximum; and
+5. exact-match every duplicated relational identity, version, revision,
+   lifecycle, provenance, key, fingerprint, and result column.
+
+The record blob has no new arbitrary whole-record product limit: `MEDIUMBLOB`
+is only the physical carrier, while the accepted Phase 1 declaration envelope
+and all existing field/type limits remain authoritative. Receipt blobs must
+have an `OCTET_LENGTH` from 1 through 65,536, matching
+`MAX_STORED_CHARACTER_RECEIPT_CANONICAL_BYTES`. Oversize, non-canonical, or
+malformed persisted data is an internal integrity failure and is never
+truncated, repaired, defaulted, partially returned, or disclosed as success.
+
+All timestamps are server-supplied UTC `DATETIME(6) NOT NULL` with no database
+default and use MySQL's `1000-01-01 00:00:00.000000` through
+`9999-12-31 23:59:59.999999` physical range. The adapter restores MySQL's
+timezone-naive value as UTC, following the existing repository convention.
+Immutable families have only `created_at`; `player_character_current` also has
+`updated_at`, changed only with its successful CAS. Timestamps never establish
+identity, order, revision, replay equivalence, confirmation, lifecycle, or
+continuity.
+
+No table has an auto-increment or opaque surrogate identifier. The authoritative
+natural or composite domain identities below already provide stable keys; a
+surrogate would add no integrity and must not replace those keys.
+
+#### `player_character_controller_bindings`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `controller_binding` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Primary key; exact Phase 1 `ControllerBindingRef` |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC audit time only |
+
+Primary/candidate key: `PRIMARY KEY (controller_binding)`. There are no other
+unique or ordinary indexes and no foreign keys. The named opaque-reference
+check applies. The row is immutable after insert; Phase 2 exposes no update,
+unbind, rebind, transfer, shared-control, delete, or subject-enumeration
+operation.
+
+This table deliberately does not store authentication scheme, account ID, or
+principal subject. A one-to-one scheme/subject mapping would prematurely
+select controller cardinality, transfer, shared-control, or account-change
+behavior. Phase 3's trusted resolver may later resolve a production
+authentication context to an already meaningful `ControllerBindingRef`, but
+that resolver and the decision to create/invoke a binding are not Phase 2
+responsibilities.
+
+#### `player_character_id_allocations`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Primary key; permanently allocated Phase 1 identity |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC allocation audit time only |
+
+Primary/candidate key: `PRIMARY KEY (player_character_id)`. There are no other
+indexes or foreign keys. The named opaque-reference check applies. The adapter
+provides insert/exists only; no delete, release, update, reuse, restoration, or
+replacement port exists. A losing transaction rolls its uncommitted allocation
+back; every committed allocation remains permanently reserved. Migration
+downgrade is safe only while these Phase 2 tables are empty.
+
+#### `player_character_current`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Primary key and immutable aggregate owner |
+| `contract_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `structured-player-character/v1` |
+| `record_revision` | signed `BIGINT` | NOT NULL; no default | Current Phase 1 revision, 1 through 9223372036854775807 |
+| `controller_binding` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact immutable binding copied into every lifecycle state |
+| `lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Closed `active`, `retired`, or `deceased` value |
+| `record_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full canonical record bytes |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Initial server UTC commit time |
+| `updated_at` | `DATETIME(6)` | NOT NULL; no default | Latest successful CAS server UTC time |
+
+Primary/candidate key: `PRIMARY KEY (player_character_id)`. Exact indexes are
+`ix_spc_current_controller_identity (controller_binding,
+player_character_id)` for authorized ownership lookup and
+`ix_spc_current_identity_revision (player_character_id, record_revision)` for
+the history foreign key. No name, declaration, prose, lifecycle-only,
+fingerprint, or timestamp index exists. The primary-key lookup already selects
+one row for CAS, so a redundant
+`(player_character_id, record_revision, controller_binding)` index is not
+added.
+
+Checks enforce the supported contract token, positive signed-64-bit revision,
+closed lifecycle set, non-empty blob, and opaque-reference rules. Adapter
+validation enforces the cross-column/canonical-record equality and the
+complete Phase 1 provenance/lifecycle matrix.
+
+#### `player_character_revisions`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Revision owner |
+| `record_revision` | signed `BIGINT` | NOT NULL; no default | Committed revision, 1 through 9223372036854775807 |
+| `contract_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact supported contract |
+| `controller_binding` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact binding preserved at this revision |
+| `lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Lifecycle at this revision |
+| `prior_revision` | signed `BIGINT` | NULL; no default | NULL only for creation; otherwise exact predecessor |
+| `mutation_kind` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Accepted Phase 1 provenance mutation kind |
+| `authority_class` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact Phase 1 provenance authority class |
+| `source_reference` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact trusted Phase 1 `AuthoritySourceRef` |
+| `record_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact complete record at this revision |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC commit time only |
+
+Primary/candidate key:
+`PRIMARY KEY (player_character_id, record_revision)`. The exact ordinary index
+is `ix_spc_revisions_controller_binding (controller_binding)` for the
+controller-binding foreign key. No other unique or ordinary index is
+authorized. Checks enforce the revision range, opaque
+references, supported contract, lifecycle set, non-empty blob, and the
+accepted Phase 1 matrix: creation is revision 1 with NULL predecessor,
+`active`, and `trusted-creation`; retirement and final death have
+`prior_revision = record_revision - 1` with their respective admitted
+lifecycle/authority pair. No Phase 1-unavailable reactivation or continuity
+return may be written as a successful revision.
+
+History rows are insert-only. The complete reconstructed record must validate
+before return; history is not a source from which an adapter may synthesize a
+different current record or receipt result.
+
+#### `player_character_creation_receipts`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `controller_binding` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Creation receipt owner |
+| `operation_namespace` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `player-character.create/v1` |
+| `operation_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Opaque Phase 1 idempotency key |
+| `fingerprint` | `BINARY(32)` | NOT NULL; no default | Raw SHA-256 of the canonical creation command payload |
+| `command_kind` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `CREATE` |
+| `result_schema_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `player-character.create-result/v1` |
+| `result_player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Allocated identity returned by the stored result |
+| `result_contract_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact result contract version |
+| `resulting_revision` | signed `BIGINT` | NOT NULL; no default | Exact initial revision 1 |
+| `resulting_lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact initial lifecycle `active` |
+| `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored creation receipt bytes |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
+
+Primary/candidate keys are
+`PRIMARY KEY (controller_binding, operation_namespace, operation_id)` and
+`UNIQUE uq_spc_creation_receipts_result_revision
+(result_player_character_id, resulting_revision)`. The latter both prevents
+two creation receipts from claiming the same initial revision and supplies the
+ordered child index for its history foreign key. There are no other indexes;
+in particular, fingerprints are not lookup identities.
+
+Checks enforce the fixed namespace, `CREATE`, result-schema and contract
+tokens, revision 1, `active`, opaque-reference rules, and receipt byte length
+1–65,536. Only a successfully committed result is representable. No rejection,
+pending state, `REVISION_EXHAUSTED`, private declaration, controller subject,
+Provider data, or public receipt format is added.
+
+#### `player_character_mutation_receipts`
+
+| Column | MySQL type | Null/default | Meaning and validation |
+| --- | --- | --- | --- |
+| `player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Character aggregate receipt owner and target |
+| `operation_namespace` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `player-character.mutate/v1` |
+| `operation_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Opaque Phase 1 idempotency key |
+| `fingerprint` | `BINARY(32)` | NOT NULL; no default | Raw SHA-256 of the canonical mutation command payload |
+| `command_kind` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Admitted successful Phase 1 command kind |
+| `result_schema_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact `player-character.mutate-result/v1` |
+| `expected_revision` | signed `BIGINT` | NOT NULL; no default | Revision bound by the accepted command |
+| `result_player_character_id` | `VARCHAR(128) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact stored-result target; must equal owner |
+| `result_contract_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact result contract version |
+| `result_command_kind` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact command kind in the stored safe result |
+| `command_result` | `VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | `RETIRED` or `DECEASED` for admitted Phase 1 success |
+| `resulting_revision` | signed `BIGINT` | NOT NULL; no default | Exact successor revision |
+| `resulting_lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Lifecycle in the stored safe result |
+| `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored mutation receipt bytes |
+| `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
+
+Primary/candidate keys are
+`PRIMARY KEY (player_character_id, operation_namespace, operation_id)` and
+`UNIQUE uq_spc_mutation_receipts_result_revision
+(player_character_id, resulting_revision)`. The exact ordinary indexes are
+`ix_spc_mutation_receipts_expected_revision
+(player_character_id, expected_revision)` and
+`ix_spc_mutation_receipts_result_revision
+(result_player_character_id, resulting_revision)`. The expected-revision index
+supports the prior-revision history foreign key. The result-revision composite
+index supports both the result-allocation foreign key through its leftmost
+`result_player_character_id` prefix and the result-revision history foreign
+key through its complete ordered columns. No other unique or ordinary index is
+authorized; no fingerprint, controller, lifecycle-only, or timestamp index
+exists.
+
+Checks enforce the fixed namespace and result schema, owner/result identity
+equality, supported contract, opaque-reference rules,
+`1 <= expected_revision <= 9223372036854775806`,
+`resulting_revision = expected_revision + 1`, the maximum resulting revision
+9223372036854775807, receipt byte length 1–65,536, and the admitted Phase 1
+success pairs: `RETIRE`/`RETIRED`/`retired` or
+`FINAL_DEATH`/`DECEASED`/`deceased`. Reactivation, continuity return, and
+`REVISION_EXHAUSTED` have no successful Phase 1 result and therefore cannot be
+stored. The fingerprint still binds the complete typed command, including
+controller-authorized target, exact applicable character reference,
+confirmation/evidence source, operation kind, and expected revision; the
+stored canonical receipt remains the accepted Phase 1 format rather than a new
+public format.
+
+`REVISION_EXHAUSTED` remains only an internal failed-operation classification.
+It is not a canonical record, history/provenance fact, successful result,
+receipt column/value, replay-visible stored result, or public outcome. The
+adapter rejects an operation requiring revision 9223372036854775808 before
+fingerprint storage, receipt lookup/write, CAS, or result disclosure.
+
+#### Exact keys, indexes, and foreign-key actions
+
+Every foreign key uses `ON DELETE RESTRICT` and `ON UPDATE RESTRICT`. No
+`CASCADE`, `SET NULL`, or database-generated update is permitted.
+
+| Child columns | Parent | Constraint |
+| --- | --- | --- |
+| `player_character_current.player_character_id` | `player_character_id_allocations.player_character_id` | `fk_spc_current_allocation` |
+| `player_character_current.controller_binding` | `player_character_controller_bindings.controller_binding` | `fk_spc_current_controller_binding` |
+| `player_character_current.(player_character_id, record_revision)` | `player_character_revisions.(player_character_id, record_revision)` | `fk_spc_current_revision` |
+| `player_character_revisions.player_character_id` | `player_character_id_allocations.player_character_id` | `fk_spc_revisions_allocation` |
+| `player_character_revisions.controller_binding` | `player_character_controller_bindings.controller_binding` | `fk_spc_revisions_controller_binding` |
+| `player_character_creation_receipts.controller_binding` | `player_character_controller_bindings.controller_binding` | `fk_spc_creation_receipts_controller_binding` |
+| `player_character_creation_receipts.result_player_character_id` | `player_character_id_allocations.player_character_id` | `fk_spc_creation_receipts_allocation` |
+| `player_character_creation_receipts.(result_player_character_id, resulting_revision)` | `player_character_revisions.(player_character_id, record_revision)` | `fk_spc_creation_receipts_revision` |
+| `player_character_mutation_receipts.player_character_id` | `player_character_id_allocations.player_character_id` | `fk_spc_mutation_receipts_allocation` |
+| `player_character_mutation_receipts.result_player_character_id` | `player_character_id_allocations.player_character_id` | `fk_spc_mutation_receipts_result_allocation` |
+| `player_character_mutation_receipts.(player_character_id, expected_revision)` | `player_character_revisions.(player_character_id, record_revision)` | `fk_spc_mutation_receipts_prior_revision` |
+| `player_character_mutation_receipts.(result_player_character_id, resulting_revision)` | `player_character_revisions.(player_character_id, record_revision)` | `fk_spc_mutation_receipts_result_revision` |
+
+The migration also uses these exact check-constraint names and responsibilities.
+Every `*_opaque` check requires the Phase 1 ASCII opaque-reference regular
+language and a non-empty value; declared `VARCHAR(128)` width supplies the
+maximum. Token checks use exact case-sensitive equality.
+
+| Table | Exact named checks |
+| --- | --- |
+| `player_character_controller_bindings` | `ck_spc_controller_bindings_opaque` for `controller_binding` |
+| `player_character_id_allocations` | `ck_spc_allocations_identity_opaque` for `player_character_id` |
+| `player_character_current` | `ck_spc_current_identity_opaque`; `ck_spc_current_binding_opaque`; `ck_spc_current_contract`; `ck_spc_current_revision_range`; `ck_spc_current_lifecycle`; `ck_spc_current_canonical_nonempty` |
+| `player_character_revisions` | `ck_spc_revisions_identity_opaque`; `ck_spc_revisions_binding_opaque`; `ck_spc_revisions_source_opaque`; `ck_spc_revisions_contract`; `ck_spc_revisions_revision_range`; `ck_spc_revisions_prior_range`; `ck_spc_revisions_provenance_matrix`; `ck_spc_revisions_canonical_nonempty` |
+| `player_character_creation_receipts` | `ck_spc_creation_receipts_binding_opaque`; `ck_spc_creation_receipts_operation_opaque`; `ck_spc_creation_receipts_result_identity_opaque`; `ck_spc_creation_receipts_protocol`; `ck_spc_creation_receipts_result`; `ck_spc_creation_receipts_canonical_size` |
+| `player_character_mutation_receipts` | `ck_spc_mutation_receipts_identity_opaque`; `ck_spc_mutation_receipts_operation_opaque`; `ck_spc_mutation_receipts_result_identity_opaque`; `ck_spc_mutation_receipts_protocol`; `ck_spc_mutation_receipts_owner_result`; `ck_spc_mutation_receipts_revision_successor`; `ck_spc_mutation_receipts_result`; `ck_spc_mutation_receipts_canonical_size` |
+
+`ck_spc_revisions_prior_range` permits NULL only where the provenance matrix
+permits creation and otherwise requires a positive signed-64-bit value below
+the resulting revision. `ck_spc_revisions_provenance_matrix` and both receipt
+`*_result` checks enforce the exact admitted combinations described in the
+per-table sections. The two `*_canonical_size` receipt checks require 1–65,536
+bytes. MySQL check enforcement is a required migration/integration assertion;
+the adapter still repeats every check before persistence and after
+reconstruction so a disabled, bypassed, or legacy constraint cannot create a
+trusted object.
+
+MySQL directly enforces table/key uniqueness, non-nullability, fixed-size
+fingerprints, revision ranges/successor arithmetic, closed accepted tokens,
+receipt byte bounds, and restrictive relationships. The adapter additionally
+enforces opaque-reference syntax, exact canonical bytes, relational/blob
+cross-bindings, and complete reconstruction because MySQL cannot validate the
+Phase 1 typed value algebra or canonical JSON equality. Reused Phase 1 domain
+rules remain the only business/lifecycle validator. Phase 3 later owns trusted
+authentication, controller resolution, command sequencing, policy invocation,
+and response disclosure. No SQL constraint or adapter branch may duplicate a
+Phase 1 mutation policy or infer a repair.
+
+The restrictive graph and absence of delete/update ports preserve allocation,
+history, receipts, provenance, controller binding, and current identity without
+inventing character deletion, archival, restoration, receipt cleanup,
+controller rebinding, Run reassignment, cross-Run movement, reference
+migration, or lifecycle recovery. Once any identity has been issued, removing
+these tables through downgrade could release an identity and is prohibited;
+recovery must be forward-only.
+
+#### Phase 2 persistence ports and trust boundary
+
+Phase 2 may add the following application-layer persistence ports and MySQL
+adapters. Inputs are already typed Phase 1 values plus server UTC timestamps;
+outputs are either `None` for not found or complete, strictly reconstructed
+Phase 1 values. Repository methods flush where needed but never commit.
+
+| Port/capability | Architectural input/output and database behavior | Failure and trust behavior |
+| --- | --- | --- |
+| Controller-binding registry `get` / `add` / `lock` | Exact `ControllerBindingRef`; load, insert, or `SELECT ... FOR UPDATE` the one registry row | Not found is `None`; duplicate insertion is a concurrency conflict; malformed data is integrity failure; no principal resolution, generation, update, or delete |
+| Player-character allocation `exists` / `add` | Exact `PlayerCharacterId`; test existence or insert the allocation ledger row | Collision is a specific allocation conflict; no retry/issuer algorithm in the adapter and no release/delete |
+| Current record `get` / `get_for_update` | Exact `PlayerCharacterId`; load unlocked or locked and reconstruct one complete `CanonicalPlayerCharacter` | Not found is `None`; any malformed column/blob/cross-binding fails before an object is returned |
+| Initial current/history insert | One complete validated revision-1 record plus canonical bytes and server UTC time | Inserts history before its FK-backed current row; any allocation, binding, history, or validation mismatch fails and rolls back |
+| Revision append | One complete validated successor record plus canonical bytes and server UTC time | Insert-only; duplicate or non-successor state is conflict/integrity failure, never history replacement |
+| Current-record CAS | Complete validated successor, exact expected revision and controller binding, server UTC update time | Updates by exact identity/current revision/binding and requires one affected row; zero is optimistic-concurrency conflict; it cannot advance from 9223372036854775807 |
+| Creation receipt `get` / `add` | Exact `CreationReceiptKey`; reconstruct or insert one validated `StoredCreationSuccessReceipt` and relational bindings | Not found is `None`; malformed receipt/result is integrity failure; duplicate natural key is a unique-race conflict, not heuristic replay |
+| Mutation receipt `get` / `add` | Exact `MutationReceiptKey`; reconstruct or insert one validated `StoredMutationSuccessReceipt`, expected revision, and relational bindings | Same behavior as creation; no read occurs until the future trusted caller has authorized the current record's exact stored controller binding |
+
+The UoW port may expose `controller_bindings`, `player_characters`,
+`creation_receipts`, and `mutation_receipts` over the same SQLAlchemy
+`AsyncSession`, with explicit `commit` and `rollback` matching the current
+repository convention. Exiting without a successful commit or with any
+exception rolls back. A unique-constraint loser must roll back the entire
+transaction, open a fresh UoW, reauthorize through the future trusted caller,
+and reread the durable winner; it must not reuse a failed session or repeat
+allocation/mutation.
+
+Phase 1 pure validation, fingerprint, receipt, replay/conflict, transaction
+order, and mutation-policy operations must be reused. Phase 2 adapters may
+persist, lock, CAS, reconstruct, and reject malformed storage; they may not
+decide authentication, call a lifecycle policy, generate a production ID,
+resolve a production controller, disclose a result, or duplicate business
+validation in ORM/SQL logic. Phase 3 owns those trusted application decisions
+and production composition. Public API/frontend, Run/story activation,
+Provider/model, Demo, and later systems remain outside both the Phase 2 ports
+and UoW.
 
 ### Transaction boundaries
 
+The following remains the accepted end-to-end order, but Phase 2 implements
+only the persistence/UoW primitives and test transaction harness needed to
+prove it. Phase 3 later owns production authentication, resolver/issuer calls,
+policy orchestration, and result disclosure.
+
 Creation transaction:
 
-1. resolve/lock or insert the trusted controller binding;
+1. a future trusted caller supplies an already validated controller binding;
+   lock its registry row, inserting it only when that caller has separately
+   authorized creation;
 2. look up the exact
    `(controller_binding, player-character.create/v1, operation_id)` scope,
    returning its validated stored safe result on exact replay or rejecting a
    conflicting reuse before allocating;
-3. allocate the ID row;
-4. insert the complete current record at initial revision;
+3. obtain an injected ID from the future trusted issuer and insert its
+   allocation row;
+4. validate the complete Phase 1 initial record and canonical bytes;
 5. insert initial revision/provenance history;
-6. insert the accepted successful creation receipt with its exact fingerprint
+6. insert the FK-backed complete current record at initial revision;
+7. insert the accepted successful creation receipt with its exact fingerprint
    and privacy-safe result envelope; and
-7. commit once.
+8. commit once.
 
 Mutation transaction:
 
-1. lock the current character and authorize its exact stored controller
-   binding;
-2. validate the complete typed operation and reject an unrepresentable revision
+1. lock and completely reconstruct the current character;
+2. a future trusted caller authorizes its exact stored controller binding
+   before receipt or character disclosure;
+3. validate the complete typed operation and reject an unrepresentable revision
    successor;
-3. look up the exact
+4. look up the exact
    `(player_character_id, player-character.mutate/v1, operation_id)` scope and
    handle validated exact replay/conflict before expected-revision evaluation;
-4. verify context/reference/expected revision for a new operation;
-5. validate complete candidate;
-6. compare-and-swap current record;
-7. insert revision/provenance and the accepted successful mutation receipt
+5. verify context/reference/expected revision for a new operation;
+6. reuse one Phase 1 policy and validate the complete candidate;
+7. insert its immutable revision/provenance history;
+8. compare-and-swap the FK-backed current record;
+9. insert the accepted successful mutation receipt
    with its exact fingerprint and privacy-safe result envelope;
-8. apply any in-scope continuity effect owned by the same transaction; and
-9. commit once.
+10. apply no Run/story-line continuity effect in Phase 2; and
+11. commit once.
 
 Any failure rolls back. Repository methods never commit. The `UnitOfWork` port
-must expose a character repository and operation repository in both MySQL and
-any composition explicitly required by the selected phase. Demo parity is not
-automatic; adding it needs separate scope because Demo IDs and clocks are
-deterministic validation fixtures, not production identity issuers.
+exposes exactly the four repository surfaces listed above in MySQL and any
+offline test double useful to Phase 2. Deterministic IDs and bindings may be
+injected by Phase 2 tests, but that injection is not a production
+identity-generation, controller-resolution, or binding-creation policy. Demo
+parity is not automatic and remains outside Phase 2.
 
 ### Rollback and recovery
 
@@ -1235,9 +1581,10 @@ scoped implementation task.
 
 ### Phase 1 — Domain envelope, identity types, and policies
 
-Status: **Implemented locally and independently accepted for the exact
-nine-path candidate. This acceptance does not authorize Phase 2 or a public
-activation.**
+Status: **Implemented and independently accepted for the exact
+nine-path candidate, then committed and pushed at
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`. This acceptance does not authorize
+Phase 2 or a public activation.**
 
 Scope:
 
@@ -1277,28 +1624,52 @@ require a missing product rule.
 
 ### Phase 2 — MySQL persistence and migration
 
+Status: **Technical prerequisites drafted as an unaccepted review candidate;
+not implemented and blocked pending fresh independent acceptance plus separate
+explicit user authorization.**
+
 Scope:
 
-- add reviewed ORM models and one linear Alembic revision;
-- extend repository and Unit of Work ports/implementations;
-- implement allocation, current record, revision/provenance, successful
-  creation and mutation receipts, CAS, locking, and rollback behavior; and
-- add real MySQL migration/repository integration tests.
+- once separately authorized, add only the six reviewed section 20 record
+  families through SQLAlchemy models/mappings and one linear Alembic revision;
+- extend repository and Unit of Work ports/implementations with the exact
+  section 20 persistence capabilities;
+- implement allocation, binding-registry storage, current record,
+  revision/provenance, successful creation and mutation receipts, CAS, locking,
+  reconstruction validation, concurrency translation, and rollback behavior;
+- add real MySQL migration/repository integration tests and narrow offline test
+  doubles where useful; and
+- make only minimal truthful status-documentation updates required by that
+  later authorized implementation.
 
-Prerequisites: Phase 1 accepted; exact ID/binding representation and schema
-types reviewed; permanent non-reuse strategy approved as technical design; the
-complete section 15 receipt ownership, key, fingerprint, equivalence, result,
-transaction, rejection, and bounded-retention semantics independently reviewed
-and accepted. The migration must directly revise actual head
+Prerequisites: Phase 1 accepted; this exact two-path technical-prerequisite
+candidate independently reviewed and accepted; permanent non-reuse and the six
+section 20 physical schemas accepted as technical design; the complete section
+15 receipt ownership, key, fingerprint, equivalence, result, transaction,
+rejection, and bounded-retention semantics retained; and separate explicit
+user authorization. The migration must directly revise actual head
 `20260719_0003`.
 
-Exclusions: backfill, deletion, public endpoints, Run binding, Provider.
+Exclusions: trusted business/application orchestration; production
+controller resolution; production controller-ID or player-character-ID
+generation (including generation of a `ControllerBindingRef`); deciding when a
+controller binding is created or invoked;
+backfill; deletion; archive/restore; public routes or response projections;
+frontend flows; Run/story-line binding or activation; Provider/model
+integration; Demo activation; production/network composition; and every Phase
+3 or later behavior.
 
 Completion criteria: migration reaches one head; empty upgrade changes no
 legacy records; allocation/non-reuse, constraints, exact creation/mutation
 receipt scopes, stored-result replay after later revisions, conflict handling,
-absence/undecided round trips, CAS, transaction, failure rollback, and
-no-cascade behavior pass real MySQL tests.
+absence/undecided and deterministic canonical-byte round trips, fixed
+65-feature persistence, aggregate 65,536-byte declaration boundary,
+case-sensitive maximum-length opaque references, malformed reconstruction and
+stored-result rejection before disclosure, CAS, concurrent writers,
+binding-insert conflict, state-plus-receipt atomicity, failure rollback,
+signed-64-bit maximum/overflow prevention, restrictive foreign keys, durable
+reload across a new session/process to the extent the persistence layer owns
+it, and no-cascade behavior pass real MySQL tests.
 
 Stop conditions: downgrade can release issued IDs; MySQL constraints require
 inventing product semantics; a receipt schema would be created before its
@@ -1451,8 +1822,8 @@ Exact placement should be confirmed at each phase.
 | `src/deviation_protocol/application/player_character_service.py` | Trusted orchestration for create/read/mutate/project | Controller resolution, complete validation, atomic/replay boundary | Application unit and MySQL service tests |
 | `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Golden-vector and replay/conflict unit tests |
 | `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
-| `src/deviation_protocol/application/player_character_identity.py` or the existing identity module | Ports/value adapters for controller binding and ID issuance | Domain separation and trusted issuer/resolver | Identity-boundary unit tests |
-| one Alembic revision whose parent is actual head `20260719_0003` | Add reviewed character persistence schema only after section 15 receipt semantics pass review | Uniqueness, non-reuse, binding, revision, provenance, distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
+| `src/deviation_protocol/application/player_character_identity.py` or the existing identity module, Phase 3 only | Ports/value adapters for production controller resolution and ID issuance | Domain separation and trusted issuer/resolver | Identity-boundary unit tests |
+| one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
 | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
 | `tests/unit/test_player_character.py` | Domain record and validation matrix | Strict complete record | Unit matrix |
 | `tests/unit/test_player_character_policies.py` | Lifecycle/confirmation/authority matrix | Every state mutation | Unit matrix |
@@ -1572,6 +1943,21 @@ changes a reusable rule.
 | Golden-memory protection | Boundary/contract | Current memory/summary/Provider data cannot masquerade as protected golden memory |
 | Migration parent and head | Migration/integration | Baseline chain is exactly `20260719_0001 -> 20260719_0002 -> 20260719_0003`; the proposed revision directly revises `20260719_0003` and produces one head |
 | Migration empty upgrade | Migration/integration | New schema only; no inferred structured records |
+| Exact Phase 2 schema | Migration/integration | All six and only the six section 20 tables have the candidate's exact columns, types, nullability, keys, indexes, checks, `ascii_bin` identity columns, restrictive FKs, and timestamp behavior; the inspected exact index inventory includes `ix_spc_revisions_controller_binding (controller_binding)` and `ix_spc_mutation_receipts_result_revision (result_player_character_id, resulting_revision)`, with the latter satisfying both mutation-receipt result-side child FKs; no undeclared MySQL-generated child-side index exists |
+| Every Phase 2 record family round trip | Persistence/integration | Binding, allocation, current, history, creation receipt, and mutation receipt survive commit and strict reload without byte or meaning changes |
+| Case-sensitive maximum opaque identities | Persistence/integration | Distinct case variants coexist; every applicable 128-character value round-trips exactly; 129-character, malformed, trimmed, folded, normalized, or reinterpreted input rejects |
+| Aggregate declaration byte boundary | Domain + persistence/integration | Exact canonical UTF-8 declaration envelopes at 65,536 bytes commit/reload; 65,537 bytes reject before any insert despite MySQL character counts |
+| Fixed 65-feature persistence | Persistence/integration | The accepted fixed 65-feature declaration commits and reloads with order, content, authority, and count unchanged and no item-count ceiling |
+| Malformed current/history record | Persistence/integration | Invalid JSON/canonical bytes, cross-column mismatch, unknown field, invalid declaration envelope, or impossible provenance fails closed before any domain object or private data is returned |
+| Malformed receipt/stored result | Persistence/integration | Invalid canonical receipt, key/fingerprint/result mismatch, impossible semantic result, or oversize blob is an integrity failure before stored-success disclosure |
+| Deterministic fingerprint storage | Application + persistence/integration | `BINARY(32)` round-trips to the exact Phase 1 lowercase digest and produces exact replay only for the canonical matching command |
+| Atomic initial state plus receipt | UoW + MySQL | Binding/allocation/revision/current/creation receipt all commit once or all roll back |
+| Atomic successor state plus receipt | UoW + MySQL | New history/current CAS/mutation receipt all commit once or all roll back |
+| Controller-binding insertion conflict | Persistence/integration | Concurrent insertion of one exact binding has at most one winner; loser rolls back and no binding mutation/rebinding policy appears |
+| Concurrent character writers | Persistence/integration | Locked/CAS writers against one expected revision yield one committed successor/receipt and clean loser rollback |
+| Signed-64-bit revision maximum | Domain + persistence/integration | Revision 9223372036854775807 reloads; 9223372036854775806 may commit its final successor; no update/receipt can require or store 9223372036854775808 |
+| Restrictive foreign keys | Migration + persistence/integration | Parent update/delete and Session cleanup cannot cascade, null, migrate, or erase character allocation, binding, current, history, provenance, or receipts |
+| Durable persistence reload | Persistence/integration | A newly opened `AsyncSession`, and a process restart only where the Phase 2 fixture supports it, reconstructs the same complete records and receipts without Provider, API, frontend, or Run composition |
 | Legacy Session compatibility | API/integration/end-to-end | Existing Sessions remain valid and unbound |
 | Migration failure/rollback | Migration/integration | Original schema/data unchanged where supported; no issued-ID release |
 
@@ -1580,6 +1966,10 @@ follow current repository conventions: pure policies and validation in unit
 tests; SQL constraints, concurrency, transactions, and migrations against real
 MySQL; public request/projection behavior in API contract/integration tests;
 and only cross-boundary continuity/recovery cases in end-to-end tests.
+Phase 2 tests may inject deterministic player-character IDs and controller
+bindings. They must not require or establish production issuance/resolution
+policy and require no Provider, model, public API, frontend, production
+resource, or network-service test.
 
 ### Intended later implementation commands
 
@@ -1666,10 +2056,11 @@ of required verification is a stop condition.
 The following remain unresolved and this plan deliberately does not select
 them:
 
-- exact player-character ID syntax, size, and issuance algorithm, subject to
-  opacity, trusted issuance, uniqueness, and permanent non-reuse;
-- exact database names/types, JSON versus normalized representation,
-  collation, timestamp, and history compaction;
+- production player-character ID issuance algorithm and entropy source; the
+  accepted Phase 1 opaque syntax/128-character bound and this candidate's
+  `ascii_bin` storage representation remain fixed for review;
+- any post-first-slice history compaction or physical-schema evolution; the
+  exact six-table Phase 2 candidate in section 20 selects neither;
 - exact structured field lengths, vocabularies, localization, custom-value
   representation, and profile/activation requiredness;
 - defaulting and update workflows for narration preferences;
@@ -1760,9 +2151,11 @@ The plan-level independent-review and correction gate is closed. The separately
 authorized Phase 1 implementation passed fresh independent read-only
 acceptance for the exact nine-path candidate after the third correction round.
 
-Phase 2 remains blocked pending separate explicit authorization. Phase 1
-acceptance does not authorize persistence, public activation, or any Phase 2
-work.
+Phase 2 remains blocked pending fresh independent read-only acceptance of the
+exact section 20 technical-prerequisite amendment and separate explicit user
+authorization. The amendment is a review candidate, not an approved or frozen
+change. Phase 1 acceptance does not authorize persistence, public activation,
+or any Phase 2 work.
 
 No phase is approved, frozen, started, or completed by being listed here.
 Approval of the frozen product contract is not implementation authorization.
@@ -1845,3 +2238,14 @@ deployment, or work outside a separately authorized phase.
   public API, frontend, Run activation, Provider integration, or public
   activation was accepted or introduced. This acceptance does not authorize a
   push, which remains user-controlled.
+- 2026-07-27: This controlled documentation-only technical-prerequisite task
+  began after accepted Phase 1 had been committed and pushed at
+  `c8808f66e8d97bc4386a481bf21669cfddcd222e`. It drafted the exact six-family
+  MySQL schema, opaque-reference/collation,
+  canonical-binary storage, key/index/foreign-key, persistence-port/UoW,
+  concurrency, rollback, and integration-test boundary for Phase 2. The
+  amendment is an unaccepted review candidate. Phase 2 remains unimplemented
+  and blocked pending fresh independent read-only acceptance of this exact
+  two-path candidate and separate user authorization. No source, test,
+  migration, database, Provider, production, network-service, staging, commit,
+  amend, or push action occurred.
