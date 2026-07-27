@@ -2,17 +2,36 @@
 
 ## 1. Status
 
-Status: **Approved and frozen downstream implementation plan — Phase 1 has
-passed fresh independent read-only acceptance for the exact nine-path
-candidate and is committed and pushed at
-`c8808f66e8d97bc4386a481bf21669cfddcd222e`; Phases 2–7 remain unimplemented
-and blocked pending separate explicit authorization.**
+Status: **Historical downstream implementation plan and technical prerequisites
+were approved and frozen; the current locked four-document candidate requires
+fresh independent approval. Phase 1 has passed fresh independent read-only acceptance for the exact nine-path
+candidate. Its original implementation commit is
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`; the current completed and pushed
+Phase 1 implementation baseline is
+`4acb8b993f15a1fdee20edc3140324730447fc9f`
+(`fix(domain): preserve exact opaque identifiers`). The substantive Phase 2
+technical prerequisites retain their historical technical-freeze role, but the
+current locked candidate requires fresh independent approval; Phases 2–7 remain
+unimplemented.**
 
 The concrete Phase 2 persistence design in section 20 is a
-technical-prerequisite amendment and **review candidate awaiting fresh
-independent acceptance**. It is not yet an accepted or frozen amendment and
-does not authorize Phase 2 implementation. Phase 2 remains unimplemented and
-blocked pending that review and separate explicit user authorization.
+technical-prerequisite amendment that received the independent verdict
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED`. The exact
+approved candidate was committed and pushed unchanged as
+`1fd29798fe256593e56029baca743484cc221ae4`
+(`docs(domain): freeze structured player-character phase 2 prerequisites`).
+It remains the historical technical-freeze commit, but it predates the current
+Phase 1 opaque-identifier correction and does not approve this current locked
+candidate. Phase 2 runtime implementation has not started: that documentation
+commit added no migration, database verification, persistence adapter,
+production composition, public route, frontend behavior, Provider integration,
+or story/Run activation. Phase 3 and every later phase remain blocked.
+
+The ordered Phase 2 implementation slices introduced in section 24 are a new
+amendment candidate, not part of the prior technical-freeze verdict. Section
+31 supplies its self-executing independent-review and unchanged-commit gate.
+Until that gate is satisfied, Phase 2 implementation remains blocked; after it
+is satisfied, Slice 1 still requires separate explicit user authorization.
 
 The pre-correction draft received one fresh independent read-only review. That
 review identified five accepted findings, `SPCIP-001` through `SPCIP-005`; the
@@ -95,7 +114,9 @@ than an implementation default.
 
 ## 4. Implementation status boundary
 
-This approved and frozen document remains the substantive design authority.
+The historical technical-freeze portions of this document remain design
+evidence, but the current locked candidate requires the section 31 review gate
+before it can become operative.
 The separately authorized Phase 1 implementation added only pure domain models,
 independent policies, deterministic character-operation serialization and
 receipt semantics, and offline unit/golden-vector tests. It changes no
@@ -127,6 +148,14 @@ Phase 3.2b. It does not implement the two frozen product specifications named
 above, a Run aggregate, a continuous-story-line aggregate, a stable
 player-character identity, controller-binding persistence, player-character
 lifecycle, or applicable character version/reference binding.
+
+The current completed Phase 1 implementation baseline is
+`4acb8b993f15a1fdee20edc3140324730447fc9f`
+(`fix(domain): preserve exact opaque identifiers`); it follows the original
+Phase 1 implementation commit
+`c8808f66e8d97bc4386a481bf21669cfddcd222e` and preserves opaque identifiers
+exactly. The current Phase 2 implementation base is this completed Phase 1
+baseline, not the historical planning baseline above.
 
 ## 6. Current-state implementation map
 
@@ -524,7 +553,7 @@ allowlist is specified in section 18.
 The trusted `PlayerCharacterIdIssuer` must allocate a fresh opaque,
 domain-qualified identifier. The caller cannot propose, restore, or select the
 ID. Accepted Phase 1 fixes the syntax to its 1–128-character opaque-reference
-alphabet, and the section 20 review candidate fixes its database
+alphabet, and the frozen section 20 technical prerequisite fixes its database
 representation. The production entropy source and random/monotonic issuance
 algorithm remain unresolved; they must produce opaque, non-meaningful,
 collision-checked values within that accepted envelope.
@@ -541,7 +570,7 @@ the mutable current record:
 - migration downgrade/recovery must never make a formerly issued ID eligible
   for allocation.
 
-This allocation ledger is required by the section 20 review candidate because
+This allocation ledger is required by frozen section 20 because
 a mutable or archived record alone cannot prove non-reuse after record
 absence. A single-table alternative would be a new technical amendment
 requiring fresh review; it is not an implementation-session choice. Database
@@ -1027,12 +1056,15 @@ prohibition/subject interface; it must not add golden-memory storage.
 
 ### Proposed ownership and schema sequence
 
-Status of this subsection: **technical-prerequisite review candidate awaiting
-fresh independent acceptance; not frozen and not implementation
-authorization.**
+Status of this subsection: **historical technical prerequisite accepted under
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED`, committed
+and pushed unchanged as
+`1fd29798fe256593e56029baca743484cc221ae4`. It predates the current Phase 1
+opaque-identifier correction and does not approve this current locked
+candidate; it is not implementation authorization.**
 
-Once this candidate has been independently accepted and Phase 2 has been
-separately authorized, one new linear Alembic revision may directly revise
+Once the section 31 slice-order gate is satisfied and the affected slice has
+been separately authorized, one new linear Alembic revision may directly revise
 `20260719_0003`, the current head inspected for this amendment. Phase 2 has
 exactly six persisted record families:
 
@@ -1082,11 +1114,13 @@ accepted Phase 1 value objects and do not select a production issuance
 algorithm.
 
 Closed protocol/version/kind tokens use the explicitly sized ASCII
-`ascii_bin` columns below. Canonical SHA-256 fingerprints use `BINARY(32)`,
-never text or a collation; the adapter converts exactly between those digest
-bytes and Phase 1's 64-character lowercase hexadecimal value. Reconstructed
-hex must match the canonical lowercase form. Fingerprints are compared only
-after scope-key lookup and are not separately indexed.
+`ascii_bin` columns below. Phase 1 command `CharacterOperationFingerprint`
+and internal `CanonicalStateRecordFingerprint` values use `BINARY(32)`, never
+text or a collation. The adapter converts the former exactly between digest
+bytes and Phase 1's 64-character lowercase hexadecimal value; reconstructed
+hex must match the canonical lowercase form. The latter remains raw internal
+digest bytes. Neither is separately indexed, and only the Phase 1 command
+fingerprint participates in post-scope-key replay equivalence.
 
 `record_canonical` is the exact output of
 `canonical_character_operation_bytes(CanonicalPlayerCharacter)` and
@@ -1120,6 +1154,40 @@ have an `OCTET_LENGTH` from 1 through 65,536, matching
 `MAX_STORED_CHARACTER_RECEIPT_CANONICAL_BYTES`. Oversize, non-canonical, or
 malformed persisted data is an internal integrity failure and is never
 truncated, repaired, defaulted, partially returned, or disclosed as success.
+
+##### Canonical state-record fingerprint and receipt binding
+
+For each persisted authoritative `PlayerCharacter` revision, the persistence
+canonical state-record representation is the exact `record_canonical` byte
+sequence produced by the existing Phase 1
+`canonical_character_operation_bytes(CanonicalPlayerCharacter)` helper after
+the frozen player-character contract and the persistence schema have completed
+their required validation and normalization. Its internal
+`CanonicalStateRecordFingerprint` is the raw 32-byte SHA-256 digest of those
+exact bytes. It identifies the canonical persisted content of one authoritative
+revision record; it is not a product identity, an event, a seventh family, or a
+separate event-sourcing subsystem.
+
+The existing helper and canonical schema control deterministic serialization:
+NFC UTF-8 JSON, stable separators and sorted normalized object keys; exact
+typed field inclusion; explicit optional/null/state representation; preserved
+meaningful text and ordered collections; and sorting only where an approved
+type declares a collection unordered. Floats, non-JSON values, duplicate or
+NFC-colliding keys, unknown fields, and lossy equivalences are rejected. Thus
+logically identical validated authoritative revision records produce identical
+bytes, while every field needed to reconstruct that exact revision is covered.
+Database row/column layout, transport formatting, incidental timestamps or
+metadata, and storage-engine representation are not inputs unless they are
+themselves members of this canonical persisted state schema.
+
+`CanonicalStateRecordFingerprint` is distinct from Phase 1
+`CharacterOperationFingerprint`. The latter retains its existing public
+operation-command/replay meaning and its existing receipt construction and
+types remain unchanged. The former is persistence-layer integrity metadata
+derived only while mapping validated Phase 1 results into the six-family Phase
+2 record set. No caller or receipt-supplied fingerprint text is authoritative
+for calculating it, and conversion preserves all Phase 1 receipt data while
+adding only the internal metadata below.
 
 All timestamps are server-supplied UTC `DATETIME(6) NOT NULL` with no database
 default and use MySQL's `1000-01-01 00:00:00.000000` through
@@ -1243,6 +1311,7 @@ different current record or receipt result.
 | `result_contract_version` | `VARCHAR(64) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact result contract version |
 | `resulting_revision` | signed `BIGINT` | NOT NULL; no default | Exact initial revision 1 |
 | `resulting_lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact initial lifecycle `active` |
+| `result_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact resulting revision-1 state record |
 | `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored creation receipt bytes |
 | `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
 
@@ -1277,6 +1346,8 @@ Provider data, or public receipt format is added.
 | `command_result` | `VARCHAR(32) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | `RETIRED` or `DECEASED` for admitted Phase 1 success |
 | `resulting_revision` | signed `BIGINT` | NOT NULL; no default | Exact successor revision |
 | `resulting_lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Lifecycle in the stored safe result |
+| `before_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact expected/before revision record |
+| `after_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact resulting/after revision record |
 | `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored mutation receipt bytes |
 | `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
 
@@ -1370,6 +1441,41 @@ authentication, controller resolution, command sequencing, policy invocation,
 and response disclosure. No SQL constraint or adapter branch may duplicate a
 Phase 1 mutation policy or infer a repair.
 
+Cross-record integrity is required at repository write and reconstruction/read
+boundaries. A creation receipt must bind to the same allocated character,
+controller binding, revision-1 canonical state, declarations, provenance, and
+canonical-record fingerprint as its referenced history row. A mutation receipt
+must bind to the same character and controller binding, exact prior/resulting
+revisions, lifecycle transition, mutation kind, authority class, source
+reference, and canonical state-record fingerprints as its referenced history rows.
+The repository must reject an incomplete or inconsistent record set, including
+missing history, broken revision continuity, substituted character/controller,
+provenance mismatch, or fingerprint mismatch. These checks validate the
+existing Phase 1 receipt contracts and stored result envelopes; they do not
+redefine them or introduce a new receipt/history product subsystem.
+
+One coherent cross-record validator receives the persisted creation receipt,
+all persisted mutation receipts relevant to the reconstructed character
+history, the complete ordered authoritative revision-record set for that
+character, its current record, the controller-binding and allocation companion records, and the
+declarations/provenance, lifecycle, and mutation metadata carried by those
+existing records. It independently reconstructs, validates, and canonicalizes
+every authoritative revision record; recomputes each
+`CanonicalStateRecordFingerprint`; and compares it to
+`result_record_fingerprint` for creation and to `before_record_fingerprint` and
+`after_record_fingerprint` for each mutation. It binds creation to the exact
+character, controller, revision 1, declarations, provenance, and result
+fingerprint; binds each mutation to that exact character/controller and its
+before/after revisions; verifies uninterrupted revision continuity and every
+applicable lifecycle transition, mutation kind, authority class, and source
+reference; and rejects cross-character or cross-controller substitution,
+missing, extra where prohibited, contradictory, or incomplete history,
+provenance mismatch, fingerprint mismatch, and internally inconsistent record
+sets. Independently valid rows are insufficient. This validator fails closed as
+an integrity failure at repository write boundaries before durable success and
+at reconstruction/read boundaries before an authoritative
+`PlayerCharacter` aggregate or stored success result is returned.
+
 The restrictive graph and absence of delete/update ports preserve allocation,
 history, receipts, provenance, controller binding, and current identity without
 inventing character deletion, archival, restoration, receipt cleanup,
@@ -1390,11 +1496,11 @@ Phase 1 values. Repository methods flush where needed but never commit.
 | Controller-binding registry `get` / `add` / `lock` | Exact `ControllerBindingRef`; load, insert, or `SELECT ... FOR UPDATE` the one registry row | Not found is `None`; duplicate insertion is a concurrency conflict; malformed data is integrity failure; no principal resolution, generation, update, or delete |
 | Player-character allocation `exists` / `add` | Exact `PlayerCharacterId`; test existence or insert the allocation ledger row | Collision is a specific allocation conflict; no retry/issuer algorithm in the adapter and no release/delete |
 | Current record `get` / `get_for_update` | Exact `PlayerCharacterId`; load unlocked or locked and reconstruct one complete `CanonicalPlayerCharacter` | Not found is `None`; any malformed column/blob/cross-binding fails before an object is returned |
-| Initial current/history insert | One complete validated revision-1 record plus canonical bytes and server UTC time | Inserts history before its FK-backed current row; any allocation, binding, history, or validation mismatch fails and rolls back |
-| Revision append | One complete validated successor record plus canonical bytes and server UTC time | Insert-only; duplicate or non-successor state is conflict/integrity failure, never history replacement |
+| Initial current/history insert | One complete validated revision-1 record plus canonical bytes, derived `CanonicalStateRecordFingerprint`, and server UTC time | Inserts history before its FK-backed current row; any allocation, binding, history, fingerprint, or validation mismatch fails and rolls back |
+| Revision append | One complete validated successor record plus canonical bytes, derived `CanonicalStateRecordFingerprint`, and server UTC time | Insert-only; duplicate or non-successor state is conflict/integrity failure, never history replacement |
 | Current-record CAS | Complete validated successor, exact expected revision and controller binding, server UTC update time | Updates by exact identity/current revision/binding and requires one affected row; zero is optimistic-concurrency conflict; it cannot advance from 9223372036854775807 |
-| Creation receipt `get` / `add` | Exact `CreationReceiptKey`; reconstruct or insert one validated `StoredCreationSuccessReceipt` and relational bindings | Not found is `None`; malformed receipt/result is integrity failure; duplicate natural key is a unique-race conflict, not heuristic replay |
-| Mutation receipt `get` / `add` | Exact `MutationReceiptKey`; reconstruct or insert one validated `StoredMutationSuccessReceipt`, expected revision, and relational bindings | Same behavior as creation; no read occurs until the future trusted caller has authorized the current record's exact stored controller binding |
+| Creation receipt `get` / `add` | Exact `CreationReceiptKey`; reconstruct or insert one validated `StoredCreationSuccessReceipt`, relational bindings, and the repository-derived revision-1 `result_record_fingerprint` | Not found is `None`; malformed receipt/result/fingerprint binding is integrity failure; duplicate natural key is a unique-race conflict, not heuristic replay |
+| Mutation receipt `get` / `add` | Exact `MutationReceiptKey`; reconstruct or insert one validated `StoredMutationSuccessReceipt`, expected revision, relational bindings, and repository-derived before/after fingerprints | Same behavior as creation; no read occurs until the future trusted caller has authorized the current record's exact stored controller binding |
 
 The UoW port may expose `controller_bindings`, `player_characters`,
 `creation_receipts`, and `mutation_receipts` over the same SQLAlchemy
@@ -1436,8 +1542,10 @@ Creation transaction:
 4. validate the complete Phase 1 initial record and canonical bytes;
 5. insert initial revision/provenance history;
 6. insert the FK-backed complete current record at initial revision;
-7. insert the accepted successful creation receipt with its exact fingerprint
-   and privacy-safe result envelope; and
+7. canonicalize the exact revision-1 state record in the persistence mapping,
+   calculate its `CanonicalStateRecordFingerprint`, and insert the accepted
+   successful creation receipt with the derived `result_record_fingerprint`,
+   its existing exact operation fingerprint, and privacy-safe result envelope; and
 8. commit once.
 
 Mutation transaction:
@@ -1454,8 +1562,11 @@ Mutation transaction:
 6. reuse one Phase 1 policy and validate the complete candidate;
 7. insert its immutable revision/provenance history;
 8. compare-and-swap the FK-backed current record;
-9. insert the accepted successful mutation receipt
-   with its exact fingerprint and privacy-safe result envelope;
+9. canonicalize the exact before and after revision records in the persistence
+   mapping, calculate their `CanonicalStateRecordFingerprint` values, and
+   insert the accepted successful mutation receipt with derived
+   `before_record_fingerprint` and `after_record_fingerprint`, its existing
+   exact operation fingerprint, and privacy-safe result envelope;
 10. apply no Run/story-line continuity effect in Phase 2; and
 11. commit once.
 
@@ -1582,9 +1693,12 @@ scoped implementation task.
 ### Phase 1 — Domain envelope, identity types, and policies
 
 Status: **Implemented and independently accepted for the exact
-nine-path candidate, then committed and pushed at
-`c8808f66e8d97bc4386a481bf21669cfddcd222e`. This acceptance does not authorize
-Phase 2 or a public activation.**
+nine-path candidate. The original implementation commit is
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`; the current completed and pushed
+implementation baseline is
+`4acb8b993f15a1fdee20edc3140324730447fc9f`
+(`fix(domain): preserve exact opaque identifiers`). This acceptance does not
+authorize Phase 2 or a public activation.**
 
 Scope:
 
@@ -1624,9 +1738,10 @@ require a missing product rule.
 
 ### Phase 2 — MySQL persistence and migration
 
-Status: **Technical prerequisites drafted as an unaccepted review candidate;
-not implemented and blocked pending fresh independent acceptance plus separate
-explicit user authorization.**
+Status: **Historical technical prerequisites were accepted and frozen at
+`1fd29798fe256593e56029baca743484cc221ae4`; runtime is not implemented and
+the current locked candidate is blocked pending the section 31 review gate plus
+separate explicit Slice 1 authorization.**
 
 Scope:
 
@@ -1642,13 +1757,14 @@ Scope:
 - make only minimal truthful status-documentation updates required by that
   later authorized implementation.
 
-Prerequisites: Phase 1 accepted; this exact two-path technical-prerequisite
-candidate independently reviewed and accepted; permanent non-reuse and the six
-section 20 physical schemas accepted as technical design; the complete section
-15 receipt ownership, key, fingerprint, equivalence, result, transaction,
-rejection, and bounded-retention semantics retained; and separate explicit
-user authorization. The migration must directly revise actual head
-`20260719_0003`.
+Prerequisites: Phase 1 accepted at the current completed implementation
+baseline; the current locked candidate independently reviewed under the section
+31 gate, with `1fd29798fe256593e56029baca743484cc221ae4` retained only as the
+historical technical-freeze commit; permanent non-reuse and the six section 20
+physical schemas retained; the complete section 15 receipt ownership, key,
+fingerprint, equivalence, result, transaction, rejection, and bounded-retention
+semantics retained; and separate explicit authorization for the exact slice.
+The migration slice must directly revise actual head `20260719_0003`.
 
 Exclusions: trusted business/application orchestration; production
 controller resolution; production controller-ID or player-character-ID
@@ -1676,6 +1792,400 @@ inventing product semantics; a receipt schema would be created before its
 section 15 semantics and Phase 1 fingerprint vectors are accepted; multiple
 transaction owners prevent atomicity; or legacy data would need inferred
 identity.
+
+#### Deterministic Phase 2 implementation slices
+
+The following order is mandatory once the section 31 amendment gate becomes
+operative. Each slice requires its own explicit implementation authorization
+and independent review. A later slice may not be folded into an earlier one
+for convenience. The order follows the actual dependency direction: typed
+ports and byte-exact reconstruction define what persistence may accept and
+return; mappings and DDL then fix the physical carrier; repositories then
+implement those contracts against that carrier; and the Unit of Work can
+finally compose the repositories and prove cross-family transaction behavior.
+
+Earlier references in this plan to the original “first slice” or “first-slice
+protocol” describe the already frozen bounded product/protocol semantics,
+including successful-receipt retention. They do not expand **Phase 2 Slice 1**
+below; this section's numbered names control Phase 2 implementation ordering.
+
+##### Phase 2 Slice 1 — Offline persistence contracts and canonical stored-record codec
+
+Why this occurs first: every mapped column, repository query, reconstruction
+path, and transaction test must depend on one previously reviewed typed
+contract for accepted input, returned values, canonical bytes, and integrity
+failure. No later Phase 2 slice can define that contract without reversing the
+domain-directed dependency.
+
+Architectural purpose: define the domain-directed Phase 2 persistence
+interfaces and the one fail-closed, database-independent conversion boundary
+between the frozen Phase 1 values and the six section 20 stored record shapes.
+Every later slice depends on this contract, while this slice depends on no ORM,
+migration, database, Provider, production composition, or Phase 3 service.
+
+Prerequisite slices: none. The section 31 amendment gate must be operative and
+this exact slice must receive separate explicit implementation authorization.
+
+In scope: only the exact application ports, six non-authoritative stored
+carriers, canonical/fingerprint codecs, integrity failure, and exhaustive
+offline tests specified below.
+
+Expected production paths, exact for this slice:
+
+- modify `src/deviation_protocol/application/ports.py`;
+- create
+  `src/deviation_protocol/infrastructure/player_character_persistence.py`.
+
+Expected test paths, exact for this slice:
+
+- create `tests/unit/test_player_character_persistence.py`;
+- do not modify the existing Phase 1 player-character test files unless a
+  separately confirmed Phase 1 regression requires it.
+
+The application port surface introduced in
+`src/deviation_protocol/application/ports.py` is exactly:
+
+- `ControllerBindingRegistryRepository` with `get`, `add`, and `lock`;
+- `PlayerCharacterRepository` with `allocation_exists`, `add_allocation`,
+  `get`, `get_for_update`, `add_initial`, `append_revision`, and
+  `compare_and_swap_current`;
+- `PlayerCharacterCreationReceiptRepository` with `get` and `add`;
+- `PlayerCharacterMutationReceiptRepository` with `get` and `add`; and
+- the existing `UnitOfWork` type annotations
+  `controller_bindings`, `player_characters`, `creation_receipts`, and
+  `mutation_receipts`.
+
+Those ports accept already validated Phase 1 identifiers, records, receipt
+keys/results, fingerprints, and server UTC timestamps. They return `None` for
+not found or complete validated Phase 1 values. They expose no commit,
+authentication, controller resolution, ID generation, retry, delete, release,
+repair, projection, policy invocation, or response-disclosure behavior.
+
+The infrastructure codec module introduces exactly these persistence-facing
+records, one for each and only each frozen family:
+
+- `StoredControllerBindingRecord`;
+- `StoredPlayerCharacterIdAllocationRecord`;
+- `StoredCurrentPlayerCharacterRecord`;
+- `StoredPlayerCharacterRevisionRecord`;
+- `StoredCreationReceiptRecord`; and
+- `StoredMutationReceiptRecord`.
+
+These are typed scalar/byte carriers matching the exact section 20 columns;
+they are not domain authority, ORM mappings, a seventh family, or public DTOs.
+The module also introduces
+`PlayerCharacterStoredRecordIntegrityError`,
+`canonical_record_to_storage_bytes`,
+`canonical_record_from_current_storage`,
+`canonical_record_from_revision_storage`,
+`creation_receipt_to_storage_bytes`,
+`creation_receipt_from_storage`,
+`mutation_receipt_to_storage_bytes`,
+`mutation_receipt_from_storage`,
+`fingerprint_to_storage_bytes`, and
+`fingerprint_from_storage_bytes`.
+
+The codec must reuse, without replacing, the Phase 1
+`CanonicalPlayerCharacter`, `StoredCreationSuccessReceipt`,
+`StoredMutationSuccessReceipt`, strict validators,
+`canonical_character_operation_bytes`,
+`canonical_player_declaration_bytes`, and fingerprint types. Encoding validates
+the complete original Phase 1 object before emitting bytes. Reconstruction
+strictly parses exactly one UTF-8 JSON object, constructs the existing Phase 1
+type, revalidates the complete actual state, recomputes canonical bytes, and
+requires byte-for-byte equality before returning any object or stored result.
+The current-record decoder cross-checks every duplicated current column; the
+history decoder additionally cross-checks prior revision, mutation kind,
+authority class, and source reference. Receipt decoders cross-check every
+scope-key, fingerprint, command, schema, owner/target, expected/result
+revision, lifecycle, result, and internal state-record-fingerprint column.
+They must also provide one aggregate cross-record validation input comprising
+the creation receipt, relevant mutation receipts, complete ordered revision
+history, current record, controller-binding/allocation companion records, and their existing
+declarations, provenance, lifecycle, and mutation metadata; per-row decoding
+alone is insufficient.
+
+The codec must reject, before returning a trusted value or disclosing stored
+success:
+
+- non-object, empty, invalid UTF-8, invalid Unicode, duplicate-key, float,
+  non-standard constant, out-of-signed-64-bit, unknown-field, missing-field,
+  non-canonical, or trailing-content JSON;
+- a canonical blob whose relational identity, contract, revision, binding,
+  lifecycle, or provenance columns differ from the reconstructed value;
+- a creation or mutation receipt whose referenced history is missing,
+  discontinuous, cross-character or cross-controller substituted, or differs
+  in provenance or canonical-record fingerprint; and
+- an empty or over-65,536-byte receipt blob, any receipt/key/result mismatch,
+  any impossible or Phase 1-unavailable success, and any receipt that would
+  represent `REVISION_EXHAUSTED`;
+- any declaration envelope above 65,536 canonical UTF-8 bytes while accepting
+  the exact 65,536-byte boundary and the fixed 65-feature ordered declaration;
+- any revision outside `1..9223372036854775807`, while accepting the maximum
+  as readable and rejecting `9223372036854775808`;
+- any Phase 1 command fingerprint other than exactly 32 storage bytes or the
+  exact Phase 1 lowercase 64-hex representation, or any internal state-record
+  fingerprint that does not equal SHA-256 of its independently recomputed
+  canonical state-record bytes; and
+- any opaque identifier that is empty, longer than 128 ASCII bytes, outside
+  the Phase 1 alphabet, trimmed, case-folded, Unicode-normalized into a
+  different value, semantically parsed, or otherwise reinterpreted.
+
+Identity and round-trip obligations are exact: the accepted 128-character
+maximum and shorter values preserve case and identical ASCII bytes; no
+whitespace trimming, case folding, Unicode normalization, semantic parsing,
+database generation, or cross-domain substitution is permitted. Omitted,
+explicitly absent, intentionally undecided, and declared values remain
+pairwise distinct. Ordered feature/custom-value collections retain order and
+exact player-authored content. All existing Phase 1 field/type limits remain
+in force and Slice 1 adds no replacement per-field or item-count ceiling.
+Encoding, decoding, re-encoding, and fingerprint conversion must be
+deterministic and byte-identical.
+
+Permitted verification level: Offline only; no database, migration execution,
+Provider, production, or network access. The focused command is:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/unit/test_player_character_persistence.py tests/unit/test_player_character.py tests/unit/test_player_character_policies.py tests/unit/test_player_character_operations.py -q
+```
+
+The implementation task must also run
+`.\.venv\Scripts\python.exe -m compileall -q src tests alembic`,
+`.\scripts\verify.ps1 -Mode Offline`, and `git diff --check`.
+
+Completion criteria: all named symbols and only the named six stored carriers
+exist; port signatures preserve domain-directed dependencies; exhaustive
+offline positive and malformed vectors prove exact canonical and fingerprint
+round trips, relational cross-binding, receipt-to-history binding (including
+later-revision reconstruction/replay), declaration states and limits,
+65-feature ordering, opaque-identity behavior, receipt semantics, maximum
+revision behavior, and fail-closed non-disclosure; the existing Phase 1 vectors
+remain unchanged; and no SQLAlchemy model, migration, repository adapter, UoW
+wiring, database test, production composition, or public behavior is added.
+
+Explicit exclusions: ORM rows, DDL, an Alembic revision, SQL statements,
+repository implementations, MySQL errors or locking, transaction orchestration,
+production issuer/resolver behavior, public routes, API/frontend/Demo changes,
+Run/story behavior, Provider integration, and Phase 3 work.
+
+Database access required by the eventual Slice 1 implementation task: **No**.
+
+Still blocked after Slice 1: all schema/migration work, MySQL adapters, UoW
+wiring, transactional integration proof, every public or production
+composition, and Phases 3–7.
+
+##### Phase 2 Slice 2 — Exact six-family SQLAlchemy metadata and linear Alembic migration
+
+Why this occurs second: ORM metadata and DDL must implement the already tested
+Slice 1 carriers and cannot safely precede their strict byte/identity contract.
+Repositories cannot be implemented against tables that do not yet have one
+reviewed exact mapping and migration.
+
+Prerequisite slices: Slice 1 implemented, independently accepted, and present.
+
+In scope: add exactly the six section 20 ORM mappings and one additive linear
+Alembic revision; encode every frozen column type, length, `ascii_bin`
+identity/token collation, `utf8mb4_bin` table default, key, named check,
+restrictive foreign key, exact ordinary/unique index, timestamp rule, and
+InnoDB option; preserve both ordinary non-unique indexes
+`ix_spc_revisions_controller_binding (controller_binding)` and
+`ix_spc_mutation_receipts_result_revision
+(result_player_character_id, resulting_revision)` exactly; keep the migration
+empty of backfill and make downgrade refuse unsafe use after issuance as
+specified in section 20.
+
+Explicit exclusions: repositories, SQL locking/CAS behavior, UoW wiring,
+creation or mutation transaction harnesses, any seventh family or table,
+Session/Run/account foreign keys, redundant indexes, SQLite, public
+composition, and every Phase 3 concern.
+
+Expected production paths:
+
+- modify `src/deviation_protocol/infrastructure/orm_models.py`;
+- create one
+  `alembic/versions/<implementation-assigned-revision>_structured_player_character_phase_2.py`.
+
+Only the later filename/revision identifier is deferred to the authorized
+implementation session's collision-free Alembic convention; its
+`down_revision` is fixed as `20260719_0003`, it must be the sole new head, and
+its contents are fixed by section 20.
+
+Expected test paths:
+
+- modify `tests/integration/test_mysql_connection.py`;
+- create `tests/integration/test_mysql_player_character.py` for schema-level
+  checks that will be extended, not replaced, by Slices 3 and 4.
+
+Permitted verification level: offline metadata/Alembic inspection plus real
+MySQL 8 integration against only `deviation_protocol_test`; no Provider,
+production, or other network service. Completion requires both the repository
+Offline verifier and the authorized MySQL verifier, plus Alembic heads/history
+and `git diff --check`.
+
+Completion criteria: the migration upgrades from `20260719_0003` to exactly one
+head; all six and only six families have the exact frozen schema; MySQL reports
+the intended collations, constraints, foreign-key actions, and complete ordered
+index inventory with no undeclared generated child index; an empty upgrade
+creates no structured records and changes no legacy row; migration failure
+behavior is verified without claiming transactional DDL where MySQL does not
+provide it; and no repository or runtime behavior is claimed.
+
+Database access required by the eventual Slice 2 implementation task:
+**Yes**, limited to the approved MySQL integration-test database for completion
+evidence. Migration execution against production or any non-test database
+remains prohibited.
+
+Still blocked after Slice 2: all production repository operations,
+reconstruction from live rows, locking/CAS, receipts, UoW composition,
+cross-family atomicity, and Phases 3–7.
+
+##### Phase 2 Slice 3 — MySQL repositories, locking, CAS, and strict reconstruction
+
+Why this occurs third: repository SQL depends on the accepted Slice 1
+ports/codecs and the accepted Slice 2 mapped physical schema. Keeping UoW
+composition later permits an independent review of every individual
+read/write/lock/CAS primitive before cross-family transaction claims.
+
+Prerequisite slices: Slices 1–2 implemented, independently accepted, and
+present.
+
+In scope: implement all four Slice 1 repository interfaces over one supplied
+`AsyncSession`; registry get/add/`SELECT ... FOR UPDATE`; allocation
+exists/add with collision classification and no release; current get and
+locked get; initial history then current insert; immutable successor-history
+append; current CAS over exact identity, expected revision, and controller
+binding with exactly one affected row; creation and mutation receipt get/add;
+flush without commit; conversion through only the Slice 1 codec; MySQL
+duplicate/constraint failure classification narrow enough not to translate
+unrelated integrity failures; and focused real-MySQL concurrency,
+round-trip, corruption, case/collation, and restrictive-FK tests.
+
+Creation-receipt lookup remains binding-owned and requires no pre-existing
+current player character. Mutation-receipt identity remains the collision-safe
+natural scope `(player_character_id, player-character.mutate/v1,
+operation_id)`. Exact replay data may be loaded after later revisions, but
+only the future trusted caller may authorize and disclose it. Repository
+methods do not invoke Phase 1 policies, choose transaction order, retry an ID,
+resolve controllers, issue production IDs, commit, or return public responses.
+
+Explicit exclusions: UoW repository construction, commit/rollback ownership,
+business orchestration, unique-race winner reauthorization, public/API/Demo
+composition, Run/story continuity effects, Provider behavior, and Phase 3.
+
+Expected production paths:
+
+- modify `src/deviation_protocol/infrastructure/repositories.py`;
+- modify `src/deviation_protocol/infrastructure/errors.py` only for the narrow
+  allocation, optimistic-concurrency, unique-race, and stored-integrity
+  classifications required by the frozen ports; and
+- reuse, without widening,
+  `src/deviation_protocol/infrastructure/player_character_persistence.py`.
+
+Expected test paths:
+
+- create `tests/unit/test_player_character_repositories.py`;
+- extend `tests/integration/test_mysql_player_character.py`.
+
+Permitted verification level: focused offline mock/unit tests plus real MySQL
+8 integration against only `deviation_protocol_test`; no production database,
+Provider, API, frontend, Demo, or external network access. Completion also
+requires Offline and MySQL verifiers, compileall, Alembic heads/history, and
+`git diff --check`.
+
+Completion criteria: all repository capabilities in section 20 pass exact
+round-trip and malformed-row tests for all six families; case variants and
+128-byte identities remain distinct and exact; 129-byte/malformed values fail;
+the 65,536-byte declaration boundary and fixed 65 features reload unchanged;
+receipt fingerprints and stored results are exact; maximum revision reloads,
+the final representable successor CAS is supported, and overflow is rejected;
+locking serializes the exact owner; one CAS winner is possible; losing or
+unrelated integrity failures are classified without repair or false replay;
+restrictive parents cannot be updated/deleted through repository behavior; and
+no repository commits independently.
+
+Database access required by the eventual Slice 3 implementation task:
+**Yes**, limited to the approved MySQL integration-test database.
+
+Still blocked after Slice 3: production UoW exposure, multi-family atomic
+creation/mutation proof, rollback/fresh-transaction winner recovery proof,
+Phase 2 closeout, every public/production invocation path, and Phases 3–7.
+
+##### Phase 2 Slice 4 — SQLAlchemy Unit of Work wiring and atomic Phase 2 integration proof
+
+Why this occurs fourth: only after each repository primitive and the physical
+schema are accepted can the existing `SqlAlchemyUnitOfWork` safely expose all
+four repositories over one `AsyncSession` and support evidence-backed
+cross-family atomicity and rollback claims.
+
+Prerequisite slices: Slices 1–3 implemented, independently accepted, and
+present.
+
+In scope: instantiate `controller_bindings`, `player_characters`,
+`creation_receipts`, and `mutation_receipts` on one entered
+`SqlAlchemyUnitOfWork`; preserve explicit commit/rollback and rollback-on-exit;
+prove with a Phase 2-only transaction harness the frozen creation and mutation
+orders without adding the Phase 3 trusted service; prove binding plus
+allocation plus revision 1 plus current plus creation receipt commit or roll
+back together; prove successor history plus current CAS plus mutation receipt
+commit or roll back together; prove concurrent binding insertion, allocation,
+receipt uniqueness, locks, CAS, and loser rollback; and prove a loser uses a
+fresh UoW for durable-winner reread without repeating allocation or mutation.
+
+The integration harness may inject deterministic typed IDs, bindings,
+timestamps, and already validated Phase 1 commands/records. It is test-only:
+it does not select production issuance, controller resolution, binding
+creation/invocation, trusted orchestration, result disclosure, or public
+composition. Exact replay and changed-command conflict are demonstrated by
+reusing the Phase 1 receipt protocol over persisted repository results,
+including authorized later-revision replay and current-state validation before
+stored-result disclosure. `REVISION_EXHAUSTED` remains an internal failure and
+creates no fingerprint, history, CAS, receipt, or persisted success.
+
+Explicit exclusions: `player_character_service.py`, resolver/issuer
+composition, `api/dependencies.py`, routes, response projections, frontend,
+Demo, Provider/model, Run/story-line activation, migration execution outside
+the approved test database, and every Phase 3 or later responsibility.
+
+Expected production paths:
+
+- modify `src/deviation_protocol/infrastructure/unit_of_work.py`;
+- do not modify the accepted Slice 1 port contract. If UoW wiring proves that
+  contract inadequate, stop for a separate reviewed amendment; no new port or
+  record family may be added inside Slice 4.
+
+Expected test paths:
+
+- modify `tests/unit/test_repository_and_uow.py`;
+- extend `tests/integration/test_mysql_player_character.py`;
+- modify `tests/integration/conftest.py` only to add owned cleanup for the
+  exact six Phase 2 families in restrictive-FK-safe order.
+
+Permitted verification level: focused unit tests, the complete Offline
+verifier, Full verification where safely configured, and real MySQL 8
+integration/MySQL verifier against only `deviation_protocol_test`; no Provider,
+production service, or other external network access.
+
+Completion criteria: one entered UoW exposes the four exact repositories on one
+session; repository methods never commit; commit publishes every required
+family exactly once; explicit rollback, exception exit, commit failure, CAS
+loss, constraint loss, and malformed reload publish no partial success; exact
+creation replay performs no second allocation; exact mutation replay after a
+later revision performs no second mutation; changed commands conflict;
+creation receipts remain independent of a pre-existing current character;
+mutation receipt scope is collision-safe; maximum-revision exhaustion persists
+nothing; a fresh session reloads byte-identical complete records/receipts; all
+Phase 2 MySQL tests pass; the canonical documentation-synchronization checklist
+and a fresh independent Phase 2 implementation audit are complete before any
+Phase 2 completion or commit request.
+
+Database access required by the eventual Slice 4 implementation task:
+**Yes**, limited to the approved MySQL integration-test database.
+
+Still blocked after Slice 4: Phase 2 is only an implementation candidate until
+its required independent audit and separately authorized closeout/commit.
+Trusted application orchestration, production controller resolution and ID
+issuance, public routes/projections, frontend, Demo, Provider, Run/story
+activation, and every Phase 3–7 responsibility remain blocked.
 
 ### Phase 3 — Trusted canonical application service
 
@@ -1813,25 +2323,32 @@ audit.
 This inventory is proposed implementation scope only. It authorizes no edit.
 Exact placement should be confirmed at each phase.
 
-### Proposed additions
+### Existing Phase 1 baseline files and proposed later additions
 
-| Proposed path | Layer and purpose | Obligation | Protecting tests |
-| --- | --- | --- | --- |
-| `src/deviation_protocol/domain/player_character.py` | Domain aggregate, distinct value objects, strict field groups, lifecycle, reference, provenance | Complete canonical record, identity separation, versions, lifecycle | New domain unit tests |
-| `src/deviation_protocol/domain/player_character_policies.py` | Independent pure policies for creation and each lifecycle route | Guardrail policy separation; transition/authority matrix | Policy matrix unit tests |
-| `src/deviation_protocol/application/player_character_service.py` | Trusted orchestration for create/read/mutate/project | Controller resolution, complete validation, atomic/replay boundary | Application unit and MySQL service tests |
-| `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Golden-vector and replay/conflict unit tests |
-| `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
-| `src/deviation_protocol/application/player_character_identity.py` or the existing identity module, Phase 3 only | Ports/value adapters for production controller resolution and ID issuance | Domain separation and trusted issuer/resolver | Identity-boundary unit tests |
-| one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
-| future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
-| `tests/unit/test_player_character.py` | Domain record and validation matrix | Strict complete record | Unit matrix |
-| `tests/unit/test_player_character_policies.py` | Lifecycle/confirmation/authority matrix | Every state mutation | Unit matrix |
-| `tests/unit/test_player_character_operations.py` | Canonical fingerprint vectors, exact replay equivalence, conflicts, and safe-result validation | Receipt protocol before schema | Application boundary tests |
-| `tests/unit/test_player_character_service.py` | Service, replay, privacy, rollback with fakes | Trusted boundary | Application tests |
-| `tests/integration/test_mysql_player_character.py` | Real MySQL repositories, transactions, CAS, constraints | Persistence/atomicity | Integration tests |
+The following existing Phase 1 baseline files will be extended during Phase 2
+where their listed responsibility applies; they are not proposed additions and
+their completed Phase 1 work is not pending.
 
-The exact split among the proposed application/domain files is `T`.
+| Status | Path | Layer and purpose | Obligation | Protecting tests |
+| --- | --- | --- | --- | --- |
+| Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character.py` | Domain aggregate, distinct value objects, strict field groups, lifecycle, reference, provenance | Complete canonical record, identity separation, versions, lifecycle | Existing and extended domain unit tests |
+| Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character_policies.py` | Independent pure policies for creation and each lifecycle route | Guardrail policy separation; transition/authority matrix | Existing and extended policy matrix unit tests |
+| Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_service.py` | Trusted orchestration for create/read/mutate/project | Controller resolution, complete validation, atomic/replay boundary | Application unit and MySQL service tests |
+| Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Existing and extended golden-vector and replay/conflict unit tests |
+| Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
+| Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_identity.py` or the existing identity module, Phase 3 only | Ports/value adapters for production controller resolution and ID issuance | Domain separation and trusted issuer/resolver | Identity-boundary unit tests |
+| Proposed Phase 2 Slice 1 addition | `src/deviation_protocol/infrastructure/player_character_persistence.py` | Database-independent stored-record carriers, canonical codec, and integrity validation | Exact six-family conversion boundary | Persistence codec unit tests |
+| Proposed Phase 2 addition | one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
+| Proposed Phase 4 addition | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
+| Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character.py` | Domain record and validation matrix | Strict complete record | Existing and extended unit matrix |
+| Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_policies.py` | Lifecycle/confirmation/authority matrix | Every state mutation | Existing and extended unit matrix |
+| Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_operations.py` | Canonical fingerprint vectors, exact replay equivalence, conflicts, and safe-result validation | Receipt protocol before schema | Existing and extended application-boundary tests |
+| Proposed Phase 2 Slice 1 addition | `tests/unit/test_player_character_persistence.py` | Stored-record codec, canonical bytes, and integrity matrix | Fail-closed persistence conversion | Offline persistence unit tests |
+| Proposed Phase 2 Slice 3 addition | `tests/unit/test_player_character_repositories.py` | Repository capability and failure classification matrix | Exact repository behavior without commits | Repository unit tests |
+| Proposed Phase 3 addition | `tests/unit/test_player_character_service.py` | Service, replay, privacy, rollback with fakes | Trusted boundary | Application tests |
+| Proposed Phase 2 addition | `tests/integration/test_mysql_player_character.py` | Real MySQL repositories, transactions, CAS, constraints | Persistence/atomicity | Integration tests |
+
+The exact split among the proposed application/domain additions is `T`.
 Repository convention supports domain, application, infrastructure, and test
 separation, but avoiding circular dependencies and keeping policy classes
 independent is more important than these filenames.
@@ -1843,9 +2360,11 @@ independent is more important than these filenames.
 | `src/deviation_protocol/application/ports.py` | Add canonical repository, separate successful creation/mutation receipt, issuer/resolver, and UoW ports | Domain-directed dependencies and exact receipt ownership | Port/service type and fake tests |
 | `src/deviation_protocol/infrastructure/orm_models.py` | Add private normalized persistence models | MySQL canonical ownership/constraints | Schema and repository tests |
 | `src/deviation_protocol/infrastructure/repositories.py` | Add lock/read/allocation/CAS/history and exact-scoped successful-receipt operations without commits | Atomic canonical mutations and replay | MySQL repository tests |
+| `src/deviation_protocol/infrastructure/errors.py` | Slice 3 only: add narrow allocation, optimistic-concurrency, unique-race, and stored-integrity classifications if required | Exact repository failure translation | Repository unit and MySQL tests |
 | `src/deviation_protocol/infrastructure/unit_of_work.py` | Expose new repositories in one `AsyncSession` transaction | Commit/rollback ownership | UoW rollback tests |
 | `tests/unit/test_repository_and_uow.py` | Cover new repository/UoW wiring and failure restoration | Existing persistence convention | Focused unit tests |
 | `tests/integration/test_mysql_connection.py` | Advance expected Alembic head and assert exact new schema | Migration verification | Real MySQL schema test |
+| `tests/integration/conftest.py` | Slice 4 only: add owned cleanup for the six Phase 2 families in restrictive-FK-safe order | Isolated integration cleanup | Phase 2 MySQL integration tests |
 | `src/deviation_protocol/api/schemas.py`, `src/deviation_protocol/api/main.py`, `src/deviation_protocol/api/dependencies.py`, and `src/deviation_protocol/api/errors.py` | Phase 5 only: narrow typed public boundary, resolver composition, safe errors | Public allowlist/authority | API unit/integration contract tests |
 | `tests/unit/test_session_service.py` and relevant API integration tests | Prove existing Session identity/projection is unchanged | Compatibility | Regression tests |
 | future Run-owned module/directory, not nameable today | Phase 4 only: bind exact ID/reference in the real Run aggregate and reject second/conflicting active character bindings on one line | Same-line/later-world continuity and frozen line cardinality | Run service/integration/contract tests |
@@ -1925,6 +2444,8 @@ changes a reusable rule.
 | Fingerprint canonicalization | Application unit golden vectors | Exact namespace/command/contract/declaration or target/revision/body/evidence fields use stable UTF-8 canonical JSON while preserving omission, absence, undecided, ordered data, and meaningful text |
 | Duplicate exact creation operation | Service + persistence | Original safe result returned; one identity allocation/current record/history/receipt |
 | Duplicate exact mutation operation after later revisions | Service + persistence | Original stored safe result returned without reconstructing from current state; no second revision/history entry |
+| Canonical state-record fingerprint | Persistence unit | Deterministic canonical record serialization yields stable SHA-256 bytes for logically identical normalized revisions, changes for authoritative state changes, and remains distinct from unchanged Phase 1 `CharacterOperationFingerprint` semantics |
+| Receipt/history cross-record integrity | Persistence/integration | Creation receipt binds its exact revision-1 result record; each mutation receipt binds its exact before/after records; parameterized corruption tests detect and fail closed on cross-character/controller substitution, missing history, extra history where prohibited, contradictory history, broken continuity, declaration/provenance/lifecycle/mutation-metadata mismatch, authority mismatch where authority applies, source-reference mismatch where source reference applies, and before/after/result fingerprint mismatch at both write and reconstruction/read boundaries before replay or disclosure |
 | Conflicting replay | Service + persistence | Same exact scope key with different fingerprint, command, target/result binding, or result-schema version conflicts; no allocation or mutation |
 | Rejected operation receipt absence | Service + persistence | Rejections create no first-slice character receipt and may be re-evaluated without ever duplicating a successful effect |
 | Current Session replay separation | Application/contract + persistence | Character operations neither reuse nor mutate `turn_requests`; Session action/request status authority remains unchanged |
@@ -1943,14 +2464,14 @@ changes a reusable rule.
 | Golden-memory protection | Boundary/contract | Current memory/summary/Provider data cannot masquerade as protected golden memory |
 | Migration parent and head | Migration/integration | Baseline chain is exactly `20260719_0001 -> 20260719_0002 -> 20260719_0003`; the proposed revision directly revises `20260719_0003` and produces one head |
 | Migration empty upgrade | Migration/integration | New schema only; no inferred structured records |
-| Exact Phase 2 schema | Migration/integration | All six and only the six section 20 tables have the candidate's exact columns, types, nullability, keys, indexes, checks, `ascii_bin` identity columns, restrictive FKs, and timestamp behavior; the inspected exact index inventory includes `ix_spc_revisions_controller_binding (controller_binding)` and `ix_spc_mutation_receipts_result_revision (result_player_character_id, resulting_revision)`, with the latter satisfying both mutation-receipt result-side child FKs; no undeclared MySQL-generated child-side index exists |
+| Exact Phase 2 schema | Migration/integration | All six and only the six section 20 tables have the frozen exact columns, types, nullability, keys, indexes, checks, `ascii_bin` identity columns, restrictive FKs, and timestamp behavior; the inspected exact index inventory includes `ix_spc_revisions_controller_binding (controller_binding)` and `ix_spc_mutation_receipts_result_revision (result_player_character_id, resulting_revision)`, with the latter satisfying both mutation-receipt result-side child FKs; no undeclared MySQL-generated child-side index exists |
 | Every Phase 2 record family round trip | Persistence/integration | Binding, allocation, current, history, creation receipt, and mutation receipt survive commit and strict reload without byte or meaning changes |
 | Case-sensitive maximum opaque identities | Persistence/integration | Distinct case variants coexist; every applicable 128-character value round-trips exactly; 129-character, malformed, trimmed, folded, normalized, or reinterpreted input rejects |
 | Aggregate declaration byte boundary | Domain + persistence/integration | Exact canonical UTF-8 declaration envelopes at 65,536 bytes commit/reload; 65,537 bytes reject before any insert despite MySQL character counts |
 | Fixed 65-feature persistence | Persistence/integration | The accepted fixed 65-feature declaration commits and reloads with order, content, authority, and count unchanged and no item-count ceiling |
 | Malformed current/history record | Persistence/integration | Invalid JSON/canonical bytes, cross-column mismatch, unknown field, invalid declaration envelope, or impossible provenance fails closed before any domain object or private data is returned |
 | Malformed receipt/stored result | Persistence/integration | Invalid canonical receipt, key/fingerprint/result mismatch, impossible semantic result, or oversize blob is an integrity failure before stored-success disclosure |
-| Deterministic fingerprint storage | Application + persistence/integration | `BINARY(32)` round-trips to the exact Phase 1 lowercase digest and produces exact replay only for the canonical matching command |
+| Deterministic fingerprint storage | Application + persistence/integration | `BINARY(32)` round-trips the exact Phase 1 lowercase command digest and the internal raw canonical state-record digest; neither changes Phase 1 public receipt construction or replay semantics |
 | Atomic initial state plus receipt | UoW + MySQL | Binding/allocation/revision/current/creation receipt all commit once or all roll back |
 | Atomic successor state plus receipt | UoW + MySQL | New history/current CAS/mutation receipt all commit once or all roll back |
 | Controller-binding insertion conflict | Persistence/integration | Concurrent insertion of one exact binding has at most one winner; loser rolls back and no binding mutation/rebinding policy appears |
@@ -2057,10 +2578,10 @@ The following remain unresolved and this plan deliberately does not select
 them:
 
 - production player-character ID issuance algorithm and entropy source; the
-  accepted Phase 1 opaque syntax/128-character bound and this candidate's
+  accepted Phase 1 opaque syntax/128-character bound and frozen section 20's
   `ascii_bin` storage representation remain fixed for review;
 - any post-first-slice history compaction or physical-schema evolution; the
-  exact six-table Phase 2 candidate in section 20 selects neither;
+  exact frozen six-table Phase 2 design in section 20 selects neither;
 - exact structured field lengths, vocabularies, localization, custom-value
   representation, and profile/activation requiredness;
 - defaulting and update workflows for narration preferences;
@@ -2095,8 +2616,10 @@ later-world-driven switching.
 
 ## 30. Acceptance criteria
 
-The completed independent read-only review confirmed that this implementation
-plan:
+The current four-document candidate is not approved. A fresh independent
+read-only review of the complete exact candidate must approve its resulting
+four SHA-256 hashes with
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` and verify that this plan:
 
 1. remains downstream from, and does not weaken or expand, the frozen product
    contract;
@@ -2121,8 +2644,10 @@ plan:
 11. uses complete strict validation, expected revision, exact authority/context
     matching, and one atomic commit;
 12. defines distinct creation and mutation receipt ownership/key scopes,
-    canonical fingerprints, exact replay/conflict and stored-original-result
-    behavior, accepted-operation-only persistence, transaction ordering, and
+    Phase 1 operation fingerprints and separately derived internal canonical
+    state-record fingerprints, exact replay/conflict and stored-original-result
+    behavior, complete cross-record validation at write and reconstruction/read
+    boundaries, accepted-operation-only persistence, transaction ordering, and
     the bounded no-cleanup first-slice assumption before Phase 2 schema work;
 13. preserves every approved optional declaration state, enforces adult-only
     age presentation, selects no narration-preference default, and preserves
@@ -2139,23 +2664,64 @@ plan:
     documentation plan;
 19. classifies product decisions, technical choices, deferrals, and exclusions
     truthfully; and
-20. was unimplemented, unstaged, uncommitted, and unpushed when the plan was
-    approved and frozen.
+20. remains unimplemented, unstaged, uncommitted, and unpushed when the review
+    occurs.
 
 Runtime acceptance for later implementation is phase-specific and cannot be
-earned by approval of this document alone.
+earned by approval of this document alone. Historical review results in section
+32 remain historical evidence only and cannot approve this corrected candidate.
 
 ## 31. Approval and implementation gate
 
-The plan-level independent-review and correction gate is closed. The separately
-authorized Phase 1 implementation passed fresh independent read-only
-acceptance for the exact nine-path candidate after the third correction round.
+The corrected four-document candidate is not approved. A fresh independent
+read-only review of its complete exact four-document candidate is required
+before the plan-level independent-review and correction gate can close. The
+separately authorized Phase 1 implementation passed fresh independent
+read-only acceptance for the exact nine-path candidate after the third
+correction round.
 
-Phase 2 remains blocked pending fresh independent read-only acceptance of the
-exact section 20 technical-prerequisite amendment and separate explicit user
-authorization. The amendment is a review candidate, not an approved or frozen
-change. Phase 1 acceptance does not authorize persistence, public activation,
-or any Phase 2 work.
+The substantive Phase 2 technical prerequisites in section 20 were
+historically accepted and frozen under
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED` at
+`1fd29798fe256593e56029baca743484cc221ae4`. That approval predates the
+current completed Phase 1 baseline and does not approve this current locked
+candidate.
+
+The ordered Phase 2 slices added under section 24 are a distinct amendment
+candidate. This implementation-order amendment becomes operative if and only
+if all of these conditions occur in order:
+
+1. a fresh independent read-only review returns
+   `STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` for the complete exact
+   resulting four-document candidate, with the review approving that exact
+   candidate's four SHA-256 hashes;
+2. separate authorization is obtained to stage and commit exactly those four
+   approved documents, and the staged and committed bytes retain the approved
+   hashes;
+3. the documentation-only commit is pushed through the repository's established
+   authorized push workflow;
+4. after the push, a new clean baseline is confirmed: `main` is checked out,
+   `HEAD` equals local `origin/main`, ahead/behind is `0/0` without an
+   unnecessary fetch unless separately authorized, the worktree and index are
+   clean, no staged or normal untracked path remains, and the pushed commit
+   contains exactly the approved documentation scope; and
+5. a separately authorized Phase 2 implementation task then begins.
+
+Before the fresh approval, no staging, commit, push, or Phase 2 implementation
+is allowed. Approval alone or a local documentation commit alone does not
+authorize Phase 2 implementation; implementation remains blocked until the
+pushed clean baseline is confirmed. Once all conditions are satisfied, this
+paragraph is self-executing: no further status-only documentation edit is
+required to activate the mandatory slice order. Actual Slice 1 implementation
+still requires the separate explicit user authorization in condition 5, and
+every later slice requires its own prerequisite acceptance and explicit
+authorization.
+
+Independent approval of this ordering amendment does not itself authorize
+implementation, migration execution, database access, staging, commit, push,
+deployment, public activation, or work outside the four-document review. Phase 1
+acceptance and the historical Phase 2 technical-freeze approval likewise do not
+authorize those actions.
 
 No phase is approved, frozen, started, or completed by being listed here.
 Approval of the frozen product contract is not implementation authorization.
@@ -2249,3 +2815,13 @@ deployment, or work outside a separately authorized phase.
   two-path candidate and separate user authorization. No source, test,
   migration, database, Provider, production, network-service, staging, commit,
   amend, or push action occurred.
+- 2026-07-27: A subsequent fresh independent read-only review of that exact
+  substantive Phase 2 technical-prerequisite candidate returned
+  `STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED`. The exact
+  reviewed candidate was then committed and pushed unchanged to `main` as
+  `1fd29798fe256593e56029baca743484cc221ae4`
+  (`docs(domain): freeze structured player-character phase 2 prerequisites`).
+  This acceptance froze the technical prerequisites only. It implemented no
+  migration, database verification, persistence adapter, production
+  composition, public route, frontend behavior, Provider integration, or
+  story/Run activation and did not authorize Phase 2 runtime work.

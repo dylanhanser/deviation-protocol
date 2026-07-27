@@ -50,6 +50,12 @@
 ## Verification and issue recording
 
 - After changes, run the full tests, `compileall`, and relevant Alembic checks.
+- For planning, review, approval, staging, or commit work, follow the
+  pending-plan baseline-invalidation and approval-token-consistency rules in
+  `docs/engineering/codex_workflow.md`. Never preserve a locked candidate hash
+  after a baseline change makes the candidate factually stale, and never issue
+  a review prompt whose successful verdict cannot satisfy the candidate's
+  required approval condition.
 - Before independent audit, describing a phase as complete, or requesting
   authorization to commit, complete the canonical documentation-synchronization
   checklist in `docs/engineering/codex_workflow.md`.

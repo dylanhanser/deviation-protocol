@@ -16,9 +16,10 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Local `origin/main` and `HEAD` at the start of this controlled planning task:
-  `f988a95baa3ae1b69183c872a5b98cfd96abd88e`
-- Ahead/behind at the start of this controlled planning task: `0/0`
+- Local `origin/main` and `HEAD`:
+  `4acb8b993f15a1fdee20edc3140324730447fc9f`
+- HEAD subject: `fix(domain): preserve exact opaque identifiers`
+- Ahead/behind: `0/0`
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -185,22 +186,78 @@ requires a separately approved downstream implementation plan and task.
 The
 [structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md)
 translates that approved and frozen product contract into proposed
-repository-specific implementation work. The plan is **approved and frozen;
-Phase 1 has passed fresh independent read-only acceptance for the exact
-nine-path candidate, closing the prior blocking findings through the third
-correction round, and Phase 1 is committed and pushed at
-`c8808f66e8d97bc4386a481bf21669cfddcd222e`.** The complete plan remains
-partially implemented. Phase 2
-receipt persistence/schema and every later phase remain blocked and
-unimplemented. A concrete Phase 2 MySQL persistence-boundary amendment has
-been drafted as a technical-prerequisite review candidate; it is not accepted,
-frozen, or implementation authorization. Phase 2 remains blocked pending a
-fresh independent read-only acceptance of that exact documentation candidate
-and separate explicit user authorization.
-There is no database receipt schema, canonical character persistence,
+repository-specific implementation work. The historical plan and its technical
+prerequisites were **approved and frozen; the current four-document candidate
+requires fresh independent approval.** Phase 1 has passed fresh independent read-only acceptance for the exact
+nine-path candidate. Its original implementation commit is
+`c8808f66e8d97bc4386a481bf21669cfddcd222e`; the current completed and pushed
+Phase 1 implementation baseline is
+`4acb8b993f15a1fdee20edc3140324730447fc9f`
+(`fix(domain): preserve exact opaque identifiers`). The complete plan remains
+partially implemented. The Phase 2 product scope and technical prerequisites
+historically received the independent verdict
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED`; the exact
+then-approved candidate was committed and pushed unchanged as
+`1fd29798fe256593e56029baca743484cc221ae4`
+(`docs(domain): freeze structured player-character phase 2 prerequisites`).
+That commit remains the technical-freeze history, but it predates the current
+Phase 1 opaque-identifier correction and does not approve the current locked
+candidate.
+
+Phase 2 runtime implementation has not started. That documentation commit
+implemented no migration, database verification, persistence adapter,
+production composition, public route, frontend behavior, Provider integration,
+or story/Run activation. Phase 3 and every later structured-player-character
+phase remain blocked.
+
+The implementation-order amendment below is a new review candidate, distinct
+from the frozen technical prerequisites. It becomes operative automatically,
+without another status-only documentation edit, only after all of these ordered
+conditions are satisfied:
+
+1. A fresh independent read-only review returns
+   `STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` for the exact complete
+   four-document candidate and its four SHA-256 hashes.
+2. Separate authorization is obtained to stage and commit exactly those four
+   approved documents, and the staged and committed bytes retain the approved
+   hashes.
+3. The documentation-only commit is pushed through the repository's
+   established authorized push workflow.
+4. After the push, a new clean baseline is confirmed: `main` is checked out,
+   `HEAD` equals local `origin/main`, ahead/behind is `0/0` without an
+   unnecessary fetch unless separately authorized, the worktree and index are
+   clean, no staged or normal untracked path remains, and the pushed commit
+   contains exactly the approved documentation scope.
+5. A separately authorized Phase 2 implementation task may then begin.
+
+Before exact-candidate approval, staging and commit are prohibited. Approval
+alone or a local documentation commit alone does not authorize Phase 2
+implementation; implementation remains blocked until the pushed clean baseline
+is confirmed. Slice 1 still requires the separate explicit authorization in
+condition 5. Approval of this amendment does not itself authorize
+implementation, migration execution, database access, staging, commit, or
+push.
+
+Subject to that gate and later slice-specific authorization, the deterministic
+Phase 2 order is:
+
+1. **Slice 1 — Offline persistence contracts and canonical stored-record
+   codec.**
+2. **Slice 2 — Exact six-family SQLAlchemy metadata and linear Alembic
+   migration.**
+3. **Slice 3 — MySQL repositories, locking, CAS, and strict reconstruction.**
+4. **Slice 4 — SQLAlchemy Unit of Work wiring and atomic Phase 2 integration
+   proof.**
+
+The detailed scope, paths, dependencies, exclusions, verification level, and
+completion criteria for every slice are authoritative in the implementation
+plan. Its existing receipt/history integrity design requires internally derived
+canonical state-record fingerprints that bind each receipt to its exact
+authoritative revision record(s). No database receipt schema, canonical character persistence,
 public/runtime route, Provider integration, frontend flow, or Run/story-line
-activation. Phase 1 acceptance does not authorize Phase 2. Publication or push
-remains a separate user-controlled action. Phase 3.2b remains closed.
+activation exists today. Phase 1 acceptance and the historical Phase 2
+technical-freeze approval do not themselves authorize Phase 2 implementation.
+Phase 3.2b remains closed.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 

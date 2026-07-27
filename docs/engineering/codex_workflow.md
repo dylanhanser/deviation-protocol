@@ -87,6 +87,50 @@ Review prompts must distinguish between:
 A large passing test count does not replace architecture, authority, or
 transaction-boundary review.
 
+## Pending-plan baseline invalidation
+
+Whenever `HEAD`, the intended implementation base, or a recorded remote
+baseline changes while a plan is pending, assess whether the change is relevant
+before further review, approval, staging, or commit. A relevant change requires
+reassessment and, where necessary, update of the implementation baseline, plan
+status, approval-bound hashes and gate, candidate path inventory, staged or
+commit scope, and safest next step. An irrelevant change does not automatically
+invalidate the plan.
+
+If a relevant changed baseline makes any recorded fact stale, all locked
+candidate hashes and prior approvals are invalid. Update the candidate, assign
+new hashes, and obtain a fresh independent review. Preserving an old candidate
+hash never takes priority over factual accuracy.
+
+## Approval-token consistency
+
+Every approval-gated candidate must define exactly one operative success
+verdict. Historical, superseded, example, prohibited, and failure tokens must
+be explicitly non-operative; competing operative success tokens are prohibited.
+
+Approval applies only to the exact complete candidate and exact hashes reviewed.
+Any byte change to an approval-bound candidate file invalidates prior approval;
+a corrected candidate needs new hashes and a fresh independent review. Approval
+of one subset or older version cannot authorize another subset or newer version.
+Historical review records may be retained as history, but a historical approval
+cannot satisfy the gate for a later corrected or expanded candidate.
+
+Before issuing a review prompt, compare the candidate's required approval token
+and condition with every successful verdict the review protocol can return. The
+exact required token must be reachable through the exact successful verdict. Do
+not begin a review while the candidate contains an obsolete, unreachable, or
+differently named operative approval token.
+
+Use this non-circular sequence for approval-gated documentation: (1) freeze the
+exact candidate and hashes; (2) conduct the independent read-only review; (3)
+obtain the required approval verdict; (4) obtain separate authorization for
+staging and commit; (5) verify staged and committed bytes and scope; (6)
+complete the authorized push workflow; (7) confirm the new clean pushed
+baseline; and (8) only then begin separately authorized implementation. A
+correction task is not the approval review. Do not commit before approval, or
+implement before the documentation is pushed and the new clean baseline is
+confirmed.
+
 ## Environment startup
 
 On Windows:
