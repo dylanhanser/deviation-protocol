@@ -48,6 +48,7 @@ from deviation_protocol.application.player_character_operations import (
     evaluate_mutation_policy,
     evaluate_mutation_receipt_protocol,
     mutation_fingerprint,
+    recover_creation_unique_race_winner,
 )
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
@@ -70,6 +71,7 @@ from deviation_protocol.domain.player_character import (
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
     PlayerConfirmation,
+    TrustedFinalDeathEvidence,
 )
 from deviation_protocol.infrastructure.database import create_engine
 from deviation_protocol.infrastructure.errors import (
@@ -101,6 +103,7 @@ from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyPlayerCharacterMutationReceiptRepository,
     SqlAlchemyPlayerCharacterRepository,
 )
+from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -3067,3 +3070,743 @@ async def test_mysql_repository_128_character_case_variants_remain_distinct(
         assert len(lower.initial.player_character_id.value) == 128
         assert len(upper.initial.controller_binding.value) == 128
         assert len(lower.initial.controller_binding.value) == 128
+
+
+@dataclass(frozen=True, slots=True)
+class _UowMutation:
+    command: CharacterMutationCommand
+    successor: CanonicalPlayerCharacter
+    receipt: StoredMutationSuccessReceipt
+
+
+async def _uow_family_counts_in_session(
+    session: AsyncSession,
+    character: _RepositoryCharacter,
+) -> tuple[int, int, int, int, int, int]:
+    predicates = (
+        (
+            PlayerCharacterControllerBindingRow,
+            PlayerCharacterControllerBindingRow.controller_binding
+            == character.initial.controller_binding.value,
+        ),
+        (
+            PlayerCharacterIdAllocationRow,
+            PlayerCharacterIdAllocationRow.player_character_id
+            == character.initial.player_character_id.value,
+        ),
+        (
+            PlayerCharacterRevisionRow,
+            PlayerCharacterRevisionRow.player_character_id
+            == character.initial.player_character_id.value,
+        ),
+        (
+            PlayerCharacterCurrentRow,
+            PlayerCharacterCurrentRow.player_character_id
+            == character.initial.player_character_id.value,
+        ),
+        (
+            PlayerCharacterCreationReceiptRow,
+            PlayerCharacterCreationReceiptRow.result_player_character_id
+            == character.initial.player_character_id.value,
+        ),
+        (
+            PlayerCharacterMutationReceiptRow,
+            PlayerCharacterMutationReceiptRow.player_character_id
+            == character.initial.player_character_id.value,
+        ),
+    )
+    counts = []
+    for row_type, predicate in predicates:
+        counts.append(
+            int(
+                await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(row_type)
+                    .where(predicate)
+                )
+                or 0
+            )
+        )
+    return tuple(counts)  # type: ignore[return-value]
+
+
+async def _uow_family_counts(
+    session_factory: async_sessionmaker[AsyncSession],
+    character: _RepositoryCharacter,
+) -> tuple[int, int, int, int, int, int]:
+    async with session_factory() as session:
+        return await _uow_family_counts_in_session(session, character)
+
+
+async def _run_uow_creation(
+    session_factory: async_sessionmaker[AsyncSession],
+    character: _RepositoryCharacter,
+    *,
+    command: CharacterCreationCommand | None = None,
+    uow: SqlAlchemyUnitOfWork | None = None,
+    injected_failure: BaseException | None = None,
+    after_staging: Any = None,
+) -> Any:
+    active_uow = uow or SqlAlchemyUnitOfWork(session_factory)
+    async with active_uow:
+        locked_binding = await active_uow.controller_bindings.lock(
+            character.initial.controller_binding
+        )
+        if locked_binding is None:
+            await active_uow.controller_bindings.add(
+                character.initial.controller_binding,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+        else:
+            assert locked_binding == character.initial.controller_binding
+
+        stored_receipt = await active_uow.creation_receipts.get(
+            character.creation_receipt.key
+        )
+        decision = evaluate_creation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            operation_id=character.creation_receipt.key.operation_id,
+            command=command or character.creation_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        if (
+            decision.code
+            is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+        ):
+            await active_uow.player_characters.add_allocation(
+                character.initial.player_character_id,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+            await active_uow.player_characters.add_initial(
+                character.initial,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+            await active_uow.creation_receipts.add(
+                character.creation_receipt,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+            if after_staging is not None:
+                await after_staging(active_uow)
+            if injected_failure is not None:
+                raise injected_failure
+        await active_uow.commit()
+        return decision
+
+
+async def _run_uow_mutation(
+    session_factory: async_sessionmaker[AsyncSession],
+    character: _RepositoryCharacter,
+    mutation: _UowMutation,
+    *,
+    command: CharacterMutationCommand | None = None,
+    injected_failure: BaseException | None = None,
+) -> Any:
+    active_command = command or mutation.command
+    async with SqlAlchemyUnitOfWork(session_factory) as uow:
+        current = await uow.player_characters.get_for_update(
+            character.initial.player_character_id
+        )
+        assert current is not None
+        assert (
+            current.controller_binding
+            == character.initial.controller_binding
+        )
+        stored_receipt = await uow.mutation_receipts.get(
+            mutation.receipt.key
+        )
+        decision = evaluate_mutation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            current_record=current,
+            operation_id=mutation.receipt.key.operation_id,
+            command=active_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        if (
+            decision.code
+            is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+        ):
+            policy_decision = evaluate_mutation_policy(
+                current,
+                command=active_command,
+                operation_id=mutation.receipt.key.operation_id,
+            )
+            assert policy_decision.accepted
+            assert policy_decision.resulting_record == mutation.successor
+            await uow.player_characters.append_revision(
+                mutation.successor,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+            if not await uow.player_characters.compare_and_swap_current(
+                mutation.successor,
+                expected_revision=current.record_revision.value,
+                created_at=_REPOSITORY_TEST_TIME,
+            ):
+                raise PlayerCharacterRepositoryConflictError(
+                    "player-character current compare-and-swap lost"
+                )
+            await uow.mutation_receipts.add(
+                mutation.receipt,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+            if injected_failure is not None:
+                raise injected_failure
+        await uow.commit()
+        return decision
+
+
+def _final_death_uow_mutation(
+    current: CanonicalPlayerCharacter,
+    *,
+    label: str,
+) -> _UowMutation:
+    operation_id = PlayerCharacterOperationId(
+        value=f"operation.final-death-{label}"
+    )
+    command = CharacterMutationCommand(
+        contract_version=current.contract_version,
+        command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+        target_player_character_id=current.player_character_id,
+        expected_revision=current.record_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=current.player_character_id,
+            contract_version=current.contract_version,
+            record_revision=current.record_revision,
+        ),
+        final_death_evidence=TrustedFinalDeathEvidence(
+            player_character_id=current.player_character_id,
+            expected_revision=current.record_revision,
+            operation_id=operation_id,
+            source_reference=AuthoritySourceRef(
+                value=f"source.final-death-{label}"
+            ),
+        ),
+    )
+    policy_decision = evaluate_mutation_policy(
+        current,
+        command=command,
+        operation_id=operation_id,
+    )
+    assert policy_decision.accepted
+    assert policy_decision.resulting_record is not None
+    successor = policy_decision.resulting_record
+    _, fingerprint = mutation_fingerprint(
+        command,
+        operation_id=operation_id,
+    )
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=current.player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=current.player_character_id,
+            contract_version=current.contract_version,
+            command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+            command_result=MutationCommandResult.DECEASED,
+            resulting_revision=successor.record_revision,
+            resulting_lifecycle=successor.lifecycle,
+        ),
+    )
+    return _UowMutation(
+        command=command,
+        successor=successor,
+        receipt=receipt,
+    )
+
+
+class _PreCommitFailingSqlAlchemyUnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(
+        self,
+        session_factory: async_sessionmaker[AsyncSession],
+    ) -> None:
+        super().__init__(session_factory)
+        self.commit_attempted = False
+
+    async def commit(self) -> None:
+        self.commit_attempted = True
+        raise RuntimeError("controlled pre-COMMIT failure")
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_uow_commits_atomic_creation_and_exact_replay(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("uow-creation")
+
+    created = await _run_uow_creation(
+        mysql_session_factory,
+        character,
+    )
+    assert (
+        created.code
+        is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+    )
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 1, 1, 1, 0)
+
+    replay = await _run_uow_creation(
+        mysql_session_factory,
+        character,
+    )
+    assert replay.code is CharacterOperationProtocolCode.EXACT_REPLAY
+    assert replay.stored_success_result == character.creation_receipt.result
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 1, 1, 1, 0)
+
+    conflict = await _run_uow_creation(
+        mysql_session_factory,
+        character,
+        command=_repository_name_command("changed creation command"),
+    )
+    assert conflict.code is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 1, 1, 1, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_kind", ("exception", "cancellation"))
+async def test_mysql_uow_creation_exception_and_cancellation_roll_back_all_families(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+    failure_kind: str,
+) -> None:
+    character = repository_test_scope.character(
+        f"uow-creation-{failure_kind}"
+    )
+    failure: BaseException
+    expected: type[BaseException]
+    if failure_kind == "cancellation":
+        failure = asyncio.CancelledError()
+        expected = asyncio.CancelledError
+    else:
+        failure = RuntimeError("controlled creation-body failure")
+        expected = RuntimeError
+
+    with pytest.raises(expected):
+        await _run_uow_creation(
+            mysql_session_factory,
+            character,
+            injected_failure=failure,
+        )
+
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (0, 0, 0, 0, 0, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_uow_pre_commit_failure_rolls_back_and_fresh_uow_succeeds(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    character = repository_test_scope.character("uow-pre-commit")
+    failing_uow = _PreCommitFailingSqlAlchemyUnitOfWork(
+        mysql_session_factory
+    )
+    staged_counts: list[tuple[int, int, int, int, int, int]] = []
+    async_session_commit_calls: list[AsyncSession] = []
+    original_async_session_commit = AsyncSession.commit
+
+    async def tracked_async_session_commit(
+        session: AsyncSession,
+    ) -> None:
+        async_session_commit_calls.append(session)
+        await original_async_session_commit(session)
+
+    monkeypatch.setattr(
+        AsyncSession,
+        "commit",
+        tracked_async_session_commit,
+    )
+
+    async def observe_staged(active_uow: SqlAlchemyUnitOfWork) -> None:
+        assert active_uow._session is not None
+        staged_counts.append(
+            await _uow_family_counts_in_session(
+                active_uow._session,
+                character,
+            )
+        )
+
+    with pytest.raises(RuntimeError, match="controlled pre-COMMIT failure"):
+        await _run_uow_creation(
+            mysql_session_factory,
+            character,
+            uow=failing_uow,
+            after_staging=observe_staged,
+        )
+
+    assert staged_counts == [(1, 1, 1, 1, 1, 0)]
+    assert failing_uow.commit_attempted
+    assert async_session_commit_calls == []
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (0, 0, 0, 0, 0, 0)
+
+    completed = await _run_uow_creation(
+        mysql_session_factory,
+        character,
+    )
+    assert (
+        completed.code
+        is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+    )
+    assert len(async_session_commit_calls) == 1
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 1, 1, 1, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_uow_creation_unique_race_rolls_back_loser_and_fresh_uow_reads_winner(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    shared_binding = ControllerBindingRef(
+        value=f"binding.uow-race-{repository_test_scope.token}"
+    )
+    winner_candidate = repository_test_scope.character(
+        "uow-race",
+        player_character_id=PlayerCharacterId(
+            value=f"pc.uow-race-a-{repository_test_scope.token}"
+        ),
+        controller_binding=shared_binding,
+    )
+    loser_candidate = repository_test_scope.character(
+        "uow-race",
+        player_character_id=PlayerCharacterId(
+            value=f"pc.uow-race-b-{repository_test_scope.token}"
+        ),
+        controller_binding=shared_binding,
+    )
+    ready = (asyncio.Event(), asyncio.Event())
+    start = asyncio.Event()
+    allocation_attempts = 0
+
+    async def attempt(
+        character: _RepositoryCharacter,
+        ready_event: asyncio.Event,
+    ) -> str:
+        nonlocal allocation_attempts
+        try:
+            async with SqlAlchemyUnitOfWork(
+                mysql_session_factory
+            ) as uow:
+                assert uow._session is not None
+                await uow._session.connection(
+                    execution_options={"isolation_level": "READ COMMITTED"}
+                )
+                locked = await uow.controller_bindings.lock(shared_binding)
+                assert locked is None
+                ready_event.set()
+                await asyncio.wait_for(
+                    start.wait(),
+                    timeout=_ASYNC_COORDINATION_TIMEOUT,
+                )
+                await uow.controller_bindings.add(
+                    shared_binding,
+                    created_at=_REPOSITORY_TEST_TIME,
+                )
+                stored_receipt = await uow.creation_receipts.get(
+                    character.creation_receipt.key
+                )
+                decision = evaluate_creation_receipt_protocol(
+                    authentication_succeeded=True,
+                    trusted_controller_binding=shared_binding,
+                    operation_id=character.creation_receipt.key.operation_id,
+                    command=character.creation_command,
+                    lookup_receipt=lambda _key: stored_receipt,
+                )
+                assert (
+                    decision.code
+                    is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+                )
+                allocation_attempts += 1
+                await uow.player_characters.add_allocation(
+                    character.initial.player_character_id,
+                    created_at=_REPOSITORY_TEST_TIME,
+                )
+                await uow.player_characters.add_initial(
+                    character.initial,
+                    created_at=_REPOSITORY_TEST_TIME,
+                )
+                await uow.creation_receipts.add(
+                    character.creation_receipt,
+                    created_at=_REPOSITORY_TEST_TIME,
+                )
+                await uow.commit()
+            return "committed"
+        except PlayerCharacterRepositoryConflictError:
+            return "conflict-rolled-back"
+
+    tasks = (
+        asyncio.create_task(attempt(winner_candidate, ready[0])),
+        asyncio.create_task(attempt(loser_candidate, ready[1])),
+    )
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(ready[0].wait(), ready[1].wait()),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+        start.set()
+        outcomes = await asyncio.wait_for(
+            asyncio.gather(*tasks),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+    finally:
+        start.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert sorted(outcomes) == ["committed", "conflict-rolled-back"]
+    committed = (
+        winner_candidate
+        if outcomes[0] == "committed"
+        else loser_candidate
+    )
+    losing = (
+        loser_candidate
+        if committed is winner_candidate
+        else winner_candidate
+    )
+    assert allocation_attempts == 1
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        committed,
+    ) == (1, 1, 1, 1, 1, 0)
+    losing_counts = await _uow_family_counts(
+        mysql_session_factory,
+        losing,
+    )
+    assert losing_counts[1:] == (0, 0, 0, 0, 0)
+
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as recovery_uow:
+        assert (
+            await recovery_uow.controller_bindings.lock(shared_binding)
+            == shared_binding
+        )
+        stored_winner = await recovery_uow.creation_receipts.get(
+            committed.creation_receipt.key
+        )
+        recovery = recover_creation_unique_race_winner(
+            losing_transaction_rolled_back=True,
+            authentication_succeeded=True,
+            trusted_controller_binding=shared_binding,
+            operation_id=committed.creation_receipt.key.operation_id,
+            command=committed.creation_command,
+            reread_receipt_in_fresh_transaction=lambda _key: stored_winner,
+        )
+        await recovery_uow.commit()
+    assert recovery.code is CharacterOperationProtocolCode.EXACT_REPLAY
+    assert recovery.stored_success_result == committed.creation_receipt.result
+    assert allocation_attempts == 1
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        committed,
+    ) == (1, 1, 1, 1, 1, 0)
+    assert (
+        await _uow_family_counts(mysql_session_factory, losing)
+    )[1:] == (0, 0, 0, 0, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_uow_commits_atomic_mutation_and_replays_after_later_revision(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("uow-mutation")
+    await _run_uow_creation(mysql_session_factory, character)
+    first_mutation = _UowMutation(
+        command=character.mutation_command,
+        successor=character.successor,
+        receipt=character.mutation_receipt,
+    )
+    first = await _run_uow_mutation(
+        mysql_session_factory,
+        character,
+        first_mutation,
+    )
+    assert first.code is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+
+    later_mutation = _final_death_uow_mutation(
+        character.successor,
+        label=f"uow-mutation-{repository_test_scope.token}",
+    )
+    later = await _run_uow_mutation(
+        mysql_session_factory,
+        character,
+        later_mutation,
+    )
+    assert later.code is CharacterOperationProtocolCode.READY_FOR_NEW_OPERATION
+
+    replay = await _run_uow_mutation(
+        mysql_session_factory,
+        character,
+        first_mutation,
+    )
+    assert replay.code is CharacterOperationProtocolCode.EXACT_REPLAY
+    assert replay.stored_success_result == character.mutation_receipt.result
+
+    changed_confirmation = PlayerConfirmation(
+        player_character_id=character.initial.player_character_id,
+        expected_revision=character.initial.record_revision,
+        operation_id=character.mutation_receipt.key.operation_id,
+        mutation_kind=PlayerCharacterMutationKind.RETIRE,
+        source_reference=AuthoritySourceRef(
+            value="source.changed-earlier-mutation"
+        ),
+    )
+    conflict = await _run_uow_mutation(
+        mysql_session_factory,
+        character,
+        first_mutation,
+        command=character.mutation_command.model_copy(
+            update={"confirmation": changed_confirmation}
+        ),
+    )
+    assert conflict.code is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+
+    stale_operation_id = PlayerCharacterOperationId(
+        value=f"operation.stale-{repository_test_scope.token}"
+    )
+    stale_command = character.mutation_command.model_copy(
+        update={
+            "confirmation": PlayerConfirmation(
+                player_character_id=character.initial.player_character_id,
+                expected_revision=character.initial.record_revision,
+                operation_id=stale_operation_id,
+                mutation_kind=PlayerCharacterMutationKind.RETIRE,
+                source_reference=AuthoritySourceRef(
+                    value="source.stale-new-operation"
+                ),
+            )
+        }
+    )
+    stale_mutation = _UowMutation(
+        command=stale_command,
+        successor=character.successor,
+        receipt=character.mutation_receipt.model_copy(
+            update={
+                "key": MutationReceiptKey(
+                    player_character_id=character.initial.player_character_id,
+                    operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+                    operation_id=stale_operation_id,
+                )
+            }
+        ),
+    )
+    stale = await _run_uow_mutation(
+        mysql_session_factory,
+        character,
+        stale_mutation,
+    )
+    assert stale.code is CharacterOperationProtocolCode.STALE_REVISION
+
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 3, 1, 1, 2)
+    async with mysql_session_factory() as session:
+        history = tuple(
+            (
+                await session.scalars(
+                    sa.select(PlayerCharacterRevisionRow)
+                    .where(
+                        PlayerCharacterRevisionRow.player_character_id
+                        == character.initial.player_character_id.value
+                    )
+                    .order_by(PlayerCharacterRevisionRow.record_revision)
+                )
+            ).all()
+        )
+        current = await session.scalar(
+            sa.select(PlayerCharacterCurrentRow).where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character.initial.player_character_id.value
+            )
+        )
+        assert tuple(row.record_revision for row in history) == (1, 2, 3)
+        assert current is not None
+        assert current.record_revision == 3
+        assert current.record_canonical == canonical_record_to_storage_bytes(
+            later_mutation.successor
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_uow_mutation_failure_rolls_back_history_current_and_receipt(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("uow-mutation-rollback")
+    await _run_uow_creation(mysql_session_factory, character)
+    mutation = _UowMutation(
+        command=character.mutation_command,
+        successor=character.successor,
+        receipt=character.mutation_receipt,
+    )
+
+    with pytest.raises(RuntimeError, match="mutation-body failure"):
+        await _run_uow_mutation(
+            mysql_session_factory,
+            character,
+            mutation,
+            injected_failure=RuntimeError(
+                "controlled mutation-body failure"
+            ),
+        )
+
+    assert await _uow_family_counts(
+        mysql_session_factory,
+        character,
+    ) == (1, 1, 1, 1, 1, 0)
+    async with mysql_session_factory() as session:
+        assert (
+            await SqlAlchemyPlayerCharacterRepository(session).get(
+                character.initial.player_character_id
+            )
+            == character.initial
+        )
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PlayerCharacterRevisionRow)
+                .where(
+                    PlayerCharacterRevisionRow.player_character_id
+                    == character.initial.player_character_id.value,
+                    PlayerCharacterRevisionRow.record_revision
+                    == character.successor.record_revision.value,
+                )
+            )
+            == 0
+        )
+        assert (
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).get(character.mutation_receipt.key)
+            is None
+        )

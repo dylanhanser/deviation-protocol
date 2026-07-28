@@ -16,10 +16,11 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Local `origin/main` and `HEAD`:
-  `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`
-- HEAD subject: `feat(player-character): add structured persistence schema`
-- Ahead/behind: `0/0`
+- Phase 2 Slice 4 pre-finalization baseline and local `origin/main`:
+  `7313b5833cae7a9f9c0b618abe5b49cfcbaba604`
+- Baseline subject: `feat(player-character): implement mysql repositories`
+- The independently approved Slice 4 finalization commit is one commit ahead of
+  local `origin/main`; nothing has been pushed.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -159,8 +160,9 @@ The
 is an **approved and frozen structured player-character product specification —
 partially implemented by the committed and pushed Phase 1 pure domain/protocol
 foundation, Phase 2 Slice 1 persistence carriers, Phase 2 Slice 2 structured
-persistence schema, and the implemented and independently approved Phase 2
-Slice 3 MySQL Repository adapters. The overall implementation plan remains only
+persistence schema, the independently approved Phase 2 Slice 3 MySQL
+Repository adapters, and the independently approved Slice 4 Unit of Work
+wiring and atomicity evidence. The overall implementation plan remains only
 partially implemented.** Its
 first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
@@ -234,11 +236,35 @@ back, retry, recover transactions, or orchestrate application workflow. Its
 two narrow infrastructure errors classify repository operation and known
 immutable/unique conflicts. Real-MySQL and offline evidence covers
 persistence, conflicts, concurrency/CAS, row locking, caller rollback,
-constraints, corrupt state, and persistence boundaries. Unit of Work wiring
-and cross-repository transaction orchestration remain deferred to Slice 4. No
-Slice 4, production composition, public route, frontend behavior, Provider
-integration, Demo behavior, runtime behavior, or story/Run activation is
-implemented.
+constraints, corrupt state, and persistence boundaries.
+
+Phase 2 Slice 4 is implemented and verified locally and received new-session
+independent implementation approval with verdict
+`PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED`; no blocking findings
+remained. Production changes are limited to the four existing
+Repository-adapter imports and their same-`AsyncSession` construction in
+`SqlAlchemyUnitOfWork.__aenter__`.
+Slice-specific unit and real-MySQL evidence is limited to
+`tests/unit/test_repository_and_uow.py` and
+`tests/integration/test_mysql_player_character.py`. It proves same-session
+Repository wiring, lazy autobegin preservation, explicit UoW commit ownership,
+normal, exceptional, and cancellation rollback, atomic creation and replay,
+controlled pre-COMMIT failure rollback, a genuine uniqueness race with loser
+rollback and fresh-UoW winner recovery, atomic mutation and replay after a
+later revision, and mutation rollback across history, current row, and receipt.
+Failed sessions are not reused, no automatic retry was added, and
+uncertain-COMMIT recovery and exactly-once behavior remain excluded.
+
+This session passed: focused UoW unit `16 passed`; focused structured-character
+MySQL `34 passed`; MySQL verifier `81 passed`; Offline verifier `1,389 passed,
+71 skipped`; and Full verifier `1,459 passed, 1 skipped`. `compileall`,
+Alembic heads/history, dependency checks, and `git diff --check` also passed.
+The initial sandboxed Full run completed the tests but could not clean pytest's
+user temporary directory; the exact permitted rerun outside that sandbox
+passed. Phase 2 is independently accepted and complete. Phase 3 application
+orchestration and runtime activation remain deferred; no API, public route,
+frontend, Demo, Provider, Run, narrative, content, or gameplay integration was
+activated.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the

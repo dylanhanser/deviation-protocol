@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock
@@ -18,7 +19,13 @@ from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.persisted_events import PersistedEventReceipt
 from deviation_protocol.infrastructure.orm_models import GameSnapshotRow
 from deviation_protocol.infrastructure.errors import OptimisticLockError
-from deviation_protocol.infrastructure.repositories import SqlAlchemyGameSessionRepository
+from deviation_protocol.infrastructure.repositories import (
+    SqlAlchemyControllerBindingRegistryRepository,
+    SqlAlchemyGameSessionRepository,
+    SqlAlchemyPlayerCharacterCreationReceiptRepository,
+    SqlAlchemyPlayerCharacterMutationReceiptRepository,
+    SqlAlchemyPlayerCharacterRepository,
+)
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
 
@@ -177,10 +184,52 @@ async def test_event_flush_failure_returns_no_receipt_capability() -> None:
 class FakeSession:
     def __init__(self) -> None:
         self.add = Mock()
+        self.begin = Mock()
+        self.execute = AsyncMock()
         self.flush = AsyncMock()
+        self.get = AsyncMock()
+        self.scalar = AsyncMock()
         self.commit = AsyncMock()
         self.rollback = AsyncMock()
         self.close = AsyncMock()
+
+
+@pytest.mark.asyncio
+async def test_unit_of_work_exposes_all_player_character_repositories_on_same_session_without_explicit_begin() -> None:
+    session = FakeSession()
+    uow = SqlAlchemyUnitOfWork(lambda: session)  # type: ignore[arg-type]
+
+    async with uow:
+        assert isinstance(
+            uow.controller_bindings,
+            SqlAlchemyControllerBindingRegistryRepository,
+        )
+        assert isinstance(
+            uow.player_characters,
+            SqlAlchemyPlayerCharacterRepository,
+        )
+        assert isinstance(
+            uow.creation_receipts,
+            SqlAlchemyPlayerCharacterCreationReceiptRepository,
+        )
+        assert isinstance(
+            uow.mutation_receipts,
+            SqlAlchemyPlayerCharacterMutationReceiptRepository,
+        )
+        assert (
+            uow.controller_bindings._session
+            is uow.player_characters._session
+            is uow.creation_receipts._session
+            is uow.mutation_receipts._session
+            is session
+        )
+        session.begin.assert_not_called()
+        session.add.assert_not_called()
+        session.execute.assert_not_awaited()
+        session.flush.assert_not_awaited()
+        session.get.assert_not_awaited()
+        session.scalar.assert_not_awaited()
+        session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -214,6 +263,20 @@ async def test_unit_of_work_rolls_back_on_exception() -> None:
             raise RuntimeError("boom")
     session.rollback.assert_awaited_once()
     session.close.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_unit_of_work_rolls_back_and_closes_on_cancellation() -> None:
+    session = FakeSession()
+    uow = SqlAlchemyUnitOfWork(lambda: session)  # type: ignore[arg-type]
+
+    with pytest.raises(asyncio.CancelledError):
+        async with uow:
+            raise asyncio.CancelledError
+
+    session.rollback.assert_awaited_once()
+    session.close.assert_awaited_once()
+    session.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio

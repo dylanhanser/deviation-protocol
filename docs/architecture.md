@@ -69,7 +69,7 @@ wiring, public route, projection, frontend, Provider integration, Demo
 behavior, Session request/action behavior, or Run/story-line binding. Later
 bounded persistence slices do not change that ownership.
 
-## Structured player-character Phase 2 Slices 1–3 persistence boundary
+## Structured player-character Phase 2 Slices 1–4 persistence boundary
 
 Phase 2 Slice 1 is implemented, independently accepted, committed, and pushed.
 It adds application persistence ports plus exactly six database-independent
@@ -119,10 +119,41 @@ transaction recovery, or application workflow. The boundary adds only
 
 Real-MySQL evidence covers persistence, constraints, conflicts, CAS
 concurrency, exact-row locking, and caller rollback; offline unit evidence
-covers corrupt state and persistence-boundary failures. Unit of Work wiring
-and cross-repository transaction orchestration remain deferred to Slice 4. No
-runtime service, public route, frontend, Provider, Demo, Session, Run, or
-story-line integration is implemented. The complete frozen implementation plan
+covers corrupt state and persistence-boundary failures.
+
+Phase 2 Slice 4 is implemented and verified locally and received new-session
+independent implementation approval with verdict
+`PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED`; no blocking findings
+remained.
+`SqlAlchemyUnitOfWork.__aenter__` now constructs the controller-binding,
+player-character, creation-receipt, and mutation-receipt adapters over the
+same active `AsyncSession` already used by the existing repositories.
+SQLAlchemy lazy autobegin remains authoritative: entry performs no SQL and
+opens no explicit transaction; repository methods may flush; successful test
+workflows commit explicitly; and uncommitted, exceptional, cancellation, and
+controlled pre-COMMIT failure paths roll back and close. No other UoW
+lifecycle method changed.
+
+Evidence is limited to `tests/unit/test_repository_and_uow.py` and
+`tests/integration/test_mysql_player_character.py`. It covers same-session
+Repository wiring, lazy autobegin preservation, explicit UoW commit ownership,
+normal, exceptional, and cancellation rollback, atomic creation and replay,
+controlled pre-COMMIT failure rollback, a genuine uniqueness race with loser
+rollback and fresh-UoW winner recovery, atomic mutation and replay after a
+later revision, and mutation rollback across history, current row, and receipt.
+This session passed the focused UoW unit selection (`16 passed`), focused
+structured-character MySQL selection (`34 passed`), MySQL verifier
+(`81 passed`), Offline verifier (`1,389 passed, 71 skipped`), and Full verifier
+(`1,459 passed, 1 skipped`), plus `compileall`, Alembic heads/history,
+dependency checks, and `git diff --check`.
+
+Phase 2 is independently accepted and complete. Failed sessions are not
+reused, no automatic retry was added, and connection-loss or uncertain-COMMIT
+recovery and exactly-once behavior remain excluded. The test-only orchestration
+is not a production application service. No runtime service, API, public route,
+frontend, Provider, Demo, Session, Run, story-line, narrative, content, or
+gameplay integration was activated; Phase 3 application orchestration and
+runtime activation remain deferred. The complete frozen implementation plan
 remains partially implemented.
 
 ## Current composition roots and Provider boundaries

@@ -6,9 +6,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deviation_protocol.application.ports import UnitOfWork
 from deviation_protocol.infrastructure.repositories import (
+    SqlAlchemyControllerBindingRegistryRepository,
     SqlAlchemyGameSessionRepository,
-    SqlAlchemyTurnRequestRepository,
     SqlAlchemyNarrativeJobRepository,
+    SqlAlchemyPlayerCharacterCreationReceiptRepository,
+    SqlAlchemyPlayerCharacterMutationReceiptRepository,
+    SqlAlchemyPlayerCharacterRepository,
+    SqlAlchemyTurnRequestRepository,
 )
 
 
@@ -23,6 +27,16 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self.sessions = SqlAlchemyGameSessionRepository(self._session)
         self.turn_requests = SqlAlchemyTurnRequestRepository(self._session)
         self.narrative_jobs = SqlAlchemyNarrativeJobRepository(self._session)
+        self.controller_bindings = SqlAlchemyControllerBindingRegistryRepository(
+            self._session
+        )
+        self.player_characters = SqlAlchemyPlayerCharacterRepository(self._session)
+        self.creation_receipts = (
+            SqlAlchemyPlayerCharacterCreationReceiptRepository(self._session)
+        )
+        self.mutation_receipts = (
+            SqlAlchemyPlayerCharacterMutationReceiptRepository(self._session)
+        )
         self._committed = False
         return self
 
