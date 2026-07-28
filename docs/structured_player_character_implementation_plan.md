@@ -14,8 +14,8 @@ implemented, independently accepted, committed, and pushed at
 `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`. Phase 2 Slice 2 is implemented,
 verified, independently reviewed with no remaining substantive issue,
 committed, and pushed at
-`a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`. Slices 3–4 and Phases 3–7 remain
-unimplemented.**
+`a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`. Phase 2 Slice 3 is implemented
+and independently approved. Slice 4 and Phases 3–7 remain unimplemented.**
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -30,11 +30,14 @@ six-family SQLAlchemy metadata, one linear Alembic migration, and bounded
 schema/migration verification. It adds no repository adapter, live-row
 reconstruction, transaction or replay orchestration, production composition,
 public route, frontend behavior, Provider integration, Demo behavior, or
-story/Run activation. Phase 2 Slice 3 remains unimplemented and is the next
-eligible bounded work: the MySQL Repository layer with locking, CAS, and strict
-reconstruction. Unit of Work wiring and cross-repository transaction
-orchestration remain deferred to Slice 4. Phase 3 and every later phase remain
-blocked.
+story/Run activation. Phase 2 Slice 3 now adds only the four existing-port
+MySQL Repository adapters with strict codec/identity reconstruction, immutable
+history, current-row locking and CAS, allocation/binding/current/revision and
+receipt operations, caller-owned sessions, and `flush()` without transaction
+ownership. Its two narrow infrastructure errors classify repository operation
+and known immutable/unique conflicts. Unit of Work wiring and cross-repository
+transaction orchestration remain deferred to Slice 4. Phase 3 and every later
+phase remain blocked.
 
 The ordered Phase 2 implementation slices introduced in section 24 were a
 separate amendment from the prior technical-freeze verdict. The section 31
@@ -60,8 +63,9 @@ and frozen product specifications. The pure Phase 1 domain and
 character-operation protocol foundation is implemented, accepted, committed,
 and pushed. Phase 2 Slice 1 is also implemented, accepted, committed, and
 pushed. Phase 2 Slice 2 is implemented, verified, independently reviewed,
-committed, and pushed; the complete product specifications remain only
-partially implemented. Phase 3.2b remains closed.
+committed, and pushed. Phase 2 Slice 3 is implemented and independently
+approved; the complete product specifications remain only partially
+implemented. Phase 3.2b remains closed.
 
 ## 2. Purpose
 
@@ -149,9 +153,12 @@ with no remaining substantive issue, was committed as
 Relevant real-MySQL verification passed with 64 tests, and all 284 relevant
 Slice 1 regression tests passed. The completed schema includes the corrected
 `ck_spc_revisions_provenance_matrix`, with explicit non-NULL `prior_revision`
-requirements for both `RETIRE` and `FINAL_DEATH`. No repository, locking/CAS,
-replay, Unit of Work, service, runtime, public, Provider, Demo, or Run/story
-behavior was added.
+requirements for both `RETIRE` and `FINAL_DEATH`. Phase 2 Slice 3 then added
+only the four existing-port MySQL Repository adapters, strict reconstruction,
+immutable revisions, receipts, locking/CAS, and narrow error translation. It
+uses caller-owned sessions and `flush()` without commit, rollback, retry, or
+application orchestration. No Unit of Work, service, runtime, public, Provider,
+Demo, or Run/story behavior was added.
 
 File names, table names, data types, endpoint shapes, and phase boundaries below
 are proposed implementation inventory. They are not authority to edit those
@@ -1740,11 +1747,12 @@ Phase 1 and Phase 2 Slice 1 were separately authorized, independently accepted,
 committed, and pushed. Phase 2 Slice 2 was separately authorized, implemented,
 verified, independently reviewed with no remaining substantive issue, committed
 as `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`, and pushed to `origin/main`.
-Phase 2 Slice 3 remains unimplemented and is the next eligible bounded
-implementation work: the MySQL Repository layer. Unit of Work and
-cross-repository transaction orchestration remain deferred to Slice 4. Every
-later slice and phase remains proposed, incomplete, and unauthorized for
-implementation.
+Phase 2 Slice 3 is implemented and independently approved: its four existing-
+port MySQL Repository adapters provide strict reconstruction, allocation,
+binding/current/revision and receipt persistence, locking, CAS, and narrow
+error translation over caller-owned sessions. Unit of Work and cross-repository
+transaction orchestration remain deferred to Slice 4. Every later slice and
+phase remains proposed, incomplete, and unauthorized for implementation.
 
 ### Phase 1 — Domain envelope, identity types, and policies
 
@@ -1799,9 +1807,9 @@ Status: **Historical technical prerequisites were accepted and frozen at
 independently accepted, committed, and pushed. Slice 2 schema metadata and its
 single migration are implemented, verified, independently reviewed, committed
 as `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`, and pushed to `origin/main`.
-Slice 3 repositories remain unimplemented and are the next eligible bounded
-work. Unit of Work integration remains deferred to Slice 4, and runtime
-persistence remains unimplemented.**
+Slice 3 repositories are implemented and independently approved. Unit of Work
+integration remains deferred to Slice 4, and runtime persistence remains
+unimplemented.**
 
 Scope:
 
@@ -2100,12 +2108,19 @@ Database access required by the eventual Slice 2 implementation task:
 evidence. Migration execution against production or any non-test database
 remains prohibited.
 
-Still unimplemented after Slice 2: the bounded Slice 3 MySQL Repository layer
-with live-row reconstruction, locking/CAS, and receipt operations is the next
-eligible work. UoW composition and cross-repository transaction orchestration
-remain deferred to Slice 4; Phases 3–7 remain blocked.
+After Slice 3, the bounded MySQL Repository layer provides live-row
+reconstruction, locking/CAS, and receipt operations. UoW composition and
+cross-repository transaction orchestration remain deferred to Slice 4; Phases
+3–7 remain blocked.
 
 ##### Phase 2 Slice 3 — MySQL repositories, locking, CAS, and strict reconstruction
+
+Status: **Implemented and independently approved for the exact four-path
+candidate. The adapters cover the frozen four existing ports, use caller-owned
+sessions, perform authorized SQL and `flush()` without commit, rollback, retry,
+or transaction recovery, and add only the two narrow infrastructure error
+classifications. Unit of Work composition and every public/runtime integration
+remain deferred.**
 
 Why this occurs third: repository SQL depends on the accepted Slice 1
 ports/codecs and the accepted Slice 2 mapped physical schema. Keeping UoW
@@ -2749,9 +2764,8 @@ correction round. Phase 2 Slice 1 was subsequently accepted and pushed at
 `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`. Phase 2 Slice 2 was subsequently
 independently reviewed with no remaining substantive issue, committed as
 `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`, and pushed to `origin/main`.
-Phase 2 Slice 3 remains unimplemented and is the next eligible bounded
-implementation work; Unit of Work and cross-repository transaction
-orchestration remain deferred to Slice 4.
+Phase 2 Slice 3 is implemented and independently approved. Unit of Work and
+cross-repository transaction orchestration remain deferred to Slice 4.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
@@ -2931,8 +2945,8 @@ deployment, or work outside a separately authorized phase.
   one commit, `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`, with parent
   `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101` and subject
   `feat(player-character): add structured persistence schema`, then pushed as
-  `3ad39c7..a280279` (`main -> main`). Phase 2 Slice 3 remains unimplemented
-  and is the next eligible bounded MySQL Repository work. Unit of Work and
-  cross-repository transaction orchestration remain deferred to Slice 4; no
-  Slice 3, Slice 4, runtime, HTTP, frontend, Demo, Provider, or narrative
+  `3ad39c7..a280279` (`main -> main`). Phase 2 Slice 3 is implemented and
+  independently approved as the bounded MySQL Repository layer. Unit of Work
+  and cross-repository transaction orchestration remain deferred to Slice 4;
+  no Slice 4, runtime, HTTP, frontend, Demo, Provider, or narrative
   implementation began.

@@ -158,9 +158,9 @@ The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
 partially implemented by the committed and pushed Phase 1 pure domain/protocol
-foundation, Phase 2 Slice 1 persistence carriers, and Phase 2 Slice 2
-structured persistence schema. Slice 2 is implemented, verified, independently
-reviewed, committed, and pushed; the overall implementation plan remains only
+foundation, Phase 2 Slice 1 persistence carriers, Phase 2 Slice 2 structured
+persistence schema, and the implemented and independently approved Phase 2
+Slice 3 MySQL Repository adapters. The overall implementation plan remains only
 partially implemented.** Its
 first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
@@ -224,12 +224,21 @@ requirements for both `RETIRE` and `FINAL_DEATH`. Relevant real-MySQL
 verification passed with 64 tests, and the relevant Slice 1 regression passed
 with 284 tests.
 
-Phase 2 Slice 3 remains unimplemented and is the next eligible bounded
-implementation work: the MySQL Repository layer with locking, CAS, receipt
-operations, and strict reconstruction. Unit of Work wiring and cross-repository
-transaction orchestration remain deferred to Slice 4. No Slice 3, Slice 4,
-production composition, public route, frontend behavior, Provider integration,
-Demo behavior, runtime behavior, or story/Run activation is implemented.
+Phase 2 Slice 3 is implemented and independently approved. It provides the
+four existing-port MySQL Repository adapters over caller-owned sessions,
+including allocation and controller-binding storage, current and immutable
+revision persistence, creation and mutation receipts, exact-row locking, and
+current-row CAS. Reconstruction uses the committed Slice 1 codec and canonical
+identity authorities; adapters flush authorized SQL but do not commit, roll
+back, retry, recover transactions, or orchestrate application workflow. Its
+two narrow infrastructure errors classify repository operation and known
+immutable/unique conflicts. Real-MySQL and offline evidence covers
+persistence, conflicts, concurrency/CAS, row locking, caller rollback,
+constraints, corrupt state, and persistence boundaries. Unit of Work wiring
+and cross-repository transaction orchestration remain deferred to Slice 4. No
+Slice 4, production composition, public route, frontend behavior, Provider
+integration, Demo behavior, runtime behavior, or story/Run activation is
+implemented.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the

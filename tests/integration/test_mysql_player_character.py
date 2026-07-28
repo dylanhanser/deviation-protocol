@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
 import importlib.util
 import os
 from pathlib import Path
@@ -18,10 +20,87 @@ from sqlalchemy import text
 from sqlalchemy.dialects import mysql
 from sqlalchemy.engine import make_url
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.ext.asyncio import AsyncConnection, AsyncEngine
+from sqlalchemy.ext.asyncio import (
+    AsyncConnection,
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+)
 
+from deviation_protocol.application.player_character_operations import (
+    CREATION_RESULT_SCHEMA_VERSION,
+    MUTATION_RESULT_SCHEMA_VERSION,
+    CharacterCreationCommand,
+    CharacterMutationCommand,
+    CharacterOperationNamespace,
+    CharacterOperationProtocolCode,
+    CreationReceiptKey,
+    CreationSuccessResult,
+    MutationCommandResult,
+    MutationReceiptKey,
+    MutationSuccessResult,
+    StoredCreationSuccessReceipt,
+    StoredMutationSuccessReceipt,
+    build_creation_success_receipt,
+    build_mutation_success_receipt,
+    creation_fingerprint,
+    evaluate_creation_receipt_protocol,
+    evaluate_mutation_policy,
+    evaluate_mutation_receipt_protocol,
+    mutation_fingerprint,
+)
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    AuthoritySourceRef,
+    CanonicalPlayerCharacter,
+    CharacterCore,
+    ControllerBindingRef,
+    Declaration,
+    DistinguishingFeatures,
+    NarrationPreferences,
+    PlayerCharacterContractVersion,
+    PlayerCharacterId,
+    PlayerCharacterLifecycle,
+    PlayerCharacterMutationKind,
+    PlayerCharacterOperationId,
+    PlayerDeclaredText,
+    PlayerSubjectiveAuthority,
+    canonical_player_declaration_bytes,
+)
+from deviation_protocol.domain.player_character_policies import (
+    CreatePlayerCharacterPolicy,
+    PlayerConfirmation,
+)
 from deviation_protocol.infrastructure.database import create_engine
-from deviation_protocol.infrastructure.orm_models import Base
+from deviation_protocol.infrastructure.errors import (
+    PlayerCharacterRepositoryConflictError,
+)
+from deviation_protocol.infrastructure.orm_models import (
+    Base,
+    PlayerCharacterControllerBindingRow,
+    PlayerCharacterCreationReceiptRow,
+    PlayerCharacterCurrentRow,
+    PlayerCharacterIdAllocationRow,
+    PlayerCharacterMutationReceiptRow,
+    PlayerCharacterRevisionRow,
+)
+from deviation_protocol.infrastructure.player_character_persistence import (
+    PlayerCharacterStoredRecordIntegrityError,
+    canonical_record_to_storage_bytes,
+    canonical_state_record_fingerprint,
+    creation_operation_evidence_from_storage,
+    creation_receipt_to_storage_bytes,
+    fingerprint_to_storage_bytes,
+    mutation_operation_evidence_from_storage,
+    mutation_operation_evidence_to_storage_bytes,
+    mutation_receipt_to_storage_bytes,
+)
+from deviation_protocol.infrastructure.repositories import (
+    SqlAlchemyControllerBindingRegistryRepository,
+    SqlAlchemyPlayerCharacterCreationReceiptRepository,
+    SqlAlchemyPlayerCharacterMutationReceiptRepository,
+    SqlAlchemyPlayerCharacterRepository,
+)
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -1621,3 +1700,1370 @@ def test_mysql_downgrade_refuses_data_before_removing_any_table(
     assert final_counts == {
         table_name: 0 for table_name in PHASE_2_TABLES
     }
+
+
+_REPOSITORY_TEST_TIME = datetime(
+    2026,
+    7,
+    28,
+    15,
+    16,
+    17,
+    123456,
+    tzinfo=UTC,
+)
+_REPOSITORY_CAS_WINNER_TIME = datetime(
+    2026,
+    7,
+    28,
+    15,
+    16,
+    18,
+    123456,
+    tzinfo=UTC,
+)
+_REPOSITORY_CAS_LOSER_TIME = datetime(
+    2026,
+    7,
+    28,
+    15,
+    16,
+    19,
+    123456,
+    tzinfo=UTC,
+)
+_ASYNC_COORDINATION_TIMEOUT = 5.0
+_EXPECTED_ROW_BLOCK_TIMEOUT = 0.2
+
+
+@dataclass(frozen=True, slots=True)
+class _RepositoryCharacter:
+    creation_command: CharacterCreationCommand
+    initial: CanonicalPlayerCharacter
+    creation_receipt: StoredCreationSuccessReceipt
+    mutation_command: CharacterMutationCommand
+    successor: CanonicalPlayerCharacter
+    mutation_receipt: StoredMutationSuccessReceipt
+
+
+@dataclass(slots=True)
+class _RepositoryTestScope:
+    token: str
+    characters: list[_RepositoryCharacter] = field(default_factory=list)
+
+    def character(
+        self,
+        suffix: str,
+        **options: Any,
+    ) -> _RepositoryCharacter:
+        character = _build_repository_character(
+            f"{self.token}-{suffix}",
+            **options,
+        )
+        self.characters.append(character)
+        return character
+
+
+def _build_repository_character(
+    label: str,
+    *,
+    creation_command: CharacterCreationCommand | None = None,
+    player_character_id: PlayerCharacterId | None = None,
+    controller_binding: ControllerBindingRef | None = None,
+) -> _RepositoryCharacter:
+    player_character_id = player_character_id or PlayerCharacterId(
+        value=f"pc.repo-{label}"
+    )
+    controller_binding = controller_binding or ControllerBindingRef(
+        value=f"binding.repo-{label}"
+    )
+    creation_command = creation_command or CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(),
+        narration_preferences=NarrationPreferences(),
+    )
+    initial = CreatePlayerCharacterPolicy().create(
+        player_character_id=player_character_id,
+        controller_binding=controller_binding,
+        character_core=creation_command.character_core,
+        narration_preferences=creation_command.narration_preferences,
+        source_reference=AuthoritySourceRef(value=f"source.create-{label}"),
+    )
+    creation_operation_id = PlayerCharacterOperationId(
+        value=f"operation.create-{label}"
+    )
+    _, creation_operation_fingerprint = creation_fingerprint(
+        creation_command
+    )
+    creation_receipt = build_creation_success_receipt(
+        key=CreationReceiptKey(
+            controller_binding=controller_binding,
+            operation_namespace=CharacterOperationNamespace.CREATE_V1,
+            operation_id=creation_operation_id,
+        ),
+        fingerprint=creation_operation_fingerprint,
+        result=CreationSuccessResult(
+            result_schema_version=CREATION_RESULT_SCHEMA_VERSION,
+            player_character_id=player_character_id,
+            contract_version=initial.contract_version,
+            resulting_revision=initial.record_revision,
+            resulting_lifecycle=initial.lifecycle,
+        ),
+    )
+
+    mutation_operation_id = PlayerCharacterOperationId(
+        value=f"operation.mutate-{label}"
+    )
+    mutation_command = CharacterMutationCommand(
+        contract_version=initial.contract_version,
+        command_kind=PlayerCharacterMutationKind.RETIRE,
+        target_player_character_id=player_character_id,
+        expected_revision=initial.record_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=player_character_id,
+            contract_version=initial.contract_version,
+            record_revision=initial.record_revision,
+        ),
+        confirmation=PlayerConfirmation(
+            player_character_id=player_character_id,
+            expected_revision=initial.record_revision,
+            operation_id=mutation_operation_id,
+            mutation_kind=PlayerCharacterMutationKind.RETIRE,
+            source_reference=AuthoritySourceRef(
+                value=f"source.retire-{label}"
+            ),
+        ),
+    )
+    mutation_decision = evaluate_mutation_policy(
+        initial,
+        command=mutation_command,
+        operation_id=mutation_operation_id,
+    )
+    assert mutation_decision.accepted
+    assert mutation_decision.resulting_record is not None
+    successor = mutation_decision.resulting_record
+    _, mutation_operation_fingerprint = mutation_fingerprint(
+        mutation_command,
+        operation_id=mutation_operation_id,
+    )
+    mutation_receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=mutation_operation_id,
+        ),
+        fingerprint=mutation_operation_fingerprint,
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=player_character_id,
+            contract_version=successor.contract_version,
+            command_kind=PlayerCharacterMutationKind.RETIRE,
+            command_result=MutationCommandResult.RETIRED,
+            resulting_revision=successor.record_revision,
+            resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+        ),
+    )
+    return _RepositoryCharacter(
+        creation_command=creation_command,
+        initial=initial,
+        creation_receipt=creation_receipt,
+        mutation_command=mutation_command,
+        successor=successor,
+        mutation_receipt=mutation_receipt,
+    )
+
+
+def _repository_player_text(value: str) -> PlayerDeclaredText:
+    return PlayerDeclaredText(
+        authority=PlayerSubjectiveAuthority.PLAYER_EXPRESSION,
+        text=value,
+    )
+
+
+def _repository_name_command(value: str) -> CharacterCreationCommand:
+    return CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(
+            name_or_code_name=Declaration[PlayerDeclaredText].declared(
+                _repository_player_text(value)
+            )
+        ),
+        narration_preferences=NarrationPreferences(),
+    )
+
+
+def _repository_feature_command(feature_count: int) -> CharacterCreationCommand:
+    features = tuple(
+        _repository_player_text(f"repository-feature-{index:03d}")
+        for index in range(feature_count)
+    )
+    return CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(
+            distinguishing_features=Declaration[
+                DistinguishingFeatures
+            ].declared(DistinguishingFeatures(features=features))
+        ),
+        narration_preferences=NarrationPreferences(),
+    )
+
+
+async def _stage_repository_creation(
+    session: AsyncSession,
+    character: _RepositoryCharacter,
+) -> None:
+    binding_repository = SqlAlchemyControllerBindingRegistryRepository(
+        session
+    )
+    character_repository = SqlAlchemyPlayerCharacterRepository(session)
+    receipt_repository = (
+        SqlAlchemyPlayerCharacterCreationReceiptRepository(session)
+    )
+    await binding_repository.add(
+        character.initial.controller_binding,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+    await character_repository.add_allocation(
+        character.initial.player_character_id,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+    await character_repository.add_initial(
+        character.initial,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+    await receipt_repository.add(
+        character.creation_receipt,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+
+
+async def _stage_repository_mutation(
+    session: AsyncSession,
+    character: _RepositoryCharacter,
+) -> None:
+    character_repository = SqlAlchemyPlayerCharacterRepository(session)
+    receipt_repository = (
+        SqlAlchemyPlayerCharacterMutationReceiptRepository(session)
+    )
+    assert (
+        await character_repository.get_for_update(
+            character.initial.player_character_id
+        )
+        == character.initial
+    )
+    await character_repository.append_revision(
+        character.successor,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+    assert await character_repository.compare_and_swap_current(
+        character.successor,
+        expected_revision=character.initial.record_revision.value,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+    await receipt_repository.add(
+        character.mutation_receipt,
+        created_at=_REPOSITORY_TEST_TIME,
+    )
+
+
+@pytest.fixture
+async def repository_test_scope(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+) -> Any:
+    scope = _RepositoryTestScope(token=uuid4().hex)
+    try:
+        yield scope
+    finally:
+        character_ids = tuple(
+            character.initial.player_character_id.value
+            for character in scope.characters
+        )
+        controller_bindings = tuple(
+            character.initial.controller_binding.value
+            for character in scope.characters
+        )
+        if not character_ids:
+            return
+        async with mysql_session_factory.begin() as session:
+            await session.execute(
+                sa.delete(PlayerCharacterMutationReceiptRow).where(
+                    PlayerCharacterMutationReceiptRow.player_character_id.in_(
+                        character_ids
+                    )
+                )
+            )
+            await session.execute(
+                sa.delete(PlayerCharacterCreationReceiptRow).where(
+                    PlayerCharacterCreationReceiptRow.result_player_character_id.in_(
+                        character_ids
+                    )
+                )
+            )
+            await session.execute(
+                sa.delete(PlayerCharacterCurrentRow).where(
+                    PlayerCharacterCurrentRow.player_character_id.in_(
+                        character_ids
+                    )
+                )
+            )
+            await session.execute(
+                sa.delete(PlayerCharacterRevisionRow).where(
+                    PlayerCharacterRevisionRow.player_character_id.in_(
+                        character_ids
+                    )
+                )
+            )
+            await session.execute(
+                sa.delete(PlayerCharacterIdAllocationRow).where(
+                    PlayerCharacterIdAllocationRow.player_character_id.in_(
+                        character_ids
+                    )
+                )
+            )
+            await session.execute(
+                sa.delete(PlayerCharacterControllerBindingRow).where(
+                    PlayerCharacterControllerBindingRow.controller_binding.in_(
+                        controller_bindings
+                    )
+                )
+            )
+        async with mysql_session_factory() as session:
+            residual = (
+                await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(PlayerCharacterRevisionRow)
+                    .where(
+                        PlayerCharacterRevisionRow.player_character_id.in_(
+                            character_ids
+                        )
+                    )
+                )
+            )
+        assert residual == 0
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repositories_flush_inside_caller_transaction_and_rollback(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("rollback")
+    async with mysql_session_factory() as session:
+        await _stage_repository_creation(session, character)
+        assert (
+            await SqlAlchemyPlayerCharacterRepository(session).get(
+                character.initial.player_character_id
+            )
+            == character.initial
+        )
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PlayerCharacterCreationReceiptRow)
+                .where(
+                    PlayerCharacterCreationReceiptRow.result_player_character_id
+                    == character.initial.player_character_id.value
+                )
+            )
+            == 1
+        )
+        await session.rollback()
+
+    async with mysql_session_factory() as session:
+        assert not await SqlAlchemyPlayerCharacterRepository(
+            session
+        ).allocation_exists(character.initial.player_character_id)
+        assert (
+            await SqlAlchemyControllerBindingRegistryRepository(session).get(
+                character.initial.controller_binding
+            )
+            is None
+        )
+        assert (
+            await SqlAlchemyPlayerCharacterCreationReceiptRepository(
+                session
+            ).get(character.creation_receipt.key)
+            is None
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_creation_round_trip_replay_and_conflicts(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("creation")
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, character)
+
+    async with mysql_session_factory() as session:
+        binding_repository = SqlAlchemyControllerBindingRegistryRepository(
+            session
+        )
+        character_repository = SqlAlchemyPlayerCharacterRepository(session)
+        receipt_repository = (
+            SqlAlchemyPlayerCharacterCreationReceiptRepository(session)
+        )
+        assert (
+            await binding_repository.lock(
+                character.initial.controller_binding
+            )
+            == character.initial.controller_binding
+        )
+        assert await character_repository.allocation_exists(
+            character.initial.player_character_id
+        )
+        assert (
+            await character_repository.get(
+                character.initial.player_character_id
+            )
+            == character.initial
+        )
+        stored_receipt = await receipt_repository.get(
+            character.creation_receipt.key
+        )
+        assert stored_receipt == character.creation_receipt
+        stored_row = await session.scalar(
+            sa.select(PlayerCharacterCreationReceiptRow).where(
+                PlayerCharacterCreationReceiptRow.controller_binding
+                == character.creation_receipt.key.controller_binding.value,
+                PlayerCharacterCreationReceiptRow.operation_namespace
+                == character.creation_receipt.key.operation_namespace.value,
+                PlayerCharacterCreationReceiptRow.operation_id
+                == character.creation_receipt.key.operation_id.value,
+            )
+        )
+        assert stored_row is not None
+        assert stored_row.fingerprint == fingerprint_to_storage_bytes(
+            character.creation_receipt.fingerprint
+        )
+        assert stored_row.result_record_fingerprint == (
+            canonical_state_record_fingerprint(character.initial)
+        )
+        assert stored_row.receipt_canonical == (
+            creation_receipt_to_storage_bytes(character.creation_receipt)
+        )
+        assert creation_operation_evidence_from_storage(
+            stored_row.operation_evidence_canonical
+        ) == character.creation_command
+        assert (
+            stored_row.result_player_character_id
+            == character.initial.player_character_id.value
+        )
+        assert (
+            stored_row.resulting_revision
+            == character.initial.record_revision.value
+        )
+
+        exact = evaluate_creation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            operation_id=character.creation_receipt.key.operation_id,
+            command=character.creation_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        assert exact.code is CharacterOperationProtocolCode.EXACT_REPLAY
+        conflicting_command = CharacterCreationCommand(
+            contract_version=PlayerCharacterContractVersion.V1,
+            character_core=CharacterCore(
+                name_or_code_name=Declaration.explicitly_absent()
+            ),
+            narration_preferences=NarrationPreferences(),
+        )
+        conflict = evaluate_creation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            operation_id=character.creation_receipt.key.operation_id,
+            command=conflicting_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        assert (
+            conflict.code
+            is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+        )
+
+    async with mysql_session_factory() as session:
+        with pytest.raises(PlayerCharacterRepositoryConflictError):
+            await SqlAlchemyControllerBindingRegistryRepository(session).add(
+                character.initial.controller_binding,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+        await session.rollback()
+    async with mysql_session_factory() as session:
+        with pytest.raises(PlayerCharacterRepositoryConflictError):
+            await SqlAlchemyPlayerCharacterRepository(
+                session
+            ).add_allocation(
+                character.initial.player_character_id,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+        await session.rollback()
+    async with mysql_session_factory() as session:
+        with pytest.raises(PlayerCharacterRepositoryConflictError):
+            await SqlAlchemyPlayerCharacterCreationReceiptRepository(
+                session
+            ).add(
+                character.creation_receipt,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+        await session.rollback()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_preserves_declaration_bytes_and_has_no_65_feature_ceiling(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    exact_declaration_command = _repository_name_command(
+        (chr(0xE9) * 32_410)
+    )
+    assert len(
+        canonical_player_declaration_bytes(
+            character_core=exact_declaration_command.character_core,
+            narration_preferences=(
+                exact_declaration_command.narration_preferences
+            ),
+        )
+    ) == 65_536
+
+    fixed_65_command = _repository_feature_command(65)
+    beyond_65_command = _repository_feature_command(66)
+    fixed_65 = fixed_65_command.character_core.distinguishing_features
+    beyond_65 = beyond_65_command.character_core.distinguishing_features
+    assert fixed_65.value is not None
+    assert beyond_65.value is not None
+    assert len(fixed_65.value.features) == 65
+    assert len(beyond_65.value.features) == 66
+    assert len(
+        canonical_player_declaration_bytes(
+            character_core=beyond_65_command.character_core,
+            narration_preferences=beyond_65_command.narration_preferences,
+        )
+    ) < 65_536
+
+    exact_declaration = repository_test_scope.character(
+        "exact-declaration",
+        creation_command=exact_declaration_command,
+    )
+    fixed_65_character = repository_test_scope.character(
+        "fixed-65-features",
+        creation_command=fixed_65_command,
+    )
+    beyond_65_character = repository_test_scope.character(
+        "beyond-65-features",
+        creation_command=beyond_65_command,
+    )
+    async with mysql_session_factory.begin() as session:
+        for character in (
+            exact_declaration,
+            fixed_65_character,
+            beyond_65_character,
+        ):
+            await _stage_repository_creation(session, character)
+
+    async with mysql_session_factory() as session:
+        repository = SqlAlchemyPlayerCharacterRepository(session)
+        for character in (
+            exact_declaration,
+            fixed_65_character,
+            beyond_65_character,
+        ):
+            assert (
+                await repository.get(character.initial.player_character_id)
+                == character.initial
+            )
+        reloaded_65 = await repository.get(
+            fixed_65_character.initial.player_character_id
+        )
+        reloaded_66 = await repository.get(
+            beyond_65_character.initial.player_character_id
+        )
+        assert reloaded_65 is not None
+        assert reloaded_66 is not None
+        reloaded_65_features = (
+            reloaded_65.character_core.distinguishing_features.value
+        )
+        reloaded_66_features = (
+            reloaded_66.character_core.distinguishing_features.value
+        )
+        assert reloaded_65_features is not None
+        assert reloaded_66_features is not None
+        assert tuple(
+            feature.text for feature in reloaded_65_features.features
+        ) == tuple(
+            feature.text for feature in fixed_65.value.features
+        )
+        assert tuple(
+            feature.text for feature in reloaded_66_features.features
+        ) == tuple(
+            feature.text for feature in beyond_65.value.features
+        )
+
+    over_limit_core = CharacterCore(
+        name_or_code_name=Declaration[PlayerDeclaredText].declared(
+            _repository_player_text((chr(0xE9) * 32_410) + "x")
+        )
+    )
+    with pytest.raises(ValueError, match="declaration"):
+        canonical_player_declaration_bytes(
+            character_core=over_limit_core,
+            narration_preferences=NarrationPreferences(),
+        )
+    with pytest.raises(ValueError, match="declaration"):
+        CreatePlayerCharacterPolicy().create(
+            player_character_id=PlayerCharacterId(
+                value=f"pc.repo-{repository_test_scope.token}-over-limit"
+            ),
+            controller_binding=ControllerBindingRef(
+                value=(
+                    f"binding.repo-{repository_test_scope.token}-over-limit"
+                )
+            ),
+            character_core=over_limit_core,
+            narration_preferences=NarrationPreferences(),
+            source_reference=AuthoritySourceRef(
+                value=f"source.repo-{repository_test_scope.token}-over-limit"
+            ),
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_mutation_preserves_history_and_replay_precedence(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("mutation")
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, character)
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_mutation(session, character)
+
+    async with mysql_session_factory() as session:
+        character_repository = SqlAlchemyPlayerCharacterRepository(session)
+        receipt_repository = (
+            SqlAlchemyPlayerCharacterMutationReceiptRepository(session)
+        )
+        assert (
+            await character_repository.get(
+                character.initial.player_character_id
+            )
+            == character.successor
+        )
+        stored_receipt = await receipt_repository.get(
+            character.mutation_receipt.key
+        )
+        assert stored_receipt == character.mutation_receipt
+        stored_row = await session.scalar(
+            sa.select(PlayerCharacterMutationReceiptRow).where(
+                PlayerCharacterMutationReceiptRow.player_character_id
+                == character.mutation_receipt.key.player_character_id.value,
+                PlayerCharacterMutationReceiptRow.operation_namespace
+                == character.mutation_receipt.key.operation_namespace.value,
+                PlayerCharacterMutationReceiptRow.operation_id
+                == character.mutation_receipt.key.operation_id.value,
+            )
+        )
+        assert stored_row is not None
+        assert stored_row.fingerprint == fingerprint_to_storage_bytes(
+            character.mutation_receipt.fingerprint
+        )
+        assert stored_row.before_record_fingerprint == (
+            canonical_state_record_fingerprint(character.initial)
+        )
+        assert stored_row.after_record_fingerprint == (
+            canonical_state_record_fingerprint(character.successor)
+        )
+        assert stored_row.receipt_canonical == (
+            mutation_receipt_to_storage_bytes(character.mutation_receipt)
+        )
+        assert mutation_operation_evidence_from_storage(
+            stored_row.operation_evidence_canonical
+        ) == character.mutation_command
+        assert (
+            stored_row.expected_revision,
+            stored_row.resulting_revision,
+        ) == (
+            character.initial.record_revision.value,
+            character.successor.record_revision.value,
+        )
+        history = tuple(
+            (
+                await session.scalars(
+                    sa.select(PlayerCharacterRevisionRow)
+                    .where(
+                        PlayerCharacterRevisionRow.player_character_id
+                        == character.initial.player_character_id.value
+                    )
+                    .order_by(PlayerCharacterRevisionRow.record_revision)
+                )
+            ).all()
+        )
+        assert tuple(row.record_revision for row in history) == (1, 2)
+        assert history[0].record_canonical == canonical_record_to_storage_bytes(
+            character.initial
+        )
+        assert history[1].record_canonical == canonical_record_to_storage_bytes(
+            character.successor
+        )
+
+        exact = evaluate_mutation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            current_record=character.successor,
+            operation_id=character.mutation_receipt.key.operation_id,
+            command=character.mutation_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        assert exact.code is CharacterOperationProtocolCode.EXACT_REPLAY
+
+        changed_confirmation = PlayerConfirmation(
+            player_character_id=character.initial.player_character_id,
+            expected_revision=character.initial.record_revision,
+            operation_id=character.mutation_receipt.key.operation_id,
+            mutation_kind=PlayerCharacterMutationKind.RETIRE,
+            source_reference=AuthoritySourceRef(
+                value="source.retire-conflicting-intent"
+            ),
+        )
+        conflicting_command = character.mutation_command.model_copy(
+            update={"confirmation": changed_confirmation}
+        )
+        conflict = evaluate_mutation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            current_record=character.successor,
+            operation_id=character.mutation_receipt.key.operation_id,
+            command=conflicting_command,
+            lookup_receipt=lambda _key: stored_receipt,
+        )
+        assert (
+            conflict.code
+            is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+        )
+        stale_operation_id = PlayerCharacterOperationId(
+            value="operation.mutation-stale"
+        )
+        stale_command = character.mutation_command.model_copy(
+            update={
+                "confirmation": PlayerConfirmation(
+                    player_character_id=character.initial.player_character_id,
+                    expected_revision=character.initial.record_revision,
+                    operation_id=stale_operation_id,
+                    mutation_kind=PlayerCharacterMutationKind.RETIRE,
+                    source_reference=AuthoritySourceRef(
+                        value="source.retire-stale"
+                    ),
+                )
+            }
+        )
+        stale = evaluate_mutation_receipt_protocol(
+            authentication_succeeded=True,
+            trusted_controller_binding=character.initial.controller_binding,
+            current_record=character.successor,
+            operation_id=stale_operation_id,
+            command=stale_command,
+            lookup_receipt=lambda _key: None,
+        )
+        assert stale.code is CharacterOperationProtocolCode.STALE_REVISION
+        assert not await character_repository.compare_and_swap_current(
+            character.successor,
+            expected_revision=character.initial.record_revision.value,
+            created_at=_REPOSITORY_TEST_TIME,
+        )
+
+    async with mysql_session_factory() as session:
+        with pytest.raises(PlayerCharacterRepositoryConflictError):
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).add(
+                character.mutation_receipt,
+                created_at=_REPOSITORY_TEST_TIME,
+            )
+        await session.rollback()
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_real_compare_and_swap_has_one_deterministic_winner(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("cas")
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, character)
+    async with mysql_session_factory.begin() as session:
+        await SqlAlchemyPlayerCharacterRepository(session).append_revision(
+            character.successor,
+            created_at=_REPOSITORY_TEST_TIME,
+        )
+
+    winner_ready = asyncio.Event()
+    loser_ready = asyncio.Event()
+    start_gate = asyncio.Event()
+    winner_staged = asyncio.Event()
+    loser_entered_cas = asyncio.Event()
+    release_winner = asyncio.Event()
+    transaction_actions: dict[str, str] = {}
+
+    async def winning_attempt() -> tuple[bool, int]:
+        async with mysql_session_factory() as session:
+            await session.begin()
+            connection_id = await session.scalar(
+                sa.text("SELECT CONNECTION_ID()")
+            )
+            assert connection_id is not None
+            winner_ready.set()
+            await asyncio.wait_for(
+                start_gate.wait(),
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            result = await SqlAlchemyPlayerCharacterRepository(
+                session
+            ).compare_and_swap_current(
+                character.successor,
+                expected_revision=character.initial.record_revision.value,
+                created_at=_REPOSITORY_CAS_WINNER_TIME,
+            )
+            assert result
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).add(
+                character.mutation_receipt,
+                created_at=_REPOSITORY_CAS_WINNER_TIME,
+            )
+            winner_staged.set()
+            await asyncio.wait_for(
+                release_winner.wait(),
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            await session.commit()
+            transaction_actions["winner"] = "committed"
+            assert not session.in_transaction()
+            return result, int(connection_id)
+
+    async def losing_attempt() -> tuple[bool, int]:
+        async with mysql_session_factory() as session:
+            await session.begin()
+            connection_id = await session.scalar(
+                sa.text("SELECT CONNECTION_ID()")
+            )
+            assert connection_id is not None
+            loser_ready.set()
+            await asyncio.wait_for(
+                start_gate.wait(),
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            await asyncio.wait_for(
+                winner_staged.wait(),
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            # The repository has no production-only SQL hook. This is the
+            # narrowest observable boundary immediately before the real CAS.
+            loser_entered_cas.set()
+            result = await SqlAlchemyPlayerCharacterRepository(
+                session
+            ).compare_and_swap_current(
+                character.successor,
+                expected_revision=character.initial.record_revision.value,
+                created_at=_REPOSITORY_CAS_LOSER_TIME,
+            )
+            assert not result
+            await session.rollback()
+            transaction_actions["loser"] = "rolled back"
+            assert not session.in_transaction()
+            return result, int(connection_id)
+
+    winner_task = asyncio.create_task(winning_attempt())
+    loser_task = asyncio.create_task(losing_attempt())
+    tasks = (winner_task, loser_task)
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(winner_ready.wait(), loser_ready.wait()),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+        start_gate.set()
+        await asyncio.wait_for(
+            winner_staged.wait(),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+        await asyncio.wait_for(
+            loser_entered_cas.wait(),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(
+                asyncio.shield(loser_task),
+                timeout=_EXPECTED_ROW_BLOCK_TIMEOUT,
+            )
+        assert not winner_task.done()
+
+        release_winner.set()
+        winner_outcome, loser_outcome = await asyncio.wait_for(
+            asyncio.gather(winner_task, loser_task),
+            timeout=_ASYNC_COORDINATION_TIMEOUT,
+        )
+    finally:
+        release_winner.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert (winner_outcome[0], loser_outcome[0]) == (True, False)
+    assert winner_outcome[1] != loser_outcome[1]
+    assert transaction_actions == {
+        "winner": "committed",
+        "loser": "rolled back",
+    }
+
+    async with mysql_session_factory() as session:
+        repository = SqlAlchemyPlayerCharacterRepository(session)
+        assert (
+            await repository.get(character.initial.player_character_id)
+            == character.successor
+        )
+        current = await session.scalar(
+            sa.select(PlayerCharacterCurrentRow).where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character.initial.player_character_id.value
+            )
+        )
+        assert current is not None
+        assert current.record_revision == 2
+        assert current.record_canonical == canonical_record_to_storage_bytes(
+            character.successor
+        )
+        assert current.updated_at.replace(tzinfo=UTC) == (
+            _REPOSITORY_CAS_WINNER_TIME
+        )
+        history = tuple(
+            (
+                await session.scalars(
+                    sa.select(PlayerCharacterRevisionRow)
+                    .where(
+                        PlayerCharacterRevisionRow.player_character_id
+                        == character.initial.player_character_id.value
+                    )
+                    .order_by(PlayerCharacterRevisionRow.record_revision)
+                )
+            ).all()
+        )
+        assert tuple(row.record_revision for row in history) == (1, 2)
+        assert history[0].record_canonical == canonical_record_to_storage_bytes(
+            character.initial
+        )
+        assert history[1].record_canonical == canonical_record_to_storage_bytes(
+            character.successor
+        )
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(PlayerCharacterMutationReceiptRow)
+                .where(
+                    PlayerCharacterMutationReceiptRow.player_character_id
+                    == character.initial.player_character_id.value
+                )
+            )
+            == 1
+        )
+        family_counts = []
+        for row_type, predicate in (
+            (
+                PlayerCharacterControllerBindingRow,
+                PlayerCharacterControllerBindingRow.controller_binding
+                == character.initial.controller_binding.value,
+            ),
+            (
+                PlayerCharacterIdAllocationRow,
+                PlayerCharacterIdAllocationRow.player_character_id
+                == character.initial.player_character_id.value,
+            ),
+            (
+                PlayerCharacterRevisionRow,
+                PlayerCharacterRevisionRow.player_character_id
+                == character.initial.player_character_id.value,
+            ),
+            (
+                PlayerCharacterCurrentRow,
+                PlayerCharacterCurrentRow.player_character_id
+                == character.initial.player_character_id.value,
+            ),
+            (
+                PlayerCharacterCreationReceiptRow,
+                PlayerCharacterCreationReceiptRow.result_player_character_id
+                == character.initial.player_character_id.value,
+            ),
+            (
+                PlayerCharacterMutationReceiptRow,
+                PlayerCharacterMutationReceiptRow.player_character_id
+                == character.initial.player_character_id.value,
+            ),
+        ):
+            family_counts.append(
+                await session.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(row_type)
+                    .where(predicate)
+                )
+            )
+        assert family_counts == [1, 1, 2, 1, 1, 1]
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_get_for_update_blocks_only_the_exact_current_row(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    locked_character = repository_test_scope.character("row-lock")
+    unrelated_character = repository_test_scope.character("row-unrelated")
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, locked_character)
+        await _stage_repository_creation(session, unrelated_character)
+
+    same_row_started = asyncio.Event()
+    unrelated_started = asyncio.Event()
+    transaction_actions: dict[str, str] = {}
+
+    async def locked_read(
+        character: _RepositoryCharacter,
+        *,
+        started: asyncio.Event,
+        caller: str,
+    ) -> tuple[CanonicalPlayerCharacter | None, int]:
+        async with mysql_session_factory() as session:
+            await session.begin()
+            connection_id = await session.scalar(
+                sa.text("SELECT CONNECTION_ID()")
+            )
+            assert connection_id is not None
+            started.set()
+            record = await SqlAlchemyPlayerCharacterRepository(
+                session
+            ).get_for_update(character.initial.player_character_id)
+            await session.rollback()
+            transaction_actions[caller] = "rolled back"
+            assert not session.in_transaction()
+            return record, int(connection_id)
+
+    async with mysql_session_factory() as first_session:
+        await first_session.begin()
+        first_connection_id = await first_session.scalar(
+            sa.text("SELECT CONNECTION_ID()")
+        )
+        assert first_connection_id is not None
+        assert (
+            await SqlAlchemyPlayerCharacterRepository(
+                first_session
+            ).get_for_update(locked_character.initial.player_character_id)
+            == locked_character.initial
+        )
+
+        same_row_task = asyncio.create_task(
+            locked_read(
+                locked_character,
+                started=same_row_started,
+                caller="same-row",
+            )
+        )
+        unrelated_task = asyncio.create_task(
+            locked_read(
+                unrelated_character,
+                started=unrelated_started,
+                caller="unrelated-row",
+            )
+        )
+        tasks = (same_row_task, unrelated_task)
+        try:
+            await asyncio.wait_for(
+                asyncio.gather(
+                    same_row_started.wait(),
+                    unrelated_started.wait(),
+                ),
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            unrelated_result = await asyncio.wait_for(
+                unrelated_task,
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+            assert unrelated_result[0] == unrelated_character.initial
+            with pytest.raises(TimeoutError):
+                await asyncio.wait_for(
+                    asyncio.shield(same_row_task),
+                    timeout=_EXPECTED_ROW_BLOCK_TIMEOUT,
+                )
+
+            await first_session.commit()
+            transaction_actions["lock-holder"] = "committed"
+            assert not first_session.in_transaction()
+            same_row_result = await asyncio.wait_for(
+                same_row_task,
+                timeout=_ASYNC_COORDINATION_TIMEOUT,
+            )
+        finally:
+            if first_session.in_transaction():
+                await first_session.rollback()
+            for task in tasks:
+                if not task.done():
+                    task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert same_row_result[0] == locked_character.initial
+    assert len(
+        {
+            int(first_connection_id),
+            same_row_result[1],
+            unrelated_result[1],
+        }
+    ) == 3
+    assert transaction_actions == {
+        "lock-holder": "committed",
+        "unrelated-row": "rolled back",
+        "same-row": "rolled back",
+    }
+
+    async with mysql_session_factory() as observer:
+        repository = SqlAlchemyPlayerCharacterRepository(observer)
+        assert (
+            await repository.get(locked_character.initial.player_character_id)
+            == locked_character.initial
+        )
+        assert (
+            await repository.get(
+                unrelated_character.initial.player_character_id
+            )
+            == unrelated_character.initial
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_distinguishes_missing_current_from_absence(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("missing-current")
+    async with mysql_session_factory.begin() as session:
+        await SqlAlchemyControllerBindingRegistryRepository(session).add(
+            character.initial.controller_binding,
+            created_at=_REPOSITORY_TEST_TIME,
+        )
+        await SqlAlchemyPlayerCharacterRepository(session).add_allocation(
+            character.initial.player_character_id,
+            created_at=_REPOSITORY_TEST_TIME,
+        )
+
+    async with mysql_session_factory() as session:
+        repository = SqlAlchemyPlayerCharacterRepository(session)
+        with pytest.raises(
+            PlayerCharacterStoredRecordIntegrityError,
+            match="current row is missing",
+        ):
+            await repository.get(character.initial.player_character_id)
+        assert (
+            await repository.get(
+                PlayerCharacterId(value=f"pc.absent-{uuid4().hex}")
+            )
+            is None
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_reconstruction_rejects_corrupt_current_blob(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    character = repository_test_scope.character("corrupt")
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, character)
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(PlayerCharacterCurrentRow)
+            .where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character.initial.player_character_id.value
+            )
+            .values(record_canonical=b"{}")
+        )
+
+    async with mysql_session_factory() as session:
+        with pytest.raises(
+            PlayerCharacterStoredRecordIntegrityError,
+            match="stored canonical player-character record is invalid",
+        ) as exc_info:
+            await SqlAlchemyPlayerCharacterRepository(session).get(
+                character.initial.player_character_id
+            )
+        assert exc_info.value.__cause__ is not None
+        unchanged_blob = await session.scalar(
+            sa.select(PlayerCharacterCurrentRow.record_canonical).where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character.initial.player_character_id.value
+            )
+        )
+        assert unchanged_blob == b"{}"
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_reconstruction_rejects_inconsistent_receipt_evidence(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    corrupt_creation = repository_test_scope.character(
+        "corrupt-creation-evidence"
+    )
+    corrupt_mutation_revision = repository_test_scope.character(
+        "corrupt-mutation-revision"
+    )
+    corrupt_mutation_intent = repository_test_scope.character(
+        "corrupt-mutation-intent"
+    )
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, corrupt_creation)
+        await _stage_repository_creation(session, corrupt_mutation_revision)
+        await _stage_repository_creation(session, corrupt_mutation_intent)
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_mutation(session, corrupt_mutation_revision)
+        await _stage_repository_mutation(session, corrupt_mutation_intent)
+
+    changed_confirmation = PlayerConfirmation(
+        player_character_id=(
+            corrupt_mutation_intent.initial.player_character_id
+        ),
+        expected_revision=(
+            corrupt_mutation_intent.initial.record_revision
+        ),
+        operation_id=(
+            corrupt_mutation_intent.mutation_receipt.key.operation_id
+        ),
+        mutation_kind=PlayerCharacterMutationKind.RETIRE,
+        source_reference=AuthoritySourceRef(
+            value="source.corrupt-mutation-intent"
+        ),
+    )
+    changed_command = corrupt_mutation_intent.mutation_command.model_copy(
+        update={"confirmation": changed_confirmation}
+    )
+    changed_evidence = mutation_operation_evidence_to_storage_bytes(
+        changed_command
+    )
+    assert changed_evidence != mutation_operation_evidence_to_storage_bytes(
+        corrupt_mutation_intent.mutation_command
+    )
+
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(PlayerCharacterCreationReceiptRow)
+            .where(
+                PlayerCharacterCreationReceiptRow.controller_binding
+                == corrupt_creation.initial.controller_binding.value,
+                PlayerCharacterCreationReceiptRow.operation_namespace
+                == corrupt_creation.creation_receipt.key.operation_namespace.value,
+                PlayerCharacterCreationReceiptRow.operation_id
+                == corrupt_creation.creation_receipt.key.operation_id.value,
+            )
+            .values(operation_evidence_canonical=b"{}")
+        )
+        await session.execute(
+            sa.update(PlayerCharacterMutationReceiptRow)
+            .where(
+                PlayerCharacterMutationReceiptRow.player_character_id
+                == (
+                    corrupt_mutation_revision.initial.player_character_id.value
+                ),
+                PlayerCharacterMutationReceiptRow.operation_namespace
+                == (
+                    corrupt_mutation_revision.mutation_receipt.key
+                    .operation_namespace.value
+                ),
+                PlayerCharacterMutationReceiptRow.operation_id
+                == (
+                    corrupt_mutation_revision.mutation_receipt.key
+                    .operation_id.value
+                ),
+            )
+            .values(after_record_fingerprint=b"\0" * 32)
+        )
+        await session.execute(
+            sa.update(PlayerCharacterMutationReceiptRow)
+            .where(
+                PlayerCharacterMutationReceiptRow.player_character_id
+                == corrupt_mutation_intent.initial.player_character_id.value,
+                PlayerCharacterMutationReceiptRow.operation_namespace
+                == (
+                    corrupt_mutation_intent.mutation_receipt.key
+                    .operation_namespace.value
+                ),
+                PlayerCharacterMutationReceiptRow.operation_id
+                == (
+                    corrupt_mutation_intent.mutation_receipt.key
+                    .operation_id.value
+                ),
+            )
+            .values(operation_evidence_canonical=changed_evidence)
+        )
+
+    async with mysql_session_factory() as session:
+        with pytest.raises(
+            PlayerCharacterStoredRecordIntegrityError,
+            match="creation operation evidence has an invalid shape",
+        ):
+            await SqlAlchemyPlayerCharacterCreationReceiptRepository(
+                session
+            ).get(corrupt_creation.creation_receipt.key)
+    async with mysql_session_factory() as session:
+        with pytest.raises(
+            PlayerCharacterStoredRecordIntegrityError,
+            match="mutation receipt does not bind adjacent history",
+        ):
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).get(corrupt_mutation_revision.mutation_receipt.key)
+    async with mysql_session_factory() as session:
+        with pytest.raises(
+            PlayerCharacterStoredRecordIntegrityError,
+            match="mutation receipt columns do not match canonical receipt",
+        ):
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).get(corrupt_mutation_intent.mutation_receipt.key)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_repository_128_character_case_variants_remain_distinct(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    repository_test_scope: _RepositoryTestScope,
+) -> None:
+    upper = repository_test_scope.character(
+        "Case",
+        player_character_id=PlayerCharacterId(value="P" * 128),
+        controller_binding=ControllerBindingRef(value="B" * 128),
+    )
+    lower = repository_test_scope.character(
+        "case",
+        player_character_id=PlayerCharacterId(value="p" * 128),
+        controller_binding=ControllerBindingRef(value="b" * 128),
+    )
+    async with mysql_session_factory.begin() as session:
+        await _stage_repository_creation(session, upper)
+        await _stage_repository_creation(session, lower)
+
+    async with mysql_session_factory() as session:
+        repository = SqlAlchemyPlayerCharacterRepository(session)
+        assert await repository.get(upper.initial.player_character_id) == (
+            upper.initial
+        )
+        assert await repository.get(lower.initial.player_character_id) == (
+            lower.initial
+        )
+        assert len(upper.initial.player_character_id.value) == 128
+        assert len(lower.initial.player_character_id.value) == 128
+        assert len(upper.initial.controller_binding.value) == 128
+        assert len(lower.initial.controller_binding.value) == 128

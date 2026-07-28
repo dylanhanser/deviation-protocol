@@ -69,7 +69,7 @@ wiring, public route, projection, frontend, Provider integration, Demo
 behavior, Session request/action behavior, or Run/story-line binding. Later
 bounded persistence slices do not change that ownership.
 
-## Structured player-character Phase 2 Slices 1–2 persistence boundary
+## Structured player-character Phase 2 Slices 1–3 persistence boundary
 
 Phase 2 Slice 1 is implemented, independently accepted, committed, and pushed.
 It adds application persistence ports plus exactly six database-independent
@@ -105,14 +105,25 @@ adding foreign keys so MySQL does not generate undeclared indexes. Downgrade
 first probes all six tables and refuses before destructive DDL if any contains
 data; only an empty new schema may be removed.
 
-Relevant real-MySQL verification passed with 64 tests, and the relevant Slice 1
-regression passed with 284 tests. This remains schema metadata only. Phase 2
-Slice 3 is unimplemented and is the next eligible bounded work: the MySQL
-Repository layer with live-row reconstruction, SQL locking, CAS, and receipt
-operations. Unit of Work wiring and cross-repository transaction orchestration
-remain deferred to Slice 4. No runtime service, public route, frontend,
-Provider, Demo, Session, Run, or story-line integration is implemented. The
-complete frozen implementation plan remains partially implemented.
+Phase 2 Slice 3 is implemented and independently approved. Its four existing-
+port MySQL Repository adapters receive caller-owned `AsyncSession` instances
+and provide controller-binding registry, character allocation/current/history,
+and creation/mutation receipt operations. They reconstruct persisted values
+only through the committed Slice 1 codec and canonical identity authorities,
+retain immutable revision history, use exact current-row CAS and SQL row
+locking, and return the frozen creation and mutation receipt forms. Adapters
+may execute authorized SQL and `flush()`, but own no commit, rollback, retry,
+transaction recovery, or application workflow. The boundary adds only
+`PlayerCharacterRepositoryError` and
+`PlayerCharacterRepositoryConflictError` as narrow infrastructure errors.
+
+Real-MySQL evidence covers persistence, constraints, conflicts, CAS
+concurrency, exact-row locking, and caller rollback; offline unit evidence
+covers corrupt state and persistence-boundary failures. Unit of Work wiring
+and cross-repository transaction orchestration remain deferred to Slice 4. No
+runtime service, public route, frontend, Provider, Demo, Session, Run, or
+story-line integration is implemented. The complete frozen implementation plan
+remains partially implemented.
 
 ## Current composition roots and Provider boundaries
 
