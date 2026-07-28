@@ -153,8 +153,84 @@ recovery and exactly-once behavior remain excluded. The test-only orchestration
 is not a production application service. No runtime service, API, public route,
 frontend, Provider, Demo, Session, Run, story-line, narrative, content, or
 gameplay integration was activated; Phase 3 application orchestration and
-runtime activation remain deferred. The complete frozen implementation plan
+runtime activation remain unimplemented. The complete frozen implementation plan
 remains partially implemented.
+
+## Structured player-character Phase 3–5 planned boundaries
+
+This section records a written planning candidate, not implemented
+architecture. P3-S1 remains pending independent read-only plan review and is
+not authorized for implementation.
+
+Structured player-character Phase 3 owns trusted application orchestration and
+its later normal production composition. Its independently reviewable order is
+creation orchestration, mutation orchestration, owned read plus detached self
+projection, then normal MySQL composition with separately accepted production
+controller resolver and player-character ID issuer adapters. Phase 4 retains
+Run and continuous-story-line binding. Phase 5 retains public projection and
+narrow authenticated activation. API routes, frontend and Demo parity are not
+ordinary Phase 3 composition, and Run binding is not moved into it.
+
+P3-S1 adds only an injectable application service boundary over the accepted
+Phase 1 and Phase 2 authorities. Typed `RequestPrincipal`,
+`PlayerCharacterOperationId`, and `CharacterCreationCommand` construction owns
+structural input validation. `CharacterCreationCommand` calls
+`canonical_player_declaration_bytes`; later `creation_fingerprint` and
+`evaluate_creation_receipt_protocol` defensively revalidate the actual typed
+instance. `CreatePlayerCharacterPolicy.create` owns trusted creation policy,
+and `validate_canonical_player_character` owns complete-record validation.
+Repository codecs retain persistence representation and stored cross-record
+integrity. The service sequences these authorities; it introduces no second
+generic validation or policy system.
+
+Principal-to-controller mapping is a separate trusted boundary. A valid
+`RequestPrincipal` is input to resolution, not a controller binding by itself.
+An absent, invalid, unknown, or untrusted mapping returns
+`AUTHORIZATION_FAILED` before the initial UoW. A missing registry row never
+authorizes a principal: the service may insert one only after the trusted
+resolver returned that exact valid `ControllerBindingRef`. It must not
+auto-register, auto-bind, copy `RequestPrincipal.player_id`, or consult
+player-character persistence to invent authority.
+
+Permanent character identity issuance is likewise separate from controller
+identity and persistence. P3-S1 may call the injected issuer exactly once only
+after binding authorization and the exact receipt protocol returns
+`READY_FOR_NEW_OPERATION`. Exact replay never calls the issuer. The allocation
+Repository remains the uniqueness backstop; an allocation collision propagates
+the existing repository conflict, causes rollback, and never triggers another
+identity issuance. The production resolver backing source and ID-generation
+algorithm remain P3-S4 composition decisions.
+
+The application service owns `UnitOfWorkFactory` use, UoW entry and the one
+explicit success-path `commit()`. Repository adapters own only their accepted
+SQL/flush behavior and never commit. `SqlAlchemyUnitOfWork` rolls back and
+closes every uncommitted, exceptional, cancellation, and controlled
+pre-COMMIT-failure path. A SQL-failed session is never reused. Success is
+returned only after commit returns.
+
+Fresh-UoW winner recovery is permitted only when
+`ControllerBindingRegistryRepository.add` raises the existing
+`PlayerCharacterRepositoryConflictError` while inserting the same newly
+resolved binding. The failed UoW must first exit, roll back, and close. At most
+one fresh UoW may reauthorize, lock the same binding, read the exact creation
+receipt, and call `recover_creation_unique_race_winner`. It may return the
+stored success only for `EXACT_REPLAY`; changed, absent, malformed, or
+unauthorized winner evidence returns the existing protocol decision. This is
+not recovery for allocation, current-row, receipt, mutation, CAS, arbitrary
+integrity, or commit conflicts and performs no write, policy call, second
+allocation, second issuance, or general retry.
+
+Existing validation exceptions, protocol decisions, policy decisions,
+`PlayerCharacterRepositoryError`,
+`PlayerCharacterRepositoryConflictError`, and
+`PlayerCharacterStoredRecordIntegrityError` cross the application boundary
+without a new generic error hierarchy or broad infrastructure translation.
+Cancellation propagates unchanged. Callers own every retry decision outside
+the single narrow binding-insertion winner read. A controlled failure before
+`AsyncSession.commit` begins makes no durability claim beyond rollback
+evidence; an exception with uncertain commit durability is propagated without
+a recovery read or a success/replay claim. Exactly-once execution is not
+claimed.
 
 ## Current composition roots and Provider boundaries
 

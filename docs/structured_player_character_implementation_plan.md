@@ -21,6 +21,15 @@ received new-session independent implementation approval with verdict
 remained. Phase 2 is independently accepted and complete. Phases 3–7 remain
 unimplemented.**
 
+Phase 2 is committed, pushed, and closed at
+`ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+(`feat(player-character): wire repositories into unit of work`). The corrected
+Phase 3–5 roadmap and exact P3-S1 candidate in section 24 are now written and
+frozen for independent read-only plan review. P3-S1 is not implemented, is not
+independently approved, and is not authorized for implementation. This
+documentation write does not authorize staging, commit, push, database access,
+or any Phase 3–5 implementation.
+
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
 `STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED`. The exact
@@ -43,7 +52,8 @@ and known immutable/unique conflicts. Phase 2 Slice 4 now wires those four
 adapters into one entered `SqlAlchemyUnitOfWork` session and supplies bounded
 test-only cross-repository transaction evidence. Its production change is
 limited to imports and `SqlAlchemyUnitOfWork.__aenter__`; it adds no production
-orchestration. Phase 3 and every later phase remain blocked.
+orchestration. Phase 3 and every later phase remain unimplemented and require
+their own accepted plan boundary and explicit authorization.
 
 The ordered Phase 2 implementation slices introduced in section 24 were a
 separate amendment from the prior technical-freeze verdict. The section 31
@@ -175,41 +185,43 @@ to `tests/unit/test_repository_and_uow.py` and
 `tests/integration/test_mysql_player_character.py`. It is verified locally and
 independently approved. Phase 2 is accepted and complete.
 
-File names, table names, data types, endpoint shapes, and phase boundaries below
-are proposed implementation inventory. They are not authority to edit those
-surfaces. Exact choices identified as `U` must be resolved before the affected
-phase begins.
+Except for the exact frozen P3-S1 symbols, signatures, and path budget in
+section 24, file names, table names, data types, endpoint shapes, and phase
+boundaries below are proposed implementation inventory. They are not authority
+to edit those surfaces. Exact choices identified as `U` must be resolved before
+the affected phase begins.
 
 ## 5. Current repository baseline
 
-The controlled planning task began from:
+The corrected Phase 3 planning candidate is written against:
 
 - repository root: `D:\deviation-protocol`;
 - branch: `main`;
-- `HEAD`: `f988a95baa3ae1b69183c872a5b98cfd96abd88e`;
-- local `origin/main`: `f988a95baa3ae1b69183c872a5b98cfd96abd88e`;
+- `HEAD`: `ac5263fd5ca652665d23a082a19b3d66f8a047d1`;
+- local `origin/main`: `ac5263fd5ca652665d23a082a19b3d66f8a047d1`;
 - ahead/behind: `0/0`;
 - `HEAD` subject:
-  `docs(product): freeze structured player-character contract`;
+  `feat(player-character): wire repositories into unit of work`;
 - clean working tree; and
 - empty index.
 
 The baseline implements the deterministic Session-based vertical slice through
-Phase 3.2b. It does not implement the two frozen product specifications named
-above, a Run aggregate, a continuous-story-line aggregate, a stable
-player-character identity, controller-binding persistence, player-character
-lifecycle, or applicable character version/reference binding.
+Phase 3.2b plus the accepted structured player-character Phase 1 pure
+domain/protocol foundation and Phase 2 persistence boundary. It does not
+implement a structured player-character application service, normal production
+composition, public character route, Run aggregate, continuous-story-line
+aggregate, frontend, Demo parity, Provider integration, narrative integration,
+or gameplay activation.
 
 The current completed Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
 (`fix(domain): preserve exact opaque identifiers`); it follows the original
 Phase 1 implementation commit
 `c8808f66e8d97bc4386a481bf21669cfddcd222e` and preserves opaque identifiers
-exactly. The current committed Phase 2 baseline is completed Slice 3 at
-`7313b5833cae7a9f9c0b618abe5b49cfcbaba604`
-(`feat(player-character): implement mysql repositories`). It is the Slice 4
-pre-finalization baseline and remains local `origin/main`; the independently
-approved Slice 4 finalization commit is one commit ahead and was not pushed.
+exactly. The current committed and pushed Phase 2 closure baseline is
+`ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+(`feat(player-character): wire repositories into unit of work`). Phase 2 is
+independently accepted and complete.
 
 ## 6. Current-state implementation map
 
@@ -267,10 +279,11 @@ finalizing. The orchestrator and
 `src/deviation_protocol/infrastructure/repositories.py` use compare-and-swap
 job transitions. There is no `NarrativeJobService` symbol.
 
-These are evidence for repository transaction, idempotency, and recovery
-patterns (`N`). They do not protect a player-character record today. Character
-operations need their own aggregate lock, expected revision, operation receipt,
-and transaction boundary (`A`, proposed as `T`).
+These remain pattern evidence (`N`). Structured player-character Phase 1 now
+owns its typed operation/replay protocol, and Phase 2 owns the dedicated
+aggregate lock, revision history/current state, operation receipts,
+Repositories, and same-session UoW wiring. What remains absent is the trusted
+production application service that sequences those accepted authorities.
 
 ### Canonical state ownership
 
@@ -279,12 +292,12 @@ and transaction boundary (`A`, proposed as `T`).
 Session snapshot. State transitions are domain-owned and Provider output is
 candidate-only. `AuthoritativeStateView` is detached.
 
-A player-character record must not be embedded only inside `GameState`: Session
-loss and Run reset must not remove it, and same-character continuity crosses
-scenario boundaries. The proposed owner is a new server-side canonical
-player-character aggregate in the domain, loaded and committed through a
-dedicated application port and MySQL repository (`A`, `T`). Session and future
-Run state hold validated references, not the master record.
+A player-character record is not embedded inside `GameState`: Session loss and
+Run reset must not remove it, and same-character continuity crosses scenario
+boundaries. `CanonicalPlayerCharacter` is the server-side domain aggregate;
+the accepted Phase 2 ports and MySQL Repository load and commit its current and
+immutable revision forms. Session and future Run state may hold only validated
+references, not the master record.
 
 ### Database, migrations, and version mechanisms
 
@@ -412,14 +425,14 @@ disabled unless separately authorized.
 | Domain | Current representation | Planned representation or boundary | Equality rule |
 | --- | --- | --- | --- |
 | Authenticated controller subject | `RequestPrincipal(authentication_scheme, player_id)` | Input to a trusted `ControllerBindingResolver` port | May authorize a binding; never equals character identity |
-| Controller binding | None | Opaque server-issued or server-resolved binding reference, stored privately and required on every canonical record | Distinct from principal fields, Session, Run, request, and character |
-| Player character | None | Permanent opaque `PlayerCharacterId` issued only by trusted server code | Equality only by exact canonical ID |
+| Controller binding | `ControllerBindingRef`; private registry Repository/table and required canonical-record field | P3-S1 resolves it only through trusted `ControllerBindingResolver`; P3-S4 later selects the production adapter | Distinct from principal fields, Session, Run, request, and character |
+| Player character | `PlayerCharacterId`; permanent allocation ledger, current record, and immutable revisions | P3-S1 obtains a complete ID only from `PlayerCharacterIdIssuer`; P3-S4 later selects the production algorithm/adapter | Equality only by exact canonical ID |
 | Static character definition | `DefinitionId`, `character_definition_id` | Retained as content/template reference where separately relevant | Reuse never establishes character equality |
 | Session | String-valued `GameSession.session_id` with strict bounded request/DTO fields | Retained narrower identity; optional future reference to an explicit Run participation binding | Never establishes character identity |
 | Run | Not implemented | Run-owned aggregate defined by Phase 3.3 implementation | Binds a character and applicable reference; does not equal either |
 | Continuous story line | Not implemented | Run/continuity-owned stable reference; exact shape unresolved. Each continuous story line is bound to exactly one active player-character identity at a time | A line cannot simultaneously bind a second or different active character. The inverse number of lines/Runs one character may occupy remains unresolved |
 | World / scenario / visit | Scenario only; no world or visit identity | Run-owned references when implemented | Context/provenance only, never character identity |
-| Applicable character reference | None | Typed pair/record containing exact `player_character_id`, supported contract version, and applicable `record_revision` | Exact match; distinct from current revision and every other version |
+| Applicable character reference | `ApplicableCharacterReference` in the accepted Phase 1 domain | Phase 4 later binds the exact typed reference through the Run-owned aggregate | Exact match; distinct from current revision and every other version |
 | Stable logical NPC | Scenario-local memory subject key only | Existing key retained; future cross-scenario identity remains deferred | Never runtime NPC ID, definition, name, or player character |
 | Runtime NPC | `NpcState.npc_id` | Unchanged | Session/scenario local only |
 | Client operation | Session `client_request_id`; turn and job IDs | Dedicated creation operation under a controller-binding scope, or a dedicated mutation operation under a player-character scope | Idempotency only, never subject identity; creation and mutation scopes are not interchangeable |
@@ -2309,38 +2322,461 @@ execution but failed pytest user-temporary-directory cleanup with a sandbox
 permission error; the exact permitted rerun outside that sandbox passed. Live
 Provider behavior remained disabled.
 
-Still deferred after Slice 4: trusted application orchestration, production
+Still unimplemented after Slice 4: trusted application orchestration, production
 controller resolution and ID issuance, public routes/projections, frontend,
 Demo, Provider, Run/story activation, and every Phase 3–7 responsibility.
 
 ### Phase 3 — Trusted canonical application service
 
-Scope:
+Status: **The corrected roadmap and P3-S1 planning candidate are written and
+frozen for independent read-only plan review. P3-S1 is not implemented,
+independently approved, or authorized for implementation.**
 
-- add controller-binding resolver and canonical character repositories to the
-  application boundary;
-- implement create, owned read, typed lifecycle commands, exact replay,
-  privacy-safe errors, and detached internal/self projection;
-- use a trusted test resolver; and
-- add application and persistence-backed service tests.
+The repository-authoritative Phase 3 order is:
 
-Prerequisites: Phases 1–2 accepted; controller-binding adapter scope reviewed;
-the exact section 15 operation protocol present in the accepted Phase 2 schema.
+| Slice | Responsibility | Prerequisite | Explicitly deferred |
+| --- | --- | --- | --- |
+| P3-S1 — Canonical creation orchestration | Injectable creation/replay service over accepted typed commands, policy, repositories, and UoW | Accepted Phases 1–2 | Production composition, API, frontend, Demo, Run, Provider |
+| P3-S2 — Canonical mutation orchestration | Receipt-before-stale workflow, policy evaluation, history, CAS, receipt, and commit | Accepted P3-S1 boundary | Public mutation, Run effects, unavailable authorities |
+| P3-S3 — Owned read and detached self projection | Authorized canonical read and explicit privacy-bounded detached projection | Accepted authorization boundary | HTTP schemas/routes and frontend |
+| P3-S4 — Normal production composition | Construct the accepted service in the normal MySQL composition root with separately accepted production resolver and issuer adapters | Accepted P3-S1–S3 plus adapter decisions | Public routes and Demo parity |
 
-Exclusions: production account system, public production endpoint, Run
-integration, death-event adapter without an owning source, Provider changes.
+#### P3-S1 — Canonical Creation Application Service
 
-Completion criteria: canonical create/read and every admitted policy are
-testable through trusted application ports; inaccessible authorities reject
-deterministically; exact successful creation and mutation replays return their
-stored safe original results; rejections create no character receipt; no path
-accepts submitted canonical authority.
+Objective: add one production application service that creates one canonical
+player character atomically or returns the exact stored safe result for a valid
+replay, without activating a runtime or public path.
 
-Stop conditions: normal composition would rely on the development principal as
-production authority; confirmation becomes a reusable capability; or final
-death requires unapproved Run/world rules.
+P3-S1 has the following maximum changed-path budget for a later authorized
+implementation:
+
+| Category | Maximum | Exact candidate inventory |
+| --- | ---: | --- |
+| Production | 2 | new `src/deviation_protocol/application/player_character_service.py`; extend `src/deviation_protocol/application/ports.py` |
+| Tests | 2 | new `tests/unit/test_player_character_service.py`; new `tests/integration/test_mysql_player_character_service.py` |
+| Documentation synchronization | 3 | `PLANS.md`; `docs/architecture.md`; this plan |
+| Dependencies, schema, ORM, migrations | 0 | none |
+
+No `__init__.py`, application-error, infrastructure-error, Repository,
+UoW, API, Demo, frontend, Provider, Run, narrative, content, or gameplay path
+belongs to P3-S1. A later implementation must stop rather than exceed this
+budget.
+
+##### Existing authorities that P3-S1 must reuse
+
+P3-S1 reuses, without redefining:
+
+- `application.identity.RequestPrincipal`;
+- `domain.player_character.PlayerCharacterId`,
+  `ControllerBindingRef`, `PlayerCharacterOperationId`,
+  `AuthoritySourceRef`, `CanonicalPlayerCharacter`,
+  `revalidate_player_character_model`,
+  `validate_canonical_player_character`, and
+  `canonical_player_declaration_bytes`;
+- `application.player_character_operations.CharacterCreationCommand`,
+  `CreationReceiptKey`, `CreationSuccessResult`,
+  `StoredCreationSuccessReceipt`, `CharacterOperationProtocolDecision`,
+  `CharacterOperationProtocolCode`, `creation_fingerprint`,
+  `evaluate_creation_receipt_protocol`, and
+  `recover_creation_unique_race_winner`;
+- `domain.player_character_policies.CreatePlayerCharacterPolicy.create`,
+  `PlayerCharacterPolicyDecision`, and `PlayerCharacterPolicyCode`;
+- `application.ports.ControllerBindingRegistryRepository`,
+  `PlayerCharacterRepository`,
+  `PlayerCharacterCreationReceiptRepository`,
+  `PlayerCharacterMutationReceiptRepository`, `UnitOfWork`, and
+  `UnitOfWorkFactory`;
+- `infrastructure.repositories.SqlAlchemyControllerBindingRegistryRepository`,
+  `SqlAlchemyPlayerCharacterRepository`,
+  `SqlAlchemyPlayerCharacterCreationReceiptRepository`, and
+  `SqlAlchemyPlayerCharacterMutationReceiptRepository`;
+- `infrastructure.unit_of_work.SqlAlchemyUnitOfWork`;
+- `infrastructure.errors.PlayerCharacterRepositoryError` and
+  `PlayerCharacterRepositoryConflictError`; and
+- `infrastructure.player_character_persistence.PlayerCharacterStoredRecordIntegrityError`.
+
+The accepted Phase 2 concurrency evidence remains
+`test_mysql_uow_creation_unique_race_rolls_back_loser_and_fresh_uow_reads_winner`.
+P3-S1 adds application sequencing evidence; it does not recreate Phase 2
+mapping, constraint, locking, rollback, or reconstruction tests.
+
+##### Exact new production symbols
+
+P3-S1 adds exactly these public production symbols:
+
+- `application.player_character_service.PlayerCharacterService`;
+- `PlayerCharacterService.create`;
+- `application.ports.ControllerBindingResolver`; and
+- `application.ports.PlayerCharacterIdIssuer`.
+
+No new application error, infrastructure error, Repository wrapper, UoW type,
+clock port, policy port, ID retry abstraction, or generic retry port is
+authorized. Existing callable-clock patterns, a trusted
+`AuthoritySourceRef`, `CreatePlayerCharacterPolicy`, and `UnitOfWorkFactory`
+are construction dependencies of the service, not caller-supplied method
+authority and not new public ports.
+
+The exact service operation is:
+
+```python
+async def create(
+    self,
+    principal: RequestPrincipal,
+    *,
+    operation_id: PlayerCharacterOperationId,
+    command: CharacterCreationCommand,
+) -> CreationSuccessResult | CharacterOperationProtocolDecision:
+    ...
+```
+
+`READY_FOR_NEW_OPERATION` is internal control flow. Only
+`CreationSuccessResult` or a non-success
+`CharacterOperationProtocolDecision` may leave this method.
+
+##### Exact new port contracts
+
+Both ports belong in `src/deviation_protocol/application/ports.py`:
+
+```python
+class ControllerBindingResolver(Protocol):
+    async def resolve(
+        self,
+        principal: RequestPrincipal,
+        /,
+    ) -> ControllerBindingRef | None: ...
+
+
+class PlayerCharacterIdIssuer(Protocol):
+    def issue(self) -> PlayerCharacterId: ...
+```
+
+| Port | Form and position | Absence or failure | Persistence and trust restriction |
+| --- | --- | --- | --- |
+| `ControllerBindingResolver.resolve` | Asynchronous; initial call before UoW entry. The one permitted recovery reauthorization may occur after fresh-UoW context entry but before its first Repository SQL/lazy transaction. | `None` or an invalid returned object becomes `AUTHORIZATION_FAILED`; resolver exceptions propagate unchanged. | May consult its own trusted authority source; may not use player-character persistence to invent authority, auto-bind an unknown principal, or derive a binding by copying `principal.player_id`. |
+| `PlayerCharacterIdIssuer.issue` | Synchronous; exactly once on a normal new-operation attempt, inside the active creation UoW after authorization and receipt evaluation return `READY_FOR_NEW_OPERATION`. | Exceptions or an invalid returned value propagate; allocation collision propagates the existing Repository conflict. | Accepts no caller input, performs no Repository/database access, supplies no collision recovery, and promises no predictable algorithm. |
+
+`RequestPrincipal` construction owns NFC/safe-identifier validation.
+`ControllerBindingRef` and `PlayerCharacterId` construction own opaque-reference
+validation. Ports return fully typed values. The service defensively
+revalidates those returned values and never normalizes them into different
+identities.
+
+A valid principal is input to trusted resolution, not authority by itself.
+`None` never becomes accepted because the registry row is absent. The service
+may add a missing registry row only after the resolver returned that exact
+valid binding. It must never auto-register, auto-bind, copy
+`principal.player_id`, or convert an unknown principal into authority.
+
+The ID issuer returns a complete `PlayerCharacterId`; the allocation Repository
+owns the database uniqueness backstop. Issuance occurs only after exact receipt
+lookup produces `READY_FOR_NEW_OPERATION`. Exact replay never issues another
+identity. Allocation collision never triggers a second issuance and is not an
+idempotent-winner race. The production resolver data source and ID-generation
+algorithm are deliberately deferred to P3-S4.
+
+##### Validation ownership
+
+Creation validation remains one ordered set of existing authorities:
+
+1. The caller constructs typed `RequestPrincipal`,
+   `PlayerCharacterOperationId`, and `CharacterCreationCommand`.
+2. Typed `PlayerCharacterOperationId` construction remains the normal
+   structural-validation boundary. Before constructing `CreationReceiptKey`,
+   any creation-receipt Repository lookup, or receipt-protocol evaluation, the
+   service nevertheless calls
+   `revalidate_player_character_model(operation_id, PlayerCharacterOperationId)`.
+   It preserves the helper's existing validation/error behavior and does not
+   catch or translate that failure into a new generic application error. This
+   reuses the existing defensive helper; it is neither a second validation
+   framework nor new domain policy.
+3. `CharacterCreationCommand` is strict, frozen, and `extra="forbid"`; its
+   `validate_declaration_envelope` validator calls
+   `canonical_player_declaration_bytes`.
+4. `canonical_player_declaration_bytes` uses
+   `revalidate_player_character_model` for `CharacterCore` and
+   `NarrationPreferences` and verifies the canonical declaration envelope.
+   Successful command construction therefore completes structural input
+   validation.
+5. After trusted controller resolution and binding locking,
+   `creation_fingerprint(command)` defensively calls
+   `revalidate_player_character_model(command, CharacterCreationCommand)` and
+   constructs the canonical fingerprint. This is not a second schema or
+   business-validation system.
+6. `evaluate_creation_receipt_protocol` defensively revalidates the binding,
+   operation ID, and command while enforcing authorization-before-disclosure
+   and receipt semantics. The service awaits the exact Repository read first
+   and supplies the already-fetched value through the evaluator's synchronous,
+   side-effect-free lookup callback.
+7. For a new operation, `CreatePlayerCharacterPolicy.create` revalidates its
+   typed inputs and owns trusted initial-record construction.
+8. `CanonicalPlayerCharacter` validates the complete record, after which the
+   service calls `validate_canonical_player_character` as the explicit
+   complete-record boundary before persistence.
+9. Repository codecs retain persistence representation and stored
+   cross-record integrity; they do not duplicate application authorization or
+   domain policy.
+
+Trusted principal mapping belongs only to `ControllerBindingResolver`; opaque
+binding validity belongs to `ControllerBindingRef`; stored exact-match,
+authorization, and privacy belong to the existing operation protocol plus
+registry/current reads. Domain-policy validity belongs to
+`CreatePlayerCharacterPolicy` and the existing mutation policy classes. The
+service only sequences these authorities.
+
+##### First execution, replay, and commit order
+
+First execution is exactly:
+
+1. Receive already constructed typed principal, operation ID, and command.
+2. Await `ControllerBindingResolver.resolve`.
+3. Return `AUTHORIZATION_FAILED` if resolution is absent or invalid.
+4. Enter one UoW.
+5. Lock the exact controller-binding registry row.
+6. If absent, add it only because the trusted resolver authorized that exact
+   binding. Catch a conflict only at this `controller_bindings.add` call site
+   for the narrow recovery path.
+7. Call
+   `revalidate_player_character_model(operation_id, PlayerCharacterOperationId)`.
+8. Call `creation_fingerprint(command)`.
+9. Construct the exact `CreationReceiptKey` and await creation-receipt lookup.
+10. Call `evaluate_creation_receipt_protocol` over the already-read receipt.
+11. Return an existing rejection decision unchanged, or return the stored
+   `CreationSuccessResult` for `EXACT_REPLAY`.
+12. Only for `READY_FOR_NEW_OPERATION`, call
+   `PlayerCharacterIdIssuer.issue` exactly once.
+13. Revalidate the issued `PlayerCharacterId`.
+14. Call `player_characters.add_allocation`; never recover or reissue on
+   collision.
+15. Call `CreatePlayerCharacterPolicy.create` with the injected trusted
+   `AuthoritySourceRef`.
+16. Call `validate_canonical_player_character` on the complete initial record.
+17. Build the existing `CreationSuccessResult` and stored creation receipt.
+18. Call `player_characters.add_initial`.
+19. Call `creation_receipts.add`.
+20. Call `uow.commit()` exactly once.
+21. Return success only after commit returns.
+
+The injected existing clock pattern supplies Repository `created_at` values;
+it adds no caller authority and does not alter the authoritative sequence
+above.
+
+Exact replay resolves trusted authority, enters a UoW, locks the binding,
+defensively fingerprints the command, reads the exact receipt, and evaluates
+the protocol. `EXACT_REPLAY` returns only the stored
+`CreationSuccessResult`. It performs no identity issuance, policy call, write,
+or commit; UoW exit rolls back/closes its read transaction.
+
+Same key with changed command data returns
+`CharacterOperationProtocolDecision(code=IDEMPOTENCY_CONFLICT)` before
+issuance, policy, write, or commit. A malformed or inconsistent stored receipt
+returns `STORED_RECEIPT_INTEGRITY_FAILURE` and discloses no stored result.
+
+`PlayerCharacterService` owns UoW construction, entry, and the single explicit
+success-path commit. Repository adapters own flush-level SQL only.
+`SqlAlchemyUnitOfWork` owns rollback and close on every uncommitted,
+exceptional, cancellation, and controlled pre-COMMIT exit. A failed session is
+never reused, and no success is disclosed before commit returns.
+
+##### Exact uniqueness-race recovery boundary
+
+Fresh-UoW recovery is allowed only for
+`PlayerCharacterRepositoryConflictError` raised at
+`ControllerBindingRegistryRepository.add` while concurrently inserting the
+same newly resolved key in
+`player_character_controller_bindings.controller_binding`.
+
+The exact permitted sequence is:
+
+1. Catch the conflict only at that add call, not around later writes.
+2. Propagate out of the original UoW so its SQL-failed session rolls back,
+   closes, and is abandoned.
+3. Open at most one fresh UoW.
+4. Re-resolve and defensively revalidate the principal's controller authority
+   once.
+5. Lock the same controller-binding registry row in the fresh UoW.
+6. Directly call
+   `revalidate_player_character_model(operation_id, PlayerCharacterOperationId)`
+   as a second defensive boundary for the retained typed operation ID.
+7. Only after that call succeeds, construct and read only the exact
+   `CreationReceiptKey` through the fresh UoW's `creation_receipts.get`
+   `(controller_binding, player-character.create/v1, operation_id)`.
+8. Call `recover_creation_unique_race_winner` over that already-read receipt
+   with `losing_transaction_rolled_back=True`.
+9. Return the stored success only for `EXACT_REPLAY`.
+   `IDEMPOTENCY_CONFLICT`, `STORED_RECEIPT_INTEGRITY_FAILURE`, or
+   `AUTHORIZATION_FAILED` returns unchanged.
+10. Perform no write, commit-required mutation, policy call, second allocation,
+   or second issuance.
+
+This second call neither replaces nor weakens the normal-path direct
+revalidation in the first-execution sequence. It reuses the existing helper and
+exact `PlayerCharacterOperationId` type, adds no validation framework, domain
+policy, or Repository responsibility, and must complete before the caller
+invokes any helper that could construct the key or perform the receipt lookup.
+If it fails, the helper's existing validation exception propagates unchanged;
+the service does not catch or translate it into an application result or
+generic infrastructure error, constructs no recovery `CreationReceiptKey`, and
+performs no fresh-UoW creation-receipt lookup.
+
+`recover_creation_unique_race_winner` remains the sole recovery outcome mapper:
+an identical winner yields `EXACT_REPLAY`, a conflicting winner yields
+`IDEMPOTENCY_CONFLICT`, and absent or malformed winner evidence yields
+`STORED_RECEIPT_INTEGRITY_FAILURE`; no internal `READY_FOR_NEW_OPERATION`
+decision escapes to the caller.
+
+The maximum is one fresh-UoW read. Write retries and ID reissuance are zero.
+This recovery does not apply to allocation collisions, initial
+revision/current duplicates, creation or mutation receipt conflicts, CAS
+failure, arbitrary integrity/DBAPI errors, or commit exceptions.
+
+##### Error and result boundary
+
+No new application error is authorized. In particular,
+`PlayerCharacterApplicationError` and
+`ConcurrentPlayerCharacterOperationError` are not P3-S1 symbols.
+
+| Condition | Caller-visible result or error | Service rule |
+| --- | --- | --- |
+| Invalid untyped construction input | Existing `ValidationError`, `TypeError`, or `ValueError` | Service is not called; no translation |
+| Corrupted typed instance | Original defensive-revalidation exception | No Repository write; no translation |
+| Missing or invalid resolver binding | `CharacterOperationProtocolDecision(code=AUTHORIZATION_FAILED)` | No initial UoW for unresolved authority |
+| Stored authority mismatch | `AUTHORIZATION_FAILED` | Reject before private result disclosure |
+| Exact receipt replay | Stored `CreationSuccessResult` | No issuer, policy, write, or commit |
+| Same key, changed command | `IDEMPOTENCY_CONFLICT` | Return existing decision unchanged |
+| Malformed/inconsistent receipt | `STORED_RECEIPT_INTEGRITY_FAILURE` | Disclose no stored result |
+| Creation policy or complete-record rejection | Original validation/domain exception | Preserve the owning authority; no receipt or translation |
+| Proven binding-insert loser | Exact stored success for `EXACT_REPLAY`, otherwise the existing protocol decision | Only the one fresh-UoW sequence above |
+| ID allocation collision | Original `PlayerCharacterRepositoryConflictError` | Roll back; no second ID |
+| Initial-row or receipt conflict | Original `PlayerCharacterRepositoryConflictError` | Roll back; no recovery |
+| Stored-record integrity failure | Original `PlayerCharacterStoredRecordIntegrityError` | Roll back/close; no translation |
+| Other Repository/DB operation failure | Original sanitized `PlayerCharacterRepositoryError` | Roll back/close; no broad translation |
+| Cancellation | Original `asyncio.CancelledError` or other cancellation `BaseException` | Do not catch, translate, or retry |
+| Controlled failure before `AsyncSession.commit` begins | Original exception | Roll back/close; claim no durable rows only to the extent Phase 2 evidence supports |
+| Commit exception with uncertain durability | Original exception; outcome explicitly unknown | No recovery read, success, or replay claim |
+
+Infrastructure adapters may retain underlying database exceptions as
+`__cause__`; the application service adds no translation layer and no public
+surface may expose those causes. Callers own every retry decision outside the
+single narrow winner-recovery read. Cancellation never triggers transparent
+retry. Uncertain-COMMIT recovery is unsupported and exactly-once execution is
+not claimed.
+
+##### P3-S1 test and verification boundary
+
+`tests/unit/test_player_character_service.py` must use strict fakes and
+fail-if-called spies to prove:
+
+- exact first-execution order and one commit;
+- exact replay with no issuer, policy, write, or commit;
+- changed-payload conflict without stored-result disclosure;
+- unresolved/invalid controller authority opens no initial UoW;
+- structural and defensive validation ordering;
+- a focused recovery-boundary case enters through
+  `PlayerCharacterService.create` with a normally constructed typed
+  `PlayerCharacterOperationId`; the strict original-UoW
+  `controller_bindings.add` fake uses the existing `object.__setattr__`
+  actual-state corruption convention on that retained instance immediately
+  before raising the exact supported same-binding uniqueness
+  `PlayerCharacterRepositoryConflictError`.
+  The original UoW must exit through its existing failed-UoW path, and the one
+  permitted fresh UoW must reauthorize and lock the binding before its second
+  direct
+  `revalidate_player_character_model(operation_id, PlayerCharacterOperationId)`
+  call rejects the now-corrupted typed ID. The original helper exception must
+  propagate untranslated before recovery `CreationReceiptKey` construction,
+  before `recover_creation_unique_race_winner`, and before the fresh-UoW
+  `creation_receipts.get`. Following the existing receipt-lookup collection
+  convention, that fresh recovery Repository's `lookups` collection must be
+  exactly `[]`; this assertion is scoped only to the recovery Repository and
+  makes no zero-lookup claim about any earlier normal-path Repository. Because
+  the ID is validly typed on service entry and is corrupted only by the
+  exact-conflict fake, constructor rejection or the normal-path revalidation
+  cannot satisfy this case;
+- original exception and cancellation propagation;
+- no success before commit;
+- rollback/close and failed-UoW non-reuse;
+- the one exact binding-add recovery with distinct UoW identities; and
+- no reissue, write retry, broad conflict catch, or second recovery attempt.
+
+`tests/integration/test_mysql_player_character_service.py` must use the real
+MySQL adapters and `SqlAlchemyUnitOfWork` to prove:
+
+- one normal creation durably publishes exactly one binding, allocation,
+  revision, current row, and creation receipt;
+- fresh-session reload and exact replay return the same safe result without a
+  second mutation;
+- changed payload leaves row counts unchanged; and
+- a controlled pre-COMMIT failure returns no success, publishes no partial
+  creation rows to a fresh session, and permits a later fresh invocation.
+
+Existing Phase 1 and Phase 2 tests remain unchanged regression evidence.
+Cancellation needs no duplicate real-database test because Phase 2 already
+proves real UoW cancellation rollback.
+
+A later authorized implementation must run `git diff --check`, `compileall`,
+the new focused unit test, focused existing player-character regressions, the
+new real-MySQL service test, Alembic heads/history sanity checks, and the
+repository Quick, Offline, MySQL, and Full verification modes. It must not
+enable a live Provider/model call or add/install a dependency.
+
+##### Binary P3-S1 acceptance criteria
+
+P3-S1 is acceptable only if all are true:
+
+1. changed paths remain within the exact budget above;
+2. all four exact new public production symbols and no generic error hierarchy
+   are present;
+3. typed construction and every existing validation, protocol, policy,
+   Repository, adapter, and UoW authority are reused rather than recreated;
+4. an unknown or untrusted principal can never become accepted merely because
+   no registry row exists;
+5. receipt evaluation precedes issuance, exact replay never issues another ID,
+   and allocation collision never reissues;
+6. first execution writes allocation, initial state, and receipt before one
+   service-owned commit and returns success only afterward;
+7. replay, changed-payload conflict, validation failure, domain rejection,
+   infrastructure failure, cancellation, and controlled pre-COMMIT failure
+   perform no unauthorized commit or success disclosure;
+8. only the exact controller-binding insertion conflict may use one fresh UoW,
+   the failed session is never reused, and every other retry count is zero;
+9. uncertain commit outcome remains unknown, unsupported for recovery, and
+   never described as exactly once;
+10. focused, regression, MySQL, Alembic, Offline, Quick, and Full verification
+    required by the later implementation task passes without Provider access;
+11. canonical documentation synchronization and independent implementation
+    review are complete before any completion or commit request; and
+12. API, frontend, Demo, Run, Provider, narrative, content, gameplay, mutation,
+    owned-read/projection, and normal production composition remain untouched.
+
+Explicit P3-S1 exclusions are API schemas/routes and public error mapping,
+frontend/profile UI, Demo composition, Run/story-line behavior, Provider,
+narrative, content, gameplay, mutation orchestration, public read/projection,
+account-system design, production resolver/issuer selection, auto-binding,
+ID-collision retry, general retry, uncertain-COMMIT recovery, and exactly-once
+claims.
+
+#### Later Phase 3 slices
+
+P3-S2 owns canonical mutation orchestration: authorize the locked current
+owner, preserve receipt-before-stale ordering, call only existing mutation
+protocol and policy authorities, append history, use current-row CAS, add the
+mutation receipt, and commit once. A rejected mutation policy returns its
+existing `PlayerCharacterPolicyDecision` unchanged. P3-S2 requires a
+separately frozen candidate and review; it is not part of P3-S1.
+
+P3-S3 owns authorized canonical read and explicit detached, allowlisted self
+projection. HTTP schemas, routes, and frontend remain deferred.
+
+P3-S4 owns only normal production construction in the MySQL composition root
+after P3-S1–S3 and separate production resolver/issuer adapter decisions are
+accepted. It must stop if normal composition would rely on the development
+principal, auto-bind an unknown principal, or select an unreviewed ID
+algorithm. Public routes and Demo parity remain deferred.
 
 ### Phase 4 — Run and continuous-story-line binding
+
+This stage is the bounded P4 Run/line integration slice. It is not normal
+runtime composition and remains unimplemented.
 
 Scope:
 
@@ -2376,27 +2812,25 @@ restart/resume, successor/replacement, or post-return binding behavior.
 
 ### Phase 5 — Public projection and narrow boundary integration
 
-Scope:
+Phase 5 owns public activation and is not ordinary Phase 3 runtime
+composition:
 
-- expose the minimum reviewed detached self projection and typed intents only
-  where an authoritative controller resolver is composed;
-- preserve current Session request recovery and error envelopes; and
-- add public contract/API tests without a character-profile UI.
+| Slice | Responsibility | Prerequisite | Explicitly deferred |
+| --- | --- | --- | --- |
+| P5-S1 — Owned-read activation | Thin authenticated public read over the accepted detached projection | P3-S3 and P3-S4 | Create, mutation, UI |
+| P5-S2 — Creation activation | Thin authenticated creation/replay route | P3-S1, P3-S4, and accepted public contract | Mutation, frontend, Demo, Run behavior |
+| P5-S3 — Admitted controller-mutation activation | Expose only independently authorized mutation kinds | P3-S2 and P3-S4; Phase 4 where Run binding is required | Final death without owner, unavailable reactivation/return, frontend |
 
-Prerequisites: Phase 3 accepted; Phase 4 if public operation requires Run
-binding; public allowlist and authentication scope independently reviewed.
+Every Phase 5 slice must preserve current Session recovery and safe public
+error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
+the distinction between controller identity and player-character identity.
+Profile UI, general patch, Provider protocol, frontend redesign, production
+rollout, and any unadmitted mutation remain excluded.
 
-Exclusions: profile UI, general patch endpoint, Provider protocol, frontend
-redesign, production rollout.
-
-Completion criteria: public allowlist/privacy, non-enumeration, stale/replay,
-identity/reference mismatch, detachment, Session/browser recovery separation,
-and no client mutation authority are tested.
-
-Stop conditions: no non-development controller authority; existing
-`PlayerVisibleStateProjection.player_id` would change meaning; safe recovery
-requires redesign of the current client contract; or private fields become
-necessary.
+Phase 5 stops if there is no non-development controller authority, if
+`PlayerVisibleStateProjection.player_id` would change meaning, if safe recovery
+requires redesign of the current client contract, or if private fields would
+become public.
 
 ### Phase 6 — Subject-reference compatibility hooks
 
@@ -2459,10 +2893,10 @@ their completed Phase 1 work is not pending.
 | --- | --- | --- | --- | --- |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character.py` | Domain aggregate, distinct value objects, strict field groups, lifecycle, reference, provenance | Complete canonical record, identity separation, versions, lifecycle | Existing and extended domain unit tests |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character_policies.py` | Independent pure policies for creation and each lifecycle route | Guardrail policy separation; transition/authority matrix | Existing and extended policy matrix unit tests |
-| Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_service.py` | Trusted orchestration for create/read/mutate/project | Controller resolution, complete validation, atomic/replay boundary | Application unit and MySQL service tests |
+| Proposed P3-S1 addition, later slices may extend only under separate scope | `src/deviation_protocol/application/player_character_service.py` | Trusted creation/replay orchestration in P3-S1 | Controller resolution, existing validation/policy reuse, atomic creation/replay boundary | P3-S1 unit and MySQL service tests |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Existing and extended golden-vector and replay/conflict unit tests |
 | Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
-| Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_identity.py` or the existing identity module, Phase 3 only | Ports/value adapters for production controller resolution and ID issuance | Domain separation and trusted issuer/resolver | Identity-boundary unit tests |
+| No P3-S1 identity module | `src/deviation_protocol/application/ports.py` | Add only `ControllerBindingResolver` and `PlayerCharacterIdIssuer` in P3-S1; production adapters wait for P3-S4 | Domain separation and trusted injectable boundaries without choosing a backing source or algorithm | P3-S1 strict fake and service tests |
 | Proposed Phase 2 Slice 1 addition | `src/deviation_protocol/infrastructure/player_character_persistence.py` | Database-independent stored-record carriers, canonical codec, and integrity validation | Exact six-family conversion boundary | Persistence codec unit tests |
 | Proposed Phase 2 addition | one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
 | Proposed Phase 4 addition | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
@@ -2471,7 +2905,8 @@ their completed Phase 1 work is not pending.
 | Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_operations.py` | Canonical fingerprint vectors, exact replay equivalence, conflicts, and safe-result validation | Receipt protocol before schema | Existing and extended application-boundary tests |
 | Proposed Phase 2 Slice 1 addition | `tests/unit/test_player_character_persistence.py` | Stored-record codec, canonical bytes, and integrity matrix | Fail-closed persistence conversion | Offline persistence unit tests |
 | Proposed Phase 2 Slice 3 addition | `tests/unit/test_player_character_repositories.py` | Repository capability and failure classification matrix | Exact repository behavior without commits | Repository unit tests |
-| Proposed Phase 3 addition | `tests/unit/test_player_character_service.py` | Service, replay, privacy, rollback with fakes | Trusted boundary | Application tests |
+| Proposed P3-S1 addition | `tests/unit/test_player_character_service.py` | Creation/replay ordering, privacy, rollback, and narrow race recovery with strict fakes | Trusted application boundary | P3-S1 unit tests |
+| Proposed P3-S1 addition | `tests/integration/test_mysql_player_character_service.py` | Real service over accepted MySQL adapters/UoW | Durable atomic creation, replay, changed-payload conflict, and controlled pre-COMMIT rollback | Fresh-session MySQL assertions |
 | Proposed Phase 2 addition | `tests/integration/test_mysql_player_character.py` | Real MySQL repositories, transactions, CAS, constraints | Persistence/atomicity | Integration tests |
 
 The exact split among the proposed application/domain additions is `T`.
@@ -2483,10 +2918,10 @@ independent is more important than these filenames.
 
 | Existing path | Purpose | Obligation | Protecting tests |
 | --- | --- | --- | --- |
-| `src/deviation_protocol/application/ports.py` | Add canonical repository, separate successful creation/mutation receipt, issuer/resolver, and UoW ports | Domain-directed dependencies and exact receipt ownership | Port/service type and fake tests |
+| `src/deviation_protocol/application/ports.py` | Phase 2 repository/UoW ports are complete; P3-S1 adds only `ControllerBindingResolver` and `PlayerCharacterIdIssuer` with the exact section 24 signatures | Trusted mapping and issuance without persistence access, auto-binding, or algorithm selection | Port/service type and strict fake tests |
 | `src/deviation_protocol/infrastructure/orm_models.py` | Add private normalized persistence models | MySQL canonical ownership/constraints | Schema and repository tests |
 | `src/deviation_protocol/infrastructure/repositories.py` | Add lock/read/allocation/CAS/history and exact-scoped successful-receipt operations without commits | Atomic canonical mutations and replay | MySQL repository tests |
-| `src/deviation_protocol/infrastructure/errors.py` | Slice 3 only: add narrow allocation, optimistic-concurrency, unique-race, and stored-integrity classifications if required | Exact repository failure translation | Repository unit and MySQL tests |
+| `src/deviation_protocol/infrastructure/errors.py` | Completed Phase 2 Slice 3 narrow Repository errors; no P3-S1 change | Preserve exact Repository failure translation without a new application hierarchy | Existing Repository unit and MySQL tests |
 | `src/deviation_protocol/infrastructure/unit_of_work.py` | Expose new repositories in one `AsyncSession` transaction | Commit/rollback ownership | UoW rollback tests |
 | `tests/unit/test_repository_and_uow.py` | Cover new repository/UoW wiring and failure restoration | Existing persistence convention | Focused unit tests |
 | `tests/integration/test_mysql_connection.py` | Advance expected Alembic head and assert exact new schema | Migration verification | Real MySQL schema test |
@@ -2815,6 +3250,22 @@ locally in Slice 4. A new-session independent implementation review returned
 `PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED` with no blocking
 findings. Phase 2 is accepted and complete.
 
+The corrected Phase 3–5 roadmap and P3-S1 candidate in section 24 are a new
+approval-bound planning candidate. They are written and frozen but have not
+been independently approved. The only operative success verdict for the next
+new-session read-only review is
+`STRUCTURED_PLAYER_CHARACTER_PHASE_3_PLAN_APPROVED`, and it applies only to the
+exact complete candidate in `PLANS.md`, `docs/architecture.md`, and this plan.
+Historical planning, correction, Phase 1, and Phase 2 verdicts are
+non-operative for this gate. Any byte change to any candidate file invalidates
+that review and requires new hashes and a fresh review.
+
+Even that verdict will not authorize implementation. After a successful
+review, separate authorization is still required to stage and commit exactly
+the approved three-file candidate; the user performs the push manually; a new
+clean pushed baseline must then be confirmed; and only a later, separately
+authorized P3-S1 implementation task may begin.
+
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
 `STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED` at
@@ -2859,6 +3310,11 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-07-28: The corrected structured player-character Phase 3–5 roadmap and
+  exact P3-S1 creation-orchestration candidate were written into `PLANS.md`,
+  `docs/architecture.md`, and this plan. This was a bounded documentation
+  planning write, not the required independent review. P3-S1 remained
+  unimplemented and unauthorized; nothing was staged, committed, or pushed.
 - 2026-07-24: Initial downstream implementation-plan draft prepared from the
   approved and frozen structured player-character contract and current
   repository evidence. This was a controlled documentation-planning task, not
@@ -2995,7 +3451,7 @@ deployment, or work outside a separately authorized phase.
   `feat(player-character): add structured persistence schema`, then pushed as
   `3ad39c7..a280279` (`main -> main`). Phase 2 Slice 3 is implemented and
   independently approved as the bounded MySQL Repository layer.
-- The current committed Slice 3 baseline is
+- The then-current committed Slice 3 baseline was
   `7313b5833cae7a9f9c0b618abe5b49cfcbaba604`
   (`feat(player-character): implement mysql repositories`). Slice 4 was
   implemented and verified locally, and its new-session independent review

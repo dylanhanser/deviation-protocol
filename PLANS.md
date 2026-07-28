@@ -16,11 +16,12 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Phase 2 Slice 4 pre-finalization baseline and local `origin/main`:
-  `7313b5833cae7a9f9c0b618abe5b49cfcbaba604`
-- Baseline subject: `feat(player-character): implement mysql repositories`
-- The independently approved Slice 4 finalization commit is one commit ahead of
-  local `origin/main`; nothing has been pushed.
+- Structured player-character Phase 2 closure baseline and local `origin/main`:
+  `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+- Baseline subject:
+  `feat(player-character): wire repositories into unit of work`
+- Structured player-character Phase 2 is independently accepted, committed,
+  pushed, and closed at this baseline.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -261,10 +262,41 @@ MySQL `34 passed`; MySQL verifier `81 passed`; Offline verifier `1,389 passed,
 Alembic heads/history, dependency checks, and `git diff --check` also passed.
 The initial sandboxed Full run completed the tests but could not clean pytest's
 user temporary directory; the exact permitted rerun outside that sandbox
-passed. Phase 2 is independently accepted and complete. Phase 3 application
-orchestration and runtime activation remain deferred; no API, public route,
-frontend, Demo, Provider, Run, narrative, content, or gameplay integration was
-activated.
+passed. Phase 2 is independently accepted, committed, pushed, and closed at
+`ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+(`feat(player-character): wire repositories into unit of work`). No API,
+public route, frontend, Demo, Provider, Run, narrative, content, or gameplay
+integration was activated.
+
+The corrected structured player-character roadmap is now a written planning
+candidate. It preserves the repository-authoritative stages:
+
+1. **Phase 3 — Trusted canonical application service**
+   - P3-S1 canonical creation orchestration;
+   - P3-S2 canonical mutation orchestration;
+   - P3-S3 owned read and detached self projection; and
+   - P3-S4 normal production composition with separately accepted production
+     controller resolver and ID issuer adapters.
+2. **Phase 4 — Run and continuous-story-line binding**
+   - bounded integration with a separately implemented Run-owned aggregate.
+3. **Phase 5 — Public projection and narrow boundary integration**
+   - P5-S1 owned-read activation;
+   - P5-S2 creation activation; and
+   - P5-S3 activation of only independently admitted controller mutations.
+
+P3-S1 is written and frozen as the current exact planning candidate in the
+[structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md).
+It is not implemented, has not received independent plan approval, and is not
+authorized for implementation. A new-session independent read-only review of
+the complete three-file planning diff is required before any later
+authorization to stage, commit, push, or implement it.
+
+Mutation, owned read/projection, normal production composition, production
+resolver/issuer adapter selection, Run/continuous-line binding, every public
+route, frontend and Demo parity remain deferred to their listed independently
+reviewable slices. Provider, narrative, content, gameplay, account-system, and
+unselected identity-generation or controller-authority designs remain outside
+P3-S1.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
