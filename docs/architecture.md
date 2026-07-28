@@ -77,8 +77,10 @@ stored carriers, strict canonical record and receipt codecs, state-record
 fingerprints, and aggregate cross-record integrity validation. Those carriers
 remain non-authoritative and perform no ORM, repository, clock, or I/O work.
 
-Phase 2 Slice 2 is implemented locally and awaits independent review. Shared
-SQLAlchemy metadata now contains exactly these six private mappings:
+Phase 2 Slice 2 is implemented and verified, received independent review with
+no remaining substantive issue, was committed as
+`a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`, and was pushed to `origin/main`.
+Shared SQLAlchemy metadata contains exactly these six private mappings:
 
 - `player_character_controller_bindings`;
 - `player_character_id_allocations`;
@@ -93,7 +95,8 @@ canonical records and evidence use binary blob carriers, and timestamps use
 server-supplied `DATETIME(6)` values without database defaults. Natural keys,
 named checks, the exact unique and ordinary indexes, and twelve named
 `RESTRICT` foreign keys encode the frozen physical contract without adding a
-seventh family.
+seventh family. The corrected `ck_spc_revisions_provenance_matrix` explicitly
+requires non-NULL `prior_revision` for both `RETIRE` and `FINAL_DEATH`.
 
 Alembic revision `20260728_0004` directly follows `20260719_0003` and is the
 single head. It adds no backfill and leaves legacy Session data and schema
@@ -102,13 +105,14 @@ adding foreign keys so MySQL does not generate undeclared indexes. Downgrade
 first probes all six tables and refuses before destructive DDL if any contains
 data; only an empty new schema may be removed.
 
-This is schema metadata only. There is still no player-character repository,
-live-row reconstruction, SQL lock/CAS, receipt replay, Unit of Work wiring,
-cross-family transaction orchestration, production controller or ID resolution,
-runtime service, public route, frontend, Provider, Demo, Session, Run, or
-story-line integration. Those responsibilities remain in later separately
-reviewed slices. The complete frozen implementation plan remains partially
-implemented.
+Relevant real-MySQL verification passed with 64 tests, and the relevant Slice 1
+regression passed with 284 tests. This remains schema metadata only. Phase 2
+Slice 3 is unimplemented and is the next eligible bounded work: the MySQL
+Repository layer with live-row reconstruction, SQL locking, CAS, and receipt
+operations. Unit of Work wiring and cross-repository transaction orchestration
+remain deferred to Slice 4. No runtime service, public route, frontend,
+Provider, Demo, Session, Run, or story-line integration is implemented. The
+complete frozen implementation plan remains partially implemented.
 
 ## Current composition roots and Provider boundaries
 

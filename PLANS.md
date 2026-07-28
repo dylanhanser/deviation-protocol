@@ -17,8 +17,8 @@ documents.
 
 - Branch: `main`
 - Local `origin/main` and `HEAD`:
-  `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`
-- HEAD subject: `feat(player-character): add persistence carrier validation`
+  `a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`
+- HEAD subject: `feat(player-character): add structured persistence schema`
 - Ahead/behind: `0/0`
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
@@ -158,9 +158,10 @@ The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
 partially implemented by the committed and pushed Phase 1 pure domain/protocol
-foundation and Phase 2 Slice 1 persistence carriers, plus a local, uncommitted
-Phase 2 Slice 2 schema candidate awaiting independent review. The overall
-implementation plan remains only partially implemented.** Its
+foundation, Phase 2 Slice 1 persistence carriers, and Phase 2 Slice 2
+structured persistence schema. Slice 2 is implemented, verified, independently
+reviewed, committed, and pushed; the overall implementation plan remains only
+partially implemented.** Its
 first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
 concerning permanent `player_character_id` non-reuse, and one MEDIUM issue
@@ -209,21 +210,26 @@ baseline governs the current numbered implementation slices.
 Phase 2 Slice 1 is implemented, independently accepted, committed, and pushed
 at `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`
 (`feat(player-character): add persistence carrier validation`). Phase 2 Slice 2
-is implemented locally and awaits fresh independent review: exactly six
-SQLAlchemy mappings and migration `20260728_0004` add the frozen schema after
-`20260719_0003`, with exact MySQL collations, keys, named checks, twelve
-restrictive foreign keys, complete index inventory, no backfill, and
-fail-closed data-present downgrade refusal. Focused schema and Slice 1
-regressions, compileall, Alembic heads/history, MySQL verification with 61
-passing tests, Offline verification with 1,357 passed and 51 skipped, and Full
-verification with 1,407 passed and one skipped live test all passed. The Slice 2
-candidate is unstaged, uncommitted, and unpushed.
+is implemented and verified, received independent review with no remaining
+substantive issue, was committed as
+`a2802799b3d3a5497f4fc097b0cc05d573d8e0ca`
+(`feat(player-character): add structured persistence schema`), and was pushed
+to `origin/main`. Its seven-path approved surface adds exactly six SQLAlchemy
+mappings and migration `20260728_0004` after `20260719_0003`, with exact MySQL
+collations, keys, named checks, twelve restrictive foreign keys, complete index
+inventory, no backfill, and fail-closed data-present downgrade refusal. The
+completed schema includes the corrected
+`ck_spc_revisions_provenance_matrix`, with explicit non-NULL `prior_revision`
+requirements for both `RETIRE` and `FINAL_DEATH`. Relevant real-MySQL
+verification passed with 64 tests, and the relevant Slice 1 regression passed
+with 284 tests.
 
-No player-character repository, locking/CAS, Unit of Work wiring, transaction
-or replay orchestration, production composition, public route, frontend
-behavior, Provider integration, Demo behavior, or story/Run activation exists.
-Slices 3 and 4 and every later structured-player-character phase remain
-blocked.
+Phase 2 Slice 3 remains unimplemented and is the next eligible bounded
+implementation work: the MySQL Repository layer with locking, CAS, receipt
+operations, and strict reconstruction. Unit of Work wiring and cross-repository
+transaction orchestration remain deferred to Slice 4. No Slice 3, Slice 4,
+production composition, public route, frontend behavior, Provider integration,
+Demo behavior, runtime behavior, or story/Run activation is implemented.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
