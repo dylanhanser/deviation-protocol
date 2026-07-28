@@ -11,8 +11,9 @@ Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
 (`fix(domain): preserve exact opaque identifiers`). The substantive Phase 2
 technical prerequisites retain their historical technical-freeze role, but the
-current locked candidate requires fresh independent approval; Phases 2–7 remain
-unimplemented.**
+current locked candidate requires fresh independent approval. Phase 2 Slice 1
+exists only as a corrected local, uncommitted candidate pending final
+independent acceptance; Slice 2 and Phases 3–7 remain unimplemented.**
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -22,10 +23,13 @@ approved candidate was committed and pushed unchanged as
 (`docs(domain): freeze structured player-character phase 2 prerequisites`).
 It remains the historical technical-freeze commit, but it predates the current
 Phase 1 opaque-identifier correction and does not approve this current locked
-candidate. Phase 2 runtime implementation has not started: that documentation
-commit added no migration, database verification, persistence adapter,
-production composition, public route, frontend behavior, Provider integration,
-or story/Run activation. Phase 3 and every later phase remain blocked.
+candidate. Phase 2 database/runtime persistence has not started: the local
+Slice 1 candidate adds only application ports, exact six-family offline
+persistence carriers, canonical codecs, aggregate validation, and bounded
+tests. It adds no ORM, migration, database adapter or verification, transaction
+or recovery behavior, production composition, public route, frontend behavior,
+Provider integration, or story/Run activation. Phase 3 and every later phase
+remain blocked.
 
 The ordered Phase 2 implementation slices introduced in section 24 are a new
 amendment candidate, not part of the prior technical-freeze verdict. Section
@@ -47,10 +51,11 @@ this frozen plan requires a new controlled amendment and review process.
 The
 [structured player-character contract](structured_player_character_contract.md)
 and [final narrative experience](final_narrative_experience.md) remain approved
-and frozen product specifications. Only the pure Phase 1 domain and
+and frozen product specifications. The pure Phase 1 domain and
 character-operation protocol foundation is implemented, accepted, committed,
-and pushed; the complete product specifications remain only partially
-implemented. Phase 3.2b remains closed.
+and pushed. Phase 2 Slice 1 exists only as a local, uncommitted candidate whose
+final independent acceptance is pending; the complete product specifications
+remain only partially implemented. Phase 3.2b remains closed.
 
 ## 2. Purpose
 
@@ -123,6 +128,15 @@ receipt semantics, and offline unit/golden-vector tests. It changes no
 database, migration, schema, repository, Unit of Work, production service,
 API, Provider, client, frontend, Demo, Session request/action, Run/story-line,
 or production behavior. It does not reopen Phase 3.2b.
+The separately authorized Phase 2 Slice 1 local candidate adds only the
+approved application ports, six non-authoritative stored carriers, canonical
+and fingerprint codecs, aggregate integrity validation, and offline tests. Its
+five reported independent-review findings have been corrected locally, and
+the corrected source/test candidate passed 94 persistence tests, 190 unchanged
+Phase 1 regressions, 284 combined contract tests, compileall, and Offline
+verification with 1,346 passed and 48 skipped. Final independent acceptance is
+still pending; nothing is staged, committed, or pushed, and Slice 2 has not
+begun.
 
 File names, table names, data types, endpoint shapes, and phase boundaries below
 are proposed implementation inventory. They are not authority to edit those
@@ -1133,7 +1147,16 @@ embedded in `record_canonical` as the ordered `character_core` and
 `narration_preferences` members. Their four-state tags preserve omitted,
 explicitly absent, declared, and intentionally undecided values; ordered
 feature/custom-value collections keep their accepted order. Phase 1 defines no
-additional per-field text or collection ceiling, so Phase 2 adds none. Before
+additional per-field text or collection ceiling, so Phase 2 adds none.
+
+Each of the two existing successful-receipt families also retains one internal
+canonical operation-evidence blob: the complete lossless Phase 1 command input
+used to compute its existing operation fingerprint. It is persistence
+integrity material, not a public receipt contract, a domain authority, or a
+seventh family. Strict decoding and byte-identical re-encoding are required;
+the existing Phase 1 fingerprint is recomputed from that evidence. Exact
+opaque identifiers retain their exact bytes and are never trimmed, normalized,
+case-folded, or reinterpreted. Before
 any write and after every read, the adapter must:
 
 1. strictly parse one UTF-8 JSON object with duplicate keys, floats,
@@ -1313,6 +1336,7 @@ different current record or receipt result.
 | `resulting_lifecycle` | `VARCHAR(16) CHARACTER SET ascii COLLATE ascii_bin` | NOT NULL; no default | Exact initial lifecycle `active` |
 | `result_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact resulting revision-1 state record |
 | `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored creation receipt bytes |
+| `operation_evidence_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact Phase 1 creation-command evidence used to recompute `fingerprint` |
 | `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
 
 Primary/candidate keys are
@@ -1349,6 +1373,7 @@ Provider data, or public receipt format is added.
 | `before_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact expected/before revision record |
 | `after_record_fingerprint` | `BINARY(32)` | NOT NULL; no default | Internal `CanonicalStateRecordFingerprint` of the exact resulting/after revision record |
 | `receipt_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact full Phase 1 stored mutation receipt bytes |
+| `operation_evidence_canonical` | `MEDIUMBLOB` | NOT NULL; no default | Exact Phase 1 mutation-command evidence used to recompute `fingerprint` |
 | `created_at` | `DATETIME(6)` | NOT NULL; no default | Server UTC successful commit time only |
 
 Primary/candidate keys are
@@ -1685,10 +1710,11 @@ contextual state. Rejections have no first-slice character receipt.
 ## 24. Implementation phases
 
 Phase 1 was separately authorized and has passed fresh independent read-only
-acceptance for the exact nine-path candidate. Every later phase remains
-proposed, incomplete, and unauthorized for implementation. A later phase may
-begin only after its prerequisites, the gate in section 31, and a separate
-scoped implementation task.
+acceptance for the exact nine-path candidate. Phase 2 Slice 1 exists only as a
+corrected local candidate pending final independent acceptance. Every later
+slice and phase remains proposed, incomplete, and unauthorized for
+implementation. A later slice or phase may begin only after its prerequisites,
+the gate in section 31, and a separate scoped implementation task.
 
 ### Phase 1 — Domain envelope, identity types, and policies
 
@@ -1739,9 +1765,9 @@ require a missing product rule.
 ### Phase 2 — MySQL persistence and migration
 
 Status: **Historical technical prerequisites were accepted and frozen at
-`1fd29798fe256593e56029baca743484cc221ae4`; runtime is not implemented and
-the current locked candidate is blocked pending the section 31 review gate plus
-separate explicit Slice 1 authorization.**
+`1fd29798fe256593e56029baca743484cc221ae4`. Phase 2 Slice 1 exists only as a
+corrected local, uncommitted candidate pending final independent acceptance.
+Database/runtime persistence is not implemented, and Slice 2 has not begun.**
 
 Scope:
 
@@ -2825,3 +2851,15 @@ deployment, or work outside a separately authorized phase.
   migration, database verification, persistence adapter, production
   composition, public route, frontend behavior, Provider integration, or
   story/Run activation and did not authorize Phase 2 runtime work.
+- 2026-07-28: A bounded findings-correction task addressed all five findings
+  from the first independent review of the local Phase 2 Slice 1 candidate.
+  Creation reconstruction now binds revision 1 and its provenance to
+  authoritative creation evidence through the existing Phase 1 creation
+  policy; mutation receipt validation preserves one-to-one transition
+  ownership; and stored revision, immutable-binary, nested-binary, and
+  state-record-fingerprint columns fail closed. Fifteen focused regressions
+  increased the persistence module from 79 to 94 passing tests while the 190
+  Phase 1 regressions remained unchanged. The 284-test combined group,
+  compileall, and Offline verification with 1,346 passed and 48 skipped also
+  passed. Final independent acceptance remains pending. Nothing was staged,
+  committed, or pushed; Slice 2 did not begin.

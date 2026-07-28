@@ -17,8 +17,8 @@ documents.
 
 - Branch: `main`
 - Local `origin/main` and `HEAD`:
-  `4acb8b993f15a1fdee20edc3140324730447fc9f`
-- HEAD subject: `fix(domain): preserve exact opaque identifiers`
+  `afa9f9c21900eebd4e08d65071a26903e83d4a65`
+- HEAD subject: `docs(domain): freeze structured player character phase 2 plan`
 - Ahead/behind: `0/0`
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
@@ -157,11 +157,12 @@ implemented. Phase 3.2b remains closed.
 The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
-partially implemented only by the committed and pushed Phase 1 pure
-domain/protocol
-foundation. Phase 1 has passed fresh independent read-only acceptance for the
-exact nine-path candidate and is accepted; the overall implementation plan
-remains only partially implemented.** Its first independent read-only review found one HIGH issue
+partially implemented by the committed and pushed Phase 1 pure domain/protocol
+foundation and a local, uncommitted Phase 2 Slice 1 candidate. Phase 1 has
+passed fresh independent read-only acceptance for the exact nine-path candidate
+and is accepted; the overall implementation plan remains only partially
+implemented. Phase 2 Slice 1 final independent acceptance is pending.** Its
+first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
 concerning permanent `player_character_id` non-reuse, and one MEDIUM issue
 concerning `controller_binding` lifecycle presence. The first controlled
@@ -204,11 +205,18 @@ That commit remains the technical-freeze history, but it predates the current
 Phase 1 opaque-identifier correction and does not approve the current locked
 candidate.
 
-Phase 2 runtime implementation has not started. That documentation commit
-implemented no migration, database verification, persistence adapter,
+Phase 2 Slice 1 now exists only as a local candidate: its application ports,
+exact six-family offline persistence carriers, canonical codecs, aggregate
+validation, and bounded tests are implemented. The five findings from its
+first independent review have been corrected locally, and the corrected
+source/test candidate passed 94 persistence tests, 190 unchanged Phase 1
+regressions, 284 combined contract tests, compileall, and Offline verification
+with 1,346 passed and 48 skipped. Final independent acceptance is still
+pending; nothing is staged, committed, or pushed. Slice 2 has not begun. No ORM,
+migration, database adapter or verification, transaction or recovery behavior,
 production composition, public route, frontend behavior, Provider integration,
-or story/Run activation. Phase 3 and every later structured-player-character
-phase remain blocked.
+or story/Run activation exists. Phase 3 and every later structured-player-
+character phase remain blocked.
 
 The implementation-order amendment below is a new review candidate, distinct
 from the frozen technical prerequisites. It becomes operative automatically,

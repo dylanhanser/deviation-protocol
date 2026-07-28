@@ -18,6 +18,17 @@ from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.persisted_events import PersistedEventReceipt
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.state import GameState
+from deviation_protocol.domain.player_character import (
+    CanonicalPlayerCharacter,
+    ControllerBindingRef,
+    PlayerCharacterId,
+)
+from deviation_protocol.application.player_character_operations import (
+    CreationReceiptKey,
+    MutationReceiptKey,
+    StoredCreationSuccessReceipt,
+    StoredMutationSuccessReceipt,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,10 +219,78 @@ class NarrativeJobRepository(ABC):
     async def recent_committed_texts(self, session_id: str, *, limit: int) -> tuple[str, ...]:
         raise NotImplementedError
 
+
+class ControllerBindingRegistryRepository(ABC):
+    @abstractmethod
+    async def get(self, controller_binding: ControllerBindingRef) -> ControllerBindingRef | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(self, controller_binding: ControllerBindingRef, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def lock(self, controller_binding: ControllerBindingRef) -> ControllerBindingRef | None:
+        raise NotImplementedError
+
+
+class PlayerCharacterRepository(ABC):
+    @abstractmethod
+    async def allocation_exists(self, player_character_id: PlayerCharacterId) -> bool:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_allocation(self, player_character_id: PlayerCharacterId, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get(self, player_character_id: PlayerCharacterId) -> CanonicalPlayerCharacter | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_for_update(self, player_character_id: PlayerCharacterId) -> CanonicalPlayerCharacter | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_initial(self, record: CanonicalPlayerCharacter, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def append_revision(self, record: CanonicalPlayerCharacter, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def compare_and_swap_current(self, record: CanonicalPlayerCharacter, *, expected_revision: int, created_at: datetime) -> bool:
+        raise NotImplementedError
+
+
+class PlayerCharacterCreationReceiptRepository(ABC):
+    @abstractmethod
+    async def get(self, key: CreationReceiptKey) -> StoredCreationSuccessReceipt | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(self, receipt: StoredCreationSuccessReceipt, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+
+class PlayerCharacterMutationReceiptRepository(ABC):
+    @abstractmethod
+    async def get(self, key: MutationReceiptKey) -> StoredMutationSuccessReceipt | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(self, receipt: StoredMutationSuccessReceipt, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
 class UnitOfWork(ABC):
     sessions: GameSessionRepository
     turn_requests: TurnRequestRepository
     narrative_jobs: NarrativeJobRepository
+    controller_bindings: ControllerBindingRegistryRepository
+    player_characters: PlayerCharacterRepository
+    creation_receipts: PlayerCharacterCreationReceiptRepository
+    mutation_receipts: PlayerCharacterMutationReceiptRepository
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":
