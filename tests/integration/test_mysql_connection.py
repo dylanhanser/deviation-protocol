@@ -100,7 +100,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             )
         ).all()
 
-    assert revision == "20260719_0003"
+    assert revision == "20260728_0004"
     table_details = {row[0]: (row[1], row[2]) for row in tables}
     expected_tables = {
         "alembic_version",
@@ -109,6 +109,12 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         "game_snapshots",
         "turn_requests",
         "narrative_jobs",
+        "player_character_controller_bindings",
+        "player_character_id_allocations",
+        "player_character_current",
+        "player_character_revisions",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
     }
     assert set(table_details) == expected_tables
     assert all(engine == "InnoDB" for engine, _ in table_details.values())
@@ -126,6 +132,52 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         ("game_snapshots", "game_sessions", "CASCADE"),
         ("turn_requests", "game_sessions", "CASCADE"),
         ("narrative_jobs", "game_sessions", "CASCADE"),
+        (
+            "player_character_current",
+            "player_character_controller_bindings",
+            "RESTRICT",
+        ),
+        (
+            "player_character_current",
+            "player_character_id_allocations",
+            "RESTRICT",
+        ),
+        ("player_character_current", "player_character_revisions", "RESTRICT"),
+        (
+            "player_character_revisions",
+            "player_character_controller_bindings",
+            "RESTRICT",
+        ),
+        (
+            "player_character_revisions",
+            "player_character_id_allocations",
+            "RESTRICT",
+        ),
+        (
+            "player_character_creation_receipts",
+            "player_character_controller_bindings",
+            "RESTRICT",
+        ),
+        (
+            "player_character_creation_receipts",
+            "player_character_id_allocations",
+            "RESTRICT",
+        ),
+        (
+            "player_character_creation_receipts",
+            "player_character_revisions",
+            "RESTRICT",
+        ),
+        (
+            "player_character_mutation_receipts",
+            "player_character_id_allocations",
+            "RESTRICT",
+        ),
+        (
+            "player_character_mutation_receipts",
+            "player_character_revisions",
+            "RESTRICT",
+        ),
     }
     assert {
         ("domain_events", "uq_domain_events_session_sequence"),
@@ -137,6 +189,26 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         ("narrative_jobs", "ix_narrative_jobs_session_status"),
         ("narrative_jobs", "ix_narrative_jobs_status_lease"),
         ("narrative_jobs", "ix_narrative_jobs_session_turn"),
+        (
+            "player_character_creation_receipts",
+            "uq_spc_creation_receipts_result_revision",
+        ),
+        (
+            "player_character_mutation_receipts",
+            "uq_spc_mutation_receipts_result_revision",
+        ),
+        (
+            "player_character_mutation_receipts",
+            "ix_spc_mutation_receipts_expected_revision",
+        ),
+        (
+            "player_character_mutation_receipts",
+            "ix_spc_mutation_receipts_result_revision",
+        ),
+        (
+            "player_character_revisions",
+            "ix_spc_revisions_controller_binding",
+        ),
     } <= indexes
     assert len(narrative_columns) == 27
     assert narrative_columns["job_id"] == ("varchar", "NO", None, 64)

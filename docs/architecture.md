@@ -62,14 +62,53 @@ ceiling to the larger command.
 Checked-in unit vectors fix the exact canonical bytes and fingerprints for
 creation and every Phase 1 mutation command.
 
-This is a pure protocol/domain foundation only. It adds no Alembic revision,
-ORM row, receipt table or repository, Unit of Work port, ID issuer, controller
-resolver, canonical persistence, production transaction wiring, public route,
-projection, frontend, Provider integration, Demo behavior, Session
-request/action behavior, or Run/story-line binding. Phase 2 receipt persistence
-and schema remain blocked pending separate explicit authorization. The complete
-frozen implementation plan remains only partially implemented. This acceptance
-does not authorize publication or push.
+This Phase 1 boundary is a pure protocol/domain foundation. It adds no
+Alembic revision, ORM row, receipt table or repository, Unit of Work port, ID
+issuer, controller resolver, canonical persistence, production transaction
+wiring, public route, projection, frontend, Provider integration, Demo
+behavior, Session request/action behavior, or Run/story-line binding. Later
+bounded persistence slices do not change that ownership.
+
+## Structured player-character Phase 2 Slices 1–2 persistence boundary
+
+Phase 2 Slice 1 is implemented, independently accepted, committed, and pushed.
+It adds application persistence ports plus exactly six database-independent
+stored carriers, strict canonical record and receipt codecs, state-record
+fingerprints, and aggregate cross-record integrity validation. Those carriers
+remain non-authoritative and perform no ORM, repository, clock, or I/O work.
+
+Phase 2 Slice 2 is implemented locally and awaits independent review. Shared
+SQLAlchemy metadata now contains exactly these six private mappings:
+
+- `player_character_controller_bindings`;
+- `player_character_id_allocations`;
+- `player_character_current`;
+- `player_character_revisions`;
+- `player_character_creation_receipts`; and
+- `player_character_mutation_receipts`.
+
+All six use InnoDB with `utf8mb4_bin` table defaults. Opaque references and
+closed tokens use exact `ascii_bin` columns, fingerprints use `BINARY(32)`,
+canonical records and evidence use binary blob carriers, and timestamps use
+server-supplied `DATETIME(6)` values without database defaults. Natural keys,
+named checks, the exact unique and ordinary indexes, and twelve named
+`RESTRICT` foreign keys encode the frozen physical contract without adding a
+seventh family.
+
+Alembic revision `20260728_0004` directly follows `20260719_0003` and is the
+single head. It adds no backfill and leaves legacy Session data and schema
+unchanged. The migration declares the complete child index inventory before
+adding foreign keys so MySQL does not generate undeclared indexes. Downgrade
+first probes all six tables and refuses before destructive DDL if any contains
+data; only an empty new schema may be removed.
+
+This is schema metadata only. There is still no player-character repository,
+live-row reconstruction, SQL lock/CAS, receipt replay, Unit of Work wiring,
+cross-family transaction orchestration, production controller or ID resolution,
+runtime service, public route, frontend, Provider, Demo, Session, Run, or
+story-line integration. Those responsibilities remain in later separately
+reviewed slices. The complete frozen implementation plan remains partially
+implemented.
 
 ## Current composition roots and Provider boundaries
 

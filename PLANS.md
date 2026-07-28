@@ -17,8 +17,8 @@ documents.
 
 - Branch: `main`
 - Local `origin/main` and `HEAD`:
-  `afa9f9c21900eebd4e08d65071a26903e83d4a65`
-- HEAD subject: `docs(domain): freeze structured player character phase 2 plan`
+  `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`
+- HEAD subject: `feat(player-character): add persistence carrier validation`
 - Ahead/behind: `0/0`
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
@@ -158,10 +158,9 @@ The
 [structured player-character contract](docs/structured_player_character_contract.md)
 is an **approved and frozen structured player-character product specification —
 partially implemented by the committed and pushed Phase 1 pure domain/protocol
-foundation and a local, uncommitted Phase 2 Slice 1 candidate. Phase 1 has
-passed fresh independent read-only acceptance for the exact nine-path candidate
-and is accepted; the overall implementation plan remains only partially
-implemented. Phase 2 Slice 1 final independent acceptance is pending.** Its
+foundation and Phase 2 Slice 1 persistence carriers, plus a local, uncommitted
+Phase 2 Slice 2 schema candidate awaiting independent review. The overall
+implementation plan remains only partially implemented.** Its
 first independent read-only review found one HIGH issue
 concerning stable same-story-line identity continuity, one MEDIUM issue
 concerning permanent `player_character_id` non-reuse, and one MEDIUM issue
@@ -187,10 +186,13 @@ requires a separately approved downstream implementation plan and task.
 The
 [structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md)
 translates that approved and frozen product contract into proposed
-repository-specific implementation work. The historical plan and its technical
-prerequisites were **approved and frozen; the current four-document candidate
-requires fresh independent approval.** Phase 1 has passed fresh independent read-only acceptance for the exact
-nine-path candidate. Its original implementation commit is
+repository-specific implementation work. The plan, technical prerequisites,
+and ordered Phase 2 slice amendment are **approved, frozen, committed, and
+pushed**; the ordering amendment baseline is
+`afa9f9c21900eebd4e08d65071a26903e83d4a65`
+(`docs(domain): freeze structured player character phase 2 plan`). Phase 1 has
+passed fresh independent read-only acceptance for the exact nine-path candidate.
+Its original implementation commit is
 `c8808f66e8d97bc4386a481bf21669cfddcd222e`; the current completed and pushed
 Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
@@ -201,27 +203,32 @@ historically received the independent verdict
 then-approved candidate was committed and pushed unchanged as
 `1fd29798fe256593e56029baca743484cc221ae4`
 (`docs(domain): freeze structured player-character phase 2 prerequisites`).
-That commit remains the technical-freeze history, but it predates the current
-Phase 1 opaque-identifier correction and does not approve the current locked
-candidate.
+That commit remains the technical-freeze history; the later ordering-amendment
+baseline governs the current numbered implementation slices.
 
-Phase 2 Slice 1 now exists only as a local candidate: its application ports,
-exact six-family offline persistence carriers, canonical codecs, aggregate
-validation, and bounded tests are implemented. The five findings from its
-first independent review have been corrected locally, and the corrected
-source/test candidate passed 94 persistence tests, 190 unchanged Phase 1
-regressions, 284 combined contract tests, compileall, and Offline verification
-with 1,346 passed and 48 skipped. Final independent acceptance is still
-pending; nothing is staged, committed, or pushed. Slice 2 has not begun. No ORM,
-migration, database adapter or verification, transaction or recovery behavior,
-production composition, public route, frontend behavior, Provider integration,
-or story/Run activation exists. Phase 3 and every later structured-player-
-character phase remain blocked.
+Phase 2 Slice 1 is implemented, independently accepted, committed, and pushed
+at `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`
+(`feat(player-character): add persistence carrier validation`). Phase 2 Slice 2
+is implemented locally and awaits fresh independent review: exactly six
+SQLAlchemy mappings and migration `20260728_0004` add the frozen schema after
+`20260719_0003`, with exact MySQL collations, keys, named checks, twelve
+restrictive foreign keys, complete index inventory, no backfill, and
+fail-closed data-present downgrade refusal. Focused schema and Slice 1
+regressions, compileall, Alembic heads/history, MySQL verification with 61
+passing tests, Offline verification with 1,357 passed and 51 skipped, and Full
+verification with 1,407 passed and one skipped live test all passed. The Slice 2
+candidate is unstaged, uncommitted, and unpushed.
 
-The implementation-order amendment below is a new review candidate, distinct
-from the frozen technical prerequisites. It becomes operative automatically,
-without another status-only documentation edit, only after all of these ordered
-conditions are satisfied:
+No player-character repository, locking/CAS, Unit of Work wiring, transaction
+or replay orchestration, production composition, public route, frontend
+behavior, Provider integration, Demo behavior, or story/Run activation exists.
+Slices 3 and 4 and every later structured-player-character phase remain
+blocked.
+
+The implementation-order amendment below was reviewed, approved, committed,
+and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
+earlier frozen technical prerequisites. The following ordered conditions
+controlled its activation:
 
 1. A fresh independent read-only review returns
    `STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` for the exact complete
@@ -238,13 +245,12 @@ conditions are satisfied:
    contains exactly the approved documentation scope.
 5. A separately authorized Phase 2 implementation task may then begin.
 
-Before exact-candidate approval, staging and commit are prohibited. Approval
-alone or a local documentation commit alone does not authorize Phase 2
-implementation; implementation remains blocked until the pushed clean baseline
-is confirmed. Slice 1 still requires the separate explicit authorization in
-condition 5. Approval of this amendment does not itself authorize
-implementation, migration execution, database access, staging, commit, or
-push.
+Those conditions were satisfied before Slice 1 began. Their satisfaction did
+not authorize any implementation slice by itself: Slices 1 and 2 each received
+separate scoped authorization, and every later slice still requires its own
+accepted predecessor and authorization. No approval described here authorizes
+staging, commit, push, database access, or implementation outside its exact
+task.
 
 Subject to that gate and later slice-specific authorization, the deterministic
 Phase 2 order is:
@@ -261,11 +267,11 @@ The detailed scope, paths, dependencies, exclusions, verification level, and
 completion criteria for every slice are authoritative in the implementation
 plan. Its existing receipt/history integrity design requires internally derived
 canonical state-record fingerprints that bind each receipt to its exact
-authoritative revision record(s). No database receipt schema, canonical character persistence,
-public/runtime route, Provider integration, frontend flow, or Run/story-line
-activation exists today. Phase 1 acceptance and the historical Phase 2
-technical-freeze approval do not themselves authorize Phase 2 implementation.
-Phase 3.2b remains closed.
+authoritative revision record(s). Slice 2 now provides the physical database
+receipt schema, but no canonical character repository, public/runtime route,
+Provider integration, frontend flow, or Run/story-line activation exists.
+Phase 1 acceptance and the historical Phase 2 technical-freeze approval do not
+themselves authorize later implementation. Phase 3.2b remains closed.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 

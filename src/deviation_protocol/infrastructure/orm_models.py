@@ -5,8 +5,10 @@ from typing import Any
 
 from sqlalchemy import (
     BigInteger,
+    CheckConstraint,
     DateTime,
     ForeignKey,
+    ForeignKeyConstraint,
     Index,
     Integer,
     String,
@@ -26,6 +28,15 @@ class Base(DeclarativeBase):
 
 
 TABLE_OPTIONS = {"mysql_engine": "InnoDB", "mysql_charset": "utf8mb4"}
+PLAYER_CHARACTER_TABLE_OPTIONS = {
+    "mysql_engine": "InnoDB",
+    "mysql_charset": "utf8mb4",
+    "mysql_collate": "utf8mb4_bin",
+}
+
+
+def _ascii_varchar(length: int) -> mysql.VARCHAR:
+    return mysql.VARCHAR(length=length, charset="ascii", collation="ascii_bin")
 
 
 class GameSessionRow(Base):
@@ -161,3 +172,574 @@ class NarrativeJobRow(Base):
     error_code: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+class PlayerCharacterControllerBindingRow(Base):
+    __tablename__ = "player_character_controller_bindings"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(controller_binding) >= 1 "
+            "AND controller_binding REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_controller_bindings_opaque",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    controller_binding: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+
+
+class PlayerCharacterIdAllocationRow(Base):
+    __tablename__ = "player_character_id_allocations"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(player_character_id) >= 1 "
+            "AND player_character_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_allocations_identity_opaque",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+
+
+class PlayerCharacterRevisionRow(Base):
+    __tablename__ = "player_character_revisions"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(player_character_id) >= 1 "
+            "AND player_character_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_revisions_identity_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(controller_binding) >= 1 "
+            "AND controller_binding REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_revisions_binding_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(source_reference) >= 1 "
+            "AND source_reference REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_revisions_source_opaque",
+        ),
+        CheckConstraint(
+            "contract_version = 'structured-player-character/v1'",
+            name="ck_spc_revisions_contract",
+        ),
+        CheckConstraint(
+            "record_revision BETWEEN 1 AND 9223372036854775807",
+            name="ck_spc_revisions_revision_range",
+        ),
+        CheckConstraint(
+            "prior_revision IS NULL "
+            "OR (prior_revision BETWEEN 1 AND 9223372036854775806 "
+            "AND prior_revision < record_revision)",
+            name="ck_spc_revisions_prior_range",
+        ),
+        CheckConstraint(
+            "("
+            "mutation_kind = 'CREATE' "
+            "AND record_revision = 1 "
+            "AND prior_revision IS NULL "
+            "AND lifecycle = 'active' "
+            "AND authority_class = 'trusted-creation'"
+            ") OR ("
+            "mutation_kind = 'RETIRE' "
+            "AND prior_revision IS NOT NULL "
+            "AND prior_revision = record_revision - 1 "
+            "AND lifecycle = 'retired' "
+            "AND authority_class = 'authenticated-controller'"
+            ") OR ("
+            "mutation_kind = 'FINAL_DEATH' "
+            "AND prior_revision IS NOT NULL "
+            "AND prior_revision = record_revision - 1 "
+            "AND lifecycle = 'deceased' "
+            "AND authority_class = 'trusted-server-outcome'"
+            ")",
+            name="ck_spc_revisions_provenance_matrix",
+        ),
+        CheckConstraint(
+            "OCTET_LENGTH(record_canonical) >= 1",
+            name="ck_spc_revisions_canonical_nonempty",
+        ),
+        ForeignKeyConstraint(
+            ("player_character_id",),
+            ("player_character_id_allocations.player_character_id",),
+            name="fk_spc_revisions_allocation",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("controller_binding",),
+            ("player_character_controller_bindings.controller_binding",),
+            name="fk_spc_revisions_controller_binding",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        Index(
+            "ix_spc_revisions_controller_binding",
+            "controller_binding",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    record_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        primary_key=True,
+    )
+    contract_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    controller_binding: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        nullable=False,
+    )
+    lifecycle: Mapped[str] = mapped_column(
+        _ascii_varchar(16),
+        nullable=False,
+    )
+    prior_revision: Mapped[int | None] = mapped_column(
+        BigInteger,
+        nullable=True,
+    )
+    mutation_kind: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    authority_class: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    source_reference: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        nullable=False,
+    )
+    record_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+
+
+class PlayerCharacterCurrentRow(Base):
+    __tablename__ = "player_character_current"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(player_character_id) >= 1 "
+            "AND player_character_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_current_identity_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(controller_binding) >= 1 "
+            "AND controller_binding REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_current_binding_opaque",
+        ),
+        CheckConstraint(
+            "contract_version = 'structured-player-character/v1'",
+            name="ck_spc_current_contract",
+        ),
+        CheckConstraint(
+            "record_revision BETWEEN 1 AND 9223372036854775807",
+            name="ck_spc_current_revision_range",
+        ),
+        CheckConstraint(
+            "lifecycle IN ('active', 'retired', 'deceased')",
+            name="ck_spc_current_lifecycle",
+        ),
+        CheckConstraint(
+            "OCTET_LENGTH(record_canonical) >= 1",
+            name="ck_spc_current_canonical_nonempty",
+        ),
+        ForeignKeyConstraint(
+            ("player_character_id",),
+            ("player_character_id_allocations.player_character_id",),
+            name="fk_spc_current_allocation",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("controller_binding",),
+            ("player_character_controller_bindings.controller_binding",),
+            name="fk_spc_current_controller_binding",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("player_character_id", "record_revision"),
+            (
+                "player_character_revisions.player_character_id",
+                "player_character_revisions.record_revision",
+            ),
+            name="fk_spc_current_revision",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        Index(
+            "ix_spc_current_controller_identity",
+            "controller_binding",
+            "player_character_id",
+        ),
+        Index(
+            "ix_spc_current_identity_revision",
+            "player_character_id",
+            "record_revision",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    contract_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    record_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    controller_binding: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        nullable=False,
+    )
+    lifecycle: Mapped[str] = mapped_column(
+        _ascii_varchar(16),
+        nullable=False,
+    )
+    record_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+
+
+class PlayerCharacterCreationReceiptRow(Base):
+    __tablename__ = "player_character_creation_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(controller_binding) >= 1 "
+            "AND controller_binding REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_creation_receipts_binding_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(operation_id) >= 1 "
+            "AND operation_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_creation_receipts_operation_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(result_player_character_id) >= 1 "
+            "AND result_player_character_id REGEXP "
+            "'^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_creation_receipts_result_identity_opaque",
+        ),
+        CheckConstraint(
+            "operation_namespace = 'player-character.create/v1' "
+            "AND command_kind = 'CREATE'",
+            name="ck_spc_creation_receipts_protocol",
+        ),
+        CheckConstraint(
+            "result_schema_version = 'player-character.create-result/v1' "
+            "AND result_contract_version = 'structured-player-character/v1' "
+            "AND resulting_revision = 1 "
+            "AND resulting_lifecycle = 'active'",
+            name="ck_spc_creation_receipts_result",
+        ),
+        CheckConstraint(
+            "OCTET_LENGTH(receipt_canonical) BETWEEN 1 AND 65536",
+            name="ck_spc_creation_receipts_canonical_size",
+        ),
+        UniqueConstraint(
+            "result_player_character_id",
+            "resulting_revision",
+            name="uq_spc_creation_receipts_result_revision",
+        ),
+        ForeignKeyConstraint(
+            ("controller_binding",),
+            ("player_character_controller_bindings.controller_binding",),
+            name="fk_spc_creation_receipts_controller_binding",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("result_player_character_id",),
+            ("player_character_id_allocations.player_character_id",),
+            name="fk_spc_creation_receipts_allocation",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("result_player_character_id", "resulting_revision"),
+            (
+                "player_character_revisions.player_character_id",
+                "player_character_revisions.record_revision",
+            ),
+            name="fk_spc_creation_receipts_revision",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    controller_binding: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    operation_namespace: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        primary_key=True,
+    )
+    operation_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    fingerprint: Mapped[bytes] = mapped_column(
+        mysql.BINARY(32),
+        nullable=False,
+    )
+    command_kind: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    result_schema_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    result_player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        nullable=False,
+    )
+    result_contract_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    resulting_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    resulting_lifecycle: Mapped[str] = mapped_column(
+        _ascii_varchar(16),
+        nullable=False,
+    )
+    result_record_fingerprint: Mapped[bytes] = mapped_column(
+        mysql.BINARY(32),
+        nullable=False,
+    )
+    receipt_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    operation_evidence_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )
+
+
+class PlayerCharacterMutationReceiptRow(Base):
+    __tablename__ = "player_character_mutation_receipts"
+    __table_args__ = (
+        CheckConstraint(
+            "CHAR_LENGTH(player_character_id) >= 1 "
+            "AND player_character_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_mutation_receipts_identity_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(operation_id) >= 1 "
+            "AND operation_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_mutation_receipts_operation_opaque",
+        ),
+        CheckConstraint(
+            "CHAR_LENGTH(result_player_character_id) >= 1 "
+            "AND result_player_character_id REGEXP "
+            "'^[A-Za-z0-9][A-Za-z0-9_.:-]*$'",
+            name="ck_spc_mutation_receipts_result_identity_opaque",
+        ),
+        CheckConstraint(
+            "operation_namespace = 'player-character.mutate/v1' "
+            "AND result_schema_version = 'player-character.mutate-result/v1' "
+            "AND result_contract_version = 'structured-player-character/v1'",
+            name="ck_spc_mutation_receipts_protocol",
+        ),
+        CheckConstraint(
+            "player_character_id = result_player_character_id",
+            name="ck_spc_mutation_receipts_owner_result",
+        ),
+        CheckConstraint(
+            "expected_revision BETWEEN 1 AND 9223372036854775806 "
+            "AND resulting_revision = expected_revision + 1 "
+            "AND resulting_revision <= 9223372036854775807",
+            name="ck_spc_mutation_receipts_revision_successor",
+        ),
+        CheckConstraint(
+            "("
+            "command_kind = 'RETIRE' "
+            "AND result_command_kind = 'RETIRE' "
+            "AND command_result = 'RETIRED' "
+            "AND resulting_lifecycle = 'retired'"
+            ") OR ("
+            "command_kind = 'FINAL_DEATH' "
+            "AND result_command_kind = 'FINAL_DEATH' "
+            "AND command_result = 'DECEASED' "
+            "AND resulting_lifecycle = 'deceased'"
+            ")",
+            name="ck_spc_mutation_receipts_result",
+        ),
+        CheckConstraint(
+            "OCTET_LENGTH(receipt_canonical) BETWEEN 1 AND 65536",
+            name="ck_spc_mutation_receipts_canonical_size",
+        ),
+        UniqueConstraint(
+            "player_character_id",
+            "resulting_revision",
+            name="uq_spc_mutation_receipts_result_revision",
+        ),
+        ForeignKeyConstraint(
+            ("player_character_id",),
+            ("player_character_id_allocations.player_character_id",),
+            name="fk_spc_mutation_receipts_allocation",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("result_player_character_id",),
+            ("player_character_id_allocations.player_character_id",),
+            name="fk_spc_mutation_receipts_result_allocation",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("player_character_id", "expected_revision"),
+            (
+                "player_character_revisions.player_character_id",
+                "player_character_revisions.record_revision",
+            ),
+            name="fk_spc_mutation_receipts_prior_revision",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        ForeignKeyConstraint(
+            ("result_player_character_id", "resulting_revision"),
+            (
+                "player_character_revisions.player_character_id",
+                "player_character_revisions.record_revision",
+            ),
+            name="fk_spc_mutation_receipts_result_revision",
+            ondelete="RESTRICT",
+            onupdate="RESTRICT",
+        ),
+        Index(
+            "ix_spc_mutation_receipts_expected_revision",
+            "player_character_id",
+            "expected_revision",
+        ),
+        Index(
+            "ix_spc_mutation_receipts_result_revision",
+            "result_player_character_id",
+            "resulting_revision",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    operation_namespace: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        primary_key=True,
+    )
+    operation_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        primary_key=True,
+    )
+    fingerprint: Mapped[bytes] = mapped_column(
+        mysql.BINARY(32),
+        nullable=False,
+    )
+    command_kind: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    result_schema_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    expected_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    result_player_character_id: Mapped[str] = mapped_column(
+        _ascii_varchar(128),
+        nullable=False,
+    )
+    result_contract_version: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    result_command_kind: Mapped[str] = mapped_column(
+        _ascii_varchar(64),
+        nullable=False,
+    )
+    command_result: Mapped[str] = mapped_column(
+        _ascii_varchar(32),
+        nullable=False,
+    )
+    resulting_revision: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+    )
+    resulting_lifecycle: Mapped[str] = mapped_column(
+        _ascii_varchar(16),
+        nullable=False,
+    )
+    before_record_fingerprint: Mapped[bytes] = mapped_column(
+        mysql.BINARY(32),
+        nullable=False,
+    )
+    after_record_fingerprint: Mapped[bytes] = mapped_column(
+        mysql.BINARY(32),
+        nullable=False,
+    )
+    receipt_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    operation_evidence_canonical: Mapped[bytes] = mapped_column(
+        mysql.MEDIUMBLOB(),
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        mysql.DATETIME(fsp=6),
+        nullable=False,
+    )

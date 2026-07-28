@@ -2,18 +2,18 @@
 
 ## 1. Status
 
-Status: **Historical downstream implementation plan and technical prerequisites
-were approved and frozen; the current locked four-document candidate requires
-fresh independent approval. Phase 1 has passed fresh independent read-only acceptance for the exact nine-path
-candidate. Its original implementation commit is
+Status: **The downstream implementation plan, technical prerequisites, and
+ordered Phase 2 slice amendment are approved, frozen, committed, and pushed.
+Phase 1 has passed fresh independent read-only acceptance for the exact
+nine-path candidate. Its original implementation commit is
 `c8808f66e8d97bc4386a481bf21669cfddcd222e`; the current completed and pushed
 Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
-(`fix(domain): preserve exact opaque identifiers`). The substantive Phase 2
-technical prerequisites retain their historical technical-freeze role, but the
-current locked candidate requires fresh independent approval. Phase 2 Slice 1
-exists only as a corrected local, uncommitted candidate pending final
-independent acceptance; Slice 2 and Phases 3–7 remain unimplemented.**
+(`fix(domain): preserve exact opaque identifiers`). Phase 2 Slice 1 is
+implemented, independently accepted, committed, and pushed at
+`3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`. Phase 2 Slice 2 is implemented
+locally, unstaged, uncommitted, and unpushed pending fresh independent review.
+Slices 3–4 and Phases 3–7 remain unimplemented.**
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -21,21 +21,20 @@ technical-prerequisite amendment that received the independent verdict
 approved candidate was committed and pushed unchanged as
 `1fd29798fe256593e56029baca743484cc221ae4`
 (`docs(domain): freeze structured player-character phase 2 prerequisites`).
-It remains the historical technical-freeze commit, but it predates the current
-Phase 1 opaque-identifier correction and does not approve this current locked
-candidate. Phase 2 database/runtime persistence has not started: the local
-Slice 1 candidate adds only application ports, exact six-family offline
-persistence carriers, canonical codecs, aggregate validation, and bounded
-tests. It adds no ORM, migration, database adapter or verification, transaction
-or recovery behavior, production composition, public route, frontend behavior,
-Provider integration, or story/Run activation. Phase 3 and every later phase
-remain blocked.
+It remains the historical technical-freeze commit. The later ordered-slice
+amendment was approved, committed, and pushed at
+`afa9f9c21900eebd4e08d65071a26903e83d4a65`. Slice 2 now adds only the exact
+six-family SQLAlchemy metadata, one linear Alembic migration, and bounded
+schema/migration verification. It adds no repository adapter, live-row
+reconstruction, transaction or replay orchestration, production composition,
+public route, frontend behavior, Provider integration, Demo behavior, or
+story/Run activation. Phase 3 and every later phase remain blocked.
 
-The ordered Phase 2 implementation slices introduced in section 24 are a new
-amendment candidate, not part of the prior technical-freeze verdict. Section
-31 supplies its self-executing independent-review and unchanged-commit gate.
-Until that gate is satisfied, Phase 2 implementation remains blocked; after it
-is satisfied, Slice 1 still requires separate explicit user authorization.
+The ordered Phase 2 implementation slices introduced in section 24 were a
+separate amendment from the prior technical-freeze verdict. The section 31
+self-executing gate has been satisfied. Each numbered slice still requires its
+own authorization and independent review, and a later slice may not be folded
+into an earlier one.
 
 The pre-correction draft received one fresh independent read-only review. That
 review identified five accepted findings, `SPCIP-001` through `SPCIP-005`; the
@@ -53,9 +52,10 @@ The
 and [final narrative experience](final_narrative_experience.md) remain approved
 and frozen product specifications. The pure Phase 1 domain and
 character-operation protocol foundation is implemented, accepted, committed,
-and pushed. Phase 2 Slice 1 exists only as a local, uncommitted candidate whose
-final independent acceptance is pending; the complete product specifications
-remain only partially implemented. Phase 3.2b remains closed.
+and pushed. Phase 2 Slice 1 is also implemented, accepted, committed, and
+pushed. Phase 2 Slice 2 is a verified local implementation candidate awaiting
+independent review; the complete product specifications remain only partially
+implemented. Phase 3.2b remains closed.
 
 ## 2. Purpose
 
@@ -120,23 +120,30 @@ than an implementation default.
 ## 4. Implementation status boundary
 
 The historical technical-freeze portions of this document remain design
-evidence, but the current locked candidate requires the section 31 review gate
-before it can become operative.
+evidence. The section 31 ordering-amendment gate is operative, but every
+numbered implementation slice retains its separate authorization and
+independent-review requirement.
 The separately authorized Phase 1 implementation added only pure domain models,
 independent policies, deterministic character-operation serialization and
 receipt semantics, and offline unit/golden-vector tests. It changes no
 database, migration, schema, repository, Unit of Work, production service,
 API, Provider, client, frontend, Demo, Session request/action, Run/story-line,
 or production behavior. It does not reopen Phase 3.2b.
-The separately authorized Phase 2 Slice 1 local candidate adds only the
-approved application ports, six non-authoritative stored carriers, canonical
-and fingerprint codecs, aggregate integrity validation, and offline tests. Its
-five reported independent-review findings have been corrected locally, and
-the corrected source/test candidate passed 94 persistence tests, 190 unchanged
-Phase 1 regressions, 284 combined contract tests, compileall, and Offline
-verification with 1,346 passed and 48 skipped. Final independent acceptance is
-still pending; nothing is staged, committed, or pushed, and Slice 2 has not
-begun.
+The separately authorized Phase 2 Slice 1 adds only the approved application
+ports, six non-authoritative stored carriers, canonical and fingerprint codecs,
+aggregate integrity validation, and offline tests. It is implemented,
+independently accepted, committed, and pushed at
+`3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`.
+
+The separately authorized Phase 2 Slice 2 local candidate adds exactly six
+SQLAlchemy mappings and migration `20260728_0004` directly after
+`20260719_0003`. It passed focused metadata/schema/migration and all 284 Slice 1
+tests, compileall, Alembic heads/history, MySQL verification with 61 passing
+tests, Offline verification with 1,357 passed and 51 skipped, and Full
+verification with 1,407 passed and one skipped opt-in live test. It is unstaged,
+uncommitted, and unpushed pending fresh independent review. No repository,
+locking/CAS, replay, Unit of Work, service, runtime, public, Provider, Demo, or
+Run/story behavior was added.
 
 File names, table names, data types, endpoint shapes, and phase boundaries below
 are proposed implementation inventory. They are not authority to edit those
@@ -1709,12 +1716,12 @@ contextual state. Rejections have no first-slice character receipt.
 
 ## 24. Implementation phases
 
-Phase 1 was separately authorized and has passed fresh independent read-only
-acceptance for the exact nine-path candidate. Phase 2 Slice 1 exists only as a
-corrected local candidate pending final independent acceptance. Every later
-slice and phase remains proposed, incomplete, and unauthorized for
-implementation. A later slice or phase may begin only after its prerequisites,
-the gate in section 31, and a separate scoped implementation task.
+Phase 1 and Phase 2 Slice 1 were separately authorized, independently accepted,
+committed, and pushed. Phase 2 Slice 2 is implemented locally and awaits fresh
+independent review. Every later slice and phase remains proposed, incomplete,
+and unauthorized for implementation. A later slice or phase may begin only
+after its prerequisites, the gate in section 31, and a separate scoped
+implementation task.
 
 ### Phase 1 — Domain envelope, identity types, and policies
 
@@ -1765,9 +1772,11 @@ require a missing product rule.
 ### Phase 2 — MySQL persistence and migration
 
 Status: **Historical technical prerequisites were accepted and frozen at
-`1fd29798fe256593e56029baca743484cc221ae4`. Phase 2 Slice 1 exists only as a
-corrected local, uncommitted candidate pending final independent acceptance.
-Database/runtime persistence is not implemented, and Slice 2 has not begun.**
+`1fd29798fe256593e56029baca743484cc221ae4`. Phase 2 Slice 1 is implemented,
+independently accepted, committed, and pushed. Slice 2 schema metadata and its
+single migration are implemented locally and await independent review.
+Repositories, Unit of Work integration, and runtime persistence remain
+unimplemented.**
 
 Scope:
 
@@ -2001,6 +2010,10 @@ wiring, transactional integration proof, every public or production
 composition, and Phases 3–7.
 
 ##### Phase 2 Slice 2 — Exact six-family SQLAlchemy metadata and linear Alembic migration
+
+Implementation status: **Implemented locally and verified; awaiting fresh
+independent review. The candidate is unstaged, uncommitted, and unpushed.
+Slices 3–4 and every runtime/public phase remain unimplemented.**
 
 Why this occurs second: ORM metadata and DDL must implement the already tested
 Slice 1 carriers and cannot safely precede their strict byte/identity contract.
@@ -2642,10 +2655,10 @@ later-world-driven switching.
 
 ## 30. Acceptance criteria
 
-The current four-document candidate is not approved. A fresh independent
-read-only review of the complete exact candidate must approve its resulting
-four SHA-256 hashes with
-`STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` and verify that this plan:
+The four-document ordering amendment was approved under
+`STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED`, committed, and pushed at
+`afa9f9c21900eebd4e08d65071a26903e83d4a65`. Its exact-candidate review
+verified that this plan:
 
 1. remains downstream from, and does not weaken or expand, the frozen product
    contract;
@@ -2693,29 +2706,30 @@ four SHA-256 hashes with
 20. remains unimplemented, unstaged, uncommitted, and unpushed when the review
     occurs.
 
-Runtime acceptance for later implementation is phase-specific and cannot be
-earned by approval of this document alone. Historical review results in section
-32 remain historical evidence only and cannot approve this corrected candidate.
+Implementation acceptance remains phase-specific and cannot be earned by
+approval of this document alone. The plan approval does not approve the current
+local Slice 2 implementation candidate.
 
 ## 31. Approval and implementation gate
 
-The corrected four-document candidate is not approved. A fresh independent
-read-only review of its complete exact four-document candidate is required
-before the plan-level independent-review and correction gate can close. The
+The corrected four-document candidate passed its exact-candidate review and
+was committed and pushed at
+`afa9f9c21900eebd4e08d65071a26903e83d4a65`, closing the plan-level gate. The
 separately authorized Phase 1 implementation passed fresh independent
 read-only acceptance for the exact nine-path candidate after the third
-correction round.
+correction round. Phase 2 Slice 1 was subsequently accepted and pushed at
+`3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`; the local Slice 2 candidate still
+requires its own fresh independent review.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
 `STRUCTURED_PLAYER_CHARACTER_PHASE_2_TECHNICAL_FREEZE_APPROVED` at
-`1fd29798fe256593e56029baca743484cc221ae4`. That approval predates the
-current completed Phase 1 baseline and does not approve this current locked
-candidate.
+`1fd29798fe256593e56029baca743484cc221ae4`. That historical approval did not
+by itself authorize any implementation slice.
 
-The ordered Phase 2 slices added under section 24 are a distinct amendment
-candidate. This implementation-order amendment becomes operative if and only
-if all of these conditions occur in order:
+The ordered Phase 2 slices added under section 24 were a distinct amendment.
+That implementation-order amendment became operative only after all of these
+conditions occurred in order:
 
 1. a fresh independent read-only review returns
    `STRUCTURED_PLAYER_CHARACTER_PHASE_2_PLAN_APPROVED` for the complete exact
@@ -2733,21 +2747,16 @@ if all of these conditions occur in order:
    contains exactly the approved documentation scope; and
 5. a separately authorized Phase 2 implementation task then begins.
 
-Before the fresh approval, no staging, commit, push, or Phase 2 implementation
-is allowed. Approval alone or a local documentation commit alone does not
-authorize Phase 2 implementation; implementation remains blocked until the
-pushed clean baseline is confirmed. Once all conditions are satisfied, this
-paragraph is self-executing: no further status-only documentation edit is
-required to activate the mandatory slice order. Actual Slice 1 implementation
-still requires the separate explicit user authorization in condition 5, and
-every later slice requires its own prerequisite acceptance and explicit
-authorization.
+Those conditions were satisfied before Slice 1 began, and the paragraph
+self-executed without another status-only activation edit. Satisfaction of the
+gate did not authorize implementation by itself. Every numbered slice still
+requires its own prerequisite acceptance and explicit authorization.
 
-Independent approval of this ordering amendment does not itself authorize
+Independent approval of the ordering amendment did not itself authorize
 implementation, migration execution, database access, staging, commit, push,
-deployment, public activation, or work outside the four-document review. Phase 1
-acceptance and the historical Phase 2 technical-freeze approval likewise do not
-authorize those actions.
+deployment, public activation, or work outside the four-document review. Phase
+1 acceptance and the historical Phase 2 technical-freeze approval likewise did
+not authorize those actions.
 
 No phase is approved, frozen, started, or completed by being listed here.
 Approval of the frozen product contract is not implementation authorization.
@@ -2863,3 +2872,17 @@ deployment, or work outside a separately authorized phase.
   compileall, and Offline verification with 1,346 passed and 48 skipped also
   passed. Final independent acceptance remains pending. Nothing was staged,
   committed, or pushed; Slice 2 did not begin.
+- 2026-07-28: After Slice 1 was independently accepted, committed, and pushed
+  at `3ad39c7bb7a2c7cc6b2571f6dcb69685b7234101`, a separately authorized
+  implementation task added only Phase 2 Slice 2. The local candidate adds the
+  exact six SQLAlchemy mappings and linear Alembic revision
+  `20260728_0004`, with `20260719_0003` as its parent, frozen MySQL
+  collations/types/keys/checks, twelve named restrictive foreign keys, the
+  exact index inventory, no backfill, and fail-closed data-present downgrade
+  refusal before destructive DDL. Focused schema and all 284 Slice 1 tests,
+  compileall, Alembic heads/history, MySQL verification with 61 passing tests,
+  Offline verification with 1,357 passed and 51 skipped, and Full verification
+  with 1,407 passed and one skipped opt-in live test passed. The candidate
+  remains unstaged, uncommitted, and unpushed pending fresh independent review.
+  No repository, locking/CAS, replay, Unit of Work, service, runtime, public,
+  frontend, Provider, Demo, Session, Run, or story-line behavior was added.
