@@ -32,6 +32,7 @@ from deviation_protocol.application.ports import (
     UnitOfWorkFactory,
 )
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
+from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
     PlayerSessionView,
@@ -55,6 +56,7 @@ from deviation_protocol.infrastructure.deepseek_narrative import (
 )
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
 from deviation_protocol.domain.player_character import AuthoritySourceRef
+from deviation_protocol.domain.run import RunAuthoritySourceRef
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
 )
@@ -62,6 +64,10 @@ from deviation_protocol.infrastructure.player_character_authority import (
     ConfiguredControllerBinding,
     ConfiguredControllerBindingResolver,
     Uuid4PlayerCharacterIdIssuer,
+)
+from deviation_protocol.infrastructure.run_authority import (
+    Uuid4ContinuousStoryLineIdIssuer,
+    Uuid4RunIdIssuer,
 )
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
@@ -114,6 +120,10 @@ def _player_character_clock() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _run_clock() -> datetime:
+    return datetime.now(timezone.utc)
+
+
 def build_player_character_service(
     *,
     uow_factory: UnitOfWorkFactory,
@@ -128,6 +138,16 @@ def build_player_character_service(
             value="source.production-player-character"
         ),
         clock=_player_character_clock,
+    )
+
+
+def build_run_service(*, uow_factory: UnitOfWorkFactory) -> RunService:
+    return RunService(
+        uow_factory=uow_factory,
+        run_id_issuer=Uuid4RunIdIssuer(),
+        continuous_story_line_id_issuer=Uuid4ContinuousStoryLineIdIssuer(),
+        source_reference=RunAuthoritySourceRef(value="source.production-run"),
+        clock=_run_clock,
     )
 
 
@@ -186,6 +206,7 @@ def build_default_services(
             uow_factory=uow_factory,
             controller_binding_resolver=controller_binding_resolver,
         ),
+        run_service=build_run_service(uow_factory=uow_factory),
         engine=engine,
         narrative_provider=provider,
     )

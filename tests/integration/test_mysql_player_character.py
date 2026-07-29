@@ -115,6 +115,7 @@ MIGRATION_PATH = (
 )
 MIGRATION_REVISION = "20260728_0004"
 MIGRATION_PARENT = "20260719_0003"
+CURRENT_HEAD_REVISION = "20260729_0005"
 
 LEGACY_MAPPED_TABLES = {
     "domain_events",
@@ -132,6 +133,13 @@ PHASE_2_TABLES = (
     "player_character_mutation_receipts",
 )
 PHASE_2_TABLE_SET = set(PHASE_2_TABLES)
+MINIMUM_RUN_CORE_TABLES = {
+    "run_current",
+    "run_revisions",
+    "run_session_participations",
+    "run_creation_receipts",
+    "run_mutation_receipts",
+}
 
 # Each entry is (column name, MySQL DDL type, nullable, primary key).
 EXPECTED_COLUMNS: dict[str, tuple[tuple[str, str, bool, bool], ...]] = {
@@ -819,7 +827,11 @@ def _record_migration_upgrade(
 
 
 def test_phase_2_metadata_has_exact_six_table_contract() -> None:
-    assert set(Base.metadata.tables) == LEGACY_MAPPED_TABLES | PHASE_2_TABLE_SET
+    assert set(Base.metadata.tables) == (
+        LEGACY_MAPPED_TABLES
+        | PHASE_2_TABLE_SET
+        | MINIMUM_RUN_CORE_TABLES
+    )
 
     for table_name in PHASE_2_TABLES:
         table = Base.metadata.tables[table_name]
@@ -883,13 +895,14 @@ def test_migration_is_one_linear_head_after_0003() -> None:
     config = Config(str(REPOSITORY_ROOT / "alembic.ini"))
     scripts = ScriptDirectory.from_config(config)
 
-    assert scripts.get_heads() == [MIGRATION_REVISION]
+    assert scripts.get_heads() == [CURRENT_HEAD_REVISION]
     revision = scripts.get_revision(MIGRATION_REVISION)
     assert revision is not None
     assert revision.down_revision == MIGRATION_PARENT
     assert tuple(
         item.revision for item in scripts.walk_revisions()
     ) == (
+        CURRENT_HEAD_REVISION,
         "20260728_0004",
         "20260719_0003",
         "20260719_0002",
@@ -1315,7 +1328,7 @@ async def _assert_revision_test_rows_absent(
             )
         ).scalar_one()
 
-    assert revision == MIGRATION_REVISION
+    assert revision == CURRENT_HEAD_REVISION
     assert (revision_count, allocation_count, binding_count) == (0, 0, 0)
 
 
@@ -1586,7 +1599,7 @@ def test_mysql_empty_schema_downgrade_and_upgrade_preserve_legacy_schema(
     revision, tables, counts = asyncio.run(
         _phase_2_database_state(database_url)
     )
-    assert revision == MIGRATION_REVISION
+    assert revision == CURRENT_HEAD_REVISION
     assert tables == PHASE_2_TABLE_SET
     assert counts == {table_name: 0 for table_name in PHASE_2_TABLES}
     legacy_before = asyncio.run(_legacy_database_snapshot(database_url))
@@ -1603,14 +1616,14 @@ def test_mysql_empty_schema_downgrade_and_upgrade_preserve_legacy_schema(
             _legacy_database_snapshot(database_url)
         ) == legacy_before
 
-        command.upgrade(config, MIGRATION_REVISION)
+        command.upgrade(config, CURRENT_HEAD_REVISION)
     finally:
-        command.upgrade(config, MIGRATION_REVISION)
+        command.upgrade(config, CURRENT_HEAD_REVISION)
 
     upgraded_revision, upgraded_tables, upgraded_counts = asyncio.run(
         _phase_2_database_state(database_url)
     )
-    assert upgraded_revision == MIGRATION_REVISION
+    assert upgraded_revision == CURRENT_HEAD_REVISION
     assert upgraded_tables == PHASE_2_TABLE_SET
     assert upgraded_counts == {
         table_name: 0 for table_name in PHASE_2_TABLES
@@ -1666,7 +1679,7 @@ def test_mysql_downgrade_refuses_data_before_removing_any_table(
     revision, tables, counts = asyncio.run(
         _phase_2_database_state(database_url)
     )
-    assert revision == MIGRATION_REVISION
+    assert revision == CURRENT_HEAD_REVISION
     assert tables == PHASE_2_TABLE_SET
     assert counts == {table_name: 0 for table_name in PHASE_2_TABLES}
 
@@ -1693,12 +1706,12 @@ def test_mysql_downgrade_refuses_data_before_removing_any_table(
         asyncio.run(
             _delete_owned_binding(database_url, controller_binding)
         )
-        command.upgrade(config, MIGRATION_REVISION)
+        command.upgrade(config, CURRENT_HEAD_REVISION)
 
     final_revision, final_tables, final_counts = asyncio.run(
         _phase_2_database_state(database_url)
     )
-    assert final_revision == MIGRATION_REVISION
+    assert final_revision == CURRENT_HEAD_REVISION
     assert final_tables == PHASE_2_TABLE_SET
     assert final_counts == {
         table_name: 0 for table_name in PHASE_2_TABLES

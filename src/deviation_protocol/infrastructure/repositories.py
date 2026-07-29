@@ -24,6 +24,19 @@ from deviation_protocol.application.ports import (
     PersistedTurnRequest,
     TurnRequestRepository,
     NarrativeJobRepository,
+    RunCreationReceiptRepository,
+    RunMutationReceiptRepository,
+    RunReceiptUniquenessConflictError,
+    RunRepository,
+    RunSessionParticipationRepository,
+    RunSessionParticipationUniquenessConflictError,
+)
+from deviation_protocol.application.run_operations import (
+    AttachSessionCommand,
+    CreateRunCommand,
+    RunOperationNamespace,
+    RunReceiptKey,
+    StoredRunSuccessReceipt,
 )
 from deviation_protocol.application.player_character_operations import (
     CharacterCreationCommand,
@@ -53,6 +66,16 @@ from deviation_protocol.domain.player_character_policies import (
     PlayerConfirmation,
     TrustedFinalDeathEvidence,
 )
+from deviation_protocol.domain.run import (
+    CanonicalRun,
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+    RunMutationKind,
+    RunOperationId,
+    RunSessionParticipationReference,
+    validate_canonical_run,
+)
 from deviation_protocol.domain.persisted_events import (
     PersistedEventReceipt,
     _issue_persisted_event_receipt,
@@ -76,6 +99,11 @@ from deviation_protocol.infrastructure.orm_models import (
     PlayerCharacterIdAllocationRow,
     PlayerCharacterMutationReceiptRow,
     PlayerCharacterRevisionRow,
+    RunCreationReceiptRow,
+    RunCurrentRow,
+    RunMutationReceiptRow,
+    RunRevisionRow,
+    RunSessionParticipationRow,
     TurnRequestRow,
     utc_now,
 )
@@ -99,6 +127,25 @@ from deviation_protocol.infrastructure.player_character_persistence import (
     mutation_receipt_from_storage,
     mutation_receipt_to_storage_bytes,
     validate_stored_player_character_record_set,
+)
+from deviation_protocol.infrastructure.run_persistence import (
+    RunRepositoryConflictError,
+    RunRepositoryError,
+    RunStoredRecordIntegrityError,
+    StoredCurrentRunRecord,
+    StoredRunCreationReceiptRecord,
+    StoredRunMutationReceiptRecord,
+    StoredRunRevisionRecord,
+    StoredRunSessionParticipationRecord,
+    attach_operation_evidence_to_storage_bytes,
+    canonical_run_from_revision_storage,
+    creation_operation_evidence_to_storage_bytes as run_creation_evidence_bytes,
+    creation_receipt_from_storage as run_creation_receipt_from_storage,
+    fingerprint_to_storage_bytes as run_fingerprint_to_storage_bytes,
+    mutation_receipt_from_storage as run_mutation_receipt_from_storage,
+    participation_from_storage,
+    run_receipt_to_storage_bytes,
+    validate_stored_run_record_set,
 )
 
 
@@ -142,6 +189,21 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
                 GameSessionRow.session_id == session_id,
                 GameSessionRow.player_id == player_id,
             )
+        )
+        return self._persisted(row) if row is not None else None
+
+    async def get_owned_for_update(
+        self,
+        session_id: str,
+        player_id: str,
+    ) -> PersistedSession | None:
+        row = await self._session.scalar(
+            select(GameSessionRow)
+            .where(
+                GameSessionRow.session_id == session_id,
+                GameSessionRow.player_id == player_id,
+            )
+            .with_for_update()
         )
         return self._persisted(row) if row is not None else None
 
@@ -1600,6 +1662,942 @@ class SqlAlchemyPlayerCharacterMutationReceiptRepository(
             row,
             conflict_message="mutation receipt unique-race conflict",
             conflict_type=PlayerCharacterMutationReceiptConflictError,
+        )
+
+
+class _SqlAlchemyRunRepositorySupport:
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def _run_scalar(self, statement: Any) -> Any:
+        try:
+            with self._session.no_autoflush:
+                return await self._session.scalar(statement)
+        except DBAPIError as exc:
+            raise RunRepositoryError("minimum Run repository read failed") from exc
+
+    async def _run_scalars(self, statement: Any) -> tuple[Any, ...]:
+        try:
+            with self._session.no_autoflush:
+                result = await self._session.scalars(statement)
+            return tuple(result.all())
+        except DBAPIError as exc:
+            raise RunRepositoryError("minimum Run repository read failed") from exc
+
+    async def _flush_run_row(
+        self,
+        row: Any,
+        *,
+        conflict_message: str,
+        conflict_type: type[RuntimeError] = RunRepositoryConflictError,
+    ) -> None:
+        self._session.add(row)
+        try:
+            await self._session.flush((row,))
+        except IntegrityError as exc:
+            if _is_mysql_duplicate_key(exc):
+                raise conflict_type(conflict_message) from exc
+            raise RunRepositoryError("minimum Run repository write failed") from exc
+        except DBAPIError as exc:
+            raise RunRepositoryError("minimum Run repository write failed") from exc
+
+    @staticmethod
+    def _current_run_record(row: RunCurrentRow) -> StoredCurrentRunRecord:
+        try:
+            return StoredCurrentRunRecord(
+                run_id=RunId(value=row.run_id),
+                continuous_story_line_id=ContinuousStoryLineId(
+                    value=row.continuous_story_line_id
+                ),
+                lifecycle_status=row.lifecycle_status,
+                state_version=row.state_version,
+                creation_operation_id=RunOperationId(
+                    value=row.creation_operation_id
+                ),
+                creation_source_reference=RunAuthoritySourceRef(
+                    value=row.creation_source_reference
+                ),
+                creation_occurred_at=_as_utc(row.creation_occurred_at),
+                prior_state_version=row.prior_state_version,
+                mutation_kind=row.mutation_kind,
+                operation_id=RunOperationId(value=row.operation_id),
+                source_reference=RunAuthoritySourceRef(
+                    value=row.source_reference
+                ),
+                occurred_at=_as_utc(row.occurred_at),
+                binding_player_character_id=row.binding_player_character_id,
+                binding_contract_version=row.binding_contract_version,
+                binding_record_revision=row.binding_record_revision,
+                binding_state=row.binding_state,
+                binding_operation_id=row.binding_operation_id,
+                binding_authority_source_ref=(
+                    row.binding_authority_source_ref
+                ),
+                bound_at=(
+                    _as_utc(row.bound_at) if row.bound_at is not None else None
+                ),
+                inactivated_at=(
+                    _as_utc(row.inactivated_at)
+                    if row.inactivated_at is not None
+                    else None
+                ),
+                active_player_character_id=row.active_player_character_id,
+                created_at=_as_utc(row.created_at),
+                updated_at=_as_utc(row.updated_at),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "stored current Run row is invalid"
+            ) from exc
+
+    @staticmethod
+    def _run_revision_record(row: RunRevisionRow) -> StoredRunRevisionRecord:
+        try:
+            return StoredRunRevisionRecord(
+                run_id=RunId(value=row.run_id),
+                continuous_story_line_id=ContinuousStoryLineId(
+                    value=row.continuous_story_line_id
+                ),
+                lifecycle_status=row.lifecycle_status,
+                state_version=row.state_version,
+                creation_operation_id=RunOperationId(
+                    value=row.creation_operation_id
+                ),
+                creation_source_reference=RunAuthoritySourceRef(
+                    value=row.creation_source_reference
+                ),
+                creation_occurred_at=_as_utc(row.creation_occurred_at),
+                prior_state_version=row.prior_state_version,
+                mutation_kind=row.mutation_kind,
+                operation_id=RunOperationId(value=row.operation_id),
+                source_reference=RunAuthoritySourceRef(
+                    value=row.source_reference
+                ),
+                occurred_at=_as_utc(row.occurred_at),
+                binding_player_character_id=row.binding_player_character_id,
+                binding_contract_version=row.binding_contract_version,
+                binding_record_revision=row.binding_record_revision,
+                binding_state=row.binding_state,
+                binding_operation_id=row.binding_operation_id,
+                binding_authority_source_ref=(
+                    row.binding_authority_source_ref
+                ),
+                bound_at=(
+                    _as_utc(row.bound_at) if row.bound_at is not None else None
+                ),
+                inactivated_at=(
+                    _as_utc(row.inactivated_at)
+                    if row.inactivated_at is not None
+                    else None
+                ),
+                active_player_character_id=None,
+                created_at=_as_utc(row.created_at),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "stored Run revision row is invalid"
+            ) from exc
+
+    @staticmethod
+    def _run_participation_record(
+        row: RunSessionParticipationRow,
+    ) -> StoredRunSessionParticipationRecord:
+        try:
+            return StoredRunSessionParticipationRecord(
+                session_id=row.session_id,
+                run_id=RunId(value=row.run_id),
+                continuous_story_line_id=ContinuousStoryLineId(
+                    value=row.continuous_story_line_id
+                ),
+                joined_state_version=row.joined_state_version,
+                operation_id=RunOperationId(value=row.operation_id),
+                source_reference=RunAuthoritySourceRef(
+                    value=row.source_reference
+                ),
+                joined_at=_as_utc(row.joined_at),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "stored Run participation row is invalid"
+            ) from exc
+
+    @staticmethod
+    def _run_creation_receipt_record(
+        row: RunCreationReceiptRow,
+    ) -> StoredRunCreationReceiptRecord:
+        try:
+            return StoredRunCreationReceiptRecord(
+                operation_namespace=row.operation_namespace,
+                operation_id=RunOperationId(value=row.operation_id),
+                fingerprint=row.fingerprint,
+                command_kind=row.command_kind,
+                result_schema_version=row.result_schema_version,
+                result_run_id=RunId(value=row.result_run_id),
+                result_continuous_story_line_id=ContinuousStoryLineId(
+                    value=row.result_continuous_story_line_id
+                ),
+                resulting_lifecycle_status=(
+                    row.resulting_lifecycle_status
+                ),
+                resulting_state_version=row.resulting_state_version,
+                receipt_canonical=row.receipt_canonical,
+                operation_evidence_canonical=(
+                    row.operation_evidence_canonical
+                ),
+                created_at=_as_utc(row.created_at),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "stored Run creation receipt row is invalid"
+            ) from exc
+
+    @staticmethod
+    def _run_mutation_receipt_record(
+        row: RunMutationReceiptRow,
+    ) -> StoredRunMutationReceiptRecord:
+        try:
+            return StoredRunMutationReceiptRecord(
+                run_id=RunId(value=row.run_id),
+                operation_namespace=row.operation_namespace,
+                operation_id=RunOperationId(value=row.operation_id),
+                fingerprint=row.fingerprint,
+                command_kind=row.command_kind,
+                result_schema_version=row.result_schema_version,
+                expected_state_version=row.expected_state_version,
+                result_run_id=RunId(value=row.result_run_id),
+                result_continuous_story_line_id=ContinuousStoryLineId(
+                    value=row.result_continuous_story_line_id
+                ),
+                resulting_lifecycle_status=(
+                    row.resulting_lifecycle_status
+                ),
+                resulting_state_version=row.resulting_state_version,
+                participation_session_id=row.participation_session_id,
+                participation_operation_id=(
+                    row.participation_operation_id
+                ),
+                participation_source_reference=(
+                    row.participation_source_reference
+                ),
+                result_player_character_id=row.result_player_character_id,
+                result_character_contract_version=(
+                    row.result_character_contract_version
+                ),
+                result_character_record_revision=(
+                    row.result_character_record_revision
+                ),
+                receipt_canonical=row.receipt_canonical,
+                operation_evidence_canonical=(
+                    row.operation_evidence_canonical
+                ),
+                created_at=_as_utc(row.created_at),
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "stored Run mutation receipt row is invalid"
+            ) from exc
+
+    @staticmethod
+    def _run_core_values(run: CanonicalRun) -> dict[str, Any]:
+        run = validate_canonical_run(run)
+        if run.player_character_binding is not None:
+            raise RunStoredRecordIntegrityError(
+                "minimum Run persistence rejects populated binding state"
+            )
+        creation = run.creation_provenance
+        current = run.current_mutation_provenance
+        return {
+            "run_id": run.run_id.value,
+            "continuous_story_line_id": (
+                run.continuous_story_line_id.value
+            ),
+            "lifecycle_status": run.lifecycle_status.value,
+            "state_version": run.state_version.value,
+            "creation_operation_id": creation.operation_id.value,
+            "creation_source_reference": creation.source_reference.value,
+            "creation_occurred_at": creation.occurred_at,
+            "prior_state_version": (
+                current.prior_state_version.value
+                if current.prior_state_version is not None
+                else None
+            ),
+            "mutation_kind": current.mutation_kind.value,
+            "operation_id": current.operation_id.value,
+            "source_reference": current.source_reference.value,
+            "occurred_at": current.occurred_at,
+            "binding_player_character_id": None,
+            "binding_contract_version": None,
+            "binding_record_revision": None,
+            "binding_state": None,
+            "binding_operation_id": None,
+            "binding_authority_source_ref": None,
+            "bound_at": None,
+            "inactivated_at": None,
+        }
+
+    @classmethod
+    def _run_revision_row(
+        cls,
+        run: CanonicalRun,
+        *,
+        created_at: datetime,
+    ) -> RunRevisionRow:
+        return RunRevisionRow(
+            **cls._run_core_values(run),
+            created_at=created_at,
+        )
+
+    @classmethod
+    def _current_run_row(
+        cls,
+        run: CanonicalRun,
+        *,
+        created_at: datetime,
+    ) -> RunCurrentRow:
+        return RunCurrentRow(
+            **cls._run_core_values(run),
+            active_player_character_id=None,
+            created_at=created_at,
+            updated_at=created_at,
+        )
+
+    async def _load_run_revision(
+        self,
+        run_id: RunId,
+        state_version: int,
+    ) -> RunRevisionRow | None:
+        return await self._run_scalar(
+            select(RunRevisionRow).where(
+                RunRevisionRow.run_id == run_id.value,
+                RunRevisionRow.state_version == state_version,
+            )
+        )
+
+    async def _load_participation_records(
+        self,
+        run_id: RunId,
+        *,
+        through_version: int | None = None,
+    ) -> tuple[StoredRunSessionParticipationRecord, ...]:
+        statement = select(RunSessionParticipationRow).where(
+            RunSessionParticipationRow.run_id == run_id.value
+        )
+        if through_version is not None:
+            statement = statement.where(
+                RunSessionParticipationRow.joined_state_version
+                <= through_version
+            )
+        rows = await self._run_scalars(
+            statement.order_by(
+                RunSessionParticipationRow.joined_state_version,
+                RunSessionParticipationRow.session_id,
+            )
+        )
+        return tuple(self._run_participation_record(row) for row in rows)
+
+    async def _run_at_revision(
+        self,
+        run_id: RunId,
+        state_version: int,
+    ) -> CanonicalRun:
+        row = await self._load_run_revision(run_id, state_version)
+        if row is None:
+            raise RunStoredRecordIntegrityError(
+                "referenced Run revision is missing"
+            )
+        participation_records = await self._load_participation_records(
+            run_id,
+            through_version=state_version,
+        )
+        return canonical_run_from_revision_storage(
+            self._run_revision_record(row),
+            participations=tuple(
+                participation_from_storage(item)
+                for item in participation_records
+            ),
+        )
+
+    async def _raise_if_missing_run_has_evidence(self, run_id: RunId) -> None:
+        statements = (
+            select(RunRevisionRow.run_id)
+            .where(RunRevisionRow.run_id == run_id.value)
+            .limit(1),
+            select(RunSessionParticipationRow.run_id)
+            .where(RunSessionParticipationRow.run_id == run_id.value)
+            .limit(1),
+            select(RunCreationReceiptRow.result_run_id)
+            .where(RunCreationReceiptRow.result_run_id == run_id.value)
+            .limit(1),
+            select(RunMutationReceiptRow.run_id)
+            .where(RunMutationReceiptRow.run_id == run_id.value)
+            .limit(1),
+        )
+        for statement in statements:
+            if await self._run_scalar(statement) is not None:
+                raise RunStoredRecordIntegrityError(
+                    "current Run row is missing"
+                )
+
+    async def _validate_complete_run(
+        self,
+        run_id: RunId,
+        *,
+        current_row: RunCurrentRow | None = None,
+        creation_receipt_override: StoredRunCreationReceiptRecord | None = None,
+        mutation_receipt_override: StoredRunMutationReceiptRecord | None = None,
+    ) -> CanonicalRun | None:
+        if current_row is None:
+            current_row = await self._run_scalar(
+                select(RunCurrentRow).where(
+                    RunCurrentRow.run_id == run_id.value
+                )
+            )
+        if current_row is None:
+            await self._raise_if_missing_run_has_evidence(run_id)
+            return None
+        current = self._current_run_record(current_row)
+        if current.run_id != run_id:
+            raise RunStoredRecordIntegrityError(
+                "current Run lookup identity is mismatched"
+            )
+        revision_statement = (
+            select(RunRevisionRow)
+            .where(RunRevisionRow.run_id == run_id.value)
+            .order_by(RunRevisionRow.state_version)
+        )
+        participation_statement = (
+            select(RunSessionParticipationRow)
+            .where(RunSessionParticipationRow.run_id == run_id.value)
+            .order_by(
+                RunSessionParticipationRow.joined_state_version,
+                RunSessionParticipationRow.session_id,
+            )
+        )
+        creation_statement = select(RunCreationReceiptRow).where(
+            RunCreationReceiptRow.result_run_id == run_id.value
+        )
+        mutation_statement = (
+            select(RunMutationReceiptRow)
+            .where(RunMutationReceiptRow.run_id == run_id.value)
+            .order_by(
+                RunMutationReceiptRow.resulting_state_version,
+                RunMutationReceiptRow.operation_id,
+            )
+        )
+        revision_rows = await self._run_scalars(revision_statement)
+        participation_rows = await self._run_scalars(participation_statement)
+        creation_row = await self._run_scalar(creation_statement)
+        mutation_rows = await self._run_scalars(mutation_statement)
+        creation = (
+            creation_receipt_override
+            if creation_receipt_override is not None
+            else (
+                self._run_creation_receipt_record(creation_row)
+                if creation_row is not None
+                else None
+            )
+        )
+        mutations = tuple(
+            self._run_mutation_receipt_record(row) for row in mutation_rows
+        )
+        if mutation_receipt_override is not None:
+            mutations += (mutation_receipt_override,)
+        return validate_stored_run_record_set(
+            creation_receipt=creation,
+            mutation_receipts=mutations,
+            revisions=tuple(
+                self._run_revision_record(row) for row in revision_rows
+            ),
+            current=current,
+            participations=tuple(
+                self._run_participation_record(row)
+                for row in participation_rows
+            ),
+        )
+
+
+class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
+    async def get(self, run_id: RunId) -> CanonicalRun | None:
+        row = await self._run_scalar(
+            select(RunCurrentRow).where(RunCurrentRow.run_id == run_id.value)
+        )
+        if row is None:
+            await self._raise_if_missing_run_has_evidence(run_id)
+            return None
+        return await self._validate_complete_run(run_id, current_row=row)
+
+    async def get_for_update(self, run_id: RunId) -> CanonicalRun | None:
+        row = await self._run_scalar(
+            select(RunCurrentRow)
+            .where(RunCurrentRow.run_id == run_id.value)
+            .with_for_update()
+        )
+        if row is None:
+            await self._raise_if_missing_run_has_evidence(run_id)
+            return None
+        return await self._validate_complete_run(run_id, current_row=row)
+
+    async def add_initial(
+        self,
+        run: CanonicalRun,
+        *,
+        created_at: datetime,
+    ) -> None:
+        run = validate_canonical_run(run)
+        if (
+            run.state_version.value != 1
+            or run.current_mutation_provenance.mutation_kind
+            is not RunMutationKind.CREATE
+            or run.trusted_participation_references
+            or run.player_character_binding is not None
+        ):
+            raise RunStoredRecordIntegrityError(
+                "initial Run state is inconsistent"
+            )
+        revision_row = self._run_revision_row(run, created_at=created_at)
+        current_row = self._current_run_row(run, created_at=created_at)
+        if canonical_run_from_revision_storage(
+            self._run_revision_record(revision_row),
+            participations=(),
+        ) != run:
+            raise RunStoredRecordIntegrityError(
+                "initial Run storage mapping is inconsistent"
+            )
+        await self._flush_run_row(
+            revision_row,
+            conflict_message="initial Run revision conflict",
+        )
+        await self._flush_run_row(
+            current_row,
+            conflict_message="initial current Run conflict",
+        )
+
+    async def append_revision(
+        self,
+        run: CanonicalRun,
+        *,
+        created_at: datetime,
+    ) -> None:
+        run = validate_canonical_run(run)
+        prior = run.current_mutation_provenance.prior_state_version
+        if (
+            prior is None
+            or run.current_mutation_provenance.mutation_kind
+            is not RunMutationKind.ATTACH_SESSION
+            or run.player_character_binding is not None
+        ):
+            raise RunStoredRecordIntegrityError(
+                "successor Run revision is not an admitted attachment"
+            )
+        current = await self._validate_complete_run(run.run_id)
+        if current is None:
+            raise RunRepositoryConflictError(
+                "successor Run has no current row"
+            )
+        if (
+            current.state_version != prior
+            or current.run_id != run.run_id
+            or current.continuous_story_line_id
+            != run.continuous_story_line_id
+            or run.state_version.value != current.state_version.value + 1
+        ):
+            raise RunRepositoryConflictError("successor Run revision is stale")
+        row = self._run_revision_row(run, created_at=created_at)
+        participation = run.trusted_participation_references[-1]
+        if (
+            participation.joined_state_version != run.state_version
+            or participation.operation_id
+            != run.current_mutation_provenance.operation_id
+        ):
+            raise RunStoredRecordIntegrityError(
+                "successor Run participation is inconsistent"
+            )
+        await self._flush_run_row(
+            row,
+            conflict_message="Run revision insertion conflict",
+        )
+
+    async def compare_and_swap_current(
+        self,
+        run: CanonicalRun,
+        *,
+        expected_state_version: int,
+        updated_at: datetime,
+    ) -> bool:
+        run = validate_canonical_run(run)
+        if (
+            type(expected_state_version) is not int
+            or expected_state_version < 1
+            or run.state_version.value != expected_state_version + 1
+            or run.current_mutation_provenance.prior_state_version is None
+            or run.current_mutation_provenance.prior_state_version.value
+            != expected_state_version
+        ):
+            raise ValueError(
+                "expected Run version does not match successor state"
+            )
+        persisted = await self._run_at_revision(
+            run.run_id,
+            run.state_version.value,
+        )
+        if persisted != run:
+            raise RunStoredRecordIntegrityError(
+                "successor Run revision does not match current candidate"
+            )
+        values = self._run_core_values(run)
+        values.pop("run_id")
+        values.pop("continuous_story_line_id")
+        values["active_player_character_id"] = None
+        values["updated_at"] = updated_at
+        try:
+            result = await self._session.execute(
+                update(RunCurrentRow)
+                .where(
+                    RunCurrentRow.run_id == run.run_id.value,
+                    RunCurrentRow.continuous_story_line_id
+                    == run.continuous_story_line_id.value,
+                    RunCurrentRow.state_version == expected_state_version,
+                )
+                .values(**values)
+            )
+        except DBAPIError as exc:
+            raise RunRepositoryError(
+                "Run current compare-and-swap failed"
+            ) from exc
+        return result.rowcount == 1
+
+
+class SqlAlchemyRunSessionParticipationRepository(
+    _SqlAlchemyRunRepositorySupport,
+    RunSessionParticipationRepository,
+):
+    async def get(
+        self,
+        session_id: str,
+    ) -> RunSessionParticipationReference | None:
+        row = await self._run_scalar(
+            select(RunSessionParticipationRow).where(
+                RunSessionParticipationRow.session_id == session_id
+            )
+        )
+        if row is None:
+            return None
+        stored = self._run_participation_record(row)
+        participation = participation_from_storage(stored)
+        if participation.session_id != session_id:
+            raise RunStoredRecordIntegrityError(
+                "Run participation lookup identity is mismatched"
+            )
+        run = await self._validate_complete_run(participation.run_id)
+        if run is None or participation not in run.trusted_participation_references:
+            raise RunStoredRecordIntegrityError(
+                "Run participation is not bound to canonical state"
+            )
+        return participation
+
+    async def add(
+        self,
+        participation: RunSessionParticipationReference,
+        *,
+        joined_at: datetime,
+    ) -> None:
+        stored = StoredRunSessionParticipationRecord(
+            session_id=participation.session_id,
+            run_id=participation.run_id,
+            continuous_story_line_id=(
+                participation.continuous_story_line_id
+            ),
+            joined_state_version=participation.joined_state_version.value,
+            operation_id=participation.operation_id,
+            source_reference=participation.source_reference,
+            joined_at=joined_at,
+        )
+        if participation_from_storage(stored) != participation:
+            raise RunStoredRecordIntegrityError(
+                "Run participation storage mapping is inconsistent"
+            )
+        revision = await self._load_run_revision(
+            participation.run_id,
+            participation.joined_state_version.value,
+        )
+        if revision is None:
+            raise RunStoredRecordIntegrityError(
+                "Run participation revision is missing"
+            )
+        revision_stored = self._run_revision_record(revision)
+        if (
+            revision_stored.run_id != participation.run_id
+            or revision_stored.continuous_story_line_id
+            != participation.continuous_story_line_id
+            or revision_stored.mutation_kind
+            != RunMutationKind.ATTACH_SESSION.value
+            or revision_stored.operation_id != participation.operation_id
+            or revision_stored.source_reference
+            != participation.source_reference
+            or revision_stored.occurred_at != joined_at
+        ):
+            raise RunStoredRecordIntegrityError(
+                "Run participation does not bind its revision"
+            )
+        row = RunSessionParticipationRow(
+            session_id=stored.session_id,
+            run_id=stored.run_id.value,
+            continuous_story_line_id=(
+                stored.continuous_story_line_id.value
+            ),
+            joined_state_version=stored.joined_state_version,
+            operation_id=stored.operation_id.value,
+            source_reference=stored.source_reference.value,
+            joined_at=joined_at,
+        )
+        await self._flush_run_row(
+            row,
+            conflict_message="Run Session participation conflict",
+            conflict_type=RunSessionParticipationUniquenessConflictError,
+        )
+
+
+class SqlAlchemyRunCreationReceiptRepository(
+    _SqlAlchemyRunRepositorySupport,
+    RunCreationReceiptRepository,
+):
+    async def get(
+        self,
+        key: RunReceiptKey,
+    ) -> StoredRunSuccessReceipt | None:
+        if key.operation_namespace is not RunOperationNamespace.CREATE_V1:
+            raise ValueError("Run creation receipt repository rejects namespace")
+        row = await self._run_scalar(
+            select(RunCreationReceiptRow).where(
+                RunCreationReceiptRow.operation_namespace
+                == key.operation_namespace.value,
+                RunCreationReceiptRow.operation_id
+                == key.operation_id.value,
+            )
+        )
+        if row is None:
+            return None
+        stored = self._run_creation_receipt_record(row)
+        receipt = run_creation_receipt_from_storage(stored)
+        if receipt.key != key:
+            raise RunStoredRecordIntegrityError(
+                "Run creation receipt lookup identity is mismatched"
+            )
+        await self._validate_complete_run(receipt.result.run_id)
+        return receipt
+
+    async def add(
+        self,
+        receipt: StoredRunSuccessReceipt,
+        *,
+        created_at: datetime,
+    ) -> None:
+        if (
+            receipt.key.operation_namespace
+            is not RunOperationNamespace.CREATE_V1
+            or receipt.command_kind is not RunMutationKind.CREATE
+        ):
+            raise ValueError("Run creation receipt repository rejects command")
+        result = receipt.result
+        revision = await self._run_at_revision(
+            result.run_id,
+            result.resulting_state_version.value,
+        )
+        command = CreateRunCommand(
+            source_reference=revision.creation_provenance.source_reference
+        )
+        stored = StoredRunCreationReceiptRecord(
+            operation_namespace=receipt.key.operation_namespace.value,
+            operation_id=receipt.key.operation_id,
+            fingerprint=run_fingerprint_to_storage_bytes(
+                receipt.fingerprint
+            ),
+            command_kind=receipt.command_kind.value,
+            result_schema_version=result.result_schema_version,
+            result_run_id=result.run_id,
+            result_continuous_story_line_id=(
+                result.continuous_story_line_id
+            ),
+            resulting_lifecycle_status=result.lifecycle_status.value,
+            resulting_state_version=result.resulting_state_version.value,
+            receipt_canonical=run_receipt_to_storage_bytes(receipt),
+            operation_evidence_canonical=(
+                run_creation_evidence_bytes(command)
+            ),
+            created_at=created_at,
+        )
+        if run_creation_receipt_from_storage(stored) != receipt:
+            raise RunStoredRecordIntegrityError(
+                "Run creation receipt storage mapping is inconsistent"
+            )
+        await self._validate_complete_run(
+            result.run_id,
+            creation_receipt_override=stored,
+        )
+        row = RunCreationReceiptRow(
+            operation_namespace=stored.operation_namespace,
+            operation_id=stored.operation_id.value,
+            fingerprint=stored.fingerprint,
+            command_kind=stored.command_kind,
+            result_schema_version=stored.result_schema_version,
+            result_run_id=stored.result_run_id.value,
+            result_continuous_story_line_id=(
+                stored.result_continuous_story_line_id.value
+            ),
+            resulting_lifecycle_status=(
+                stored.resulting_lifecycle_status
+            ),
+            resulting_state_version=stored.resulting_state_version,
+            receipt_canonical=stored.receipt_canonical,
+            operation_evidence_canonical=(
+                stored.operation_evidence_canonical
+            ),
+            created_at=created_at,
+        )
+        await self._flush_run_row(
+            row,
+            conflict_message="Run creation receipt conflict",
+            conflict_type=RunReceiptUniquenessConflictError,
+        )
+
+
+class SqlAlchemyRunMutationReceiptRepository(
+    _SqlAlchemyRunRepositorySupport,
+    RunMutationReceiptRepository,
+):
+    async def get(
+        self,
+        key: RunReceiptKey,
+    ) -> StoredRunSuccessReceipt | None:
+        if key.operation_namespace is not RunOperationNamespace.ATTACH_SESSION_V1:
+            raise ValueError("minimum Run mutation repository rejects namespace")
+        row = await self._run_scalar(
+            select(RunMutationReceiptRow).where(
+                RunMutationReceiptRow.run_id == key.run_id.value,
+                RunMutationReceiptRow.operation_namespace
+                == key.operation_namespace.value,
+                RunMutationReceiptRow.operation_id
+                == key.operation_id.value,
+            )
+        )
+        if row is None:
+            return None
+        stored = self._run_mutation_receipt_record(row)
+        receipt = run_mutation_receipt_from_storage(stored)
+        if receipt.key != key:
+            raise RunStoredRecordIntegrityError(
+                "Run mutation receipt lookup identity is mismatched"
+            )
+        await self._validate_complete_run(key.run_id)
+        return receipt
+
+    async def add(
+        self,
+        receipt: StoredRunSuccessReceipt,
+        *,
+        created_at: datetime,
+    ) -> None:
+        if (
+            receipt.key.operation_namespace
+            is not RunOperationNamespace.ATTACH_SESSION_V1
+            or receipt.command_kind is not RunMutationKind.ATTACH_SESSION
+            or receipt.key.run_id is None
+        ):
+            raise ValueError("minimum Run mutation repository rejects command")
+        result = receipt.result
+        participation = result.participation_reference
+        if participation is None:
+            raise RunStoredRecordIntegrityError(
+                "Run attachment receipt has no participation"
+            )
+        expected_version = result.resulting_state_version.value - 1
+        before = await self._run_at_revision(
+            receipt.key.run_id,
+            expected_version,
+        )
+        after = await self._run_at_revision(
+            receipt.key.run_id,
+            result.resulting_state_version.value,
+        )
+        command = AttachSessionCommand(
+            run_id=after.run_id,
+            continuous_story_line_id=after.continuous_story_line_id,
+            session_id=participation.session_id,
+            expected_state_version=before.state_version,
+            source_reference=after.current_mutation_provenance.source_reference,
+        )
+        stored = StoredRunMutationReceiptRecord(
+            run_id=receipt.key.run_id,
+            operation_namespace=receipt.key.operation_namespace.value,
+            operation_id=receipt.key.operation_id,
+            fingerprint=run_fingerprint_to_storage_bytes(
+                receipt.fingerprint
+            ),
+            command_kind=receipt.command_kind.value,
+            result_schema_version=result.result_schema_version,
+            expected_state_version=expected_version,
+            result_run_id=result.run_id,
+            result_continuous_story_line_id=(
+                result.continuous_story_line_id
+            ),
+            resulting_lifecycle_status=result.lifecycle_status.value,
+            resulting_state_version=result.resulting_state_version.value,
+            participation_session_id=participation.session_id,
+            participation_operation_id=participation.operation_id.value,
+            participation_source_reference=(
+                participation.source_reference.value
+            ),
+            result_player_character_id=None,
+            result_character_contract_version=None,
+            result_character_record_revision=None,
+            receipt_canonical=run_receipt_to_storage_bytes(receipt),
+            operation_evidence_canonical=(
+                attach_operation_evidence_to_storage_bytes(command)
+            ),
+            created_at=created_at,
+        )
+        if run_mutation_receipt_from_storage(stored) != receipt:
+            raise RunStoredRecordIntegrityError(
+                "Run mutation receipt storage mapping is inconsistent"
+            )
+        await self._validate_complete_run(
+            receipt.key.run_id,
+            mutation_receipt_override=stored,
+        )
+        row = RunMutationReceiptRow(
+            run_id=stored.run_id.value,
+            operation_namespace=stored.operation_namespace,
+            operation_id=stored.operation_id.value,
+            fingerprint=stored.fingerprint,
+            command_kind=stored.command_kind,
+            result_schema_version=stored.result_schema_version,
+            expected_state_version=stored.expected_state_version,
+            result_run_id=stored.result_run_id.value,
+            result_continuous_story_line_id=(
+                stored.result_continuous_story_line_id.value
+            ),
+            resulting_lifecycle_status=(
+                stored.resulting_lifecycle_status
+            ),
+            resulting_state_version=stored.resulting_state_version,
+            participation_session_id=stored.participation_session_id,
+            participation_operation_id=stored.participation_operation_id,
+            participation_source_reference=(
+                stored.participation_source_reference
+            ),
+            result_player_character_id=None,
+            result_character_contract_version=None,
+            result_character_record_revision=None,
+            receipt_canonical=stored.receipt_canonical,
+            operation_evidence_canonical=(
+                stored.operation_evidence_canonical
+            ),
+            created_at=created_at,
+        )
+        await self._flush_run_row(
+            row,
+            conflict_message="Run mutation receipt conflict",
+            conflict_type=RunReceiptUniquenessConflictError,
         )
 
 

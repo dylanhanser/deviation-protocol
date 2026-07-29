@@ -30,6 +30,16 @@ from deviation_protocol.application.player_character_operations import (
     StoredCreationSuccessReceipt,
     StoredMutationSuccessReceipt,
 )
+from deviation_protocol.application.run_operations import (
+    RunReceiptKey,
+    StoredRunSuccessReceipt,
+)
+from deviation_protocol.domain.run import (
+    CanonicalRun,
+    ContinuousStoryLineId,
+    RunId,
+    RunSessionParticipationReference,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -109,6 +119,14 @@ class GameSessionRepository(ABC):
     async def get_owned(self, session_id: str, player_id: str) -> PersistedSession | None:
         """Load safe session metadata using ownership as part of the query."""
         raise NotImplementedError
+
+    async def get_owned_for_update(
+        self,
+        session_id: str,
+        player_id: str,
+    ) -> PersistedSession | None:
+        """Lock an owned Session when a separate aggregate claims its identity."""
+        return await self.get_owned(session_id, player_id)
 
     @abstractmethod
     async def get_by_creation_request(
@@ -304,6 +322,92 @@ class PlayerCharacterMutationReceiptRepository(ABC):
     async def add(self, receipt: StoredMutationSuccessReceipt, *, created_at: datetime) -> None:
         raise NotImplementedError
 
+
+class RunSessionParticipationUniquenessConflictError(RuntimeError):
+    """Only the immutable Session-participation primary-key race."""
+
+
+class RunReceiptUniquenessConflictError(RuntimeError):
+    """Only a Run successful-receipt unique-key race."""
+
+
+class RunIdIssuer(Protocol):
+    def issue(self) -> RunId: ...
+
+
+class ContinuousStoryLineIdIssuer(Protocol):
+    def issue(self) -> ContinuousStoryLineId: ...
+
+
+class RunRepository(ABC):
+    @abstractmethod
+    async def get(self, run_id: RunId) -> CanonicalRun | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_for_update(self, run_id: RunId) -> CanonicalRun | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add_initial(self, run: CanonicalRun, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def append_revision(self, run: CanonicalRun, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def compare_and_swap_current(
+        self,
+        run: CanonicalRun,
+        *,
+        expected_state_version: int,
+        updated_at: datetime,
+    ) -> bool:
+        raise NotImplementedError
+
+
+class RunSessionParticipationRepository(ABC):
+    @abstractmethod
+    async def get(
+        self, session_id: str
+    ) -> RunSessionParticipationReference | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(
+        self,
+        participation: RunSessionParticipationReference,
+        *,
+        joined_at: datetime,
+    ) -> None:
+        raise NotImplementedError
+
+
+class RunCreationReceiptRepository(ABC):
+    @abstractmethod
+    async def get(self, key: RunReceiptKey) -> StoredRunSuccessReceipt | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(
+        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime
+    ) -> None:
+        raise NotImplementedError
+
+
+class RunMutationReceiptRepository(ABC):
+    @abstractmethod
+    async def get(self, key: RunReceiptKey) -> StoredRunSuccessReceipt | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def add(
+        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime
+    ) -> None:
+        raise NotImplementedError
+
+
 class UnitOfWork(ABC):
     sessions: GameSessionRepository
     turn_requests: TurnRequestRepository
@@ -312,6 +416,10 @@ class UnitOfWork(ABC):
     player_characters: PlayerCharacterRepository
     creation_receipts: PlayerCharacterCreationReceiptRepository
     mutation_receipts: PlayerCharacterMutationReceiptRepository
+    runs: RunRepository
+    run_participations: RunSessionParticipationRepository
+    run_creation_receipts: RunCreationReceiptRepository
+    run_mutation_receipts: RunMutationReceiptRepository
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":

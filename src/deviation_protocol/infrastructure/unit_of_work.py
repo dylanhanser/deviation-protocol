@@ -12,6 +12,10 @@ from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyPlayerCharacterCreationReceiptRepository,
     SqlAlchemyPlayerCharacterMutationReceiptRepository,
     SqlAlchemyPlayerCharacterRepository,
+    SqlAlchemyRunCreationReceiptRepository,
+    SqlAlchemyRunMutationReceiptRepository,
+    SqlAlchemyRunRepository,
+    SqlAlchemyRunSessionParticipationRepository,
     SqlAlchemyTurnRequestRepository,
 )
 
@@ -36,6 +40,16 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         )
         self.mutation_receipts = (
             SqlAlchemyPlayerCharacterMutationReceiptRepository(self._session)
+        )
+        self.runs = SqlAlchemyRunRepository(self._session)
+        self.run_participations = SqlAlchemyRunSessionParticipationRepository(
+            self._session
+        )
+        self.run_creation_receipts = SqlAlchemyRunCreationReceiptRepository(
+            self._session
+        )
+        self.run_mutation_receipts = SqlAlchemyRunMutationReceiptRepository(
+            self._session
         )
         self._committed = False
         return self

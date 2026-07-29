@@ -350,11 +350,12 @@ def test_create_app_does_not_build_or_connect_dependencies(monkeypatch: pytest.M
     assert created.title == "Deviation Protocol"
 
 
-def test_importing_api_module_does_not_read_json_or_create_engine() -> None:
+def test_importing_api_module_does_not_read_json_create_engine_or_issue_ids() -> None:
     repository_root = Path(__file__).parents[2]
     script = """
 from pathlib import Path
 import sqlalchemy.ext.asyncio
+import uuid
 
 original_open = Path.open
 def guarded_open(path, *args, **kwargs):
@@ -364,6 +365,7 @@ def guarded_open(path, *args, **kwargs):
 
 Path.open = guarded_open
 sqlalchemy.ext.asyncio.create_async_engine = lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError('API import created an engine'))
+uuid.uuid4 = lambda: (_ for _ in ()).throw(AssertionError('API import issued an identity'))
 import deviation_protocol.api.main
 """
     completed = subprocess.run(

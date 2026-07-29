@@ -25,6 +25,10 @@ from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyPlayerCharacterCreationReceiptRepository,
     SqlAlchemyPlayerCharacterMutationReceiptRepository,
     SqlAlchemyPlayerCharacterRepository,
+    SqlAlchemyRunCreationReceiptRepository,
+    SqlAlchemyRunMutationReceiptRepository,
+    SqlAlchemyRunRepository,
+    SqlAlchemyRunSessionParticipationRepository,
 )
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -40,6 +44,23 @@ async def test_repository_locks_session_row_for_turn_processing() -> None:
     assert await repository.lock_for_turn("session-1") is True
     statement = sql_session.execute.await_args.args[0]
     assert statement._for_update_arg is not None
+
+
+@pytest.mark.asyncio
+async def test_repository_locks_exact_owned_session_for_run_participation() -> None:
+    sql_session = AsyncMock()
+    sql_session.scalar.return_value = None
+    repository = SqlAlchemyGameSessionRepository(sql_session)
+
+    assert (
+        await repository.get_owned_for_update("session-1", "player-1")
+        is None
+    )
+    statement = sql_session.scalar.await_args.args[0]
+    assert statement._for_update_arg is not None
+    compiled = str(statement)
+    assert "game_sessions.session_id" in compiled
+    assert "game_sessions.player_id" in compiled
 
 
 @pytest.mark.asyncio
@@ -216,11 +237,28 @@ async def test_unit_of_work_exposes_all_player_character_repositories_on_same_se
             uow.mutation_receipts,
             SqlAlchemyPlayerCharacterMutationReceiptRepository,
         )
+        assert isinstance(uow.runs, SqlAlchemyRunRepository)
+        assert isinstance(
+            uow.run_participations,
+            SqlAlchemyRunSessionParticipationRepository,
+        )
+        assert isinstance(
+            uow.run_creation_receipts,
+            SqlAlchemyRunCreationReceiptRepository,
+        )
+        assert isinstance(
+            uow.run_mutation_receipts,
+            SqlAlchemyRunMutationReceiptRepository,
+        )
         assert (
             uow.controller_bindings._session
             is uow.player_characters._session
             is uow.creation_receipts._session
             is uow.mutation_receipts._session
+            is uow.runs._session
+            is uow.run_participations._session
+            is uow.run_creation_receipts._session
+            is uow.run_mutation_receipts._session
             is session
         )
         session.begin.assert_not_called()

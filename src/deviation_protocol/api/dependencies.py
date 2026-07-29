@@ -11,6 +11,7 @@ from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
 )
 from deviation_protocol.application.ports import TurnOrchestrator
+from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.application.narrative_models import NarrativeProvider
 
@@ -20,6 +21,7 @@ class ApiServices:
     session_service: SessionService
     turn_orchestrator: TurnOrchestrator
     player_character_service: PlayerCharacterService | None = None
+    run_service: RunService | None = None
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
 

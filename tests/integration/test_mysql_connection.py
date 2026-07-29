@@ -100,7 +100,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             )
         ).all()
 
-    assert revision == "20260728_0004"
+    assert revision == "20260729_0005"
     table_details = {row[0]: (row[1], row[2]) for row in tables}
     expected_tables = {
         "alembic_version",
@@ -115,6 +115,11 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         "player_character_revisions",
         "player_character_creation_receipts",
         "player_character_mutation_receipts",
+        "run_current",
+        "run_revisions",
+        "run_session_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
     }
     assert set(table_details) == expected_tables
     assert all(engine == "InnoDB" for engine, _ in table_details.values())
@@ -178,6 +183,23 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             "player_character_revisions",
             "RESTRICT",
         ),
+        ("run_current", "run_revisions", "RESTRICT"),
+        ("run_current", "player_character_revisions", "RESTRICT"),
+        ("run_revisions", "player_character_revisions", "RESTRICT"),
+        ("run_session_participations", "game_sessions", "RESTRICT"),
+        ("run_session_participations", "run_revisions", "RESTRICT"),
+        ("run_creation_receipts", "run_revisions", "RESTRICT"),
+        ("run_mutation_receipts", "run_revisions", "RESTRICT"),
+        (
+            "run_mutation_receipts",
+            "run_session_participations",
+            "RESTRICT",
+        ),
+        (
+            "run_mutation_receipts",
+            "player_character_revisions",
+            "RESTRICT",
+        ),
     }
     assert {
         ("domain_events", "uq_domain_events_session_sequence"),
@@ -209,6 +231,11 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             "player_character_revisions",
             "ix_spc_revisions_controller_binding",
         ),
+        ("run_current", "uq_run_current_story_line"),
+        ("run_current", "uq_run_current_active_character"),
+        ("run_session_participations", "uq_run_participations_revision"),
+        ("run_creation_receipts", "uq_run_creation_receipts_result"),
+        ("run_mutation_receipts", "uq_run_mutation_receipts_result"),
     } <= indexes
     assert len(narrative_columns) == 27
     assert narrative_columns["job_id"] == ("varchar", "NO", None, 64)
