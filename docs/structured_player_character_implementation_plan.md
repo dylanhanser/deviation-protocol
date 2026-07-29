@@ -18,20 +18,29 @@ committed, and pushed at
 and independently approved. Slice 4 is implemented, verified locally, and
 received new-session independent implementation approval with verdict
 `PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED`; no blocking findings
-remained. Phase 2 is independently accepted and complete. Phases 3–7 remain
+remained. Phase 2 is independently accepted and complete. The first fresh
+independent P3-S1 implementation review found one blocking exception-
+suppression recovery-provenance defect. A bounded, uncommitted and unpushed
+correction candidate now exists and requires another fresh independent
+read-only implementation review; it is not approved or complete. Phase 3
+remains incomplete, and later Phase 3 slices plus Phases 4–7 remain
 unimplemented.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
 (`feat(player-character): wire repositories into unit of work`). The Phase 3–5
-roadmap remains written, but P3-S1 is unimplemented. Its first implementation
-attempt exposed a typed-conflict ownership contradiction, and the first
+roadmap remains written. The revised section 24 P3-S1 authority amendment was
+independently approved, committed, and pushed at
+`c6d0220a2442887e89717b5b6facb14af4604236`. Its first implementation attempt
+had exposed a typed-conflict ownership contradiction, and the first
 authority-amendment design was rejected because the existing infrastructure
-conflict is shared across unrelated Repository operations. The revised section
-24 authority amendment is a documentation-only candidate for independent
-read-only amendment review. It is not independently approved and does not
-authorize staging, commit, push, database access, or any Phase 3–5
-implementation.
+conflict is shared across unrelated Repository operations. A later, separately
+authorized task created the local P3-S1 implementation candidate. Its first
+fresh independent implementation review found that a recorded binding-add
+conflict could incorrectly authorize recovery after `__aexit__` suppressed it.
+The bounded correction candidate is uncommitted, unpushed, and requires another
+fresh independent read-only implementation review; neither P3-S1 nor Phase 3
+is approved or complete.
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -2332,10 +2341,13 @@ Demo, Provider, Run/story activation, and every Phase 3–7 responsibility.
 ### Phase 3 — Trusted canonical application service
 
 Status: **The revised P3-S1 narrow conflict-translation authority amendment is
-a documentation-only candidate pending independent read-only amendment review.
-The first implementation attempt and the first shared-error inheritance
-amendment both stopped without implementation. P3-S1 is not implemented,
-independently amendment-approved, or authorized for implementation.**
+independently approved, committed, and pushed at
+`c6d0220a2442887e89717b5b6facb14af4604236`. A separately authorized local
+P3-S1 implementation candidate received one changes-required review for the
+exception-suppression recovery defect. A bounded correction candidate now
+exists. It remains uncommitted, unpushed, and requires another fresh
+independent read-only implementation review; P3-S1 and Phase 3 are not approved
+or complete.**
 
 The repository-authoritative Phase 3 order is:
 
@@ -3433,10 +3445,10 @@ locally in Slice 4. A new-session independent implementation review returned
 `PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED` with no blocking
 findings. Phase 2 is accepted and complete.
 
-The revised P3-S1 conflict-translation authority in section 24 is a new
-approval-bound documentation amendment candidate. P3-S1 remains unimplemented,
-and independent read-only amendment review is pending. The only operative
-success verdict for the next new-session read-only amendment review is
+The revised P3-S1 conflict-translation authority in section 24 was independently
+approved, committed, and pushed unchanged at
+`c6d0220a2442887e89717b5b6facb14af4604236`. The only operative success verdict
+for that amendment review was
 `APPROVED_STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_CONFLICT_AMENDMENT`,
 and it applies only to the exact complete candidate in `PLANS.md`,
 `docs/architecture.md`, and this plan. The former
@@ -3444,14 +3456,17 @@ and it applies only to the exact complete candidate in `PLANS.md`,
 planning, correction, Phase 1, and Phase 2 verdicts are non-operative for this
 amendment gate. The candidate-preparation verdict
 `STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_CONFLICT_AMENDMENT_CANDIDATE_COMPLETE`
-is likewise not amendment approval. Any byte change to any candidate file
-invalidates a review and requires new hashes and a fresh review.
+is likewise not amendment approval. Any byte change to that approval-bound
+amendment candidate before its documentation commit would have invalidated the
+review and required new hashes and a fresh review.
 
-Even that verdict will not authorize implementation. After a successful
-review, separate authorization is still required to stage and commit exactly
-the approved three-file candidate; the user performs the push manually; a new
-clean pushed baseline must then be confirmed; and only a later, separately
-authorized P3-S1 implementation task may begin.
+That verdict did not authorize implementation. Separate authorization staged
+and committed exactly the approved three-file amendment, the user completed
+the push, and the clean pushed baseline was confirmed before this later,
+separately authorized P3-S1 implementation task began. The resulting local
+implementation candidate is uncommitted and unpushed. It still requires fresh
+independent implementation review and does not make P3-S1 or Phase 3 approved
+or complete.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
@@ -3497,6 +3512,27 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-07-29: The first fresh independent read-only review of the local P3-S1
+  implementation candidate returned changes required for one blocking
+  control-flow defect. The exact controller-binding add exception was recorded
+  and re-raised, but if the initial Unit of Work suppressed it, the recorded
+  value alone could still select a fresh-UoW winner recovery. This bounded
+  correction candidate requires the same exception object to escape the failed
+  initial UoW and be confirmed by the outer handler; suppression instead
+  re-raises the preserved original object without recovery, receipt lookup,
+  success, or replay. Focused regression coverage was added. The candidate
+  remains uncommitted and unpushed and requires another fresh independent
+  read-only implementation review. P3-S1 and Phase 3 remain unapproved and
+  incomplete; no implementation commit or push occurred.
+- 2026-07-29: The revised three-file P3-S1 authority-conflict amendment
+  received its exact operative independent-review verdict, was committed and
+  pushed unchanged at `c6d0220a2442887e89717b5b6facb14af4604236`, and was
+  confirmed as the clean `main`/`origin/main` baseline. A later separately
+  authorized task created the bounded local P3-S1 implementation candidate.
+  The candidate remains uncommitted, unpushed, and pending fresh independent
+  implementation review. P3-S1 and Phase 3 are not approved or complete, and
+  no API, composition, Demo, frontend, Provider, Run, narrative, content, or
+  gameplay path was activated.
 - 2026-07-29: The first P3-S1 implementation attempt stopped with
   `BLOCKED_STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_AMENDMENT_REPOSITORY_CONFLICT`
   after repository inspection proved that

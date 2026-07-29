@@ -60,6 +60,7 @@ from deviation_protocol.domain.persisted_events import (
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.infrastructure.errors import (
     OptimisticLockError,
+    PlayerCharacterControllerBindingConflictError,
     PlayerCharacterRepositoryConflictError,
     PlayerCharacterRepositoryError,
 )
@@ -584,15 +585,21 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
                 "structured player-character repository read failed"
             ) from exc
 
-    async def _flush_row(self, row: Any, *, conflict_message: str) -> None:
+    async def _flush_row(
+        self,
+        row: Any,
+        *,
+        conflict_message: str,
+        conflict_type: type[PlayerCharacterRepositoryConflictError] = (
+            PlayerCharacterRepositoryConflictError
+        ),
+    ) -> None:
         self._session.add(row)
         try:
             await self._session.flush((row,))
         except IntegrityError as exc:
             if _is_mysql_duplicate_key(exc):
-                raise PlayerCharacterRepositoryConflictError(
-                    conflict_message
-                ) from exc
+                raise conflict_type(conflict_message) from exc
             raise PlayerCharacterRepositoryError(
                 "structured player-character repository write failed"
             ) from exc
@@ -999,6 +1006,7 @@ class SqlAlchemyControllerBindingRegistryRepository(
                 created_at=created_at,
             ),
             conflict_message="controller-binding insertion conflict",
+            conflict_type=PlayerCharacterControllerBindingConflictError,
         )
 
     async def lock(

@@ -158,13 +158,18 @@ remains partially implemented.
 
 ## Structured player-character Phase 3–5 planned boundaries
 
-This section records a documentation-only authority-amendment candidate, not
-implemented architecture. P3-S1 remains unimplemented and unauthorized. Its
-first implementation attempt exposed a typed-conflict ownership contradiction,
-and the first amendment design was rejected because it would have made a
-shared infrastructure conflict satisfy a controller-binding-only application
-contract. Independent read-only review of the revised amendment remains
-pending.
+The P3-S1 conflict authority amendment was independently approved, committed,
+and pushed at `c6d0220a2442887e89717b5b6facb14af4604236`. The first fresh
+independent implementation review found one blocking recovery-provenance
+defect when the initial Unit of Work suppresses the exact controller-binding
+add conflict. A bounded local correction candidate now realizes the boundary
+described below, but it is uncommitted, unpushed, and requires another fresh
+independent read-only implementation review. It is not accepted implemented
+architecture: P3-S1 and Phase 3 are not approved or complete, and no production
+runtime path is activated. The first implementation attempt exposed a
+typed-conflict ownership contradiction, and the rejected first amendment would
+have made a shared infrastructure conflict satisfy a controller-binding-only
+application contract.
 
 Structured player-character Phase 3 owns trusted application orchestration and
 its later normal production composition. Its independently reviewable order is
@@ -261,6 +266,15 @@ creation receipt, and call `recover_creation_unique_race_winner`. If that
 revalidation fails, its original exception propagates unchanged and recovery
 performs exactly zero receipt lookups.
 
+The corrected service records the exact exception only at that enclosed add
+boundary, re-raises it through the failed initial UoW, and authorizes recovery
+only when the outer handler observes the same exception object after UoW exit.
+If `__aexit__` suppresses that exception, the preserved original object is
+raised fail-closed: no fresh UoW is created, no recovery binding lock or receipt
+lookup occurs, and no success or replay result is returned. A different
+same-type exception from UoW entry, exit, rollback, close, commit, or any other
+operation cannot satisfy the identity check.
+
 Recovery remains prohibited for allocation, creation-receipt, initial
 canonical-state, stale or missing-current, other Repository-operation,
 authorization, validation, policy, issuer, generic database, UoW enter/exit,
@@ -292,6 +306,16 @@ synchronization may change only `PLANS.md`, this document, and
 `docs/structured_player_character_implementation_plan.md`. No dependency,
 schema, migration, ORM, UoW, API, composition, Demo, frontend, Provider, Run,
 narrative, scenario, content, or gameplay path is authorized.
+
+The current bounded correction candidate stays within that boundary. It adds
+the injectable creation service and the two typed conflict symbols, selects the
+binding-only subtype at the exact controller-binding row flush, requires outer
+exception-instance identity after failed-UoW disposal, fails closed on
+suppression, and supplies focused unit and MySQL integration tests. It changes
+no schema, migration, ORM, UoW, composition root, API, Demo, Provider, Run,
+narrative, scenario, content, or gameplay path. The candidate remains
+uncommitted and unpushed; another fresh independent read-only implementation
+review is required before any acceptance or later Git authorization.
 
 ## Current composition roots and Provider boundaries
 

@@ -1,3 +1,8 @@
+from deviation_protocol.application.ports import (
+    ControllerBindingUniquenessConflictError,
+)
+
+
 class OptimisticLockError(RuntimeError):
     pass
 
@@ -12,3 +17,10 @@ class PlayerCharacterRepositoryError(RuntimeError):
 
 class PlayerCharacterRepositoryConflictError(PlayerCharacterRepositoryError):
     """A known immutable or unique repository constraint won a race."""
+
+
+class PlayerCharacterControllerBindingConflictError(
+    PlayerCharacterRepositoryConflictError,
+    ControllerBindingUniquenessConflictError,
+):
+    """A duplicate at the exact controller-binding add flush."""

@@ -8,6 +8,7 @@ from typing import Any, Mapping, Protocol, Sequence
 
 from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
+from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.narrative_models import NarrativeProvider
 from deviation_protocol.application.narrative_jobs import NarrativeJob, NarrativeJobStatus
 from deviation_protocol.application.resolution import ResolutionResult
@@ -218,6 +219,22 @@ class NarrativeJobRepository(ABC):
     @abstractmethod
     async def recent_committed_texts(self, session_id: str, *, limit: int) -> tuple[str, ...]:
         raise NotImplementedError
+
+
+class ControllerBindingUniquenessConflictError(RuntimeError):
+    """Only the approved controller-binding add uniqueness race."""
+
+
+class ControllerBindingResolver(Protocol):
+    async def resolve(
+        self,
+        principal: RequestPrincipal,
+        /,
+    ) -> ControllerBindingRef | None: ...
+
+
+class PlayerCharacterIdIssuer(Protocol):
+    def issue(self) -> PlayerCharacterId: ...
 
 
 class ControllerBindingRegistryRepository(ABC):

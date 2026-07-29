@@ -22,6 +22,15 @@ documents.
   `feat(player-character): wire repositories into unit of work`
 - Structured player-character Phase 2 is independently accepted, committed,
   pushed, and closed at this baseline.
+- The structured player-character P3-S1 authority-conflict amendment is
+  independently approved, committed, and pushed at
+  `c6d0220a2442887e89717b5b6facb14af4604236`.
+- The first fresh independent P3-S1 implementation review found one blocking
+  recovery-provenance defect when the initial Unit of Work suppresses the exact
+  controller-binding add conflict. A bounded local correction candidate now
+  exists over that baseline. It is uncommitted, unpushed, and requires another
+  fresh independent read-only implementation review; P3-S1 and Phase 3 are not
+  approved or complete.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -284,17 +293,27 @@ candidate. It preserves the repository-authoritative stages:
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
 
-P3-S1 remains unimplemented. Its first implementation attempt stopped before
-production or test changes because the planned typed-conflict ownership
-contradicted the repository dependency direction. The first documentation
-amendment design was then rejected because the existing
+P3-S1 now has a bounded, uncommitted and unpushed correction candidate
+requiring another fresh independent read-only implementation review. The prior
+fresh implementation review found one blocking control-flow defect: a locally
+recorded controller-binding add conflict could incorrectly authorize recovery
+after the initial Unit of Work suppressed that exception. The correction
+requires the same exception instance to escape the failed initial Unit of Work
+and be confirmed by the outer handler, and fails closed with the preserved
+original instance after suppression. P3-S1 is not implementation-approved or
+complete, and Phase 3 remains incomplete. The first implementation attempt
+stopped before production or test changes because the planned typed-conflict
+ownership contradicted the repository dependency direction. The first
+documentation amendment design was then rejected because the existing
 `PlayerCharacterRepositoryConflictError` is a shared infrastructure conflict
 used by controller-binding, allocation, initial-state, receipt, stale-current,
 and other Repository paths; making that shared type implement a
 controller-binding-only application contract would misclassify unrelated
 conflicts.
 
-The revised documentation-only authority amendment candidate instead adds the
+The revised documentation-only authority amendment was independently approved,
+committed, and pushed at
+`c6d0220a2442887e89717b5b6facb14af4604236`. It adds the
 narrow application-owned
 `application.ports.ControllerBindingUniquenessConflictError` contract and the
 binding-specific infrastructure
@@ -306,7 +325,8 @@ at the exact `ControllerBindingRegistryRepository.add` row flush may select the
 new subtype, and `PlayerCharacterService` may catch only the application-owned
 contract immediately around that exact call.
 
-The later P3-S1 implementation budget is exactly `4 + 2 + 3`: production may
+The corrected P3-S1 implementation candidate remains within the exact
+`4 + 2 + 3` budget: production may
 change only `src/deviation_protocol/application/player_character_service.py`,
 `src/deviation_protocol/application/ports.py`,
 `src/deviation_protocol/infrastructure/errors.py`, and
@@ -314,11 +334,13 @@ change only `src/deviation_protocol/application/player_character_service.py`,
 `tests/unit/test_player_character_service.py` and
 `tests/integration/test_mysql_player_character_service.py`; documentation
 synchronization may change only `PLANS.md`, `docs/architecture.md`, and
-`docs/structured_player_character_implementation_plan.md`. This amendment
-changes documentation only, does not authorize implementation, and does not
-mark P3-S1 or Phase 3 complete. A new-session independent read-only review of
-the complete three-file amendment candidate remains pending before any later
-authorization to stage, commit, push, or implement it.
+`docs/structured_player_character_implementation_plan.md`. The committed
+amendment changed documentation only and did not itself authorize
+implementation. A later separate authorization created the local
+implementation candidate, and this bounded correction followed the first
+changes-required review without staging, commit, or push. Another fresh
+independent read-only implementation review remains required; neither P3-S1
+nor Phase 3 is approved or complete.
 
 Mutation, owned read/projection, normal production composition, production
 resolver/issuer adapter selection, Run/continuous-line binding, every public
