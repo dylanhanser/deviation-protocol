@@ -158,9 +158,13 @@ remains partially implemented.
 
 ## Structured player-character Phase 3–5 planned boundaries
 
-This section records a written planning candidate, not implemented
-architecture. P3-S1 remains pending independent read-only plan review and is
-not authorized for implementation.
+This section records a documentation-only authority-amendment candidate, not
+implemented architecture. P3-S1 remains unimplemented and unauthorized. Its
+first implementation attempt exposed a typed-conflict ownership contradiction,
+and the first amendment design was rejected because it would have made a
+shared infrastructure conflict satisfy a controller-binding-only application
+contract. Independent read-only review of the revised amendment remains
+pending.
 
 Structured player-character Phase 3 owns trusted application orchestration and
 its later normal production composition. Its independently reviewable order is
@@ -208,17 +212,61 @@ closes every uncommitted, exceptional, cancellation, and controlled
 pre-COMMIT-failure path. A SQL-failed session is never reused. Success is
 returned only after commit returns.
 
-Fresh-UoW winner recovery is permitted only when
-`ControllerBindingRegistryRepository.add` raises the existing
-`PlayerCharacterRepositoryConflictError` while inserting the same newly
-resolved binding. The failed UoW must first exit, roll back, and close. At most
-one fresh UoW may reauthorize, lock the same binding, read the exact creation
-receipt, and call `recover_creation_unique_race_winner`. It may return the
-stored success only for `EXACT_REPLAY`; changed, absent, malformed, or
-unauthorized winner evidence returns the existing protocol decision. This is
-not recovery for allocation, current-row, receipt, mutation, CAS, arbitrary
-integrity, or commit conflicts and performs no write, policy call, second
-allocation, second issuance, or general retry.
+The application/port layer may own the one narrow typed exception contract
+`application.ports.ControllerBindingUniquenessConflictError` for only the
+approved controller-binding uniqueness race. Infrastructure may satisfy that
+contract through the correspondingly narrow concrete adapter exception
+`infrastructure.errors.PlayerCharacterControllerBindingConflictError`.
+The concrete exception must remain a
+`PlayerCharacterRepositoryConflictError` for existing infrastructure
+compatibility, but the existing shared
+`PlayerCharacterRepositoryConflictError` must not inherit or implement the
+narrow application contract. Allocation, initial revision/current, creation
+or mutation receipt, missing-current, stale-current, and every other shared
+Repository conflict therefore remain distinguishable and do not satisfy the
+narrow contract.
+
+This dependency direction is intentional. Infrastructure already depends on
+application ports and may import the narrow application-owned contract.
+Application code must not import `deviation_protocol.infrastructure` or any
+concrete infrastructure error. `PlayerCharacterService` imports only
+`ControllerBindingUniquenessConflictError` and places its static `except`
+boundary immediately around the awaited `controller_bindings.add` call.
+This scoped contract does not establish a generic application persistence-error
+hierarchy, a second conflict contract, or an application translation of MySQL
+or SQLAlchemy exceptions.
+
+The exact infrastructure translation remains local to
+`SqlAlchemyControllerBindingRegistryRepository.add`. Its
+`PlayerCharacterControllerBindingRow` flush contains only that row, and
+`player_character_controller_bindings.controller_binding` is the table's sole
+unique key because it is the primary key. The existing
+`_is_mysql_duplicate_key` test therefore identifies a duplicate of that exact
+binding at that exact flush. A narrowly parameterized `_flush_row` call may
+select `PlayerCharacterControllerBindingConflictError` there while every other
+call retains the default shared conflict. No message matching, dynamic import,
+reflection, classifier, wrapper, generic marker, or broad `_flush_row`
+refactor is authorized, and existing exception chaining and diagnostics remain
+intact.
+
+Fresh-UoW winner recovery requires both conditions: the narrow
+`ControllerBindingUniquenessConflictError` identity is raised, and it is raised
+synchronously by the exact `controller_bindings.add` call enclosed by the
+service's narrow catch boundary. The type alone never authorizes recovery at a
+later operation or different call site. The failed initial UoW must first
+fully exit, roll back, close, and be discarded. At most one different fresh
+UoW may reauthorize, lock the same binding, perform the second direct operation
+ID revalidation before constructing the recovery receipt key, read the exact
+creation receipt, and call `recover_creation_unique_race_winner`. If that
+revalidation fails, its original exception propagates unchanged and recovery
+performs exactly zero receipt lookups.
+
+Recovery remains prohibited for allocation, creation-receipt, initial
+canonical-state, stale or missing-current, other Repository-operation,
+authorization, validation, policy, issuer, generic database, UoW enter/exit,
+rollback/close, commit, and uncertain-commit failures. An approved recovery
+performs no write, policy call, second allocation, second issuance, or generic
+retry. No retry or receipt lookup follows an uncertain commit outcome.
 
 Existing validation exceptions, protocol decisions, policy decisions,
 `PlayerCharacterRepositoryError`,
@@ -231,6 +279,19 @@ the single narrow binding-insertion winner read. A controlled failure before
 evidence; an exception with uncertain commit durability is propagated without
 a recovery read or a success/replay claim. Exactly-once execution is not
 claimed.
+
+The later implementation is capped at exactly `4 + 2 + 3` paths: production
+may change only
+`src/deviation_protocol/application/player_character_service.py`,
+`src/deviation_protocol/application/ports.py`,
+`src/deviation_protocol/infrastructure/errors.py`, and
+`src/deviation_protocol/infrastructure/repositories.py`; tests may change only
+`tests/unit/test_player_character_service.py` and
+`tests/integration/test_mysql_player_character_service.py`; documentation
+synchronization may change only `PLANS.md`, this document, and
+`docs/structured_player_character_implementation_plan.md`. No dependency,
+schema, migration, ORM, UoW, API, composition, Demo, frontend, Provider, Run,
+narrative, scenario, content, or gameplay path is authorized.
 
 ## Current composition roots and Provider boundaries
 

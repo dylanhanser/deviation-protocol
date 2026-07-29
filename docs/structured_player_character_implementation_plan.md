@@ -23,12 +23,15 @@ unimplemented.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
-(`feat(player-character): wire repositories into unit of work`). The corrected
-Phase 3–5 roadmap and exact P3-S1 candidate in section 24 are now written and
-frozen for independent read-only plan review. P3-S1 is not implemented, is not
-independently approved, and is not authorized for implementation. This
-documentation write does not authorize staging, commit, push, database access,
-or any Phase 3–5 implementation.
+(`feat(player-character): wire repositories into unit of work`). The Phase 3–5
+roadmap remains written, but P3-S1 is unimplemented. Its first implementation
+attempt exposed a typed-conflict ownership contradiction, and the first
+authority-amendment design was rejected because the existing infrastructure
+conflict is shared across unrelated Repository operations. The revised section
+24 authority amendment is a documentation-only candidate for independent
+read-only amendment review. It is not independently approved and does not
+authorize staging, commit, push, database access, or any Phase 3–5
+implementation.
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -185,7 +188,7 @@ to `tests/unit/test_repository_and_uow.py` and
 `tests/integration/test_mysql_player_character.py`. It is verified locally and
 independently approved. Phase 2 is accepted and complete.
 
-Except for the exact frozen P3-S1 symbols, signatures, and path budget in
+Except for the exact amended P3-S1 symbols, signatures, and path budget in
 section 24, file names, table names, data types, endpoint shapes, and phase
 boundaries below are proposed implementation inventory. They are not authority
 to edit those surfaces. Exact choices identified as `U` must be resolved before
@@ -193,15 +196,15 @@ the affected phase begins.
 
 ## 5. Current repository baseline
 
-The corrected Phase 3 planning candidate is written against:
+The revised P3-S1 authority-amendment candidate is written against:
 
 - repository root: `D:\deviation-protocol`;
 - branch: `main`;
-- `HEAD`: `ac5263fd5ca652665d23a082a19b3d66f8a047d1`;
-- local `origin/main`: `ac5263fd5ca652665d23a082a19b3d66f8a047d1`;
+- `HEAD`: `323069ff63a71adad3b7896e1a233b3d21ba8da2`;
+- local `origin/main`: `323069ff63a71adad3b7896e1a233b3d21ba8da2`;
 - ahead/behind: `0/0`;
 - `HEAD` subject:
-  `feat(player-character): wire repositories into unit of work`;
+  `docs(player-character): approve phase 3 implementation plan`;
 - clean working tree; and
 - empty index.
 
@@ -2328,9 +2331,11 @@ Demo, Provider, Run/story activation, and every Phase 3–7 responsibility.
 
 ### Phase 3 — Trusted canonical application service
 
-Status: **The corrected roadmap and P3-S1 planning candidate are written and
-frozen for independent read-only plan review. P3-S1 is not implemented,
-independently approved, or authorized for implementation.**
+Status: **The revised P3-S1 narrow conflict-translation authority amendment is
+a documentation-only candidate pending independent read-only amendment review.
+The first implementation attempt and the first shared-error inheritance
+amendment both stopped without implementation. P3-S1 is not implemented,
+independently amendment-approved, or authorized for implementation.**
 
 The repository-authoritative Phase 3 order is:
 
@@ -2347,20 +2352,22 @@ Objective: add one production application service that creates one canonical
 player character atomically or returns the exact stored safe result for a valid
 replay, without activating a runtime or public path.
 
-P3-S1 has the following maximum changed-path budget for a later authorized
-implementation:
+P3-S1 has the following exact `4 + 2 + 3` maximum changed-path budget for a
+later separately authorized implementation:
 
 | Category | Maximum | Exact candidate inventory |
 | --- | ---: | --- |
-| Production | 2 | new `src/deviation_protocol/application/player_character_service.py`; extend `src/deviation_protocol/application/ports.py` |
+| Production | 4 | new `src/deviation_protocol/application/player_character_service.py`; extend `src/deviation_protocol/application/ports.py`; extend `src/deviation_protocol/infrastructure/errors.py`; minimally extend `src/deviation_protocol/infrastructure/repositories.py` only for the exact binding-add duplicate translation |
 | Tests | 2 | new `tests/unit/test_player_character_service.py`; new `tests/integration/test_mysql_player_character_service.py` |
 | Documentation synchronization | 3 | `PLANS.md`; `docs/architecture.md`; this plan |
 | Dependencies, schema, ORM, migrations | 0 | none |
 
-No `__init__.py`, application-error, infrastructure-error, Repository,
-UoW, API, Demo, frontend, Provider, Run, narrative, content, or gameplay path
-belongs to P3-S1. A later implementation must stop rather than exceed this
-budget.
+No additional path belongs to P3-S1. In particular, no dependency, schema,
+migration, ORM model, UoW interface or implementation, other infrastructure
+module, `__init__.py`, API route, composition root, Demo, frontend, Provider or
+model integration, Run Protocol implementation, narrative, scenario, content,
+or gameplay path is authorized. A later implementation must stop rather than
+exceed this budget.
 
 ##### Existing authorities that P3-S1 must reuse
 
@@ -2400,18 +2407,122 @@ The accepted Phase 2 concurrency evidence remains
 P3-S1 adds application sequencing evidence; it does not recreate Phase 2
 mapping, constraint, locking, rollback, or reconstruction tests.
 
+##### Conflict ownership and exact Repository translation amendment
+
+Repository inspection establishes that the exact shared infrastructure symbol
+is `infrastructure.errors.PlayerCharacterRepositoryConflictError`. The
+existing `_flush_row` translates a MySQL duplicate key identified by
+`_is_mysql_duplicate_key` into that shared type for all of these operations:
+
+- `SqlAlchemyControllerBindingRegistryRepository.add`;
+- `SqlAlchemyPlayerCharacterRepository.add_allocation`;
+- both revision and current-row flushes in
+  `SqlAlchemyPlayerCharacterRepository.add_initial`;
+- the revision flush in `append_revision`;
+- the creation-receipt insert flush; and
+- the mutation-receipt insert flush.
+
+The same shared type is also raised directly for missing-current and
+stale-current conditions in `append_revision`, creation-receipt key/result
+prechecks, and mutation-receipt key/result prechecks. It is therefore a shared
+infrastructure conflict identity, not a controller-binding-only signal. The
+rejected first amendment would have made that existing shared class inherit or
+implement an application-owned binding contract, which would have made
+allocation, initial-state, receipt, stale-current, and other conflicts satisfy
+the recovery type. That design is prohibited.
+
+The exact approved translation boundary is the
+`await self._flush_row(PlayerCharacterControllerBindingRow(...))` call in
+`SqlAlchemyControllerBindingRegistryRepository.add`. That flush targets only
+the one newly added binding row. The
+`player_character_controller_bindings` table has
+`controller_binding` as its primary key and no other unique constraint, so a
+MySQL 1062 recognized at this exact row-only flush is the approved same-binding
+uniqueness race. Translation at this call is therefore sufficiently narrow
+without examining a message or classifying any other Repository operation.
+
+The application dependency scan
+`test_domain_and_application_dependency_direction_scan` prohibits every
+`deviation_protocol.infrastructure` import from application modules.
+Conversely, `infrastructure/repositories.py` and
+`infrastructure/unit_of_work.py` already import application ports, and the
+dependency scan imposes no application-import prohibition on infrastructure.
+The amended dependency direction is therefore:
+
+```text
+application.ports.ControllerBindingUniquenessConflictError
+                          ^
+                          |
+infrastructure.errors.PlayerCharacterControllerBindingConflictError
+                          |
+                          v
+infrastructure.errors.PlayerCharacterRepositoryConflictError compatibility
+```
+
+`application.ports.ControllerBindingUniquenessConflictError` is the one narrow
+application-owned typed exception contract. The unchanged shared
+`PlayerCharacterRepositoryConflictError` must not inherit or implement it.
+`infrastructure.errors.PlayerCharacterControllerBindingConflictError` is the
+one new concrete binding-specific exception and must be a normal statically
+catchable subtype of both the narrow application contract and the existing
+shared infrastructure conflict. This preserves existing callers that catch the
+shared type while keeping the shared type and all unrelated instances outside
+the narrow application contract.
+
+The smallest approved Repository change is a private, narrowly parameterized
+`_flush_row` conflict type whose default remains
+`PlayerCharacterRepositoryConflictError`. Only the controller-binding
+Repository's exact add call supplies
+`PlayerCharacterControllerBindingConflictError`; every other caller omits the
+parameter and retains its current behavior. `_flush_row` must continue to use
+`raise ... from exc`, and `_is_mysql_duplicate_key` remains unchanged. A local
+catch-and-rethrow is not needed. This amendment authorizes no message matching,
+module-name inspection, dynamic import, reflection, general exception
+classifier, generic retry marker, Repository wrapper, broad helper refactor,
+or application handling of MySQL or SQLAlchemy exceptions.
+
+The authorized private shape is:
+
+```python
+async def _flush_row(
+    self,
+    row: Any,
+    *,
+    conflict_message: str,
+    conflict_type: type[PlayerCharacterRepositoryConflictError] = (
+        PlayerCharacterRepositoryConflictError
+    ),
+) -> None:
+    ...
+    if _is_mysql_duplicate_key(exc):
+        raise conflict_type(conflict_message) from exc
+```
+
+Only `SqlAlchemyControllerBindingRegistryRepository.add` passes
+`conflict_type=PlayerCharacterControllerBindingConflictError`. This is a
+private helper signature adjustment, not a public abstraction or classifier.
+
 ##### Exact new production symbols
 
-P3-S1 adds exactly these public production symbols:
+P3-S1 preserves the four previously approved public production symbols:
 
 - `application.player_character_service.PlayerCharacterService`;
 - `PlayerCharacterService.create`;
 - `application.ports.ControllerBindingResolver`; and
 - `application.ports.PlayerCharacterIdIssuer`.
 
-No new application error, infrastructure error, Repository wrapper, UoW type,
-clock port, policy port, ID retry abstraction, or generic retry port is
-authorized. Existing callable-clock patterns, a trusted
+The amendment authorizes only these two additional public production symbols:
+
+- `application.ports.ControllerBindingUniquenessConflictError`; and
+- `infrastructure.errors.PlayerCharacterControllerBindingConflictError`.
+
+The existing `PlayerCharacterRepositoryConflictError` remains present with its
+shared semantic scope and must not acquire the narrow contract as a base. No
+generic application persistence-error hierarchy, second application conflict
+contract, result code, UoW type, Repository wrapper, clock or policy port, ID
+retry abstraction, generic retry, validation framework, adapter, composition
+root, or persistence responsibility is authorized. Existing callable-clock
+patterns, a trusted
 `AuthoritySourceRef`, `CreatePlayerCharacterPolicy`, and `UnitOfWorkFactory`
 are construction dependencies of the service, not caller-supplied method
 authority and not new public ports.
@@ -2433,11 +2544,16 @@ async def create(
 `CreationSuccessResult` or a non-success
 `CharacterOperationProtocolDecision` may leave this method.
 
-##### Exact new port contracts
+##### Exact new application/port contracts
 
-Both ports belong in `src/deviation_protocol/application/ports.py`:
+The narrow exception contract and both ports belong in
+`src/deviation_protocol/application/ports.py`:
 
 ```python
+class ControllerBindingUniquenessConflictError(RuntimeError):
+    """Only the approved controller-binding add uniqueness race."""
+
+
 class ControllerBindingResolver(Protocol):
     async def resolve(
         self,
@@ -2449,6 +2565,25 @@ class ControllerBindingResolver(Protocol):
 class PlayerCharacterIdIssuer(Protocol):
     def issue(self) -> PlayerCharacterId: ...
 ```
+
+The infrastructure error module may add the corresponding concrete exception
+with the following required static relationships:
+
+```python
+class PlayerCharacterControllerBindingConflictError(
+    PlayerCharacterRepositoryConflictError,
+    ControllerBindingUniquenessConflictError,
+):
+    """A duplicate at the exact controller-binding add flush."""
+```
+
+An equally narrow normal typed base ordering is acceptable only if static
+`except ControllerBindingUniquenessConflictError` works, existing
+`except PlayerCharacterRepositoryConflictError` compatibility is preserved,
+and `PlayerCharacterRepositoryConflictError` itself remains outside the narrow
+contract. The application service imports only
+`ControllerBindingUniquenessConflictError`; it must not import the concrete
+infrastructure subtype.
 
 | Port | Form and position | Absence or failure | Persistence and trust restriction |
 | --- | --- | --- | --- |
@@ -2533,8 +2668,9 @@ First execution is exactly:
 4. Enter one UoW.
 5. Lock the exact controller-binding registry row.
 6. If absent, add it only because the trusted resolver authorized that exact
-   binding. Catch a conflict only at this `controller_bindings.add` call site
-   for the narrow recovery path.
+   binding. Place `except ControllerBindingUniquenessConflictError` only
+   immediately around the awaited `controller_bindings.add` call for the
+   narrow recovery path; do not enclose any later operation.
 7. Call
    `revalidate_player_character_model(operation_id, PlayerCharacterOperationId)`.
 8. Call `creation_fingerprint(command)`.
@@ -2579,15 +2715,25 @@ never reused, and no success is disclosed before commit returns.
 
 ##### Exact uniqueness-race recovery boundary
 
-Fresh-UoW recovery is allowed only for
-`PlayerCharacterRepositoryConflictError` raised at
-`ControllerBindingRegistryRepository.add` while concurrently inserting the
-same newly resolved key in
-`player_character_controller_bindings.controller_binding`.
+Fresh-UoW recovery is allowed only when both conditions are true:
+
+1. the application-owned
+   `ControllerBindingUniquenessConflictError` contract is raised; and
+2. it is raised synchronously from the exact awaited
+   `ControllerBindingRegistryRepository.add` call enclosed by the service's
+   narrow catch boundary while concurrently inserting the same newly resolved
+   key in `player_character_controller_bindings.controller_binding`.
+
+The expected real adapter signal is
+`PlayerCharacterControllerBindingConflictError`, but the service neither
+imports nor catches that infrastructure name. Exception identity alone does
+not authorize recovery if the narrow contract appears at a later write,
+another Repository operation, UoW lifecycle method, or any other call site.
 
 The exact permitted sequence is:
 
-1. Catch the conflict only at that add call, not around later writes.
+1. Catch only `ControllerBindingUniquenessConflictError` at that add call, not
+   around later writes or UoW lifecycle work.
 2. Propagate out of the original UoW so its SQL-failed session rolls back,
    closes, and is abandoned.
 3. Open at most one fresh UoW.
@@ -2625,13 +2771,20 @@ an identical winner yields `EXACT_REPLAY`, a conflicting winner yields
 decision escapes to the caller.
 
 The maximum is one fresh-UoW read. Write retries and ID reissuance are zero.
-This recovery does not apply to allocation collisions, initial
-revision/current duplicates, creation or mutation receipt conflicts, CAS
-failure, arbitrary integrity/DBAPI errors, or commit exceptions.
+This recovery does not apply to allocation collisions, creation-receipt
+conflicts, initial canonical-state revision/current conflicts, stale or
+missing-current conflicts, mutation receipt or other Repository-operation
+conflicts, authorization failures, validation failures, policy failures,
+issuer failures, arbitrary integrity/DBAPI errors, generic database failures,
+UoW enter or exit failures, rollback or close failures, commit failures, or
+uncertain commit outcomes. No retry or receipt lookup may follow an uncertain
+commit outcome.
 
 ##### Error and result boundary
 
-No new application error is authorized. In particular,
+The only new application-owned exception is the narrow static catch contract
+`ControllerBindingUniquenessConflictError`; it is not a caller result code or
+a generic application persistence hierarchy.
 `PlayerCharacterApplicationError` and
 `ConcurrentPlayerCharacterOperationError` are not P3-S1 symbols.
 
@@ -2645,7 +2798,8 @@ No new application error is authorized. In particular,
 | Same key, changed command | `IDEMPOTENCY_CONFLICT` | Return existing decision unchanged |
 | Malformed/inconsistent receipt | `STORED_RECEIPT_INTEGRITY_FAILURE` | Disclose no stored result |
 | Creation policy or complete-record rejection | Original validation/domain exception | Preserve the owning authority; no receipt or translation |
-| Proven binding-insert loser | Exact stored success for `EXACT_REPLAY`, otherwise the existing protocol decision | Only the one fresh-UoW sequence above |
+| Proven binding-insert loser raising the narrow contract at the exact add call | Exact stored success for `EXACT_REPLAY`, otherwise the existing protocol decision | Only the one fresh-UoW sequence above |
+| Narrow contract raised at any unapproved operation or later boundary | Original exception | Propagate; do not enter recovery |
 | ID allocation collision | Original `PlayerCharacterRepositoryConflictError` | Roll back; no second ID |
 | Initial-row or receipt conflict | Original `PlayerCharacterRepositoryConflictError` | Roll back; no recovery |
 | Stored-record integrity failure | Original `PlayerCharacterStoredRecordIntegrityError` | Roll back/close; no translation |
@@ -2666,18 +2820,30 @@ not claimed.
 `tests/unit/test_player_character_service.py` must use strict fakes and
 fail-if-called spies to prove:
 
+- the application service source imports only
+  `application.ports.ControllerBindingUniquenessConflictError` for this
+  recovery and contains no application-to-infrastructure import;
+- `PlayerCharacterControllerBindingConflictError` is statically catchable
+  through both `ControllerBindingUniquenessConflictError` and the existing
+  shared `PlayerCharacterRepositoryConflictError`;
+- the existing shared error itself is neither an instance nor a subclass of
+  the narrow application contract;
 - exact first-execution order and one commit;
 - exact replay with no issuer, policy, write, or commit;
 - changed-payload conflict without stored-result disclosure;
 - unresolved/invalid controller authority opens no initial UoW;
 - structural and defensive validation ordering;
+- only the exact `controller_bindings.add` catch boundary enters recovery;
+- a narrow typed exception raised from allocation, initial-state, receipt, a
+  later Repository operation, or any other unapproved boundary propagates
+  unchanged and enters no recovery;
 - a focused recovery-boundary case enters through
   `PlayerCharacterService.create` with a normally constructed typed
   `PlayerCharacterOperationId`; the strict original-UoW
   `controller_bindings.add` fake uses the existing `object.__setattr__`
   actual-state corruption convention on that retained instance immediately
   before raising the exact supported same-binding uniqueness
-  `PlayerCharacterRepositoryConflictError`.
+  `ControllerBindingUniquenessConflictError`.
   The original UoW must exit through its existing failed-UoW path, and the one
   permitted fresh UoW must reauthorize and lock the binding before its second
   direct
@@ -2694,7 +2860,11 @@ fail-if-called spies to prove:
   cannot satisfy this case;
 - original exception and cancellation propagation;
 - no success before commit;
-- rollback/close and failed-UoW non-reuse;
+- commit and uncertain-commit failures propagate and enter no recovery or
+  receipt lookup;
+- failed initial UoW rollback, close, disposal, and non-reuse occur before
+  construction or entry of the different recovery UoW;
+- at most one fresh recovery UoW is entered;
 - the one exact binding-add recovery with distinct UoW identities; and
 - no reissue, write retry, broad conflict catch, or second recovery attempt.
 
@@ -2703,6 +2873,15 @@ MySQL adapters and `SqlAlchemyUnitOfWork` to prove:
 
 - one normal creation durably publishes exactly one binding, allocation,
   revision, current row, and creation receipt;
+- a real controller-binding duplicate emits
+  `PlayerCharacterControllerBindingConflictError`, which satisfies both the
+  narrow application contract and the existing shared infrastructure
+  conflict;
+- allocation, initial revision/current, creation-receipt, mutation-receipt,
+  stale-current, and other relevant Repository conflicts continue to emit or
+  satisfy only their existing shared boundary and never the narrow contract;
+- the real binding-add uniqueness race alone may enter the service's one
+  fresh-UoW recovery;
 - fresh-session reload and exact replay return the same safe result without a
   second mutation;
 - changed payload leaves row counts unchanged; and
@@ -2724,8 +2903,9 @@ enable a live Provider/model call or add/install a dependency.
 P3-S1 is acceptable only if all are true:
 
 1. changed paths remain within the exact budget above;
-2. all four exact new public production symbols and no generic error hierarchy
-   are present;
+2. the four previously approved and two amendment-authorized public production
+   symbols are present, and no generic error hierarchy or second application
+   conflict contract exists;
 3. typed construction and every existing validation, protocol, policy,
    Repository, adapter, and UoW authority are reused rather than recreated;
 4. an unknown or untrusted principal can never become accepted merely because
@@ -2737,8 +2917,10 @@ P3-S1 is acceptable only if all are true:
 7. replay, changed-payload conflict, validation failure, domain rejection,
    infrastructure failure, cancellation, and controlled pre-COMMIT failure
    perform no unauthorized commit or success disclosure;
-8. only the exact controller-binding insertion conflict may use one fresh UoW,
-   the failed session is never reused, and every other retry count is zero;
+8. only the binding-specific subtype raised at the exact controller-binding
+   insertion call may use one fresh UoW; the shared conflict and every unrelated
+   conflict remain outside the narrow contract, the failed session is never
+   reused, and every other retry count is zero;
 9. uncertain commit outcome remains unknown, unsupported for recovery, and
    never described as exactly once;
 10. focused, regression, MySQL, Alembic, Offline, Quick, and Full verification
@@ -2896,7 +3078,7 @@ their completed Phase 1 work is not pending.
 | Proposed P3-S1 addition, later slices may extend only under separate scope | `src/deviation_protocol/application/player_character_service.py` | Trusted creation/replay orchestration in P3-S1 | Controller resolution, existing validation/policy reuse, atomic creation/replay boundary | P3-S1 unit and MySQL service tests |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Existing and extended golden-vector and replay/conflict unit tests |
 | Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
-| No P3-S1 identity module | `src/deviation_protocol/application/ports.py` | Add only `ControllerBindingResolver` and `PlayerCharacterIdIssuer` in P3-S1; production adapters wait for P3-S4 | Domain separation and trusted injectable boundaries without choosing a backing source or algorithm | P3-S1 strict fake and service tests |
+| No P3-S1 identity module | `src/deviation_protocol/application/ports.py` | Add only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError` in P3-S1; production adapters wait for P3-S4 | Domain separation, trusted injectable boundaries, and one narrow application-owned binding-race contract without choosing a backing source or algorithm | P3-S1 strict fake, type-relationship, dependency, and service tests |
 | Proposed Phase 2 Slice 1 addition | `src/deviation_protocol/infrastructure/player_character_persistence.py` | Database-independent stored-record carriers, canonical codec, and integrity validation | Exact six-family conversion boundary | Persistence codec unit tests |
 | Proposed Phase 2 addition | one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
 | Proposed Phase 4 addition | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
@@ -2918,10 +3100,10 @@ independent is more important than these filenames.
 
 | Existing path | Purpose | Obligation | Protecting tests |
 | --- | --- | --- | --- |
-| `src/deviation_protocol/application/ports.py` | Phase 2 repository/UoW ports are complete; P3-S1 adds only `ControllerBindingResolver` and `PlayerCharacterIdIssuer` with the exact section 24 signatures | Trusted mapping and issuance without persistence access, auto-binding, or algorithm selection | Port/service type and strict fake tests |
+| `src/deviation_protocol/application/ports.py` | Phase 2 repository/UoW ports are complete; P3-S1 adds only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError` with the exact section 24 contracts | Trusted mapping and issuance plus one narrow binding-race catch identity without persistence access, auto-binding, or algorithm selection | Port/service type, dependency-direction, exception-relationship, and strict fake tests |
 | `src/deviation_protocol/infrastructure/orm_models.py` | Add private normalized persistence models | MySQL canonical ownership/constraints | Schema and repository tests |
-| `src/deviation_protocol/infrastructure/repositories.py` | Add lock/read/allocation/CAS/history and exact-scoped successful-receipt operations without commits | Atomic canonical mutations and replay | MySQL repository tests |
-| `src/deviation_protocol/infrastructure/errors.py` | Completed Phase 2 Slice 3 narrow Repository errors; no P3-S1 change | Preserve exact Repository failure translation without a new application hierarchy | Existing Repository unit and MySQL tests |
+| `src/deviation_protocol/infrastructure/repositories.py` | Phase 2 Repository behavior remains complete; P3-S1 may only narrowly parameterize `_flush_row` and select `PlayerCharacterControllerBindingConflictError` at the exact controller-binding add flush | Preserve all other Repository behavior while translating only the approved MySQL binding duplicate | The two P3-S1 tests; existing Repository-wide dependency verification remains unchanged |
+| `src/deviation_protocol/infrastructure/errors.py` | Add only `PlayerCharacterControllerBindingConflictError`; leave `PlayerCharacterRepositoryConflictError` semantically shared and outside the narrow application contract | Preserve shared-error compatibility without reclassifying allocation, initial-state, receipt, stale-current, or other conflicts | The two P3-S1 tests |
 | `src/deviation_protocol/infrastructure/unit_of_work.py` | Expose new repositories in one `AsyncSession` transaction | Commit/rollback ownership | UoW rollback tests |
 | `tests/unit/test_repository_and_uow.py` | Cover new repository/UoW wiring and failure restoration | Existing persistence convention | Focused unit tests |
 | `tests/integration/test_mysql_connection.py` | Advance expected Alembic head and assert exact new schema | Migration verification | Real MySQL schema test |
@@ -3119,6 +3301,7 @@ runtime behavior.
 | Story-line integration permits two active characters on one line | Enforce the frozen one-active-character-per-story-line invariant in the owning service transaction and persistence backstop; stop if the real Run/line schema cannot enforce it |
 | Inverse line cardinality or post-ending behavior is inferred | Preserve only the frozen line-to-character direction and approved lifecycle effects; stop rather than select how many lines one character occupies, restart/resume, successor/replacement, or return behavior |
 | Controller-binding registry implies transfer/recovery behavior | No binding mutation API; classify new behavior as product decision |
+| Shared Repository conflict is mistaken for the binding-only race | Keep `PlayerCharacterRepositoryConflictError` outside the narrow application contract; emit the binding-specific compatible subtype only from the exact binding-row duplicate flush; require both type and call-site provenance for recovery |
 | Character transaction is split across aggregate owners | Shared MySQL transaction or stop for approved consistency design |
 | Receipt schema precedes exact first-slice semantics | Phase 2 is gated on section 15 review and Phase 1 golden vectors; use distinct creation/mutation scopes and accepted-result receipts only |
 | Existing idempotency rows are reused outside Session scope | Keep character receipts separate from Session `turn_requests` and their lifecycle |
@@ -3250,15 +3433,19 @@ locally in Slice 4. A new-session independent implementation review returned
 `PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED` with no blocking
 findings. Phase 2 is accepted and complete.
 
-The corrected Phase 3–5 roadmap and P3-S1 candidate in section 24 are a new
-approval-bound planning candidate. They are written and frozen but have not
-been independently approved. The only operative success verdict for the next
-new-session read-only review is
-`STRUCTURED_PLAYER_CHARACTER_PHASE_3_PLAN_APPROVED`, and it applies only to the
-exact complete candidate in `PLANS.md`, `docs/architecture.md`, and this plan.
-Historical planning, correction, Phase 1, and Phase 2 verdicts are
-non-operative for this gate. Any byte change to any candidate file invalidates
-that review and requires new hashes and a fresh review.
+The revised P3-S1 conflict-translation authority in section 24 is a new
+approval-bound documentation amendment candidate. P3-S1 remains unimplemented,
+and independent read-only amendment review is pending. The only operative
+success verdict for the next new-session read-only amendment review is
+`APPROVED_STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_CONFLICT_AMENDMENT`,
+and it applies only to the exact complete candidate in `PLANS.md`,
+`docs/architecture.md`, and this plan. The former
+`STRUCTURED_PLAYER_CHARACTER_PHASE_3_PLAN_APPROVED` token and all historical
+planning, correction, Phase 1, and Phase 2 verdicts are non-operative for this
+amendment gate. The candidate-preparation verdict
+`STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_CONFLICT_AMENDMENT_CANDIDATE_COMPLETE`
+is likewise not amendment approval. Any byte change to any candidate file
+invalidates a review and requires new hashes and a fresh review.
 
 Even that verdict will not authorize implementation. After a successful
 review, separate authorization is still required to stage and commit exactly
@@ -3310,6 +3497,21 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-07-29: The first P3-S1 implementation attempt stopped with
+  `BLOCKED_STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_AUTHORITY_AMENDMENT_REPOSITORY_CONFLICT`
+  after repository inspection proved that
+  `PlayerCharacterRepositoryConflictError` is shared by controller-binding,
+  allocation, initial-state, receipt, stale-current, and other conflicts. No
+  P3-S1 production or test code was implemented.
+- 2026-07-29: The first documentation amendment design was rejected because it
+  would have made that shared infrastructure error implement an
+  application-owned controller-binding-only contract. This revised
+  documentation-only candidate instead assigns
+  `ControllerBindingUniquenessConflictError` to application ports,
+  `PlayerCharacterControllerBindingConflictError` to infrastructure, and the
+  binding-specific subtype selection to the exact controller-binding add
+  duplicate-key flush. Independent read-only amendment review remains pending;
+  P3-S1 remains unimplemented, and nothing was staged, committed, or pushed.
 - 2026-07-28: The corrected structured player-character Phase 3–5 roadmap and
   exact P3-S1 creation-orchestration candidate were written into `PLANS.md`,
   `docs/architecture.md`, and this plan. This was a bounded documentation

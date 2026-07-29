@@ -284,11 +284,40 @@ candidate. It preserves the repository-authoritative stages:
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
 
-P3-S1 is written and frozen as the current exact planning candidate in the
-[structured player-character downstream implementation plan](docs/structured_player_character_implementation_plan.md).
-It is not implemented, has not received independent plan approval, and is not
-authorized for implementation. A new-session independent read-only review of
-the complete three-file planning diff is required before any later
+P3-S1 remains unimplemented. Its first implementation attempt stopped before
+production or test changes because the planned typed-conflict ownership
+contradicted the repository dependency direction. The first documentation
+amendment design was then rejected because the existing
+`PlayerCharacterRepositoryConflictError` is a shared infrastructure conflict
+used by controller-binding, allocation, initial-state, receipt, stale-current,
+and other Repository paths; making that shared type implement a
+controller-binding-only application contract would misclassify unrelated
+conflicts.
+
+The revised documentation-only authority amendment candidate instead adds the
+narrow application-owned
+`application.ports.ControllerBindingUniquenessConflictError` contract and the
+binding-specific infrastructure
+`infrastructure.errors.PlayerCharacterControllerBindingConflictError`.
+The new concrete exception remains compatible with
+`PlayerCharacterRepositoryConflictError`, while the shared error itself
+remains outside the narrow contract. Only the MySQL duplicate-key translation
+at the exact `ControllerBindingRegistryRepository.add` row flush may select the
+new subtype, and `PlayerCharacterService` may catch only the application-owned
+contract immediately around that exact call.
+
+The later P3-S1 implementation budget is exactly `4 + 2 + 3`: production may
+change only `src/deviation_protocol/application/player_character_service.py`,
+`src/deviation_protocol/application/ports.py`,
+`src/deviation_protocol/infrastructure/errors.py`, and
+`src/deviation_protocol/infrastructure/repositories.py`; tests may change only
+`tests/unit/test_player_character_service.py` and
+`tests/integration/test_mysql_player_character_service.py`; documentation
+synchronization may change only `PLANS.md`, `docs/architecture.md`, and
+`docs/structured_player_character_implementation_plan.md`. This amendment
+changes documentation only, does not authorize implementation, and does not
+mark P3-S1 or Phase 3 complete. A new-session independent read-only review of
+the complete three-file amendment candidate remains pending before any later
 authorization to stage, commit, push, or implement it.
 
 Mutation, owned read/projection, normal production composition, production
