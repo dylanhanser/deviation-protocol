@@ -4,6 +4,12 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
+P4-G0 status: **minimum Run-core documentation authority approved and closed;
+its independent read-only review returned
+`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. The resulting
+documentation milestone is local until the user manually pushes it. The minimum
+Run core and Structured Player Character Phase 4 remain unimplemented.**
+
 ## Goals
 
 - Give players bounded pre-game control over world pressure and narrative
@@ -24,6 +30,56 @@ Phase ownership: **Phase 3.3**
 - Defining NPC residence progression or production Provider pricing.
 - Letting a player freely select an arbitrary world or directly select every
   later world.
+
+## Minimum Run-core prerequisite for player-character Phase 4
+
+The complete Run Protocol remains approved product design and is not
+implemented. Before Structured Player Character P4-S1, only the smaller
+prerequisite specified by the
+[Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
+must be implemented and independently reviewed.
+
+That prerequisite freezes:
+
+- distinct strict opaque `RunId` and `ContinuousStoryLineId` carriers;
+- one Run permanently owning exactly one continuous story line, rather than a
+  generalized container for unrelated lines;
+- a canonical current Run record, immutable Run revisions, and a positive
+  monotonic `RunStateVersion` with compare-and-swap persistence;
+- the closed minimum lifecycle values `pre_first_turn`, `active`, `completed`,
+  and `terminated`;
+- a separate immutable Run-owned Session participation record, with no Run,
+  line, or character-binding column added to `game_sessions`;
+- a Run application service as the one transaction owner for minimum Run
+  mutations and the future character binding; and
+- an all-null authoritative storage seam for the future exact
+  player-character and applicable contract/revision reference.
+
+`pre_first_turn` and `active` are active continuous-story-line states for
+binding exclusivity. `completed` and `terminated` are non-active historical
+states. The minimum core creates only `pre_first_turn`; it does not implement
+the transition to any other lifecycle value. When a later authorized terminal
+transition has a character binding, Run authority must make the binding
+historical in the same atomic change.
+
+The minimum aggregate is allocated before the first turn and therefore does
+not pretend that a resolved protocol, entry world, current visit, or scenario
+already exists. The existing lifecycle below remains authoritative: before
+the first turn can begin, the resolved protocol plus
+`entry_world_id`/`entry_world_version` must receive their Run binding and be
+frozen. Full Phase 3.3 implementation continues to own that transition,
+world/visit identity, later-world selection, revisits, and world-line rules.
+
+Session participation is created only through trusted Run orchestration.
+Caller-supplied Session data cannot select or replace a Run; participation
+does not grant character ownership or controller authority. Multiple distinct
+trusted Sessions may participate in the same Run, while one Session cannot
+participate in conflicting Runs. This record does not activate public resume,
+reconnect, cross-tab, browser-restart, or multi-device behavior.
+
+The minimum Run core and its production composition remain unimplemented at
+P4-G0. The reserved character-binding seam is populated only by separately
+authorized P4-S1 work.
 
 ## Responsibility separation
 
@@ -328,6 +384,7 @@ Phase 3.3 is acceptable only when:
 ## Related documents
 
 - [Project roadmap](../PLANS.md)
+- [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 - [Narrative Provider boundary](narrative_provider.md)
 - [NPC Relationship and Temporary Residence](npc_relationship_residence.md)
 - [Current scenario specification](scenarios/death_certificate_v1.md)

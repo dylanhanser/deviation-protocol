@@ -32,7 +32,13 @@ P3-S2 mutation orchestration, P3-S3 owned read and detached projection, and
 P3-S4 normal production composition are implemented. P3-S1 through P3-S4 are
 complete, and the complete Phase 3 code candidate received independent
 read-only approval with no implementation finding remaining open. Phase 3 is
-complete. Phase 4 has not started, and Phases 4–7 remain deferred.**
+complete, committed, and pushed at
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`
+(`feat(player-character): complete canonical application service`). Phase 4
+implementation has not started. P4-G0 documentation authority is approved and
+closed following `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; the
+resulting documentation milestone is local until the user manually pushes it,
+and Phases 4–7 remain unimplemented.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -46,11 +52,13 @@ conflict is shared across unrelated Repository operations. The later separately
 authorized P3-S1 implementation and its bounded correction completed final
 independent implementation approval, then were committed and pushed at
 `7606e51523338247ea33ed9329346fdba046d29b`. The later P3-S1 status
-synchronization is the current pushed baseline
+synchronization was the then-current pushed baseline
 `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`. The complete Phase 3 candidate
-subsequently implemented P3-S2 through P3-S4 and received independent
-read-only approval. This documentation synchronization records that completed
-local milestone without claiming it has been pushed.
+subsequently implemented P3-S2 through P3-S4, received independent read-only
+approval, and was committed and pushed at
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`. P4-G0 documentation authority
+is approved and closed; it freezes the minimum Run-core prerequisite without
+beginning that prerequisite or Phase 4.
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -74,9 +82,10 @@ and known immutable/unique conflicts. Phase 2 Slice 4 now wires those four
 adapters into one entered `SqlAlchemyUnitOfWork` session and supplies bounded
 test-only cross-repository transaction evidence. Its production change is
 limited to imports and `SqlAlchemyUnitOfWork.__aenter__`; it adds no production
-orchestration. P3-S1 through P3-S4 are implemented and complete. Phase 4 and
-every later phase remain unimplemented and require their own accepted plan
-boundary and explicit authorization.
+orchestration. P3-S1 through P3-S4 are implemented, complete, committed, and
+pushed. P4-G0 documentation authority is approved and closed. The minimum Run
+core, Phase 4, and every later phase remain unimplemented and require their
+own accepted plan boundary, predecessor approval, and explicit authorization.
 
 The ordered Phase 2 implementation slices introduced in section 24 were a
 separate amendment from the prior technical-freeze verdict. The section 31
@@ -152,6 +161,14 @@ applicable world state. The current request, Session, Provider, public-client,
 and memory contracts remain intact unless a later separately approved
 implementation phase identifies and reviews a narrow incompatibility.
 
+For Phase 4, the
+[Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
+owns only the prerequisite Run-core implementation sequence, persistence,
+transaction order, and acceptance evidence. This plan owns P4-G0/P4-S1 gating
+and the character-binding boundary. The Run Protocol owns the Run and line
+lifecycle; this plan cannot use a broad roadmap sentence to override either
+that authority or the player-character contract.
+
 This plan uses the following decision classification:
 
 | Code | Classification |
@@ -216,6 +233,13 @@ endpoint shapes, and phase boundaries below remain prospective inventory and
 are not authority to edit those surfaces. Exact choices identified as `U` must
 be resolved before the affected phase begins.
 
+P4-G0 documentation authority is approved and closed. Its three accepted
+decisions are current authority rather than unresolved inventory: the minimum
+Run core comes first; one character may occupy at most one active line while
+one line has one active character binding once bound; and Session participation
+uses a separate Run-owned record. The minimum Run core and P4-S1 are not
+implemented.
+
 ## 5. Historical baselines and pre-closure Phase 3 baseline
 
 The revised P3-S1 authority-amendment candidate was written against this
@@ -247,11 +271,13 @@ approval. The three-document closure status synchronization was subsequently
 committed and pushed at the pre-closure `HEAD`/local-`origin/main` baseline
 `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
 (`docs(player-character): close phase 3 slice 1 status sync`). The current
-worktree milestone is the complete independently approved Phase 3 candidate.
-This document uses that commit as the historical pre-closure baseline and does
-not embed the milestone commit's self-referential hash. No future session may
-use either historical baseline above to implement P3-S1 or another Phase 3
-slice again.
+completed Phase 3 baseline is the independently approved, committed, and
+pushed
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`
+(`feat(player-character): complete canonical application service`). This
+section retains `150074d...` only as the historical pre-closure baseline. No
+future session may use either historical baseline above to implement P3-S1 or
+another Phase 3 slice again.
 
 The current completed Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
@@ -294,9 +320,14 @@ design is approved but not implemented. Therefore:
 - a `GameSession` must not be relabeled as a Run (`A`, `N`);
 - a scenario ID or version must not be treated as a world or visit ID (`A`);
 - same-story-line and later-world integration must be stop-gated on a real
-  Run-owned binding surface (`T`, with the owning shape still `U`), while
-  preserving the already-frozen rule that each continuous story line is bound
-  to exactly one active player-character identity at a time (`A`); and
+  Run-owned binding surface (`T`), whose minimum prerequisite is now frozen in
+  `docs/minimum_run_core_implementation_plan.md`;
+- that prerequisite uses distinct `RunId` and `ContinuousStoryLineId`
+  carriers, with one Run permanently owning exactly one line (`A/T`);
+- each line has exactly one active character binding once bound, and one
+  canonical character belongs to at most one active line (`A`);
+- trusted Session participation must use a separate Run-owned record and must
+  not add Run/binding columns to `game_sessions` (`A/T`); and
 - the domain can define the character side of a typed binding before Run
   integration, but cannot invent Run lifecycle or movement mechanics (`E`).
 
@@ -468,9 +499,9 @@ disabled unless separately authorized.
 | Controller binding | `ControllerBindingRef`; private registry Repository/table and required canonical-record field | The trusted resolver uses the exact configured production allowlist | Distinct from principal fields, Session, Run, request, and character |
 | Player character | `PlayerCharacterId`; permanent allocation ledger, current record, and immutable revisions | The production issuer supplies a validated canonical UUIDv4-based ID | Equality only by exact canonical ID |
 | Static character definition | `DefinitionId`, `character_definition_id` | Retained as content/template reference where separately relevant | Reuse never establishes character equality |
-| Session | String-valued `GameSession.session_id` with strict bounded request/DTO fields | Retained narrower identity; optional future reference to an explicit Run participation binding | Never establishes character identity |
-| Run | Not implemented | Run-owned aggregate defined by Phase 3.3 implementation | Binds a character and applicable reference; does not equal either |
-| Continuous story line | Not implemented | Run/continuity-owned stable reference; exact shape unresolved. Each continuous story line is bound to exactly one active player-character identity at a time | A line cannot simultaneously bind a second or different active character. The inverse number of lines/Runs one character may occupy remains unresolved |
+| Session | String-valued `GameSession.session_id` with strict bounded request/DTO fields | Retained narrower identity plus a separate immutable Run-owned participation record | Never establishes character identity, Run selection, or controller authority |
+| Run | Not implemented | P4-G0 freezes a distinct strict opaque `RunId` and one Run-owned canonical aggregate; the minimum core remains unimplemented | Owns one line and later its binding transaction; never equals Session, line, character, controller, world, or operation identity |
+| Continuous story line | Not implemented | P4-G0 freezes a distinct strict opaque `ContinuousStoryLineId`, permanently owned one-to-one by its Run | Once bound, one active character per line; one character belongs to at most one active line; historical non-active references do not count |
 | World / scenario / visit | Scenario only; no world or visit identity | Run-owned references when implemented | Context/provenance only, never character identity |
 | Applicable character reference | `ApplicableCharacterReference` in the accepted Phase 1 domain | Phase 4 later binds the exact typed reference through the Run-owned aggregate | Exact match; distinct from current revision and every other version |
 | Stable logical NPC | Scenario-local memory subject key only | Existing key retained; future cross-scenario identity remains deferred | Never runtime NPC ID, definition, name, or player character |
@@ -517,12 +548,13 @@ The first implementation slice explicitly excludes:
   inventory, statistics, combat, or progression fields or systems;
 - profile-completion, activation, quick-start-template, vocabulary,
   localization, or default-selection product rules;
-- multiple concurrent characters per controller and character limits;
+- account/controller limits and how many distinct canonical character records
+  one controller may keep active; active line occupancy is frozen separately;
 - shared control, multiple controllers, delegation, controller transfer,
   cross-account transfer, account recovery, or unbinding;
 - arbitrary cross-Run or cross-story-line movement;
-- continuity-line restart/resume, successor/replacement behavior, and the
-  inverse number of simultaneous story lines or Runs one character may occupy;
+- continuity-line restart/resume and successor/replacement behavior; active
+  binding cardinality is frozen separately and is not excluded or unresolved;
 - hard deletion and every delete API or repository method;
 - retention, archival, restoration, cloning, merging, or recovery policy;
 - resurrection, rebirth, reincarnation, time-reversal, or equivalent identity
@@ -561,7 +593,7 @@ database row or accept a wire DTO as canonical. The proposed closed envelope is:
 | `character_core` | Required strict group, capable of approved declarations; every individual field optional and absence preserved | `A` |
 | `narration_preferences` | Required strict group; optional internal-thought preference with the three approved values and no silent default | `A` |
 | `character_development` | Strict collection, initially empty because no approved mutation issuer is in the slice | `A/E` |
-| `continuity_metadata` | Required strict group holding only trusted explicit references/evidence supplied by an owning authority; may contain no current-line reference when none is authorized. A line binding cannot simultaneously name a second or different active player character | Frozen line-to-character invariant `A`; exact storage, inverse cardinality, and post-ending/restart/successor behavior `U` |
+| `continuity_metadata` | Required strict group holding only trusted explicit references/evidence supplied by an owning authority; may contain no current-line reference when none is authorized. A line binding cannot simultaneously name a second or different active player character, and a character cannot occupy a second active line | Both active-binding cardinality directions `A`; post-ending restart/successor behavior `U` |
 | `authority_provenance` | Required mutation fact matching target, prior/result revision, mutation kind, authority class, and trusted source reference | `A`; storage layout `T` |
 
 The supported `character_core` schema must be capable of the exact approved
@@ -838,7 +870,7 @@ stored-success disclosure. A valid `9223372036854775806` to
 `9223372036854775807` transition and its exact stored-result replay remain
 supported.
 
-Cross-Run concurrency remains deferred. The first slice must nevertheless be
+Cross-Run concurrency behavior beyond the frozen rule that one canonical player character belongs to at most one active continuous story line remains deferred. The first slice must nevertheless be
 safe for concurrent commands against the one canonical record: only one
 matching expected revision may commit; all losers refresh from the last
 committed record.
@@ -989,77 +1021,79 @@ opens a fallback mutation path.
 The character side of a future binding is:
 
 ```text
-Run-owned binding
+RunId
+  -> owns exactly one ContinuousStoryLineId
+  -> Run-owned binding
   -> exact stable player_character_id
   -> exact applicable character contract/revision reference
   -> Run-owned continuous-story-line, world, scenario, and visit references
 ```
 
-The current repository lacks the Run-owned side. Phase 4 must therefore stop
-before persistence or API integration unless the Phase 3.3 implementation
-provides an approved aggregate and transaction boundary. The plan must not add
-`run_id` columns whose semantics are guessed from `GameSession`.
+The current repository still lacks the Run-owned side. P4-G0 freezes its
+minimum prerequisite in
+[Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md):
+distinct `RunId` and `ContinuousStoryLineId` carriers; one Run permanently
+owning one line; current state and immutable revisions with monotonic CAS;
+separate trusted Session participation; a Run application transaction owner;
+and an all-null future character-binding envelope. The minimum core and Phase
+4 remain unimplemented. `GameSession` must not masquerade as Run, and no Run
+or binding column may be added to `game_sessions`.
 
-The missing runtime aggregate does not make all cardinality unresolved. The
-frozen line-to-character invariant is already authoritative:
+Both active-binding directions are current authority:
 
-- each continuous story line is bound to exactly one active
-  `player_character_id` at a time;
-- a line cannot simultaneously acquire a second or different active
-  player-character binding; and
-- a scenario, world, visit, Run boundary, retry, or concurrency race cannot
-  replace that binding as a side effect.
+- a continuous story line has exactly one active canonical
+  player-character binding once bound;
+- one canonical player character belongs to at most one active continuous
+  story line;
+- a completed, terminated, or otherwise non-active historical line retains
+  its immutable exact reference without counting as active; and
+- retry, concurrency, scenario, world, visit, Run, Session, browser, or
+  Provider behavior cannot replace or clone that binding.
 
-Phase 4 must enforce this invariant at the Run/line service boundary inside the
-same transaction strategy that establishes, validates, or authoritatively ends
-the owning binding without providing a replacement path. The service must lock
-or otherwise serialize the exact line owner, inspect
-the existing active binding, and reject a second or conflicting
-`player_character_id` before either aggregate changes. The persistence
-mechanism must provide a database backstop appropriate to the real Run/line
-schema. If that schema does not yet permit a uniqueness/constraint strategy,
-Phase 4 records the invariant and stops before persistence rather than
-inventing a Run table, lifecycle, or replacement policy.
+P4-S1 must enforce both directions at the Run service boundary and database
+backstop. It locks or otherwise serializes the exact Run/line, exact-matches
+the `ApplicableCharacterReference`, and rejects a second/conflicting line or
+character before any canonical change. The Run service owns the one mutation
+UnitOfWork and one commit; the character aggregate is read-only.
 
-Once that owner exists, integration must:
+P4-S1 must:
 
-1. load the Run-owned binding and canonical character under the transaction
-   strategy approved for the owning aggregates;
-2. exact-match player-character ID and applicable reference;
-3. prove that the continuous story line has exactly one active
-   player-character binding and reject a second or conflicting binding;
-4. preserve both character ID and applicable reference across same-line
-   scenario changes;
-5. preserve both across Run-authorized progression into a later world;
-6. let Run policy alone select world, scenario, visit, eligibility, and world
-   state;
-7. reject a boundary that attempts to create, replace, merge, transfer,
-   retire, reactivate, kill, delete, or re-version the character; and
-8. bind any resulting memory/relationship/consequence provenance to the exact
-   logical subjects.
+1. resolve trusted controller authority;
+2. use the P4-S1-only narrow Phase 3-owned internal read seam specified by the
+   minimum Run-core plan to lock and obtain the owned canonical exact
+   reference and lifecycle evidence inside the already-owned Run UnitOfWork,
+   without trusting submitted ownership or opening a nested UnitOfWork;
+3. leave existing `PlayerCharacterService` create, mutate, and public
+   `get_owned` semantics unchanged and never treat detached owned/public data
+   as writable canonical state;
+4. evaluate the binding receipt before stale Run-state rejection;
+5. require an active character and active Run/line for a new binding after
+   receipt evaluation;
+6. write the complete Run/line/character/reference/provenance envelope, Run
+   revision, current-state CAS, and receipt atomically;
+7. reject conflicting active bindings with no Run or character mutation;
+8. preserve ID/reference through same-line scenarios and Run-authorized
+   later-world progression;
+9. let Run policy alone select world, scenario, visit, eligibility, and world
+   state; and
+10. add no independent character commit, Session copy of the character
+   aggregate, replacement, transfer, or reference-following policy.
 
-If a cross-aggregate atomic commit is required but the Run and character
-records cannot share the existing MySQL `AsyncSession` transaction, integration
-stops for an explicit consistency design. An outbox, saga, or eventual
-consistency protocol must not be invented in this plan.
+The minimum Run core stores Session participation in its own immutable
+Run-owned record. Participation is created only by trusted Run orchestration,
+does not grant ownership/controller authority, supports multiple distinct
+Sessions on one continuing Run, and prevents one Session from conflicting Run
+routing. It does not change legacy Session rows or activate public resume,
+reconnect, cross-tab, browser-restart, or multi-device behavior. The narrow
+Phase 3-owned read seam preserves the approved authorization, non-enumeration,
+canonical validation, and projection boundaries; it performs no character
+mutation or commit. P4-S1 may not invent an outbox, saga, distributed
+transaction, or eventual-consistency protocol.
 
-Existing Sessions remain legacy narrower records. A future Session
-participation field may reference a Run binding only when explicitly created by
-trusted Run/Session orchestration. It may be nullable for legacy Sessions and
-must never be backfilled from `GameSession.player_id`,
-`character_definition_id`, scenario, browser storage, or prose.
-
-Session loss, browser reset, Run reset, and transport failure may invalidate
-ephemeral participation/recovery state, but cannot delete or mutate the
-canonical character. Exact Run reset and continuity-line restart semantics
-remain deferred.
-
-This one-direction invariant does not decide how many simultaneous story lines
-or Runs one character may occupy, what binding remains after retirement or
-death beyond the already-approved current-line ending effect, whether an
-authorized return resumes or starts a line, how restart/resume works, how a
-successor or replacement is represented, or whether cross-Run/cross-line
-movement is ever allowed.
+Restart/resume, Session reassignment, successor/replacement,
+post-retirement/death/return binding behavior, arbitrary transfer, and
+cross-Run/cross-line movement remain deferred. Those deferrals do not weaken
+the frozen active cardinality or same-line exact-reference preservation.
 
 ## 17. Provider, client, and trusted-server boundaries
 
@@ -1149,7 +1183,8 @@ The first slice should add compatibility tests/value types but not rewrite
 `PlayerMemoryState`, `NpcMemoryRecord`, relationship basis points, or event
 receipts. Full persistence integration is blocked until:
 
-- a player-character participates through an explicit Run/Session binding;
+- a player character has an explicit Run-owned line binding and the Session
+  has a separate trusted Run participation record;
 - the owning memory/relationship/consequence contract specifies its record
   shape and transaction;
 - cross-scenario logical NPC identity is approved where needed; and
@@ -1196,9 +1231,10 @@ applicable-reference, rejected-operation, pending-operation, archive, or
 deletion record. The future Run/consumer character binding remains Phase 4
 inventory only. No concrete Run or account parent schema exists, so Phase 2
 must not fabricate one or add a foreign key to `game_sessions`. A later
-Run-owning migration must choose its table and enforce the frozen
-one-active-character-per-story-line direction without changing these six
-families or silently selecting a reference-following policy.
+Run-owning migration, now planned by the minimum Run-core authority, must use
+separate Run-owned record families and enforce both active binding cardinality
+directions without changing these six families, adding Run columns to
+`game_sessions`, or silently selecting a reference-following policy.
 
 Within this boundary, the controller binding owns a creation receipt; the
 stable player-character identity is the mutation receipt owner, subject, and
@@ -1735,12 +1771,12 @@ reference, memory subject, or provenance from:
 - current memory facts, NPC keys, relationships, summaries, or events; or
 - Provider output or narrative prose.
 
-A later explicit structured participation workflow may bind a newly created
-canonical character to a new Run/Session using trusted authority. Legacy
-Sessions remain unbound and cannot invoke structured-character mutations. If a
-schema column is later added to `game_sessions`, it must be nullable for legacy
-rows and set only by trusted binding creation; absence means legacy/unbound,
-not an invitation to infer identity.
+A later trusted Run workflow stores Session participation only in the separate
+Run-owned `run_session_participations` family frozen by P4-G0. It adds no Run,
+line, or character-binding column to `game_sessions`, and participation does
+not bind or authorize a character. Legacy Sessions remain unbound and cannot
+invoke structured-character mutations merely because they exist; absence of a
+participation record is not an invitation to infer identity or routing.
 
 Unsupported record versions fail read-only or require an approved migration.
 An older writer encountering unknown canonical fields must not rewrite the
@@ -2375,7 +2411,9 @@ complete historical stages. P3-S2 canonical mutation orchestration, P3-S3
 owned read and detached projection, and P3-S4 normal production composition
 are implemented. P3-S1 through P3-S4 are complete. The complete Phase 3 code
 candidate received independent read-only approval, and no implementation
-finding remains open. Phase 3 is complete; Phase 4 has not started.**
+finding remains open. Phase 3 is complete, committed, and pushed at
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Phase 4 implementation has not
+started; P4-G0 documentation authority is approved and closed.**
 
 The repository-authoritative Phase 3 order is:
 
@@ -3392,40 +3430,91 @@ deferred.
 
 ### Phase 4 — Run and continuous-story-line binding
 
-This stage is the bounded P4 Run/line integration slice. It is not normal
-runtime composition and remains unimplemented.
+Phase 4 implementation has not started.
+
+#### P4-G0 — Minimum Run-core authority and implementation-plan freeze
+
+Status: **documentation authority approved and closed.**
+
+The independent read-only review returned
+`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; the resulting
+documentation milestone is local until the user manually pushes it.
+
+P4-G0 freezes, but does not implement:
+
+- the smallest prerequisite Run core;
+- both active character/story-line cardinality directions;
+- a separate trusted Session participation record;
+- Run-owned transaction, CAS, receipt, and replay behavior; and
+- the future exact character/reference binding seam.
+
+The canonical prerequisite sequence, path budgets, migration-head rule,
+verification, exclusions, and acceptance evidence are owned by
+[Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md).
+The P4-G0 independent-review approval condition cross-references that plan's
+single canonical operative verdict
+`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; this is not a second
+verdict definition.
+
+P4-G0 documentation authority is closed. Its resulting local documentation
+milestone still requires manual user push and clean-baseline confirmation. It
+does not authorize minimum Run-core implementation.
+
+#### Minimum Phase 3.3 Run-core prerequisite
+
+After the P4-G0 milestone is manually pushed and a clean baseline is confirmed,
+MRC-S1 is the next unstarted implementation slice. MRC-S2 and MRC-S3 remain
+later unstarted ordered slices in the coherent minimum Run core frozen by its
+owning plan. It provides stable
+Run/line identity, canonical state/version, durable persistence, separate
+participation, Run service/UoW ownership, receipt/replay behavior, a reserved
+all-null binding envelope, and Run-aware production composition without a
+public route.
+
+The complete prerequisite must then pass fresh independent read-only review,
+canonical documentation synchronization, a separately authorized milestone
+commit, manual user push, and clean-baseline confirmation. It does not itself
+populate a character binding or implement the full Run Protocol.
+
+#### P4-S1 — Canonical character and applicable-reference binding
+
+P4-S1 may begin only after the minimum Run core is implemented,
+independently approved, documented, committed, manually pushed, and confirmed
+as a clean baseline.
 
 Scope:
 
-- connect the character-side typed binding to the separately implemented
-  Run-owned aggregate;
-- enforce that each continuous story line has exactly one active
-  player-character binding and reject a second or conflicting binding;
-- add a separately reviewed Run/line persistence migration only if the real
-  owner requires one, following the then-current Alembic head;
-- validate and preserve exact character ID and applicable reference across
-  scenario and authorized later-world changes;
-- bind Session participation only through trusted Run orchestration; and
-- add integration tests for boundaries and mismatch rejection.
+- resolve trusted controller authority and obtain the canonical owned
+  character/reference through the approved narrow Phase 3-owned same-UoW read
+  seam;
+- activate the Run-owned binding envelope with exact `PlayerCharacterId`,
+  contract version, and record revision;
+- enforce exactly one active character binding per line and at most one active
+  line per character;
+- reject second/conflicting and concurrent bindings atomically;
+- preserve exact ID/reference across scenarios and any Run-authorized
+  later-world transition in the same line;
+- use the Run service as the one binding transaction owner; and
+- add focused domain/service/MySQL concurrency, mismatch, rollback, replay,
+  and continuity tests.
 
-Prerequisites: approved Run aggregate, continuous-line reference, world/visit
-identity, transition authority, and compatible transaction ownership.
+P4-S1 does not expose an API, frontend, Demo behavior, public resume, general
+reference-following policy, arbitrary movement, replacement, transfer, or full
+world/visit execution. Later Phase 4 continuity integrations require their own
+authorized slice when the owning scenario/world transition surfaces exist.
 
-Exclusions: implementing Phase 3.3 itself, arbitrary movement, reset semantics,
-reference-following policy, cross-Run concurrency.
+Completion criteria: the exact binding commits once or not at all; both
+cardinality conflicts fail with neither subject changed; historical non-active
+references do not count as active; same-line boundaries preserve the exact
+reference; Run authority remains intact; and no Session or detached projection
+becomes writable character state.
 
-Completion criteria: same-line scenario and authorized later-world transitions
-preserve exact ID/reference; attempts, including concurrent attempts, to give
-one story line a second or different active character fail atomically; every
-boundary-driven switch fails atomically; Run retains all of its current
-authority.
-
-Stop conditions: the prerequisite Run surfaces do not exist; `GameSession`
-would need to masquerade as Run; cross-aggregate atomicity is unresolved;
-line-owner serialization and a persistence backstop cannot enforce the frozen
-one-active-character-per-story-line invariant; a reference change is
-requested; or implementation would have to select inverse cardinality,
-restart/resume, successor/replacement, or post-return binding behavior.
+Stop conditions: the minimum prerequisite is absent or unapproved;
+`GameSession` would masquerade as Run; one Run-owned transaction cannot hold
+the canonical binding change; either cardinality direction lacks a database
+backstop; approved Phase 3 ownership semantics cannot be preserved; a
+reference change, transfer, restart/resume, replacement, or post-return rule is
+required; or implementation would activate a deferred public/runtime surface.
 
 ### Phase 5 — Public projection and narrow boundary integration
 
@@ -3458,8 +3547,8 @@ Scope:
 - preserve runtime/logical NPC separation; and
 - add compatibility tests without replacing current memory storage.
 
-Prerequisites: explicit Run/Session participation and owning adjacent-system
-contracts.
+Prerequisites: explicit separate Run-owned Session participation and owning
+adjacent-system contracts.
 
 Exclusions: full relationship, consequence, memory, golden-memory, and
 cross-scenario NPC systems.
@@ -3517,7 +3606,7 @@ their completed Phase 1 work is not pending.
 | Implemented P3-S4 authority adapters | `src/deviation_protocol/infrastructure/player_character_authority.py` | Exact configured controller allowlist and production UUIDv4 issuer | Fail-closed authority/configuration and opaque user-information-free IDs | Composition and authority tests |
 | Proposed Phase 2 Slice 1 addition | `src/deviation_protocol/infrastructure/player_character_persistence.py` | Database-independent stored-record carriers, canonical codec, and integrity validation | Exact six-family conversion boundary | Persistence codec unit tests |
 | Proposed Phase 2 addition | one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
-| Proposed Phase 4 addition | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
+| Planned minimum Run-core prerequisite | one next-head Alembic revision selected only at implementation time | Add the five Run-owned record families and all-null future binding seam frozen by the minimum Run-core plan | Run/line identity, current/revision CAS, participation, receipts, both active cardinality backstops | Run migration/service/concurrency tests |
 | Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character.py` | Domain record and validation matrix | Strict complete record | Existing and extended unit matrix |
 | Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_policies.py` | Lifecycle/confirmation/authority matrix | Every state mutation | Existing and extended unit matrix |
 | Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_operations.py` | Canonical fingerprint vectors, exact replay equivalence, conflicts, and safe-result validation | Receipt protocol before schema | Existing and extended application-boundary tests |
@@ -3549,15 +3638,13 @@ independent is more important than these filenames.
 | `tests/integration/conftest.py` | Slice 4 only: add owned cleanup for the six Phase 2 families in restrictive-FK-safe order | Isolated integration cleanup | Phase 2 MySQL integration tests |
 | `src/deviation_protocol/api/main.py` and `src/deviation_protocol/api/dependencies.py` | P3-S4 production composition only; Phase 5 later owns narrow public routes | Expose the canonical service without activating HTTP behavior | Composition tests |
 | `tests/unit/test_session_service.py` and relevant API integration tests | Prove existing Session identity/projection is unchanged | Compatibility | Regression tests |
-| future Run-owned module/directory, not nameable today | Phase 4 only: bind exact ID/reference in the real Run aggregate and reject second/conflicting active character bindings on one line | Same-line/later-world continuity and frozen line cardinality | Run service/integration/contract tests |
+| Run-owned paths budgeted by `docs/minimum_run_core_implementation_plan.md` | Minimum prerequisite first; P4-S1 later activates the exact binding seam | Same-line/later-world exact-reference continuity and both active cardinality directions | Run service/integration/contract tests |
 | future adjacent-system owning modules, not nameable today | Phase 6 only: accept explicit logical subject refs | Memory/NPC/consequence correctness | Compatibility/integration tests |
 
 The Phase 3-specific rows in both tables are implemented and preserve the
-independently approved boundary. Phase 4 and all later phases remain
-unimplemented.
-
-No Run-owned source path can be named reliably because no Run implementation
-exists. Inventing one here would prejudge Phase 3.3 architecture.
+independently approved boundary. P4-G0 now delegates the exact minimum
+Run-core path budgets to its owning plan. The prerequisite, Phase 4, and all
+later phases remain unimplemented.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -3620,7 +3707,9 @@ changes a reusable rule.
 | Run/world/scenario/visit mismatch | Run integration | Owning context rejects atomically |
 | Applicable-reference mismatch | Domain + Run integration | No use or mutation |
 | Second active character on one story line | Run application/service + persistence/integration | An existing line binding rejects a second or different active `player_character_id` with neither aggregate changed |
+| Second active story line for one character | Run application/service + persistence/integration | A character already bound to one active line rejects a different active line with neither aggregate changed; historical non-active references do not count |
 | Concurrent conflicting line bindings | Run persistence/integration | Competing transactions for one story line produce exactly one committed active character binding; the loser rejects and no split binding state remains |
+| Conflicting Session participation | Run application/service + persistence/integration | A separate immutable record permits multiple Sessions on one Run but prevents one Session from being routed to conflicting Runs; no `game_sessions` Run/binding columns or inferred backfill |
 | Scenario continuity | Run integration/end-to-end | Exact ID and reference preserved |
 | Later-world continuity | Run integration/end-to-end | Run selects world; exact ID/reference preserved |
 | Unauthorized reference advance | Domain + Run integration | Rejected before boundary mutation |
@@ -3741,8 +3830,8 @@ runtime behavior.
 | Optional declaration states collapse or preference defaults silently | Closed state wrapper, exhaustive unit/persistence tests, and a Phase 1 stop if omission, explicit absence, intentionally undecided, or selected preference cannot remain distinct |
 | External or inferred material settles player-controlled inner state | Separate authority types and negative domain/service/contract tests; stop any server, Provider, narration, NPC, summary, event, memory, or consequence inference path |
 | Player declaration is accepted as an external fact | Subjective declaration types cannot satisfy world/NPC/consequence authority; reject before canonical commit |
-| Story-line integration permits two active characters on one line | Enforce the frozen one-active-character-per-story-line invariant in the owning service transaction and persistence backstop; stop if the real Run/line schema cannot enforce it |
-| Inverse line cardinality or post-ending behavior is inferred | Preserve only the frozen line-to-character direction and approved lifecycle effects; stop rather than select how many lines one character occupies, restart/resume, successor/replacement, or return behavior |
+| Story-line integration violates either active cardinality direction | Enforce one active character per bound line and at most one active line per character in the Run service transaction and database backstops; historical non-active references do not count |
+| Post-ending behavior is inferred | Preserve immutable history and deterministic active-to-historical ending effect; stop rather than select restart/resume, successor/replacement, transfer, or return behavior |
 | Controller-binding registry implies transfer/recovery behavior | No binding mutation API; classify new behavior as product decision |
 | Shared Repository conflict is mistaken for the binding-only race | Keep `PlayerCharacterRepositoryConflictError` outside the narrow application contract; emit the binding-specific compatible subtype only from the exact binding-row duplicate flush; require both type and call-site provenance for recovery |
 | Character transaction is split across aggregate owners | Shared MySQL transaction or stop for approved consistency design |
@@ -3770,14 +3859,15 @@ them:
   representation, and profile/activation requiredness;
 - defaulting and update workflows for narration preferences;
 - character/profile creation drafts and UI;
-- account/controller character limits and concurrent active-character rules;
+- account/controller character limits and how many distinct canonical
+  character records one controller may keep active; active line occupancy is
+  already frozen separately;
 - controller transfer, shared control, delegation, recovery, unbinding, and
   account-change behavior;
-- exact continuous-story-line identity and the inverse number of simultaneous
-  active story lines or Runs one character may occupy;
-- restart/resume, successor/replacement, post-retirement/death/return binding,
-  cross-Run concurrency, and arbitrary movement between unrelated Runs/story
-  lines/accounts;
+- restart/resume, Session reassignment, successor/replacement,
+  post-retirement/death/return binding, cross-Run behavior beyond the frozen
+  active-binding exclusivity, and arbitrary movement between unrelated
+  Runs/story lines/accounts;
 - pinned, floating, checkpointed, migrating, automatically following, or any
   other applicable-reference/revision-following behavior;
 - when or how an applicable reference may be changed by future approved
@@ -3820,10 +3910,10 @@ verified that this plan:
    all existing narrower versions;
 8. preserves exact player-character ID and applicable reference across
    same-story-line scenario and Run-authorized later-world boundaries;
-9. preserves the frozen rule that each continuous story line has
-   exactly one active player-character binding, rejects second/conflicting
-   bindings atomically, and does not select inverse cardinality or replacement
-   behavior;
+9. preserves the frozen rules that each bound continuous story line has
+   exactly one active player-character binding and each character belongs to
+   at most one active line, rejects either conflict atomically, retains
+   historical non-active references, and selects no replacement behavior;
 10. selects no general applicable-reference policy;
 11. uses complete strict validation, expected revision, exact authority/context
     matching, and one atomic commit;
@@ -3895,7 +3985,7 @@ separately authorized P3-S1 implementation task began. The resulting
 implementation and bounded correction subsequently completed final independent
 review, commit, and push as `7606e51523338247ea33ed9329346fdba046d29b`.
 Its closure status synchronization was subsequently committed and pushed as
-the current baseline `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+the then-current baseline `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
 (`docs(player-character): close phase 3 slice 1 status sync`). P3-S1 is
 complete and closed.
 
@@ -3903,10 +3993,13 @@ P3-S2 through P3-S4 were subsequently implemented as the complete Phase 3
 candidate. The candidate received independent read-only approval with
 `STRUCTURED_PLAYER_CHARACTER_PHASE_3_REVIEW_APPROVED`; no correctness,
 authorization, privacy, transaction, composition, or material test-coverage
-finding remains open. This three-document synchronization records the earned
-status without embedding a self-referential closure commit hash. Phase 3 is
-complete; Phase 4 has not started. The local milestone commit remains unpushed
-until the user performs the separate manual push.
+finding remains open. The complete milestone was committed and pushed at
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`
+(`feat(player-character): complete canonical application service`). Phase 3 is
+complete. Phase 4 implementation has not started. P4-G0 later received
+`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; its documentation
+authority is approved and closed, while the resulting milestone remains local
+until the user manually pushes it.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
@@ -3952,12 +4045,24 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-07-29: P4-G0 prepared the five-path documentation-only minimum
+  Run-core authority candidate after Phase 3 was independently approved,
+  committed, and pushed at `cafb12272e703e8751c78bb6852cec90d7d7ec8d`.
+  It freezes the minimum-core-first order, both active binding cardinality
+  directions, separate trusted Session participation, and the P4-S1
+  transaction seam. Its subsequent independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`, and the documentation
+  authority is approved and closed. The resulting milestone remains local until
+  the user manually pushes it. The minimum Run core, P4-S1, Phase 5, and all
+  later implementation remain unstarted; nothing in this entry is
+  implementation authorization.
 - 2026-07-29: The completed P3-S2 implementation-readiness review reported
   three blockers: no operative service/path/acceptance boundary, indeterminate
   CAS-loss and mutation-receipt uniqueness-conflict behavior, and operative
   baseline text still pointing to the superseded pre-push baseline. This
   three-document candidate resolves only those blockers. It records
-  `150074d58cdbf3aee08bea9c1084325b2b0f0a3f` as the current pushed baseline,
+  `150074d58cdbf3aee08bea9c1084325b2b0f0a3f` as the then-current pushed
+  baseline,
   defines the exact `4 + 2 + 3` P3-S2 contract, maps CAS false to
   `STALE_REVISION`, and limits receipt-race recovery to the exact local
   receipt-add conflict followed by at most one disposed-then-fresh UoW read.

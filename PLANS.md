@@ -13,13 +13,16 @@ documents.
 - **Planned phase:** assigned to a future phase whose implementation has not
   started.
 
-## Current baseline
+## Reviewed P4-G0 baseline
 
 - Branch: `main`
-- Pre-closure structured player-character baseline and unchanged local
-  `origin/main`: `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+- Reviewed P4-G0 parent, pre-closeout baseline, and current local
+  `origin/main`: `cafb12272e703e8751c78bb6852cec90d7d7ec8d`
 - Baseline subject:
-  `docs(player-character): close phase 3 slice 1 status sync`
+  `feat(player-character): complete canonical application service`
+- Historical pre-closure Phase 3 baseline:
+  `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+  (`docs(player-character): close phase 3 slice 1 status sync`)
 - Historical structured player-character Phase 2 closure baseline:
   `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
   (`feat(player-character): wire repositories into unit of work`)
@@ -32,7 +35,7 @@ documents.
   `7606e51523338247ea33ed9329346fdba046d29b`
   (`feat(player-character): add race-safe creation recovery`) and pushed to
   `main`. Its three-document closure status synchronization was subsequently
-  committed and pushed as the current baseline
+  committed and pushed as the then-current baseline
   `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
   (`docs(player-character): close phase 3 slice 1 status sync`). P3-S1 is
   implemented, independently approved, committed, pushed, complete, and
@@ -40,12 +43,18 @@ documents.
 - Structured player-character Phase 3 is implemented and complete. P3-S1
   through P3-S4 are complete, and the complete Phase 3 code candidate received
   independent read-only approval with no implementation finding remaining
-  open. This documentation synchronization and the approved code candidate
-  remain local until the user pushes the milestone commit.
-- Phase 4 has not started. API routes, frontend activation, Demo behavior,
-  Provider behavior, Run Protocol integration, narrative integration, scenario
-  integration, combat integration, and public gameplay activation remain
-  deferred.
+  open. The milestone is committed and pushed at
+  `cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Complete Phase 3 Offline
+  verification recorded `1,469 passed, 79 skipped`; the existing focused
+  MySQL player-character selection recorded `42 passed`.
+- P4-G0 documentation authority is approved and closed. Its independent
+  read-only review returned
+  `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. The resulting
+  documentation milestone is local until the user manually pushes it.
+- Phase 4 implementation has not started. The minimum Run core, API routes,
+  frontend activation, Demo behavior, Provider behavior, full Run Protocol,
+  narrative integration, scenario integration, combat integration, and public
+  gameplay activation remain unimplemented or deferred as assigned.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -295,15 +304,22 @@ integration was activated.
 The structured player-character roadmap preserves the repository-authoritative
 stages:
 
-1. **Phase 3 — Trusted canonical application service**
-   - P3-S1 canonical creation orchestration;
-   - P3-S2 canonical mutation orchestration;
-   - P3-S3 owned read and detached self projection; and
-   - P3-S4 normal production composition with separately accepted production
-     controller resolver and ID issuer adapters.
-2. **Phase 4 — Run and continuous-story-line binding**
-   - bounded integration with a separately implemented Run-owned aggregate.
-3. **Phase 5 — Public projection and narrow boundary integration**
+1. **Phase 3 — Trusted canonical application service: complete and pushed**
+   - P3-S1 through P3-S4 are closed at the current accepted baseline.
+2. **P4-G0 — Minimum Run-core authority freeze: approved and closed**
+   - the independent read-only review returned
+     `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; the resulting
+     documentation milestone is local until the user manually pushes it.
+3. **Minimum Phase 3.3 Run-core prerequisite: not implemented**
+   - MRC-S1 is the next implementation slice after that push and clean-baseline
+     confirmation; MRC-S2 and MRC-S3 remain later ordered slices, and none has
+     started;
+   - its required sequence is owned by [the canonical minimum Run-core
+     plan](docs/minimum_run_core_implementation_plan.md).
+4. **P4-S1 — Run-owned continuous-story-line binding: not started**
+   - bind the canonical character and exact applicable reference only after
+     the minimum Run core is implemented and approved.
+5. **Phase 5 — Public projection and narrow boundary integration: deferred**
    - P5-S1 owned-read activation;
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
@@ -353,11 +369,14 @@ started.
 
 The subsequent P3-S1 status synchronization was committed and pushed at the
 pre-closure baseline `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
-(`docs(player-character): close phase 3 slice 1 status sync`). The present
-milestone candidate completes P3-S2 mutation orchestration, P3-S3 owned read
-and detached projection, and P3-S4 normal production composition. The complete
-Phase 3 code candidate received independent read-only approval with no open
-implementation finding. Phase 3 is complete; Phase 4 has not started.
+(`docs(player-character): close phase 3 slice 1 status sync`). The complete
+Phase 3 milestone then added P3-S2 mutation orchestration, P3-S3 owned read and
+detached projection, and P3-S4 normal production composition. It received
+independent read-only approval with no open implementation finding and was
+committed and pushed at
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Phase 3 is complete. Phase 4
+implementation has not started; P4-G0 documentation authority is approved and
+closed.
 
 Production controller authority is an explicit configured allowlist matched by
 the complete exact `(authentication_scheme, player_id)` `RequestPrincipal`
@@ -481,6 +500,24 @@ remain Deferred.
 The canonical design is
 [Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md).
 
+P4-G0 documentation authority is approved and closed following independent
+read-only review with `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. It
+freezes a smaller minimum Run-core prerequisite in
+[Minimum Run Core Implementation Plan](docs/minimum_run_core_implementation_plan.md):
+stable Run/line identity, minimum lifecycle and state version, durable
+Run-owned persistence/UoW, separate trusted Session participation, and the
+future atomic character-binding seam. The resulting documentation milestone is
+local until the user manually pushes it. MRC-S1 is next after that push and
+clean-baseline confirmation; MRC-S2 and MRC-S3 remain later ordered slices and
+none has started. P4-S1 follows only after that minimum core is implemented,
+independently approved, documented, committed, manually pushed, and confirmed
+as a clean baseline.
+
+Neither P4-G0 nor the minimum prerequisite marks the full Run Protocol
+implemented. World generation, profile resolution, scenario execution,
+later-world selection, visits/revisits, world-line transitions, narrative
+progression, and public Run behavior remain deferred beyond this gate.
+
 ## Phase 3.4: NPC Relationship and Temporary Residence
 
 Status: **Approved product design — not implemented.**
@@ -506,6 +543,9 @@ The canonical decision is
 
 ## Deferred
 
+- Full Run Protocol behavior beyond the minimum prerequisite; Phase 3.4 NPC
+  residence; structured-character API/frontend/Demo activation; Provider,
+  narrative, scenario, combat, and public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
   progression, and priority-injection details.
 - Exact Phase 3.3 parameter values, serialization, and compatibility policy.
@@ -557,6 +597,9 @@ manually.
   [`docs/decisions/0001-production-provider-distribution.md`](docs/decisions/0001-production-provider-distribution.md).
 - Run Protocol and difficulty/world profiles:
   [`docs/run_protocol.md`](docs/run_protocol.md).
+- Minimum Run-core prerequisite implementation sequence, persistence,
+  transaction, and evidence:
+  [`docs/minimum_run_core_implementation_plan.md`](docs/minimum_run_core_implementation_plan.md).
 - NPC relationship and temporary residence:
   [`docs/npc_relationship_residence.md`](docs/npc_relationship_residence.md).
 - Documentation and Git workflow:

@@ -1,7 +1,8 @@
 # Structured Player-Character Contract
 
 Status: **Approved and frozen structured player-character product
-specification — not implemented.**
+specification — partially implemented through completed Phase 3; Run-owned
+continuous-story-line binding remains unimplemented Phase 4 work.**
 
 Authority scope: **Normative player-character identity, canonical record,
 revision, lifecycle, validation, projection, and adjacent-authority
@@ -10,8 +11,11 @@ boundaries**
 ## 1. Status and authority
 
 This document is the approved and frozen structured player-character product
-specification. It remains not implemented and does not describe current runtime
-behavior. Approval and freeze do not authorize runtime work.
+specification. Its Phase 1 through Phase 3 foundation is implemented,
+independently approved, committed, and pushed. The Run-owned
+continuous-story-line binding and later public activation are not implemented;
+Phase 4 has not started. Approval and freeze do not authorize a later
+implementation phase.
 
 The approved and frozen
 [Final Narrative Experience and Long-Term Systems](final_narrative_experience.md)
@@ -29,11 +33,9 @@ the implemented [engineering guardrails](engineering/guardrails.md) and
 
 This contract MUST NOT silently redefine existing runtime behavior. A material
 conflict with an approved product requirement or a retained narrower authority
-MUST block approval and be resolved explicitly. Future implementation MAY
-begin only after this approved contract has been committed and pushed and a
-downstream implementation plan and task have been separately approved. This
-controlled closeout creates only the local documentation commit; Codex does not
-push.
+MUST block the affected later phase and be resolved explicitly. Further
+implementation MAY begin only through the approved downstream implementation
+plan and a separately authorized task.
 
 ## 2. Purpose
 
@@ -78,10 +80,13 @@ This contract does not:
 - add biography, class, origin, body, stats, inventory, progression, combat,
   skills, abilities, possession, inheritance, cloning, merging, deletion,
   transfer, or character-switching systems;
-- decide account character limits or concurrent active-character rules;
+- decide account/controller character limits or how many distinct canonical
+  characters one controller may keep active; this does not weaken the frozen
+  at-most-one-active-story-line-per-character binding rule;
 - define exact movement or transition mechanics, compatibility mechanics,
   arbitrary movement between unrelated Runs, transfer between separate
-  continuous story lines or accounts, or cross-Run concurrency;
+  continuous story lines or accounts, or cross-Run concurrency beyond the
+  frozen at-most-one-active-line-per-character rule;
 - decide whether a particular resurrection, rebirth, reincarnation, time
   reversal, or equivalent event preserves identity;
 - decide whether time reversal removes already authoritative consequences;
@@ -103,7 +108,7 @@ are normative when capitalized.
 | Controller | The authenticated account, principal, or equivalent trusted subject permitted to submit intent for a character |
 | Player-authored declaration | A declaration intentionally submitted or explicitly confirmed by the controller through a trusted player workflow |
 | Stable player-character identity | The immutable logical identity of one canonical player character |
-| Continuous story line | The product-level narrative continuity currently bound to one active player-character identity |
+| Continuous story line | Run-owned product-level narrative continuity with exactly one active player-character binding once bound; one character may belong to at most one active line |
 | Authoritative transition | A validated, authorized, atomic lifecycle mutation issued by trusted server policy |
 | Public projection | An explicit allowlist view safe for the intended client audience; never a mutable canonical object |
 | Provider candidate | Untrusted model output, including output that is structurally valid |
@@ -141,8 +146,10 @@ similarity MUST NOT establish identity continuity. Identity continuity MUST be
 an explicit trusted fact bound to `player_character_id`.
 
 One account or controller MAY be associated with multiple distinct canonical
-player characters. This contract does not select an upper bound or decide how
-many may be active concurrently.
+player characters. This contract does not select an account-level upper bound
+or decide how many distinct character records that controller may keep active.
+Independently, one canonical player character may belong to at most one active
+continuous story line.
 
 ## 7. Canonical player-character record
 
@@ -159,7 +166,7 @@ The minimum field groups are:
 | `character_core` | Required group; individual supported declarations may be absent until a separately approved profile rule requires them | Bounded player-authored declaration slots | Persistent self-description and identity presentation; absence means unset, not inferred |
 | `narration_preferences` | Required group; individual preference may be absent | Bounded player-selected presentation controls | Affects presentation only; absence does not authorize a Provider or server to choose subjective facts |
 | `character_development` | Optional entries | Bounded, typed, trusted-event-derived facts with provenance | Long-term consequences accepted by server rules; absence means no accepted entry of that type |
-| `continuity_metadata` | Required group; current-line reference or references conditional on lifecycle and transition context | Trusted references and explicit adjudication records | Binds current or ended continuity without deriving identity from prose; relationship cardinality remains delegated |
+| `continuity_metadata` | Required group; current-line reference or references conditional on lifecycle and transition context | Trusted references and explicit adjudication records | Binds current or ended continuity without deriving identity from prose; one line has one active binding once bound and one character has at most one active line |
 | `authority_provenance` | Required for each canonical mutation | Trusted mutation kind, actor/authority class, and source reference | Supports validation and audit; public absence is expected because it is not generally projected |
 
 The first contract version is referred to in this document as
@@ -344,7 +351,7 @@ request-lifecycle authorities and MUST NOT apply a mutation twice.
 
 | State | Meaning | Continuous-story-line rule |
 | --- | --- | --- |
-| `active` | Living canonical player character eligible for an explicitly authorized active continuity binding | Every continuous story line using the character MUST bind it explicitly; simultaneous line/Run cardinality remains unselected |
+| `active` | Living canonical player character eligible for an explicitly authorized active continuity binding | Every line using the character MUST bind it explicitly; one line has exactly one active binding once bound and the character belongs to at most one active line |
 | `retired` | Living canonical player character whose current continuous story line ended through explicit retirement | MUST have no silently active current line; consequences remain attached |
 | `deceased` | Canonical player character whose final death was authoritatively established | Current continuous story line is ended; ordinary reactivation is forbidden |
 
@@ -516,22 +523,46 @@ public client or request lifecycle.
 
 ## 20. Run and world relationship
 
-Player-character, Run, world, scenario, visit, region, and Session identities
-remain distinct.
+Player-character, Run, continuous-story-line, world, scenario, visit, region,
+and Session identities remain distinct.
 
 The canonical relationship required by the approved product authority is:
 
 ```text
-Run identity
-  -> binds one stable player_character_id
-  -> binds the applicable character contract/revision reference
+RunId
+  -> permanently owns one ContinuousStoryLineId
+  -> stores one explicit active player-character binding once bound
+       -> exact stable player_character_id
+       -> exact ApplicableCharacterReference
   -> uses Run-owned world and scenario bindings
 ```
 
 The Run authority owns Run creation, frozen protocol, entry-world identity and
 version, later-world selection, visit identity, and world-line rules. This
 character contract owns only the character identity/revision side of that
-binding and the rule that a binding MUST be explicit and validated.
+binding and the rule that a binding MUST be explicit and validated. The
+[Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
+freezes the prerequisite persistence and transaction seam. Neither that core
+nor the binding is implemented at P4-G0.
+
+Active binding cardinality is no longer unresolved:
+
+- once a continuous story line is bound, it has exactly one active canonical
+  player-character binding while active;
+- one canonical player character belongs to at most one active continuous
+  story line;
+- a second or conflicting active binding fails atomically without changing
+  either canonical subject;
+- a completed, terminated, or otherwise non-active historical line may retain
+  its immutable exact character/reference history without counting as a
+  second active binding; and
+- ending a bound Run/line MUST make the binding historical in the same
+  Run-owned canonical transaction.
+
+No cloning, transfer, replacement, automatic rebinding, or ownership inference
+is authorized by these rules. A Run or line identity, Session, controller,
+account, character definition, world, scenario, visit, browser record, or
+piece of prose cannot substitute for the bound `player_character_id`.
 
 Within the same continuous story line, every scenario change MUST preserve the
 same bound `player_character_id`. Run-authorized progression into a later world
@@ -570,22 +601,41 @@ Runs, separate continuous story lines, or accounts. Run reset, browser reset,
 Session loss, transport failure, or Provider failure MUST NOT create, delete,
 retire, reactivate, or replace a player character.
 
+The future P4-S1 binding is a Run-owned mutation. The Run application service
+MUST resolve trusted controller authority, obtain the canonical owned
+character and exact applicable reference through the narrow Phase 3-owned
+internal read seam defined by the minimum Run-core plan, and commit the
+complete Run binding revision and receipt inside the already-owned Run
+UnitOfWork. That seam MUST preserve existing Phase 3 authorization,
+non-enumeration, validation, and public `get_owned` behavior without opening a
+nested UnitOfWork. The binding operation MUST NOT trust submitted ownership,
+update the player-character aggregate, coordinate independent service commits,
+copy that aggregate into Session state, or treat a detached owned/public
+projection as writable persistence state.
+
+Session participation is a separate Run-owned persistence record. It MUST NOT
+add Run, line, or character-binding columns to `game_sessions`; MUST be created
+only by trusted Run orchestration; MUST NOT grant character ownership or
+controller authority; and MUST reject conflicting participation. Multiple
+distinct trusted Sessions MAY participate in the same Run without activating
+public resume, reconnect, cross-tab, browser-restart, or multi-device behavior.
+
 The following remain unresolved and MUST NOT be inferred by implementation:
 
 - exact same-line movement, transition, and compatibility mechanics, without
   making the binding's identity continuity optional;
-- whether one character may be bound to multiple active Runs and the applicable
-  cross-Run concurrency rules;
 - arbitrary movement between unrelated Runs, transfer between separate
   continuous story lines, cross-account transfer, and ownership transfer;
 - whether a Run binding follows later character revisions, checkpoints a
   specific revision, or otherwise follows revisions, including when a future
   approved policy may change the applicable character version reference; this
   deferral is not current authority for a scenario or later-world boundary to
-  change that reference; and
-- exact cross-Run, revisit, and world-line compatibility, plus policy for any
-  world movement not already authorized by Run authority and the frozen product
-  specification.
+  change that reference;
+- restart/resume, Session reassignment, successor/replacement, and
+  post-retirement/death/return behavior; and
+- exact cross-Run behavior beyond the frozen active-binding exclusivity,
+  revisit and world-line compatibility, plus policy for any world movement not
+  already authorized by Run authority and the frozen product specification.
 
 ## 21. NPC, relationship, memory, and golden-memory references
 
@@ -714,7 +764,7 @@ specification MUST define and verify:
 | Lifecycle policy classes | Independent policies for retirement, reactivation, final death, and authorized continuity |
 | Confirmation protocol | Explicit, identity/revision-bound retirement/reactivation confirmation with replay and ambiguity tests |
 | Atomic persistence | Character, lifecycle, bindings, provenance, consequences, and response commit or roll back together |
-| Run/world binding integration | Explicit stable ID plus applicable character version reference; stable-ID and no-silent-reference-switch tests across scenario, genre, world, visit, and Run-authorized later-world boundaries; no silent transfer or Session-derived replacement |
+| Run/world binding integration | Run-owned exact `RunId`/`ContinuousStoryLineId`, stable character ID plus applicable character reference, one-active-line-per-character and one-binding-per-line database/service backstops, atomic conflict tests, stable-ID and no-silent-reference-switch tests across scenario, genre, world, visit, and Run-authorized later-world boundaries, separate trusted Session participation, and no silent transfer or Session-derived replacement |
 | Memory/NPC integration | Correct stable player-character and logical-NPC subject binding without weakening current memory authority |
 | Provider boundary | Candidate-only behavior, failure preservation, no direct mutation path, and `MODEL-001` coverage |
 | Public projection | Explicit allowlists, privacy scans, immutable copies, and no authority-bearing internals |
@@ -770,7 +820,10 @@ separately approved downstream implementation plan and task.
 
 ## 27. Deferred questions and explicitly unselected designs
 
-The following are deliberately unresolved:
+The following are deliberately unselected by this product contract. A
+narrower downstream authority may already select a bounded representation for
+an implemented or planned slice; that does not promote the choice into this
+product contract or authorize adjacent work:
 
 - exact wire, DTO, API, persistence, table, column, snapshot, migration, and
   public-projection shapes;
@@ -778,19 +831,24 @@ The following are deliberately unresolved:
   quick-start templates;
 - activation/profile-completion requiredness for supported `character_core`
   declarations;
-- account/controller character limits and concurrent active-character rules;
+- account/controller character limits and how many distinct canonical
+  character records one controller may keep active; active line occupancy is
+  already frozen separately;
 - ownership transfer, shared control, delegation, unbinding, account recovery,
   deletion, archival, retention, restoration, cloning, and merging mechanics,
   all subordinate to permanent `player_character_id` non-reuse;
 - exact same-line movement and compatibility mechanics, arbitrary movement
   between unrelated Runs, transfer between separate continuous story lines or
-  accounts, cross-Run concurrency, and any world movement not already
-  authorized by Run authority and the frozen product specification;
+  accounts, cross-Run behavior beyond the frozen active-binding exclusivity,
+  and any world movement not already authorized by Run authority and the
+  frozen product specification;
 - whether Run bindings float with later character revisions, checkpoint a
   specific revision, or otherwise follow revisions, including when a future
   approved policy may change the applicable character version reference; this
   deferral supplies no current boundary-driven reference-change authority;
-- exact continuous-story-line identity and restart/resume semantics;
+- restart/resume, Session reassignment, and public reconnect semantics; the
+  minimum canonical `ContinuousStoryLineId` carrier and one-Run/one-line
+  ownership are frozen by P4-G0;
 - availability and identity outcome of resurrection, rebirth, reincarnation,
   time reversal, or equivalent continuity;
 - time-reversal effect on authoritative consequences;
@@ -857,8 +915,9 @@ one local documentation commit. It was not an independent review, changed no
 runtime behavior, made no additional product decision, and did not push. Codex
 does not push.
 
-The structured player-character contract is approved and frozen and remains not
-implemented. Approval and freeze do not authorize runtime work. Implementation
-requires a separately approved downstream implementation plan and task. The
-approved final narrative experience specification remains approved, frozen,
-and not implemented. Phase 3.2b remains closed.
+The structured player-character contract is approved and frozen and partially
+implemented through completed, independently approved, committed, and pushed
+Phase 3. The Run-owned continuous-story-line binding remains unimplemented;
+Phase 4 has not started. Approval and freeze do not authorize later runtime
+work. The approved final narrative experience specification remains approved,
+frozen, and not implemented. Phase 3.2b remains closed.
