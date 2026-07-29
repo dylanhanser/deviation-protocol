@@ -309,11 +309,48 @@ populated writes, no binding commits, and no public behavior activates.
 `application/ports.py`, `application/run_service.py`,
 `infrastructure/repositories.py`, and `api/main.py`, with
 `test_run_service.py`, `test_run_repositories.py`, `test_run_composition.py`,
-`test_mysql_run.py`, and the new MySQL binding module. It activates the complete
-internal atomic binding service and the binding-aware Player Character mutation
-guard together; successful binding must not activate unless that guard is active
-in the same completed slice. It preserves public non-activation/no migration,
-and remains unstaged through final review.
+`test_run_operations.py`, `test_mysql_run.py`, and the new MySQL binding module.
+The exact P4-S1b implementation inventory is exactly four production paths:
+`src/deviation_protocol/application/ports.py`,
+`src/deviation_protocol/application/run_service.py`,
+`src/deviation_protocol/infrastructure/repositories.py`, and
+`src/deviation_protocol/api/main.py`; and exactly six test paths:
+`tests/unit/test_run_service.py`, `tests/unit/test_run_repositories.py`,
+`tests/unit/test_run_composition.py`, `tests/unit/test_run_operations.py`,
+`tests/integration/test_mysql_run.py`, and
+`tests/integration/test_mysql_player_character_run_binding.py`. The total
+implementation candidate inventory after this authorized test correction is
+exactly ten paths.
+
+This is a post-freeze inventory correction. P4-S1a correctly required internal
+binding capabilities to remain inactive, but P4-S1b intentionally activates
+them. The existing `test_p4_s1a_keeps_binding_persistence_service_and_public_api_inactive`
+checkpoint in `tests/unit/test_run_operations.py` combines obsolete
+internal-inactivity assertions with still-valid public non-activation
+assertions. Adding this path is necessary to represent the phase transition
+honestly. P4-S1b authorizes changes in that file only to replace or rename that
+obsolete checkpoint so it accurately validates the P4-S1b phase boundary. The
+corrected checkpoint must stop asserting that populated active-binding
+persistence, `RunService.bind_player_character_to_run`, and
+`binding_integrity_guard_enabled=True` composition remain absent. It must
+preserve and continue validating that `ReservedBindPlayerCharacterCommand`
+remains rejected at the public boundary; `run.bind-player-character/v1` remains
+reserved and rejected; no public API route or DTO activates binding; and no
+frontend, Demo, scenario, world, gameplay, Provider, or model path activates
+binding. No unrelated test or assertion in `tests/unit/test_run_operations.py`
+is authorized to change.
+
+This correction does not alter the approved P4-S1a implementation or
+historical behavior; weaken RETIRE or FINAL_DEATH lifecycle guards; change the
+frozen transaction owner or lock order; change binding, replay, receipt, CAS,
+or concurrency semantics; expand production scope; activate public binding; or
+authorize P4-S2 or later work. It does not authorize migrations, dependencies,
+configuration, scripts, frontend, Demo, scenario, world, Provider, or model
+changes. It activates the complete internal atomic binding service and the
+binding-aware Player Character mutation guard together; successful binding
+must not activate unless that guard is active in the same completed slice. It
+preserves public non-activation/no migration, and remains unstaged through
+final review.
 
 ## Test, verification, and gate
 
