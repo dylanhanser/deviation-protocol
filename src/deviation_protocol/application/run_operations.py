@@ -4,11 +4,23 @@ from datetime import datetime
 from enum import StrEnum
 import hashlib
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_serializer,
+    model_validator,
+)
 
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    PlayerCharacterId,
+    validate_applicable_character_reference,
+)
 from deviation_protocol.domain.run import (
     CanonicalRun,
     ContinuousStoryLineId,
+    ReservedPlayerCharacterBinding,
     RunAuthoritySourceRef,
     RunId,
     RunLifecycleStatus,
@@ -25,6 +37,9 @@ from deviation_protocol.domain.run import (
 
 CREATE_RUN_RESULT_SCHEMA_VERSION = "run.create-result/v1"
 ATTACH_SESSION_RESULT_SCHEMA_VERSION = "run.attach-session-result/v1"
+BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION = (
+    "run.bind-player-character-result/v1"
+)
 
 
 class _StrictFrozenModel(BaseModel):
@@ -68,6 +83,14 @@ class ReservedBindPlayerCharacterCommand(_StrictFrozenModel):
     source_reference: RunAuthoritySourceRef
 
 
+class BindPlayerCharacterCommand(_StrictFrozenModel):
+    run_id: RunId
+    continuous_story_line_id: ContinuousStoryLineId
+    target_player_character_id: PlayerCharacterId
+    expected_state_version: RunStateVersion
+    source_reference: RunAuthoritySourceRef
+
+
 class RunSafeResult(_StrictFrozenModel):
     result_schema_version: str = Field(strict=True, min_length=1, max_length=64)
     run_id: RunId
@@ -75,6 +98,26 @@ class RunSafeResult(_StrictFrozenModel):
     lifecycle_status: RunLifecycleStatus
     resulting_state_version: RunStateVersion
     participation_reference: RunSessionParticipationReference | None = None
+    applicable_character_reference: ApplicableCharacterReference | None = None
+
+    @model_serializer(mode="plain")
+    def serialize_result(self) -> dict[str, object]:
+        serialized: dict[str, object] = {
+            "result_schema_version": self.result_schema_version,
+            "run_id": self.run_id,
+            "continuous_story_line_id": self.continuous_story_line_id,
+            "lifecycle_status": self.lifecycle_status,
+            "resulting_state_version": self.resulting_state_version,
+            "participation_reference": self.participation_reference,
+        }
+        if (
+            self.result_schema_version
+            == BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION
+        ):
+            serialized["applicable_character_reference"] = (
+                self.applicable_character_reference
+            )
+        return serialized
 
     @model_validator(mode="after")
     def validate_result_shape(self) -> RunSafeResult:
@@ -83,6 +126,7 @@ class RunSafeResult(_StrictFrozenModel):
                 self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN
                 or self.resulting_state_version.value != 1
                 or self.participation_reference is not None
+                or self.applicable_character_reference is not None
             ):
                 raise ValueError("creation result must describe initial unjoined state")
         elif self.result_schema_version == ATTACH_SESSION_RESULT_SCHEMA_VERSION:
@@ -90,6 +134,7 @@ class RunSafeResult(_StrictFrozenModel):
             if (
                 not self.lifecycle_status.is_active_line
                 or participation is None
+                or self.applicable_character_reference is not None
                 or (
                     participation.run_id != self.run_id
                     or participation.continuous_story_line_id
@@ -99,6 +144,16 @@ class RunSafeResult(_StrictFrozenModel):
                 )
             ):
                 raise ValueError("participation result is inconsistent")
+        elif (
+            self.result_schema_version
+            == BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION
+        ):
+            if (
+                not self.lifecycle_status.is_active_line
+                or self.participation_reference is not None
+                or self.applicable_character_reference is None
+            ):
+                raise ValueError("player-character binding result is inconsistent")
         else:
             raise ValueError("Run result schema is not admitted")
         return self
@@ -132,6 +187,10 @@ class StoredRunSuccessReceipt(_StrictFrozenModel):
             RunMutationKind.ATTACH_SESSION: (
                 RunOperationNamespace.ATTACH_SESSION_V1,
                 ATTACH_SESSION_RESULT_SCHEMA_VERSION,
+            ),
+            RunMutationKind.BIND_PLAYER_CHARACTER: (
+                RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+                BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION,
             ),
         }.get(self.command_kind)
         if expected is None or (
@@ -211,6 +270,31 @@ def attach_session_fingerprint(
     return _fingerprint({"command_kind": RunMutationKind.ATTACH_SESSION, "continuous_story_line_id": command.continuous_story_line_id, "expected_state_version": command.expected_state_version.value, "operation_id": operation_id, "operation_namespace": RunOperationNamespace.ATTACH_SESSION_V1, "run_id": command.run_id, "session_id": command.session_id, "source_reference": command.source_reference})
 
 
+def bind_player_character_fingerprint(
+    command: BindPlayerCharacterCommand,
+    *,
+    operation_id: RunOperationId,
+) -> tuple[bytes, RunOperationFingerprint]:
+    command = revalidate_run_model(command, BindPlayerCharacterCommand)
+    operation_id = revalidate_run_model(operation_id, RunOperationId)
+    return _fingerprint(
+        {
+            "command_kind": RunMutationKind.BIND_PLAYER_CHARACTER,
+            "continuous_story_line_id": command.continuous_story_line_id,
+            "expected_state_version": command.expected_state_version.value,
+            "operation_id": operation_id,
+            "operation_namespace": (
+                RunOperationNamespace.BIND_PLAYER_CHARACTER_V1
+            ),
+            "run_id": command.run_id,
+            "source_reference": command.source_reference,
+            "target_player_character_id": (
+                command.target_player_character_id
+            ),
+        }
+    )
+
+
 def attach_session_to_run(
     run: CanonicalRun,
     command: AttachSessionCommand,
@@ -260,6 +344,77 @@ def attach_session_to_run(
         creation_provenance=run.creation_provenance,
         current_mutation_provenance=provenance,
         trusted_participation_references=(*run.trusted_participation_references, participation),
+        player_character_binding=run.player_character_binding,
+    )
+
+
+def bind_player_character_to_run(
+    run: CanonicalRun,
+    command: BindPlayerCharacterCommand,
+    *,
+    applicable_character_reference: ApplicableCharacterReference,
+    operation_id: RunOperationId,
+    occurred_at: datetime,
+) -> CanonicalRun:
+    """Return the one-version successor containing one complete active binding."""
+
+    run = validate_canonical_run(run)
+    command = revalidate_run_model(command, BindPlayerCharacterCommand)
+    applicable_character_reference = validate_applicable_character_reference(
+        applicable_character_reference
+    )
+    operation_id = revalidate_run_model(operation_id, RunOperationId)
+    if (
+        command.run_id != run.run_id
+        or command.continuous_story_line_id
+        != run.continuous_story_line_id
+        or command.expected_state_version != run.state_version
+    ):
+        raise ValueError(
+            "bind-player-character command does not bind the current Run state"
+        )
+    if not run.lifecycle_status.is_active_line:
+        raise ValueError("cannot bind a player character to a non-active Run line")
+    if run.player_character_binding is not None:
+        raise ValueError("Run line already has a player-character binding")
+    if (
+        applicable_character_reference.player_character_id
+        != command.target_player_character_id
+    ):
+        raise ValueError(
+            "applicable character reference does not bind the command target"
+        )
+    successor = run.state_version.successor()
+    provenance = RunMutationProvenance(
+        target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version,
+        resulting_state_version=successor,
+        mutation_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+        operation_id=operation_id,
+        source_reference=command.source_reference,
+        occurred_at=occurred_at,
+    )
+    binding = ReservedPlayerCharacterBinding(
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        applicable_character_reference=applicable_character_reference,
+        binding_state="active",
+        binding_operation_id=operation_id,
+        binding_authority_source_ref=command.source_reference,
+        bound_at=occurred_at,
+    )
+    return CanonicalRun(
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        lifecycle_status=run.lifecycle_status,
+        state_version=successor,
+        creation_provenance=run.creation_provenance,
+        current_mutation_provenance=provenance,
+        trusted_participation_references=(
+            run.trusted_participation_references
+        ),
+        player_character_binding=binding,
     )
 
 
@@ -300,6 +455,30 @@ def attach_session_result(run: CanonicalRun) -> RunSafeResult:
     if run.current_mutation_provenance.mutation_kind is not RunMutationKind.ATTACH_SESSION or not run.trusted_participation_references:
         raise ValueError("participation result requires an attached Session state")
     return RunSafeResult(result_schema_version=ATTACH_SESSION_RESULT_SCHEMA_VERSION, run_id=run.run_id, continuous_story_line_id=run.continuous_story_line_id, lifecycle_status=run.lifecycle_status, resulting_state_version=run.state_version, participation_reference=run.trusted_participation_references[-1])
+
+
+def bind_player_character_result(run: CanonicalRun) -> RunSafeResult:
+    run = validate_canonical_run(run)
+    binding = run.player_character_binding
+    if (
+        run.current_mutation_provenance.mutation_kind
+        is not RunMutationKind.BIND_PLAYER_CHARACTER
+        or binding is None
+        or binding.binding_state != "active"
+    ):
+        raise ValueError(
+            "player-character binding result requires a binding Run state"
+        )
+    return RunSafeResult(
+        result_schema_version=BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION,
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        lifecycle_status=run.lifecycle_status,
+        resulting_state_version=run.state_version,
+        applicable_character_reference=(
+            binding.applicable_character_reference
+        ),
+    )
 
 
 def _fingerprint(payload: object) -> tuple[bytes, RunOperationFingerprint]:

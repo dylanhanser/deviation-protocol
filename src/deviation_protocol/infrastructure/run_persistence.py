@@ -9,21 +9,35 @@ from typing import Any
 
 from deviation_protocol.application.run_operations import (
     ATTACH_SESSION_RESULT_SCHEMA_VERSION,
+    BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION,
     CREATE_RUN_RESULT_SCHEMA_VERSION,
     AttachSessionCommand,
+    BindPlayerCharacterCommand,
     CreateRunCommand,
     RunOperationFingerprint,
     RunOperationNamespace,
     StoredRunSuccessReceipt,
     attach_session_fingerprint,
     attach_session_result,
+    bind_player_character_fingerprint,
+    bind_player_character_result,
     create_run_fingerprint,
     creation_result,
+)
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    CanonicalPlayerCharacter,
+    PlayerCharacterContractVersion,
+    PlayerCharacterId,
+    PlayerCharacterLifecycle,
+    PlayerCharacterRevision,
+    validate_canonical_player_character,
 )
 from deviation_protocol.domain.run import (
     CanonicalRun,
     ContinuousStoryLineId,
     MAX_RUN_STATE_VERSION,
+    ReservedPlayerCharacterBinding,
     RunAuthoritySourceRef,
     RunId,
     RunLifecycleStatus,
@@ -302,6 +316,33 @@ def attach_operation_evidence_from_storage(value: bytes) -> AttachSessionCommand
     return command
 
 
+def binding_operation_evidence_to_storage_bytes(
+    command: BindPlayerCharacterCommand,
+) -> bytes:
+    try:
+        command = revalidate_run_model(command, BindPlayerCharacterCommand)
+        return canonical_run_operation_bytes(command)
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise _fail("Run binding operation evidence is invalid") from exc
+
+
+def binding_operation_evidence_from_storage(
+    value: bytes,
+) -> BindPlayerCharacterCommand:
+    _strict_object(value)
+    try:
+        command = BindPlayerCharacterCommand.model_validate_json(value)
+        command = revalidate_run_model(
+            command,
+            BindPlayerCharacterCommand,
+        )
+    except (TypeError, ValueError) as exc:
+        raise _fail("Run binding operation evidence is invalid") from exc
+    if binding_operation_evidence_to_storage_bytes(command) != value:
+        raise _fail("Run binding operation evidence is non-canonical")
+    return command
+
+
 def participation_from_storage(
     stored: StoredRunSessionParticipationRecord,
 ) -> RunSessionParticipationReference:
@@ -335,7 +376,7 @@ def participation_from_storage(
         raise _fail("stored Run participation is invalid") from exc
 
 
-_BINDING_FIELDS = (
+_BINDING_ENVELOPE_FIELDS = (
     "binding_player_character_id",
     "binding_contract_version",
     "binding_record_revision",
@@ -344,13 +385,85 @@ _BINDING_FIELDS = (
     "binding_authority_source_ref",
     "bound_at",
     "inactivated_at",
-    "active_player_character_id",
 )
 
 
-def _require_absent_binding(stored: Any) -> None:
-    if any(getattr(stored, field_name) is not None for field_name in _BINDING_FIELDS):
-        raise _fail("minimum Run-core stored binding seam must remain fully absent")
+def _binding_from_storage(
+    stored: StoredCurrentRunRecord | StoredRunRevisionRecord,
+) -> ReservedPlayerCharacterBinding | None:
+    values = tuple(
+        getattr(stored, field_name)
+        for field_name in _BINDING_ENVELOPE_FIELDS
+    )
+    present = tuple(value is not None for value in values)
+    required_present = present[:-1]
+    is_current = isinstance(stored, StoredCurrentRunRecord)
+    if not any(present):
+        if stored.active_player_character_id is not None:
+            raise _fail(
+                "unbound current Run has an active-character backstop"
+            )
+        return None
+    if not all(required_present):
+        raise _fail("stored Run binding evidence is partial")
+    if not is_current and stored.active_player_character_id is not None:
+        raise _fail(
+            "immutable Run revision has a current-only active backstop"
+        )
+    _require_version(
+        stored.binding_record_revision,
+        "binding_record_revision",
+    )
+    _require_utc(stored.bound_at, "bound_at")
+    if stored.inactivated_at is not None:
+        _require_utc(stored.inactivated_at, "inactivated_at")
+    if (
+        stored.binding_state != "active"
+        or stored.inactivated_at is not None
+    ):
+        raise _fail("P4-S1 stored binding must be complete and active")
+    if (
+        is_current
+        and stored.active_player_character_id
+        != stored.binding_player_character_id
+    ):
+        raise _fail(
+            "active binding does not match the current-row backstop"
+        )
+    try:
+        binding = ReservedPlayerCharacterBinding(
+            run_id=revalidate_run_model(stored.run_id, RunId),
+            continuous_story_line_id=revalidate_run_model(
+                stored.continuous_story_line_id,
+                ContinuousStoryLineId,
+            ),
+            applicable_character_reference=ApplicableCharacterReference(
+                player_character_id=PlayerCharacterId(
+                    value=stored.binding_player_character_id
+                ),
+                contract_version=PlayerCharacterContractVersion(
+                    stored.binding_contract_version
+                ),
+                record_revision=PlayerCharacterRevision(
+                    value=stored.binding_record_revision
+                ),
+            ),
+            binding_state=stored.binding_state,
+            binding_operation_id=RunOperationId(
+                value=stored.binding_operation_id
+            ),
+            binding_authority_source_ref=RunAuthoritySourceRef(
+                value=stored.binding_authority_source_ref
+            ),
+            bound_at=stored.bound_at,
+            inactivated_at=stored.inactivated_at,
+        )
+        return revalidate_run_model(
+            binding,
+            ReservedPlayerCharacterBinding,
+        )
+    except (AttributeError, TypeError, ValueError) as exc:
+        raise _fail("stored Run binding evidence is invalid") from exc
 
 
 def _run_from_core(
@@ -372,7 +485,7 @@ def _run_from_core(
             raise _fail("stored current Run audit times are inconsistent")
     elif stored.created_at != stored.occurred_at:
         raise _fail("stored Run revision audit time is inconsistent")
-    _require_absent_binding(stored)
+    binding = _binding_from_storage(stored)
     try:
         run_id = revalidate_run_model(stored.run_id, RunId)
         line_id = revalidate_run_model(
@@ -432,6 +545,7 @@ def _run_from_core(
                 creation_provenance=creation,
                 current_mutation_provenance=current,
                 trusted_participation_references=participations,
+                player_character_binding=binding,
             )
         )
     except (AttributeError, TypeError, ValueError) as exc:
@@ -506,56 +620,127 @@ def mutation_receipt_from_storage(
         stored.operation_evidence_canonical,
         "operation_evidence_canonical",
     )
-    reserved = (
-        stored.result_player_character_id,
-        stored.result_character_contract_version,
-        stored.result_character_record_revision,
-    )
-    if any(value is not None for value in reserved):
-        raise _fail("minimum Run mutation receipt populated reserved binding fields")
-    if (
-        stored.participation_session_id is None
-        or stored.participation_operation_id is None
-        or stored.participation_source_reference is None
-    ):
-        raise _fail("Run attachment receipt participation fields are incomplete")
     receipt = _receipt_from_storage(stored.receipt_canonical)
-    command = attach_operation_evidence_from_storage(
-        stored.operation_evidence_canonical
-    )
-    _, fingerprint = attach_session_fingerprint(
-        command,
-        operation_id=stored.operation_id,
-    )
     result = receipt.result
-    participation = result.participation_reference
     if (
-        receipt.key.operation_namespace
-        is not RunOperationNamespace.ATTACH_SESSION_V1
-        or receipt.key.run_id != stored.run_id
+        receipt.key.run_id != stored.run_id
         or receipt.key.operation_namespace.value != stored.operation_namespace
         or receipt.key.operation_id != stored.operation_id
         or fingerprint_to_storage_bytes(receipt.fingerprint) != stored.fingerprint
-        or receipt.fingerprint != fingerprint
-        or receipt.command_kind is not RunMutationKind.ATTACH_SESSION
-        or receipt.command_kind.value != stored.command_kind
-        or result.result_schema_version != ATTACH_SESSION_RESULT_SCHEMA_VERSION
         or result.result_schema_version != stored.result_schema_version
-        or command.expected_state_version.value != stored.expected_state_version
         or result.resulting_state_version.value
         != stored.resulting_state_version
+        or stored.resulting_state_version
+        != stored.expected_state_version + 1
         or result.run_id != stored.result_run_id
+        or result.run_id != stored.run_id
         or result.continuous_story_line_id
         != stored.result_continuous_story_line_id
         or result.lifecycle_status.value != stored.resulting_lifecycle_status
-        or participation is None
-        or participation.session_id != stored.participation_session_id
-        or participation.operation_id.value
-        != stored.participation_operation_id
-        or participation.source_reference.value
-        != stored.participation_source_reference
     ):
         raise _fail("stored Run mutation receipt columns are inconsistent")
+    if stored.command_kind == RunMutationKind.ATTACH_SESSION.value:
+        reserved = (
+            stored.result_player_character_id,
+            stored.result_character_contract_version,
+            stored.result_character_record_revision,
+        )
+        if any(value is not None for value in reserved):
+            raise _fail(
+                "Run attachment receipt populated binding result fields"
+            )
+        if (
+            stored.participation_session_id is None
+            or stored.participation_operation_id is None
+            or stored.participation_source_reference is None
+        ):
+            raise _fail(
+                "Run attachment receipt participation fields are incomplete"
+            )
+        command = attach_operation_evidence_from_storage(
+            stored.operation_evidence_canonical
+        )
+        _, fingerprint = attach_session_fingerprint(
+            command,
+            operation_id=stored.operation_id,
+        )
+        participation = result.participation_reference
+        if (
+            receipt.key.operation_namespace
+            is not RunOperationNamespace.ATTACH_SESSION_V1
+            or receipt.fingerprint != fingerprint
+            or receipt.command_kind is not RunMutationKind.ATTACH_SESSION
+            or result.result_schema_version
+            != ATTACH_SESSION_RESULT_SCHEMA_VERSION
+            or command.expected_state_version.value
+            != stored.expected_state_version
+            or participation is None
+            or result.applicable_character_reference is not None
+            or participation.session_id
+            != stored.participation_session_id
+            or participation.operation_id.value
+            != stored.participation_operation_id
+            or participation.source_reference.value
+            != stored.participation_source_reference
+        ):
+            raise _fail(
+                "stored Run attachment receipt columns are inconsistent"
+            )
+    elif stored.command_kind == RunMutationKind.BIND_PLAYER_CHARACTER.value:
+        participation_fields = (
+            stored.participation_session_id,
+            stored.participation_operation_id,
+            stored.participation_source_reference,
+        )
+        binding_result_fields = (
+            stored.result_player_character_id,
+            stored.result_character_contract_version,
+            stored.result_character_record_revision,
+        )
+        if any(value is not None for value in participation_fields):
+            raise _fail(
+                "Run binding receipt populated participation fields"
+            )
+        if not all(value is not None for value in binding_result_fields):
+            raise _fail("Run binding receipt result fields are incomplete")
+        _require_version(
+            stored.result_character_record_revision,
+            "result_character_record_revision",
+        )
+        command = binding_operation_evidence_from_storage(
+            stored.operation_evidence_canonical
+        )
+        _, fingerprint = bind_player_character_fingerprint(
+            command,
+            operation_id=stored.operation_id,
+        )
+        reference = result.applicable_character_reference
+        if (
+            receipt.key.operation_namespace
+            is not RunOperationNamespace.BIND_PLAYER_CHARACTER_V1
+            or receipt.fingerprint != fingerprint
+            or receipt.command_kind
+            is not RunMutationKind.BIND_PLAYER_CHARACTER
+            or result.result_schema_version
+            != BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION
+            or command.expected_state_version.value
+            != stored.expected_state_version
+            or result.participation_reference is not None
+            or reference is None
+            or reference.player_character_id.value
+            != stored.result_player_character_id
+            or reference.contract_version.value
+            != stored.result_character_contract_version
+            or reference.record_revision.value
+            != stored.result_character_record_revision
+            or command.target_player_character_id
+            != reference.player_character_id
+        ):
+            raise _fail(
+                "stored Run binding receipt columns are inconsistent"
+            )
+    else:
+        raise _fail("stored Run mutation receipt command is not admitted")
     return receipt
 
 
@@ -576,7 +761,7 @@ def _same_core(
         "operation_id",
         "source_reference",
         "occurred_at",
-        *_BINDING_FIELDS,
+        *_BINDING_ENVELOPE_FIELDS,
     )
     return all(getattr(current, name) == getattr(revision, name) for name in names)
 
@@ -588,6 +773,9 @@ def validate_stored_run_record_set(
     revisions: tuple[StoredRunRevisionRecord, ...] | None,
     current: StoredCurrentRunRecord | None,
     participations: tuple[StoredRunSessionParticipationRecord, ...],
+    referenced_player_character_revision: (
+        CanonicalPlayerCharacter | None
+    ) = None,
 ) -> CanonicalRun:
     """Reconstruct one complete Run history or fail closed."""
 
@@ -602,9 +790,6 @@ def validate_stored_run_record_set(
     versions = tuple(item.state_version for item in ordered_revisions)
     if versions != tuple(range(1, len(ordered_revisions) + 1)):
         raise _fail("Run revision history is missing or discontinuous")
-    _require_absent_binding(current)
-    for revision in ordered_revisions:
-        _require_absent_binding(revision)
     if current.state_version != versions[-1] or not _same_core(
         current,
         ordered_revisions[-1],
@@ -620,8 +805,6 @@ def validate_stored_run_record_set(
     joined_versions = tuple(
         item.joined_state_version.value for item in decoded_participations
     )
-    if joined_versions != tuple(range(2, len(ordered_revisions) + 1)):
-        raise _fail("Run participation history is missing or discontinuous")
     if len({item.session_id for item in decoded_participations}) != len(
         decoded_participations
     ):
@@ -659,6 +842,78 @@ def validate_stored_run_record_set(
         for item in (*history[1:], current_run)
     ):
         raise _fail("Run history rewrote immutable creation provenance")
+    expected_joined_versions = tuple(
+        item.state_version.value
+        for item in history[1:]
+        if (
+            item.current_mutation_provenance.mutation_kind
+            is RunMutationKind.ATTACH_SESSION
+        )
+    )
+    if joined_versions != expected_joined_versions:
+        raise _fail("Run participation history is missing or discontinuous")
+
+    binding_versions = tuple(
+        item.state_version.value
+        for item in history
+        if (
+            item.current_mutation_provenance.mutation_kind
+            is RunMutationKind.BIND_PLAYER_CHARACTER
+        )
+    )
+    current_binding = current_run.player_character_binding
+    if current_binding is None:
+        if binding_versions or any(
+            item.player_character_binding is not None for item in history
+        ):
+            raise _fail("Run history lost surviving binding evidence")
+        if referenced_player_character_revision is not None:
+            raise _fail(
+                "unbound Run has unexpected referenced character evidence"
+            )
+    else:
+        if len(binding_versions) != 1:
+            raise _fail(
+                "Run history must contain exactly one binding transition"
+            )
+        binding_version = binding_versions[0]
+        for item in history:
+            expected_binding = (
+                None
+                if item.state_version.value < binding_version
+                else current_binding
+            )
+            if item.player_character_binding != expected_binding:
+                raise _fail(
+                    "Run history replaced or contradicted its binding"
+                )
+        if referenced_player_character_revision is None:
+            raise _fail(
+                "referenced immutable player-character revision is missing"
+            )
+        try:
+            referenced_record = validate_canonical_player_character(
+                referenced_player_character_revision
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise _fail(
+                "referenced immutable player-character revision is invalid"
+            ) from exc
+        reference = current_binding.applicable_character_reference
+        if (
+            referenced_record.player_character_id
+            != reference.player_character_id
+            or referenced_record.contract_version
+            != reference.contract_version
+            or referenced_record.record_revision
+            != reference.record_revision
+            or referenced_record.lifecycle
+            is not PlayerCharacterLifecycle.ACTIVE
+        ):
+            raise _fail(
+                "binding reference does not match its immutable "
+                "player-character revision"
+            )
 
     creation = creation_receipt_from_storage(creation_receipt)
     creation_command = creation_operation_evidence_from_storage(
@@ -697,29 +952,85 @@ def validate_stored_run_record_set(
         before = history[version - 2]
         after = history[version - 1]
         stored, receipt = mutation_by_version[version]
-        command = attach_operation_evidence_from_storage(
-            stored.operation_evidence_canonical
-        )
-        participation = after.trusted_participation_references[-1]
-        stored_participation = ordered_participations[version - 2]
         provenance = after.current_mutation_provenance
         if (
-            receipt.result != attach_session_result(after)
-            or receipt.key.run_id != after.run_id
+            receipt.key.run_id != after.run_id
             or receipt.key.operation_id != provenance.operation_id
             or stored.run_id != after.run_id
             or stored.expected_state_version != before.state_version.value
-            or command.run_id != after.run_id
-            or command.continuous_story_line_id
-            != after.continuous_story_line_id
-            or command.session_id != participation.session_id
-            or command.expected_state_version != before.state_version
-            or command.source_reference != provenance.source_reference
-            or participation.operation_id != provenance.operation_id
-            or participation.source_reference != provenance.source_reference
-            or stored_participation.joined_at != provenance.occurred_at
             or stored.created_at != provenance.occurred_at
         ):
-            raise _fail("Run attachment evidence does not bind adjacent history")
+            raise _fail("Run mutation evidence does not bind adjacent history")
+        if provenance.mutation_kind is RunMutationKind.ATTACH_SESSION:
+            command = attach_operation_evidence_from_storage(
+                stored.operation_evidence_canonical
+            )
+            if not after.trusted_participation_references:
+                raise _fail(
+                    "Run attachment history has no participation evidence"
+                )
+            participation = after.trusted_participation_references[-1]
+            stored_participation = next(
+                (
+                    item
+                    for item in ordered_participations
+                    if item.joined_state_version == version
+                ),
+                None,
+            )
+            if (
+                receipt.result != attach_session_result(after)
+                or command.run_id != after.run_id
+                or command.continuous_story_line_id
+                != after.continuous_story_line_id
+                or command.session_id != participation.session_id
+                or command.expected_state_version != before.state_version
+                or command.source_reference != provenance.source_reference
+                or participation.operation_id != provenance.operation_id
+                or participation.source_reference
+                != provenance.source_reference
+                or stored_participation is None
+                or stored_participation.joined_at
+                != provenance.occurred_at
+                or after.player_character_binding
+                != before.player_character_binding
+            ):
+                raise _fail(
+                    "Run attachment evidence does not bind adjacent history"
+                )
+        elif (
+            provenance.mutation_kind
+            is RunMutationKind.BIND_PLAYER_CHARACTER
+        ):
+            command = binding_operation_evidence_from_storage(
+                stored.operation_evidence_canonical
+            )
+            binding = after.player_character_binding
+            if (
+                binding is None
+                or before.player_character_binding is not None
+                or receipt.result != bind_player_character_result(after)
+                or command.run_id != after.run_id
+                or command.continuous_story_line_id
+                != after.continuous_story_line_id
+                or command.expected_state_version != before.state_version
+                or command.source_reference != provenance.source_reference
+                or command.target_player_character_id
+                != binding.applicable_character_reference.player_character_id
+                or binding.binding_operation_id
+                != provenance.operation_id
+                or binding.binding_authority_source_ref
+                != provenance.source_reference
+                or binding.bound_at != provenance.occurred_at
+                or any(
+                    item.joined_state_version.value == version
+                    for item in decoded_participations
+                )
+            ):
+                raise _fail(
+                    "Run binding evidence does not bind adjacent history"
+                )
+        else:
+            raise _fail("Run history contains an unsupported mutation")
 
     return current_run

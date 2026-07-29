@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Protocol, cast
 
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_operations import (
@@ -36,12 +37,16 @@ from deviation_protocol.application.ports import (
     ControllerBindingUniquenessConflictError,
     MutationReceiptUniquenessConflictError,
     PlayerCharacterIdIssuer,
+    UnitOfWork,
     UnitOfWorkFactory,
 )
 from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
     AuthoritySourceRef,
+    CanonicalPlayerCharacter,
     ControllerBindingRef,
     PlayerCharacterId,
+    PlayerCharacterLifecycle,
     PlayerCharacterMutationKind,
     PlayerCharacterOperationId,
     revalidate_player_character_model,
@@ -49,8 +54,32 @@ from deviation_protocol.domain.player_character import (
 )
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
+    PlayerCharacterPolicyCode,
     PlayerCharacterPolicyDecision,
 )
+from deviation_protocol.domain.run import (
+    CanonicalRun,
+    validate_canonical_run,
+)
+
+
+class PlayerCharacterBindingEvidenceIntegrityError(ValueError):
+    """Canonical binding evidence is contradictory or incomplete."""
+
+
+@dataclass(frozen=True, slots=True)
+class PlayerCharacterBindingEligibilityEvidence:
+    """The narrow owned character evidence exposed to internal Run binding."""
+
+    applicable_character_reference: ApplicableCharacterReference
+    lifecycle: PlayerCharacterLifecycle
+
+
+class _ActiveBindingEvidenceRepository(Protocol):
+    async def get_active_for_player_character_for_update(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> CanonicalRun | None: ...
 
 
 @dataclass(slots=True)
@@ -61,6 +90,7 @@ class PlayerCharacterService:
     create_policy: CreatePlayerCharacterPolicy
     source_reference: AuthoritySourceRef
     clock: Callable[[], datetime]
+    binding_integrity_guard_enabled: bool = False
 
     async def create(
         self,
@@ -314,6 +344,36 @@ class PlayerCharacterService:
                 ):
                     return protocol_decision
 
+                if (
+                    self.binding_integrity_guard_enabled
+                    and command.command_kind
+                    in {
+                        PlayerCharacterMutationKind.RETIRE,
+                        PlayerCharacterMutationKind.FINAL_DEATH,
+                    }
+                ):
+                    active_binding = (
+                        await self.get_active_binding_evidence_for_update(
+                            uow,
+                            locked_player_character=current,
+                        )
+                    )
+                    if active_binding is not None:
+                        if (
+                            current.lifecycle
+                            is not PlayerCharacterLifecycle.ACTIVE
+                        ):
+                            raise PlayerCharacterBindingEvidenceIntegrityError(
+                                "an active Run binding references an inactive "
+                                "current player character"
+                            )
+                        return PlayerCharacterPolicyDecision(
+                            code=(
+                                PlayerCharacterPolicyCode
+                                .ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED
+                            )
+                        )
+
                 policy_decision = evaluate_mutation_policy(
                     current,
                     command=command,
@@ -459,6 +519,90 @@ class PlayerCharacterService:
             return PlayerCharacterSelfProjection.from_validated_record(
                 current
             )
+
+    async def lock_owned_for_binding(
+        self,
+        uow: UnitOfWork,
+        *,
+        trusted_controller_binding: ControllerBindingRef,
+        target_player_character_id: PlayerCharacterId,
+    ) -> PlayerCharacterBindingEligibilityEvidence | None:
+        """Lock and return only the owned character evidence needed by Run."""
+
+        trusted_controller_binding = revalidate_player_character_model(
+            trusted_controller_binding,
+            ControllerBindingRef,
+        )
+        target_player_character_id = revalidate_player_character_model(
+            target_player_character_id,
+            PlayerCharacterId,
+        )
+        current = await uow.player_characters.get_for_update(
+            target_player_character_id
+        )
+        if current is None:
+            return None
+        try:
+            current = validate_canonical_player_character(current)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PlayerCharacterBindingEvidenceIntegrityError(
+                "locked player-character evidence is malformed or corrupt"
+            ) from exc
+        if current.controller_binding != trusted_controller_binding:
+            return None
+        if current.player_character_id != target_player_character_id:
+            raise PlayerCharacterBindingEvidenceIntegrityError(
+                "locked player-character evidence has a mismatched identity"
+            )
+        return PlayerCharacterBindingEligibilityEvidence(
+            applicable_character_reference=ApplicableCharacterReference(
+                player_character_id=current.player_character_id,
+                contract_version=current.contract_version,
+                record_revision=current.record_revision,
+            ),
+            lifecycle=current.lifecycle,
+        )
+
+    async def get_active_binding_evidence_for_update(
+        self,
+        uow: UnitOfWork,
+        *,
+        locked_player_character: CanonicalPlayerCharacter,
+    ) -> CanonicalRun | None:
+        """Load and lock canonical active-line evidence after the character lock."""
+
+        current = validate_canonical_player_character(
+            locked_player_character
+        )
+        repository = cast(_ActiveBindingEvidenceRepository, uow.runs)
+        run = await repository.get_active_for_player_character_for_update(
+            current.player_character_id
+        )
+        if run is None:
+            return None
+        try:
+            run = validate_canonical_run(run)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PlayerCharacterBindingEvidenceIntegrityError(
+                "active-line lookup returned malformed or corrupt binding "
+                "evidence"
+            ) from exc
+        binding = run.player_character_binding
+        if (
+            not run.lifecycle_status.is_active_line
+            or binding is None
+            or binding.binding_state != "active"
+            or binding.inactivated_at is not None
+            or binding.run_id != run.run_id
+            or binding.continuous_story_line_id
+            != run.continuous_story_line_id
+            or binding.applicable_character_reference.player_character_id
+            != current.player_character_id
+        ):
+            raise PlayerCharacterBindingEvidenceIntegrityError(
+                "active-line lookup returned contradictory binding evidence"
+            )
+        return run
 
     async def _recover_binding_winner(
         self,

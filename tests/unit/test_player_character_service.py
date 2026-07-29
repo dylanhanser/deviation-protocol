@@ -35,7 +35,15 @@ from deviation_protocol.application.player_character_operations import (
     mutation_fingerprint,
 )
 from deviation_protocol.application.player_character_service import (
+    PlayerCharacterBindingEligibilityEvidence,
+    PlayerCharacterBindingEvidenceIntegrityError,
     PlayerCharacterService,
+)
+from deviation_protocol.application.run_operations import (
+    BindPlayerCharacterCommand,
+    CreateRunCommand,
+    bind_player_character_to_run,
+    construct_created_run,
 )
 from deviation_protocol.application.ports import (
     ControllerBindingUniquenessConflictError,
@@ -63,6 +71,15 @@ from deviation_protocol.domain.player_character_policies import (
     PlayerCharacterPolicyCode,
     PlayerCharacterPolicyDecision,
     PlayerConfirmation,
+    TrustedFinalDeathEvidence,
+)
+from deviation_protocol.domain.run import (
+    CanonicalRun,
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+    RunOperationId,
+    RunStateVersion,
 )
 from deviation_protocol.infrastructure.errors import (
     PlayerCharacterControllerBindingConflictError,
@@ -230,6 +247,62 @@ def _changed_mutation_command(
                 }
             )
         }
+    )
+
+
+def _final_death_command(
+    fixture: _MutationFixture,
+) -> CharacterMutationCommand:
+    return CharacterMutationCommand(
+        contract_version=fixture.command.contract_version,
+        command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+        target_player_character_id=(
+            fixture.command.target_player_character_id
+        ),
+        expected_revision=fixture.command.expected_revision,
+        applicable_reference=fixture.command.applicable_reference,
+        final_death_evidence=TrustedFinalDeathEvidence(
+            player_character_id=(
+                fixture.command.target_player_character_id
+            ),
+            expected_revision=fixture.command.expected_revision,
+            operation_id=fixture.operation_id,
+            source_reference=AuthoritySourceRef(
+                value="source.final-death"
+            ),
+        ),
+    )
+
+
+def _active_bound_run(fixture: _MutationFixture) -> CanonicalRun:
+    run_id = RunId(value=f"run.{fixture.current.player_character_id.value}")
+    line_id = ContinuousStoryLineId(
+        value=f"csl.{fixture.current.player_character_id.value}"
+    )
+    source = RunAuthoritySourceRef(value="source.binding-guard")
+    created = construct_created_run(
+        CreateRunCommand(source_reference=source),
+        run_id=run_id,
+        continuous_story_line_id=line_id,
+        operation_id=RunOperationId(value="operation.run-create"),
+        occurred_at=_NOW,
+    )
+    return bind_player_character_to_run(
+        created,
+        BindPlayerCharacterCommand(
+            run_id=run_id,
+            continuous_story_line_id=line_id,
+            target_player_character_id=(
+                fixture.current.player_character_id
+            ),
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=source,
+        ),
+        applicable_character_reference=(
+            fixture.command.applicable_reference
+        ),
+        operation_id=RunOperationId(value="operation.run-bind"),
+        occurred_at=_NOW,
     )
 
 
@@ -530,6 +603,30 @@ class _MutationReceiptRepository:
         self.added = receipt
 
 
+class _RunRepository:
+    def __init__(
+        self,
+        *,
+        name: str,
+        events: list[str],
+        active_run: Any = None,
+    ) -> None:
+        self.name = name
+        self.events = events
+        self.active_run = active_run
+        self.lock_calls = 0
+
+    async def get_active_for_player_character_for_update(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> Any:
+        self.lock_calls += 1
+        self.events.append(f"{self.name}:run-binding-lock")
+        if isinstance(self.active_run, BaseException):
+            raise self.active_run
+        return self.active_run
+
+
 class _Uow:
     def __init__(
         self,
@@ -540,6 +637,7 @@ class _Uow:
         player_characters: _PlayerCharacterRepository | None = None,
         creation_receipts: _CreationReceiptRepository | None = None,
         mutation_receipts: _MutationReceiptRepository | None = None,
+        runs: _RunRepository | None = None,
         enter_error: BaseException | None = None,
         exit_error: BaseException | None = None,
         suppress_exit_exception: bool = False,
@@ -557,6 +655,7 @@ class _Uow:
         self.mutation_receipts = mutation_receipts or (
             _MutationReceiptRepository(name=name, events=events)
         )
+        self.runs = runs or _RunRepository(name=name, events=events)
         self.enter_error = enter_error
         self.exit_error = exit_error
         self.suppress_exit_exception = suppress_exit_exception
@@ -634,6 +733,7 @@ def _service(
     issuer: _Issuer,
     policy: _Policy,
     clock: Callable[[], datetime] | None = None,
+    binding_integrity_guard_enabled: bool = False,
 ) -> PlayerCharacterService:
     return PlayerCharacterService(
         uow_factory=factory,
@@ -642,6 +742,7 @@ def _service(
         create_policy=policy,
         source_reference=AuthoritySourceRef(value="source.service-create"),
         clock=clock or (lambda: _NOW),
+        binding_integrity_guard_enabled=binding_integrity_guard_enabled,
     )
 
 
@@ -707,6 +808,7 @@ def _mutation_uow(
     append_error: BaseException | None = None,
     cas_result: Any = True,
     receipt_add_error: BaseException | None = None,
+    active_run: Any = None,
     enter_error: BaseException | None = None,
     exit_error: BaseException | None = None,
     suppress_exit_exception: bool = False,
@@ -743,6 +845,11 @@ def _mutation_uow(
             get_error=receipt_get_error,
             add_error=receipt_add_error,
         ),
+        runs=_RunRepository(
+            name=name,
+            events=events,
+            active_run=active_run,
+        ),
         enter_error=enter_error,
         exit_error=exit_error,
         suppress_exit_exception=suppress_exit_exception,
@@ -756,6 +863,7 @@ def _mutation_service(
     resolver: _Resolver,
     events: list[str],
     clock: Callable[[], datetime] | None = None,
+    binding_integrity_guard_enabled: bool = False,
 ) -> PlayerCharacterService:
     return _service(
         factory=factory,
@@ -771,6 +879,9 @@ def _mutation_service(
             ),
         ),
         clock=clock,
+        binding_integrity_guard_enabled=(
+            binding_integrity_guard_enabled
+        ),
     )
 
 
@@ -1654,6 +1765,291 @@ def test_mutation_receipt_conflict_has_exact_static_relationships() -> None:
         "conflict_type=PlayerCharacterMutationReceiptConflictError"
         in receipt_class_source
     )
+
+
+def test_active_binding_guard_uses_the_existing_domain_policy_identity() -> None:
+    assert (
+        PlayerCharacterPolicyCode
+        .ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED.value
+        == "ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED"
+    )
+
+
+@pytest.mark.asyncio
+async def test_binding_eligibility_seam_uses_the_supplied_uow_character_lock() -> None:
+    fixture = _mutation_fixture("binding-read-seam")
+    events: list[str] = []
+    uow = _mutation_uow(fixture, events)
+    service = _mutation_service(
+        factory=_UowFactory([], events),
+        resolver=_Resolver([], events),
+        events=events,
+    )
+
+    evidence = await service.lock_owned_for_binding(
+        uow,
+        trusted_controller_binding=fixture.binding,
+        target_player_character_id=fixture.current.player_character_id,
+    )
+
+    assert evidence == PlayerCharacterBindingEligibilityEvidence(
+        applicable_character_reference=(
+            fixture.command.applicable_reference
+        ),
+        lifecycle=fixture.current.lifecycle,
+    )
+    assert events == ["initial:character-lock"]
+    assert uow.player_characters.lock_calls == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["missing", "wrong-owner"])
+async def test_binding_eligibility_seam_is_non_enumerating(
+    state: str,
+) -> None:
+    fixture = _mutation_fixture(f"binding-read-{state}")
+    events: list[str] = []
+    wrong_owner = fixture.current.detached_validated_copy(
+        controller_binding=ControllerBindingRef(value="binding.other")
+    )
+    uow = _mutation_uow(
+        fixture,
+        events,
+        missing_current=state == "missing",
+        current=wrong_owner if state == "wrong-owner" else None,
+    )
+    service = _mutation_service(
+        factory=_UowFactory([], events),
+        resolver=_Resolver([], events),
+        events=events,
+    )
+
+    evidence = await service.lock_owned_for_binding(
+        uow,
+        trusted_controller_binding=fixture.binding,
+        target_player_character_id=fixture.current.player_character_id,
+    )
+
+    assert evidence is None
+    assert events == ["initial:character-lock"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "command_kind",
+    (
+        PlayerCharacterMutationKind.RETIRE,
+        PlayerCharacterMutationKind.FINAL_DEATH,
+    ),
+)
+async def test_active_binding_guard_rejects_before_policy_or_any_write(
+    monkeypatch: pytest.MonkeyPatch,
+    command_kind: PlayerCharacterMutationKind,
+) -> None:
+    fixture = _mutation_fixture(f"binding-guard-{command_kind.value}")
+    command = (
+        fixture.command
+        if command_kind is PlayerCharacterMutationKind.RETIRE
+        else _final_death_command(fixture)
+    )
+    events: list[str] = []
+    active_run = _active_bound_run(fixture)
+    initial = _mutation_uow(
+        fixture,
+        events,
+        active_run=active_run,
+    )
+
+    def forbidden_policy(*args: Any, **kwargs: Any) -> Any:
+        raise AssertionError(
+            "binding guard must reject before the domain lifecycle transition"
+        )
+
+    def forbidden_clock() -> datetime:
+        raise AssertionError(
+            "binding guard must reject before constructing persistence writes"
+        )
+
+    monkeypatch.setattr(
+        service_module,
+        "evaluate_mutation_policy",
+        forbidden_policy,
+    )
+    result = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+        clock=forbidden_clock,
+        binding_integrity_guard_enabled=True,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=command,
+    )
+
+    assert result == PlayerCharacterPolicyDecision(
+        code=(
+            PlayerCharacterPolicyCode
+            .ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED
+        )
+    )
+    assert events == [
+        "resolve:1",
+        "factory:initial",
+        "initial:enter",
+        "initial:character-lock",
+        "initial:mutation-receipt-get",
+        "initial:run-binding-lock",
+        "initial:exit:none",
+        "initial:rollback",
+        "initial:close",
+        "initial:exit-complete",
+    ]
+    assert initial.player_characters.append_calls == 0
+    assert initial.player_characters.cas_calls == 0
+    assert initial.mutation_receipts.add_calls == 0
+    assert initial.runs.lock_calls == 1
+    assert initial.commit_calls == 0
+    assert initial.rolled_back and not initial.committed
+    assert active_run.state_version == RunStateVersion(value=2)
+    assert fixture.current.record_revision == PlayerCharacterRevision(value=1)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "command_kind",
+    (
+        PlayerCharacterMutationKind.RETIRE,
+        PlayerCharacterMutationKind.FINAL_DEATH,
+    ),
+)
+async def test_guarded_unbound_lifecycle_mutations_remain_unchanged(
+    command_kind: PlayerCharacterMutationKind,
+) -> None:
+    fixture = _mutation_fixture(f"unbound-{command_kind.value}")
+    command = (
+        fixture.command
+        if command_kind is PlayerCharacterMutationKind.RETIRE
+        else _final_death_command(fixture)
+    )
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events)
+
+    result = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+        binding_integrity_guard_enabled=True,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=command,
+    )
+
+    assert isinstance(result, MutationSuccessResult)
+    assert result.command_kind is command_kind
+    assert result.resulting_revision == PlayerCharacterRevision(value=2)
+    assert result.resulting_lifecycle.value == (
+        "retired"
+        if command_kind is PlayerCharacterMutationKind.RETIRE
+        else "deceased"
+    )
+    assert initial.runs.lock_calls == 1
+    assert initial.player_characters.append_calls == 1
+    assert initial.player_characters.cas_calls == 1
+    assert initial.mutation_receipts.add_calls == 1
+    assert initial.commit_calls == 1
+    assert initial.committed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("evidence_kind", "message"),
+    (
+        ("malformed", "malformed or corrupt binding evidence"),
+        ("contradictory", "malformed or corrupt binding evidence"),
+        ("wrong-character", "contradictory binding evidence"),
+        (
+            "surviving-missing-current",
+            "surviving immutable binding evidence has no current row",
+        ),
+    ),
+)
+async def test_binding_guard_integrity_failures_close_without_writes(
+    evidence_kind: str,
+    message: str,
+) -> None:
+    fixture = _mutation_fixture(f"integrity-{evidence_kind}")
+    valid_run = _active_bound_run(fixture)
+    if evidence_kind == "malformed":
+        active_evidence: Any = object()
+    elif evidence_kind == "contradictory":
+        active_evidence = valid_run.model_copy(
+            update={"player_character_binding": None}
+        )
+    elif evidence_kind == "wrong-character":
+        binding = valid_run.player_character_binding
+        assert binding is not None
+        active_evidence = valid_run.model_copy(
+            update={
+                "player_character_binding": binding.model_copy(
+                    update={
+                        "applicable_character_reference": (
+                            ApplicableCharacterReference(
+                                player_character_id=PlayerCharacterId(
+                                    value="pc.foreign"
+                                ),
+                                contract_version=(
+                                    PlayerCharacterContractVersion.V1
+                                ),
+                                record_revision=PlayerCharacterRevision(
+                                    value=1
+                                ),
+                            )
+                        )
+                    }
+                )
+            }
+        )
+    else:
+        active_evidence = PlayerCharacterBindingEvidenceIntegrityError(
+            "surviving immutable binding evidence has no current row"
+        )
+    events: list[str] = []
+    initial = _mutation_uow(
+        fixture,
+        events,
+        active_run=active_evidence,
+    )
+
+    with pytest.raises(
+        PlayerCharacterBindingEvidenceIntegrityError,
+        match=message,
+    ):
+        await _mutation_service(
+            factory=_UowFactory([initial], events),
+            resolver=_Resolver([fixture.binding], events),
+            events=events,
+            binding_integrity_guard_enabled=True,
+        ).mutate(
+            _PRINCIPAL,
+            operation_id=fixture.operation_id,
+            command=fixture.command,
+        )
+
+    assert events[:6] == [
+        "resolve:1",
+        "factory:initial",
+        "initial:enter",
+        "initial:character-lock",
+        "initial:mutation-receipt-get",
+        "initial:run-binding-lock",
+    ]
+    assert initial.player_characters.append_calls == 0
+    assert initial.player_characters.cas_calls == 0
+    assert initial.mutation_receipts.add_calls == 0
+    assert initial.commit_calls == 0
+    assert initial.rolled_back and initial.closed
 
 
 @pytest.mark.asyncio

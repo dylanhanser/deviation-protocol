@@ -215,7 +215,7 @@ class RunMutationProvenance(_StrictFrozenModel):
 
 
 class ReservedPlayerCharacterBinding(_StrictFrozenModel):
-    """Frozen envelope for P4-S1; MRC-S1 accepts no populated instance."""
+    """The exact immutable Run-owned player-character binding envelope."""
 
     run_id: RunId
     continuous_story_line_id: ContinuousStoryLineId
@@ -266,7 +266,7 @@ class CanonicalRun(_StrictFrozenModel):
     creation_provenance: RunMutationProvenance
     current_mutation_provenance: RunMutationProvenance
     trusted_participation_references: tuple[RunSessionParticipationReference, ...] = ()
-    player_character_binding: None = None
+    player_character_binding: ReservedPlayerCharacterBinding | None = None
 
     @model_validator(mode="after")
     def validate_complete_minimum_state(self) -> CanonicalRun:
@@ -282,20 +282,65 @@ class CanonicalRun(_StrictFrozenModel):
         ):
             raise ValueError("Run provenance does not bind the canonical state")
         if self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
-            raise ValueError("MRC-S1 permits only pre_first_turn canonical state")
+            raise ValueError("current Run implementation permits only pre_first_turn state")
+        binding = self.player_character_binding
+        if binding is not None:
+            if (
+                binding.run_id != self.run_id
+                or binding.continuous_story_line_id
+                != self.continuous_story_line_id
+            ):
+                raise ValueError("player-character binding does not bind this Run")
+            if (
+                binding.binding_state != "active"
+                or binding.inactivated_at is not None
+                or not self.lifecycle_status.is_active_line
+            ):
+                raise ValueError(
+                    "P4-S1 permits only a complete active binding on an active line"
+                )
         if current.mutation_kind is RunMutationKind.BIND_PLAYER_CHARACTER:
-            raise ValueError("MRC-S1 rejects player-character binding")
-        versions = tuple(item.joined_state_version.value for item in self.trusted_participation_references)
+            if binding is None:
+                raise ValueError(
+                    "binding mutation provenance requires a complete binding"
+                )
+            if (
+                binding.binding_operation_id != current.operation_id
+                or binding.binding_authority_source_ref
+                != current.source_reference
+                or binding.bound_at != current.occurred_at
+            ):
+                raise ValueError(
+                    "binding mutation provenance is inconsistent with the binding"
+                )
+        versions = tuple(
+            item.joined_state_version.value
+            for item in self.trusted_participation_references
+        )
         sessions = tuple(item.session_id for item in self.trusted_participation_references)
+        expected_successor_versions = set(range(2, self.state_version.value + 1))
+        participation_versions = set(versions)
+        missing_versions = expected_successor_versions - participation_versions
         if (
-            len(versions) != self.state_version.value - 1
-            or any(
-                version != expected
-                for expected, version in enumerate(versions, start=2)
+            len(versions) != len(participation_versions)
+            or tuple(sorted(versions)) != versions
+            or not participation_versions <= expected_successor_versions
+            or (
+                binding is None
+                and missing_versions
+            )
+            or (
+                binding is not None
+                and len(missing_versions) != 1
+            )
+            or (
+                current.mutation_kind is RunMutationKind.BIND_PLAYER_CHARACTER
+                and missing_versions != {self.state_version.value}
             )
         ):
             raise ValueError(
-                "participation references must cover every successor version in order"
+                "participation references must cover every non-binding "
+                "successor version in order"
             )
         if len(sessions) != len(set(sessions)):
             raise ValueError("participation references must have unique Session identities")
@@ -311,10 +356,11 @@ class CanonicalRun(_StrictFrozenModel):
                 self.state_version.value != 1
                 or self.trusted_participation_references
                 or current != creation
+                or binding is not None
             ):
                 raise ValueError(
                     "creation state must be version one with exact creation provenance "
-                    "and no participation"
+                    "and no participation or binding"
                 )
         elif self.current_mutation_provenance.mutation_kind is RunMutationKind.ATTACH_SESSION:
             if not self.trusted_participation_references:

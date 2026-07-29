@@ -80,6 +80,7 @@ def canonical_run(
     state_version: RunStateVersion | None = None,
     current_kind: RunMutationKind = RunMutationKind.CREATE,
     participation: tuple[RunSessionParticipationReference, ...] = (),
+    binding: ReservedPlayerCharacterBinding | None = None,
 ) -> CanonicalRun:
     version = state_version or RunStateVersion(
         value=1 if current_kind is RunMutationKind.CREATE else 2
@@ -104,6 +105,38 @@ def canonical_run(
         creation_provenance=provenance(),
         current_mutation_provenance=current,
         trusted_participation_references=participation,
+        player_character_binding=binding,
+    )
+
+
+def player_character_reference(
+    *,
+    player_character_id: str = "pc.bound",
+) -> ApplicableCharacterReference:
+    return ApplicableCharacterReference(
+        player_character_id=PlayerCharacterId(value=player_character_id),
+        contract_version=PlayerCharacterContractVersion.V1,
+        record_revision=PlayerCharacterRevision(value=1),
+    )
+
+
+def active_binding(
+    *,
+    target_run_id: RunId | None = None,
+    target_line_id: ContinuousStoryLineId | None = None,
+    operation_id: RunOperationId | None = None,
+    source: RunAuthoritySourceRef | None = None,
+    bound_at: datetime | None = None,
+) -> ReservedPlayerCharacterBinding:
+    return ReservedPlayerCharacterBinding(
+        run_id=target_run_id or run_id(),
+        continuous_story_line_id=target_line_id or line_id(),
+        applicable_character_reference=player_character_reference(),
+        binding_state="active",
+        binding_operation_id=operation_id
+        or RunOperationId(value="operation.bind_player_character"),
+        binding_authority_source_ref=source or source_ref(),
+        bound_at=bound_at or datetime(2026, 7, 29, tzinfo=UTC),
     )
 
 
@@ -141,8 +174,126 @@ def test_canonical_run_accepts_only_initial_unbound_state_and_strict_provenance(
         CanonicalRun.model_validate(
             {**run.model_dump(mode="python"), "lifecycle_status": RunLifecycleStatus.ACTIVE}
         )
-    with pytest.raises(ValidationError, match="MRC-S1 rejects"):
+    with pytest.raises(ValidationError, match="complete binding"):
         canonical_run(current_kind=RunMutationKind.BIND_PLAYER_CHARACTER)
+
+
+def test_canonical_run_accepts_one_complete_active_binding_transition() -> None:
+    binding = active_binding()
+    run = canonical_run(
+        state_version=RunStateVersion(value=2),
+        current_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+        binding=binding,
+    )
+
+    assert validate_canonical_run(run) is run
+    assert run.player_character_binding == binding
+    assert run.trusted_participation_references == ()
+    assert (
+        run.current_mutation_provenance.operation_id
+        == binding.binding_operation_id
+    )
+    assert (
+        run.current_mutation_provenance.source_reference
+        == binding.binding_authority_source_ref
+    )
+    assert run.current_mutation_provenance.occurred_at == binding.bound_at
+
+
+@pytest.mark.parametrize(
+    ("binding_change", "message"),
+    (
+        (
+            {"run_id": RunId(value="run.foreign")},
+            "does not bind this Run",
+        ),
+        (
+            {
+                "continuous_story_line_id": ContinuousStoryLineId(
+                    value="csl.foreign"
+                )
+            },
+            "does not bind this Run",
+        ),
+        (
+            {
+                "binding_operation_id": RunOperationId(
+                    value="operation.foreign"
+                )
+            },
+            "provenance is inconsistent",
+        ),
+        (
+            {
+                "binding_authority_source_ref": RunAuthoritySourceRef(
+                    value="source.foreign"
+                )
+            },
+            "provenance is inconsistent",
+        ),
+        (
+            {
+                "bound_at": datetime(
+                    2026,
+                    7,
+                    29,
+                    0,
+                    0,
+                    1,
+                    tzinfo=UTC,
+                )
+            },
+            "provenance is inconsistent",
+        ),
+    ),
+)
+def test_canonical_run_rejects_binding_that_contradicts_run_or_provenance(
+    binding_change: dict[str, object],
+    message: str,
+) -> None:
+    binding = active_binding().model_copy(update=binding_change)
+
+    with pytest.raises((ValidationError, ValueError), match=message):
+        canonical_run(
+            state_version=RunStateVersion(value=2),
+            current_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+            binding=binding,
+        )
+
+
+def test_canonical_run_rejects_binding_without_exactly_one_binding_version() -> None:
+    binding = active_binding()
+    participation_two = participation(2)
+    participation_three = participation(3)
+    participation_four = participation(4)
+
+    with pytest.raises(
+        ValidationError,
+        match="every non-binding successor version",
+    ):
+        canonical_run(
+            state_version=RunStateVersion(value=2),
+            current_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+            participation=(participation_two,),
+            binding=binding,
+        )
+    later_attachment = canonical_run(
+        state_version=RunStateVersion(value=3),
+        current_kind=RunMutationKind.ATTACH_SESSION,
+        participation=(participation_three,),
+        binding=binding,
+    )
+    assert later_attachment.player_character_binding == binding
+    with pytest.raises(
+        ValidationError,
+        match="every non-binding successor version",
+    ):
+        canonical_run(
+            state_version=RunStateVersion(value=4),
+            current_kind=RunMutationKind.ATTACH_SESSION,
+            participation=(participation_four,),
+            binding=binding,
+        )
 
 
 @pytest.mark.parametrize(
@@ -297,7 +448,7 @@ def test_canonical_run_requires_exact_continuous_participation_versions() -> Non
     for invalid in invalid_states:
         with pytest.raises(
             (ValidationError, ValueError),
-            match="every successor version in order",
+            match="every non-binding successor version in order",
         ):
             validate_canonical_run(invalid)
 
@@ -317,7 +468,10 @@ def test_canonical_run_rejects_invalid_participation_and_corrupted_instance_stat
         participation=(participation,),
     )
     assert validate_canonical_run(run) == run
-    with pytest.raises(ValidationError, match="every successor version in order"):
+    with pytest.raises(
+        ValidationError,
+        match="every non-binding successor version in order",
+    ):
         canonical_run(
             state_version=RunStateVersion(value=2),
             current_kind=RunMutationKind.ATTACH_SESSION,
@@ -331,7 +485,10 @@ def test_canonical_run_rejects_invalid_participation_and_corrupted_instance_stat
     )
     with pytest.raises(ValueError, match="non-canonical instance state"):
         validate_canonical_run(nested_corrupted)
-    with pytest.raises(ValidationError, match="every successor version in order"):
+    with pytest.raises(
+        ValidationError,
+        match="every non-binding successor version in order",
+    ):
         CanonicalRun.model_validate(
             {
                 **canonical_run().model_dump(mode="python"),
