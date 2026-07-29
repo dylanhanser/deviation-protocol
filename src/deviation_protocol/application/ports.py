@@ -225,6 +225,10 @@ class ControllerBindingUniquenessConflictError(RuntimeError):
     """Only the approved controller-binding add uniqueness race."""
 
 
+class MutationReceiptUniquenessConflictError(RuntimeError):
+    """Only the approved mutation-receipt add uniqueness race."""
+
+
 class ControllerBindingResolver(Protocol):
     async def resolve(
         self,

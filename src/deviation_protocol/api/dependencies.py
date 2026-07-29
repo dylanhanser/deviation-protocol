@@ -7,6 +7,9 @@ from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.player_character_service import (
+    PlayerCharacterService,
+)
 from deviation_protocol.application.ports import TurnOrchestrator
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.application.narrative_models import NarrativeProvider
@@ -16,6 +19,7 @@ from deviation_protocol.application.narrative_models import NarrativeProvider
 class ApiServices:
     session_service: SessionService
     turn_orchestrator: TurnOrchestrator
+    player_character_service: PlayerCharacterService | None = None
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
 

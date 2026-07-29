@@ -15,23 +15,34 @@ import deviation_protocol.application.player_character_service as service_module
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_operations import (
     CREATION_RESULT_SCHEMA_VERSION,
+    MUTATION_RESULT_SCHEMA_VERSION,
     CharacterCreationCommand,
+    CharacterMutationCommand,
     CharacterOperationNamespace,
     CharacterOperationProtocolCode,
     CharacterOperationProtocolDecision,
     CreationReceiptKey,
     CreationSuccessResult,
+    MutationCommandResult,
+    MutationReceiptKey,
+    MutationSuccessResult,
     StoredCreationSuccessReceipt,
+    StoredMutationSuccessReceipt,
     build_creation_success_receipt,
+    build_mutation_success_receipt,
     creation_fingerprint,
+    evaluate_mutation_policy,
+    mutation_fingerprint,
 )
 from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
 )
 from deviation_protocol.application.ports import (
     ControllerBindingUniquenessConflictError,
+    MutationReceiptUniquenessConflictError,
 )
 from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
     AuthoritySourceRef,
     CanonicalPlayerCharacter,
     CharacterCore,
@@ -40,16 +51,22 @@ from deviation_protocol.domain.player_character import (
     NarrationPreferences,
     PlayerCharacterContractVersion,
     PlayerCharacterId,
+    PlayerCharacterMutationKind,
     PlayerCharacterOperationId,
+    PlayerCharacterRevision,
     PlayerDeclaredText,
     PlayerSubjectiveAuthority,
     revalidate_player_character_model,
 )
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
+    PlayerCharacterPolicyCode,
+    PlayerCharacterPolicyDecision,
+    PlayerConfirmation,
 )
 from deviation_protocol.infrastructure.errors import (
     PlayerCharacterControllerBindingConflictError,
+    PlayerCharacterMutationReceiptConflictError,
     PlayerCharacterRepositoryConflictError,
     PlayerCharacterRepositoryError,
 )
@@ -78,6 +95,16 @@ class _CreationFixture:
     command: CharacterCreationCommand
     record: CanonicalPlayerCharacter
     receipt: StoredCreationSuccessReceipt
+
+
+@dataclass(frozen=True, slots=True)
+class _MutationFixture:
+    binding: ControllerBindingRef
+    operation_id: PlayerCharacterOperationId
+    command: CharacterMutationCommand
+    current: CanonicalPlayerCharacter
+    successor: CanonicalPlayerCharacter
+    receipt: StoredMutationSuccessReceipt
 
 
 def _creation_fixture(label: str = "default") -> _CreationFixture:
@@ -122,6 +149,87 @@ def _creation_fixture(label: str = "default") -> _CreationFixture:
         command=command,
         record=record,
         receipt=receipt,
+    )
+
+
+def _mutation_fixture(label: str = "default") -> _MutationFixture:
+    created = _creation_fixture(f"mutation-{label}")
+    operation_id = PlayerCharacterOperationId(
+        value=f"operation.mutation-{label}"
+    )
+    command = CharacterMutationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        command_kind=PlayerCharacterMutationKind.RETIRE,
+        target_player_character_id=created.player_character_id,
+        expected_revision=created.record.record_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=created.player_character_id,
+            contract_version=created.record.contract_version,
+            record_revision=created.record.record_revision,
+        ),
+        confirmation=PlayerConfirmation(
+            player_character_id=created.player_character_id,
+            expected_revision=created.record.record_revision,
+            operation_id=operation_id,
+            mutation_kind=PlayerCharacterMutationKind.RETIRE,
+            source_reference=AuthoritySourceRef(
+                value=f"source.mutation-{label}"
+            ),
+        ),
+    )
+    policy_decision = evaluate_mutation_policy(
+        created.record,
+        command=command,
+        operation_id=operation_id,
+    )
+    assert policy_decision.accepted
+    successor = policy_decision.resulting_record
+    assert successor is not None
+    _, fingerprint = mutation_fingerprint(
+        command,
+        operation_id=operation_id,
+    )
+    result = MutationSuccessResult(
+        result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+        player_character_id=successor.player_character_id,
+        contract_version=successor.contract_version,
+        command_kind=command.command_kind,
+        command_result=MutationCommandResult.RETIRED,
+        resulting_revision=successor.record_revision,
+        resulting_lifecycle=successor.lifecycle,
+    )
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=successor.player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=result,
+    )
+    return _MutationFixture(
+        binding=created.binding,
+        operation_id=operation_id,
+        command=command,
+        current=created.record,
+        successor=successor,
+        receipt=receipt,
+    )
+
+
+def _changed_mutation_command(
+    fixture: _MutationFixture,
+) -> CharacterMutationCommand:
+    return fixture.command.model_copy(
+        update={
+            "confirmation": fixture.command.confirmation.model_copy(
+                update={
+                    "source_reference": AuthoritySourceRef(
+                        value="source.mutation-changed"
+                    )
+                }
+            )
+        }
     )
 
 
@@ -248,14 +356,37 @@ class _PlayerCharacterRepository:
         events: list[str],
         allocation_error: BaseException | None = None,
         initial_error: BaseException | None = None,
+        current: Any = None,
+        append_error: BaseException | None = None,
+        cas_result: Any = True,
     ) -> None:
         self.name = name
         self.events = events
         self.allocation_error = allocation_error
         self.initial_error = initial_error
+        self.current = current
+        self.append_error = append_error
+        self.cas_result = cas_result
         self.allocation_calls = 0
         self.initial_calls = 0
+        self.lock_calls = 0
+        self.append_calls = 0
+        self.cas_calls = 0
         self.record: CanonicalPlayerCharacter | None = None
+        self.appended: CanonicalPlayerCharacter | None = None
+        self.swapped: CanonicalPlayerCharacter | None = None
+
+    async def get_for_update(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> Any:
+        self.lock_calls += 1
+        self.events.append(f"{self.name}:character-lock")
+        if isinstance(self.current, BaseException):
+            raise self.current
+        if self.current is not None:
+            assert self.current.player_character_id == player_character_id
+        return self.current
 
     async def add_allocation(
         self,
@@ -281,6 +412,36 @@ class _PlayerCharacterRepository:
         if self.initial_error is not None:
             raise self.initial_error
         self.record = record
+
+    async def append_revision(
+        self,
+        record: CanonicalPlayerCharacter,
+        *,
+        created_at: datetime,
+    ) -> None:
+        assert created_at == _NOW
+        self.append_calls += 1
+        self.events.append(f"{self.name}:history-append")
+        if self.append_error is not None:
+            raise self.append_error
+        self.appended = record
+
+    async def compare_and_swap_current(
+        self,
+        record: CanonicalPlayerCharacter,
+        *,
+        expected_revision: int,
+        created_at: datetime,
+    ) -> bool:
+        assert created_at == _NOW
+        assert expected_revision == record.record_revision.value - 1
+        self.cas_calls += 1
+        self.events.append(f"{self.name}:current-cas")
+        if isinstance(self.cas_result, BaseException):
+            raise self.cas_result
+        if self.cas_result:
+            self.swapped = record
+        return self.cas_result
 
 
 class _CreationReceiptRepository:
@@ -326,6 +487,49 @@ class _CreationReceiptRepository:
         self.added = receipt
 
 
+class _MutationReceiptRepository:
+    def __init__(
+        self,
+        *,
+        name: str,
+        events: list[str],
+        stored: StoredMutationSuccessReceipt | None = None,
+        get_error: BaseException | None = None,
+        add_error: BaseException | None = None,
+    ) -> None:
+        self.name = name
+        self.events = events
+        self.stored = stored
+        self.get_error = get_error
+        self.add_error = add_error
+        self.lookups: list[MutationReceiptKey] = []
+        self.add_calls = 0
+        self.added: StoredMutationSuccessReceipt | None = None
+
+    async def get(
+        self,
+        key: MutationReceiptKey,
+    ) -> StoredMutationSuccessReceipt | None:
+        self.lookups.append(key)
+        self.events.append(f"{self.name}:mutation-receipt-get")
+        if self.get_error is not None:
+            raise self.get_error
+        return self.stored
+
+    async def add(
+        self,
+        receipt: StoredMutationSuccessReceipt,
+        *,
+        created_at: datetime,
+    ) -> None:
+        assert created_at == _NOW
+        self.add_calls += 1
+        self.events.append(f"{self.name}:mutation-receipt-add")
+        if self.add_error is not None:
+            raise self.add_error
+        self.added = receipt
+
+
 class _Uow:
     def __init__(
         self,
@@ -335,6 +539,7 @@ class _Uow:
         controller_bindings: _BindingRepository,
         player_characters: _PlayerCharacterRepository | None = None,
         creation_receipts: _CreationReceiptRepository | None = None,
+        mutation_receipts: _MutationReceiptRepository | None = None,
         enter_error: BaseException | None = None,
         exit_error: BaseException | None = None,
         suppress_exit_exception: bool = False,
@@ -348,6 +553,9 @@ class _Uow:
         )
         self.creation_receipts = creation_receipts or (
             _CreationReceiptRepository(name=name, events=events)
+        )
+        self.mutation_receipts = mutation_receipts or (
+            _MutationReceiptRepository(name=name, events=events)
         )
         self.enter_error = enter_error
         self.exit_error = exit_error
@@ -425,6 +633,7 @@ def _service(
     resolver: _Resolver,
     issuer: _Issuer,
     policy: _Policy,
+    clock: Callable[[], datetime] | None = None,
 ) -> PlayerCharacterService:
     return PlayerCharacterService(
         uow_factory=factory,
@@ -432,7 +641,7 @@ def _service(
         player_character_id_issuer=issuer,
         create_policy=policy,
         source_reference=AuthoritySourceRef(value="source.service-create"),
-        clock=lambda: _NOW,
+        clock=clock or (lambda: _NOW),
     )
 
 
@@ -482,6 +691,86 @@ def _uow(
         exit_error=exit_error,
         suppress_exit_exception=suppress_exit_exception,
         commit_error=commit_error,
+    )
+
+
+def _mutation_uow(
+    fixture: _MutationFixture,
+    events: list[str],
+    *,
+    name: str = "initial",
+    current: Any = None,
+    missing_current: bool = False,
+    stored_receipt: StoredMutationSuccessReceipt | None = None,
+    character_error: BaseException | None = None,
+    receipt_get_error: BaseException | None = None,
+    append_error: BaseException | None = None,
+    cas_result: Any = True,
+    receipt_add_error: BaseException | None = None,
+    enter_error: BaseException | None = None,
+    exit_error: BaseException | None = None,
+    suppress_exit_exception: bool = False,
+    commit_error: BaseException | None = None,
+) -> _Uow:
+    return _Uow(
+        name=name,
+        events=events,
+        controller_bindings=_BindingRepository(
+            name=name,
+            events=events,
+            binding=fixture.binding,
+            lock_result=fixture.binding,
+        ),
+        player_characters=_PlayerCharacterRepository(
+            name=name,
+            events=events,
+            current=(
+                character_error
+                if character_error is not None
+                else (
+                    None
+                    if missing_current
+                    else (fixture.current if current is None else current)
+                )
+            ),
+            append_error=append_error,
+            cas_result=cas_result,
+        ),
+        mutation_receipts=_MutationReceiptRepository(
+            name=name,
+            events=events,
+            stored=stored_receipt,
+            get_error=receipt_get_error,
+            add_error=receipt_add_error,
+        ),
+        enter_error=enter_error,
+        exit_error=exit_error,
+        suppress_exit_exception=suppress_exit_exception,
+        commit_error=commit_error,
+    )
+
+
+def _mutation_service(
+    *,
+    factory: _UowFactory,
+    resolver: _Resolver,
+    events: list[str],
+    clock: Callable[[], datetime] | None = None,
+) -> PlayerCharacterService:
+    return _service(
+        factory=factory,
+        resolver=resolver,
+        issuer=_Issuer(
+            AssertionError("mutation must not issue a character identity"),
+            events,
+        ),
+        policy=_Policy(
+            events,
+            error=AssertionError(
+                "mutation must not call the creation policy"
+            ),
+        ),
+        clock=clock,
     )
 
 
@@ -1327,3 +1616,630 @@ async def test_issuer_policy_and_uow_exit_failures_never_recover(
 
     assert exc_info.value is error
     assert factory.calls == 1
+
+
+def test_mutation_receipt_conflict_has_exact_static_relationships() -> None:
+    conflict = PlayerCharacterMutationReceiptConflictError("receipt race")
+
+    assert isinstance(conflict, MutationReceiptUniquenessConflictError)
+    assert isinstance(conflict, PlayerCharacterRepositoryConflictError)
+    assert not isinstance(
+        PlayerCharacterRepositoryConflictError("shared"),
+        MutationReceiptUniquenessConflictError,
+    )
+    assert PlayerCharacterMutationReceiptConflictError.__mro__[:5] == (
+        PlayerCharacterMutationReceiptConflictError,
+        PlayerCharacterRepositoryConflictError,
+        PlayerCharacterRepositoryError,
+        MutationReceiptUniquenessConflictError,
+        RuntimeError,
+    )
+
+    repository_source = (
+        Path(service_module.__file__).parents[1]
+        / "infrastructure"
+        / "repositories.py"
+    ).read_text(encoding="utf-8")
+    assert (
+        repository_source.count(
+            "conflict_type=PlayerCharacterMutationReceiptConflictError"
+        )
+        == 1
+    )
+    receipt_class_source = repository_source.split(
+        "class SqlAlchemyPlayerCharacterMutationReceiptRepository",
+        maxsplit=1,
+    )[1]
+    assert (
+        "conflict_type=PlayerCharacterMutationReceiptConflictError"
+        in receipt_class_source
+    )
+
+
+@pytest.mark.asyncio
+async def test_mutate_success_has_exact_write_commit_and_return_order(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _mutation_fixture("success")
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events)
+    factory = _UowFactory([initial], events)
+    policy_calls = 0
+
+    def tracked_policy(
+        record: CanonicalPlayerCharacter,
+        *,
+        command: CharacterMutationCommand,
+        operation_id: PlayerCharacterOperationId,
+    ) -> PlayerCharacterPolicyDecision:
+        nonlocal policy_calls
+        policy_calls += 1
+        events.append("mutation-policy")
+        return evaluate_mutation_policy(
+            record,
+            command=command,
+            operation_id=operation_id,
+        )
+
+    def clock() -> datetime:
+        events.append("clock")
+        return _NOW
+
+    monkeypatch.setattr(
+        service_module,
+        "evaluate_mutation_policy",
+        tracked_policy,
+    )
+    result = await _mutation_service(
+        factory=factory,
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+        clock=clock,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert result == fixture.receipt.result
+    assert policy_calls == 1
+    assert events == [
+        "resolve:1",
+        "factory:initial",
+        "initial:enter",
+        "initial:character-lock",
+        "initial:mutation-receipt-get",
+        "mutation-policy",
+        "clock",
+        "initial:history-append",
+        "initial:current-cas",
+        "initial:mutation-receipt-add",
+        "initial:commit",
+        "initial:exit:none",
+        "initial:close",
+        "initial:exit-complete",
+    ]
+    assert initial.player_characters.appended == fixture.successor
+    assert initial.player_characters.swapped == fixture.successor
+    assert initial.mutation_receipts.added == fixture.receipt
+    assert initial.commit_calls == 1
+    assert initial.committed and initial.closed
+    assert events.index("initial:commit") < events.index(
+        "initial:exit-complete"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["missing", "wrong-owner"])
+async def test_mutate_missing_and_wrong_owner_are_non_enumerating(
+    state: str,
+) -> None:
+    fixture = _mutation_fixture(state)
+    events: list[str] = []
+    wrong_owner = fixture.current.detached_validated_copy(
+        controller_binding=ControllerBindingRef(value="binding.other-owner")
+    )
+    initial = _mutation_uow(
+        fixture,
+        events,
+        missing_current=state == "missing",
+        current=wrong_owner if state == "wrong-owner" else None,
+    )
+
+    decision = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert isinstance(decision, CharacterOperationProtocolDecision)
+    assert decision.code is CharacterOperationProtocolCode.AUTHORIZATION_FAILED
+    assert initial.mutation_receipts.lookups == []
+    assert initial.player_characters.append_calls == 0
+    assert initial.commit_calls == 0
+    assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid_input",
+    ["command", "operation-id", "revision"],
+)
+async def test_mutate_invalid_typed_inputs_precede_key_construction(
+    invalid_input: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _mutation_fixture(f"invalid-{invalid_input}")
+    command = fixture.command.model_copy(deep=True)
+    operation_id = fixture.operation_id.model_copy(deep=True)
+    if invalid_input == "command":
+        object.__setattr__(command, "contract_version", "invalid")
+    elif invalid_input == "operation-id":
+        object.__setattr__(operation_id, "value", "not valid")
+    else:
+        object.__setattr__(command.expected_revision, "value", 0)
+
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events)
+    constructed_keys: list[dict[str, Any]] = []
+    original_key = service_module.MutationReceiptKey
+
+    def track_key(**kwargs: Any) -> MutationReceiptKey:
+        constructed_keys.append(kwargs)
+        return original_key(**kwargs)
+
+    monkeypatch.setattr(service_module, "MutationReceiptKey", track_key)
+    with pytest.raises((ValidationError, TypeError, ValueError)):
+        await _mutation_service(
+            factory=_UowFactory([initial], events),
+            resolver=_Resolver([fixture.binding], events),
+            events=events,
+        ).mutate(
+            _PRINCIPAL,
+            operation_id=operation_id,
+            command=command,
+        )
+
+    assert constructed_keys == []
+    assert initial.mutation_receipts.lookups == []
+    assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+async def test_mutate_revision_exhaustion_precedes_receipt_lookup() -> None:
+    fixture = _mutation_fixture("revision-exhausted")
+    maximum_revision = PlayerCharacterRevision(
+        value=9_223_372_036_854_775_807
+    )
+    command = CharacterMutationCommand(
+        contract_version=fixture.command.contract_version,
+        command_kind=fixture.command.command_kind,
+        target_player_character_id=fixture.command.target_player_character_id,
+        expected_revision=maximum_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=fixture.current.player_character_id,
+            contract_version=fixture.current.contract_version,
+            record_revision=maximum_revision,
+        ),
+        confirmation=PlayerConfirmation(
+            player_character_id=fixture.current.player_character_id,
+            expected_revision=maximum_revision,
+            operation_id=fixture.operation_id,
+            mutation_kind=fixture.command.command_kind,
+            source_reference=AuthoritySourceRef(
+                value="source.revision-exhausted"
+            ),
+        ),
+    )
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events)
+
+    decision = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=command,
+    )
+
+    assert isinstance(decision, CharacterOperationProtocolDecision)
+    assert decision.code is CharacterOperationProtocolCode.REVISION_EXHAUSTED
+    assert initial.mutation_receipts.lookups == []
+    assert initial.player_characters.append_calls == 0
+    assert initial.commit_calls == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("reuse", ["compatible", "incompatible"])
+async def test_mutate_receipt_is_evaluated_before_stale_revision(
+    reuse: str,
+) -> None:
+    fixture = _mutation_fixture(f"receipt-before-stale-{reuse}")
+    events: list[str] = []
+    initial = _mutation_uow(
+        fixture,
+        events,
+        current=fixture.successor,
+        stored_receipt=fixture.receipt,
+    )
+    command = (
+        fixture.command
+        if reuse == "compatible"
+        else _changed_mutation_command(fixture)
+    )
+
+    result = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+        clock=lambda: (_ for _ in ()).throw(
+            AssertionError("replay must not read the clock")
+        ),
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=command,
+    )
+
+    if reuse == "compatible":
+        assert result == fixture.receipt.result
+    else:
+        assert isinstance(result, CharacterOperationProtocolDecision)
+        assert (
+            result.code
+            is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+        )
+        assert result.stored_success_result is None
+    assert initial.mutation_receipts.lookups == [fixture.receipt.key]
+    assert initial.player_characters.append_calls == 0
+    assert initial.player_characters.cas_calls == 0
+    assert initial.mutation_receipts.add_calls == 0
+    assert initial.commit_calls == 0
+    assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+async def test_mutate_new_stale_revision_stops_before_policy() -> None:
+    fixture = _mutation_fixture("new-stale")
+    events: list[str] = []
+    initial = _mutation_uow(
+        fixture,
+        events,
+        current=fixture.successor,
+    )
+
+    decision = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert isinstance(decision, CharacterOperationProtocolDecision)
+    assert decision.code is CharacterOperationProtocolCode.STALE_REVISION
+    assert initial.mutation_receipts.lookups == [fixture.receipt.key]
+    assert initial.player_characters.append_calls == 0
+    assert initial.commit_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_mutate_policy_denial_returns_exact_object_without_persistence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _mutation_fixture("denial")
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events)
+    denied = PlayerCharacterPolicyDecision(
+        code=PlayerCharacterPolicyCode.INVALID_TRANSITION
+    )
+    policy_calls = 0
+
+    def deny(*args: Any, **kwargs: Any) -> PlayerCharacterPolicyDecision:
+        nonlocal policy_calls
+        policy_calls += 1
+        return denied
+
+    monkeypatch.setattr(service_module, "evaluate_mutation_policy", deny)
+    result = await _mutation_service(
+        factory=_UowFactory([initial], events),
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+        clock=lambda: (_ for _ in ()).throw(
+            AssertionError("denial must not read the clock")
+        ),
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert result is denied
+    assert policy_calls == 1
+    assert initial.player_characters.append_calls == 0
+    assert initial.player_characters.cas_calls == 0
+    assert initial.mutation_receipts.add_calls == 0
+    assert initial.commit_calls == 0
+    assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+async def test_mutate_cas_false_returns_stale_and_rolls_back_history() -> None:
+    fixture = _mutation_fixture("cas-loss")
+    events: list[str] = []
+    initial = _mutation_uow(fixture, events, cas_result=False)
+    factory = _UowFactory([initial], events)
+
+    decision = await _mutation_service(
+        factory=factory,
+        resolver=_Resolver([fixture.binding], events),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert isinstance(decision, CharacterOperationProtocolDecision)
+    assert decision.code is CharacterOperationProtocolCode.STALE_REVISION
+    assert initial.player_characters.append_calls == 1
+    assert initial.player_characters.cas_calls == 1
+    assert initial.mutation_receipts.add_calls == 0
+    assert initial.commit_calls == 0
+    assert factory.calls == 1
+    assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "failure_site",
+    ["lock", "history", "cas", "receipt", "commit", "cancel"],
+)
+async def test_mutate_failures_propagate_and_never_retry(
+    failure_site: str,
+) -> None:
+    fixture = _mutation_fixture(f"failure-{failure_site}")
+    events: list[str] = []
+    error: BaseException = (
+        asyncio.CancelledError()
+        if failure_site == "cancel"
+        else RuntimeError(failure_site)
+    )
+    initial = _mutation_uow(
+        fixture,
+        events,
+        character_error=error if failure_site == "lock" else None,
+        append_error=(
+            error if failure_site in {"history", "cancel"} else None
+        ),
+        cas_result=error if failure_site == "cas" else True,
+        receipt_add_error=error if failure_site == "receipt" else None,
+        commit_error=error if failure_site == "commit" else None,
+    )
+    factory = _UowFactory([initial], events)
+
+    with pytest.raises(type(error)) as exc_info:
+        await _mutation_service(
+            factory=factory,
+            resolver=_Resolver([fixture.binding], events),
+            events=events,
+        ).mutate(
+            _PRINCIPAL,
+            operation_id=fixture.operation_id,
+            command=fixture.command,
+        )
+
+    assert exc_info.value is error
+    assert factory.calls == 1
+    assert initial.rolled_back and initial.closed
+    assert initial.commit_calls == (1 if failure_site == "commit" else 0)
+
+
+@pytest.mark.asyncio
+async def test_exact_mutation_receipt_conflict_recovers_one_committed_winner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    fixture = _mutation_fixture("race-winner")
+    events: list[str] = []
+    conflict = MutationReceiptUniquenessConflictError("receipt race")
+    initial = _mutation_uow(
+        fixture,
+        events,
+        receipt_add_error=conflict,
+    )
+    recovery = _mutation_uow(
+        fixture,
+        events,
+        name="recovery",
+        current=fixture.successor,
+        stored_receipt=fixture.receipt,
+    )
+    factory = _UowFactory([initial, recovery], events)
+    policy_calls = 0
+    original_policy = service_module.evaluate_mutation_policy
+
+    def tracked_policy(*args: Any, **kwargs: Any) -> Any:
+        nonlocal policy_calls
+        policy_calls += 1
+        return original_policy(*args, **kwargs)
+
+    monkeypatch.setattr(
+        service_module,
+        "evaluate_mutation_policy",
+        tracked_policy,
+    )
+    result = await _mutation_service(
+        factory=factory,
+        resolver=_Resolver(
+            [fixture.binding, fixture.binding],
+            events,
+        ),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=fixture.command,
+    )
+
+    assert result == fixture.receipt.result
+    assert policy_calls == 1
+    assert factory.calls == 2
+    assert initial.exit_exception is conflict
+    assert initial.rolled_back and initial.closed and initial.exited
+    assert recovery.rolled_back and recovery.closed and recovery.exited
+    assert recovery.player_characters.append_calls == 0
+    assert recovery.player_characters.cas_calls == 0
+    assert recovery.mutation_receipts.add_calls == 0
+    assert recovery.commit_calls == 0
+    assert events.index("initial:exit-complete") < events.index(
+        "factory:recovery"
+    )
+    assert events.index("resolve:2") < events.index(
+        "recovery:character-lock"
+    )
+    assert events.index("recovery:character-lock") < events.index(
+        "recovery:mutation-receipt-get"
+    )
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("winner_evidence", ["incompatible", "missing"])
+async def test_mutation_recovery_conflict_or_missing_evidence_fails_closed(
+    winner_evidence: str,
+) -> None:
+    fixture = _mutation_fixture(f"recovery-{winner_evidence}")
+    events: list[str] = []
+    command = (
+        _changed_mutation_command(fixture)
+        if winner_evidence == "incompatible"
+        else fixture.command
+    )
+    initial = _mutation_uow(
+        fixture,
+        events,
+        receipt_add_error=MutationReceiptUniquenessConflictError(
+            "receipt race"
+        ),
+    )
+    recovery = _mutation_uow(
+        fixture,
+        events,
+        name="recovery",
+        current=fixture.successor,
+        stored_receipt=(
+            fixture.receipt
+            if winner_evidence == "incompatible"
+            else None
+        ),
+    )
+    factory = _UowFactory([initial, recovery], events)
+
+    decision = await _mutation_service(
+        factory=factory,
+        resolver=_Resolver(
+            [fixture.binding, fixture.binding],
+            events,
+        ),
+        events=events,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=fixture.operation_id,
+        command=command,
+    )
+
+    assert isinstance(decision, CharacterOperationProtocolDecision)
+    assert decision.code is (
+        CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+        if winner_evidence == "incompatible"
+        else CharacterOperationProtocolCode.STORED_RECEIPT_INTEGRITY_FAILURE
+    )
+    assert factory.calls == 2
+    assert recovery.commit_calls == 0
+
+
+@pytest.mark.asyncio
+async def test_mutation_conflict_requires_exact_escaped_exception_provenance() -> None:
+    fixture = _mutation_fixture("provenance")
+    for exit_behavior in ("suppressed", "replacement"):
+        events: list[str] = []
+        recorded = MutationReceiptUniquenessConflictError("recorded")
+        replacement = MutationReceiptUniquenessConflictError("replacement")
+        initial = _mutation_uow(
+            fixture,
+            events,
+            receipt_add_error=recorded,
+            suppress_exit_exception=exit_behavior == "suppressed",
+            exit_error=(
+                replacement if exit_behavior == "replacement" else None
+            ),
+        )
+        factory = _UowFactory([initial], events)
+
+        with pytest.raises(
+            MutationReceiptUniquenessConflictError
+        ) as exc_info:
+            await _mutation_service(
+                factory=factory,
+                resolver=_Resolver([fixture.binding], events),
+                events=events,
+            ).mutate(
+                _PRINCIPAL,
+                operation_id=fixture.operation_id,
+                command=fixture.command,
+            )
+
+        assert exc_info.value is (
+            recorded if exit_behavior == "suppressed" else replacement
+        )
+        assert factory.calls == 1
+        assert initial.rolled_back and initial.closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "unapproved_error",
+    [
+        PlayerCharacterRepositoryConflictError("shared receipt conflict"),
+        MutationReceiptUniquenessConflictError("commit narrow type"),
+    ],
+    ids=["shared-receipt-conflict", "narrow-type-at-commit"],
+)
+async def test_mutation_unapproved_conflicts_never_recover(
+    unapproved_error: BaseException,
+) -> None:
+    fixture = _mutation_fixture("unapproved")
+    events: list[str] = []
+    is_commit = isinstance(
+        unapproved_error,
+        MutationReceiptUniquenessConflictError,
+    )
+    initial = _mutation_uow(
+        fixture,
+        events,
+        receipt_add_error=None if is_commit else unapproved_error,
+        commit_error=unapproved_error if is_commit else None,
+    )
+    factory = _UowFactory([initial], events)
+
+    with pytest.raises(type(unapproved_error)) as exc_info:
+        await _mutation_service(
+            factory=factory,
+            resolver=_Resolver([fixture.binding], events),
+            events=events,
+        ).mutate(
+            _PRINCIPAL,
+            operation_id=fixture.operation_id,
+            command=fixture.command,
+        )
+
+    assert exc_info.value is unapproved_error
+    assert factory.calls == 1
+    assert initial.rolled_back and initial.closed

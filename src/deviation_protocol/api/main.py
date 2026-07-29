@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path as FilePath
 from typing import Annotated, Any
 
@@ -22,7 +23,14 @@ from deviation_protocol.api.schemas import (
     NarrativeRequestStatusResponse,
 )
 from deviation_protocol.application.identity import RequestPrincipal
-from deviation_protocol.application.ports import TurnOrchestrator
+from deviation_protocol.application.player_character_service import (
+    PlayerCharacterService,
+)
+from deviation_protocol.application.ports import (
+    ControllerBindingResolver,
+    TurnOrchestrator,
+    UnitOfWorkFactory,
+)
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
@@ -46,6 +54,15 @@ from deviation_protocol.infrastructure.deepseek_narrative import (
     DeepSeekSettings,
 )
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
+from deviation_protocol.domain.player_character import AuthoritySourceRef
+from deviation_protocol.domain.player_character_policies import (
+    CreatePlayerCharacterPolicy,
+)
+from deviation_protocol.infrastructure.player_character_authority import (
+    ConfiguredControllerBinding,
+    ConfiguredControllerBindingResolver,
+    Uuid4PlayerCharacterIdIssuer,
+)
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -93,8 +110,41 @@ def _public_error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
     }
 
 
-def build_default_services() -> ApiServices:
+def _player_character_clock() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def build_player_character_service(
+    *,
+    uow_factory: UnitOfWorkFactory,
+    controller_binding_resolver: ControllerBindingResolver,
+) -> PlayerCharacterService:
+    return PlayerCharacterService(
+        uow_factory=uow_factory,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_id_issuer=Uuid4PlayerCharacterIdIssuer(),
+        create_policy=CreatePlayerCharacterPolicy(),
+        source_reference=AuthoritySourceRef(
+            value="source.production-player-character"
+        ),
+        clock=_player_character_clock,
+    )
+
+
+def build_default_services(
+    *,
+    player_character_controller_bindings: (
+        Sequence[ConfiguredControllerBinding] | None
+    ) = None,
+) -> ApiServices:
     """Build runtime dependencies without opening a connection or running migrations."""
+    controller_binding_resolver = (
+        ConfiguredControllerBindingResolver.from_environment()
+        if player_character_controller_bindings is None
+        else ConfiguredControllerBindingResolver(
+            player_character_controller_bindings
+        )
+    )
     scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
     catalog = scenario_catalog.content_catalog
     engine = create_engine()
@@ -132,6 +182,10 @@ def build_default_services() -> ApiServices:
             scenario_catalog=scenario_catalog,
         ),
         turn_orchestrator=orchestrator,
+        player_character_service=build_player_character_service(
+            uow_factory=uow_factory,
+            controller_binding_resolver=controller_binding_resolver,
+        ),
         engine=engine,
         narrative_provider=provider,
     )

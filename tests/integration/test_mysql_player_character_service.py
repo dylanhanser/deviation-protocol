@@ -32,6 +32,7 @@ from deviation_protocol.application.player_character_service import (
 )
 from deviation_protocol.application.ports import (
     ControllerBindingUniquenessConflictError,
+    MutationReceiptUniquenessConflictError,
 )
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
@@ -51,9 +52,11 @@ from deviation_protocol.domain.player_character import (
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
     PlayerConfirmation,
+    TrustedFinalDeathEvidence,
 )
 from deviation_protocol.infrastructure.errors import (
     PlayerCharacterControllerBindingConflictError,
+    PlayerCharacterMutationReceiptConflictError,
     PlayerCharacterRepositoryConflictError,
 )
 from deviation_protocol.infrastructure.orm_models import (
@@ -89,6 +92,14 @@ class _CreationInput:
     player_character_id: PlayerCharacterId
     operation_id: PlayerCharacterOperationId
     command: CharacterCreationCommand
+
+
+@dataclass(frozen=True, slots=True)
+class _MutationInput:
+    operation_id: PlayerCharacterOperationId
+    command: CharacterMutationCommand
+    successor: CanonicalPlayerCharacter
+    receipt: StoredMutationSuccessReceipt
 
 
 @dataclass(slots=True)
@@ -437,11 +448,11 @@ async def test_mysql_service_pre_commit_failure_rolls_back_before_fresh_success(
     ) == (1, 1, 1, 1, 1, 0)
 
 
-def _retirement(
+def _retirement_input(
     record: CanonicalPlayerCharacter,
     *,
     label: str,
-) -> tuple[CanonicalPlayerCharacter, StoredMutationSuccessReceipt]:
+) -> _MutationInput:
     operation_id = PlayerCharacterOperationId(
         value=f"operation.retire-{label}"
     )
@@ -493,7 +504,84 @@ def _retirement(
             resulting_lifecycle=successor.lifecycle,
         ),
     )
-    return successor, receipt
+    return _MutationInput(
+        operation_id=operation_id,
+        command=command,
+        successor=successor,
+        receipt=receipt,
+    )
+
+
+def _retirement(
+    record: CanonicalPlayerCharacter,
+    *,
+    label: str,
+) -> tuple[CanonicalPlayerCharacter, StoredMutationSuccessReceipt]:
+    mutation = _retirement_input(record, label=label)
+    return mutation.successor, mutation.receipt
+
+
+def _final_death_input(
+    record: CanonicalPlayerCharacter,
+    *,
+    label: str,
+) -> _MutationInput:
+    operation_id = PlayerCharacterOperationId(
+        value=f"operation.final-death-{label}"
+    )
+    command = CharacterMutationCommand(
+        contract_version=record.contract_version,
+        command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+        target_player_character_id=record.player_character_id,
+        expected_revision=record.record_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=record.player_character_id,
+            contract_version=record.contract_version,
+            record_revision=record.record_revision,
+        ),
+        final_death_evidence=TrustedFinalDeathEvidence(
+            player_character_id=record.player_character_id,
+            expected_revision=record.record_revision,
+            operation_id=operation_id,
+            source_reference=AuthoritySourceRef(
+                value=f"source.final-death-{label}"
+            ),
+        ),
+    )
+    decision = evaluate_mutation_policy(
+        record,
+        command=command,
+        operation_id=operation_id,
+    )
+    assert decision.resulting_record is not None
+    successor = decision.resulting_record
+    _, fingerprint = mutation_fingerprint(
+        command,
+        operation_id=operation_id,
+    )
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=record.player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=record.player_character_id,
+            contract_version=record.contract_version,
+            command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+            command_result=MutationCommandResult.DECEASED,
+            resulting_revision=successor.record_revision,
+            resulting_lifecycle=successor.lifecycle,
+        ),
+    )
+    return _MutationInput(
+        operation_id=operation_id,
+        command=command,
+        successor=successor,
+        receipt=receipt,
+    )
 
 
 def _assert_shared_not_narrow(error: BaseException) -> None:
@@ -502,9 +590,13 @@ def _assert_shared_not_narrow(error: BaseException) -> None:
         error,
         ControllerBindingUniquenessConflictError,
     )
+    assert not isinstance(
+        error,
+        MutationReceiptUniquenessConflictError,
+    )
 
 
-async def test_mysql_only_controller_binding_duplicate_is_narrow(
+async def test_mysql_conflict_prechecks_and_unrelated_writes_remain_shared(
     mysql_session_factory: async_sessionmaker[AsyncSession],
     player_character_service_scope: _ServiceScope,
 ) -> None:
@@ -834,3 +926,319 @@ async def test_mysql_real_binding_race_service_recovers_in_one_fresh_uow(
     assert (
         await _family_counts(mysql_session_factory, loser)
     )[1:] == (0, 0, 0, 0, 0)
+
+
+async def test_mysql_mutation_is_atomic_reloadable_and_replayable(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_service_scope: _ServiceScope,
+) -> None:
+    creation = player_character_service_scope.creation("mutation-atomic")
+    service = _service(creation, mysql_session_factory)
+    created = await service.create(
+        _PRINCIPAL,
+        operation_id=creation.operation_id,
+        command=creation.command,
+    )
+    assert not isinstance(created, CharacterOperationProtocolDecision)
+
+    async with mysql_session_factory() as session:
+        initial = await SqlAlchemyPlayerCharacterRepository(session).get(
+            creation.player_character_id
+        )
+    assert initial is not None
+    retirement = _retirement_input(
+        initial,
+        label=f"{player_character_service_scope.token}-atomic",
+    )
+
+    retired = await service.mutate(
+        _PRINCIPAL,
+        operation_id=retirement.operation_id,
+        command=retirement.command,
+    )
+    assert retired == retirement.receipt.result
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 2, 1, 1, 1)
+
+    async with mysql_session_factory() as session:
+        reloaded_retired = await SqlAlchemyPlayerCharacterRepository(
+            session
+        ).get(creation.player_character_id)
+        reloaded_receipt = (
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).get(retirement.receipt.key)
+        )
+    assert reloaded_retired == retirement.successor
+    assert reloaded_receipt == retirement.receipt
+
+    final_death = _final_death_input(
+        retirement.successor,
+        label=f"{player_character_service_scope.token}-atomic",
+    )
+    deceased = await _service(
+        creation,
+        mysql_session_factory,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=final_death.operation_id,
+        command=final_death.command,
+    )
+    assert deceased == final_death.receipt.result
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 3, 1, 1, 2)
+
+    replay = await _service(
+        creation,
+        mysql_session_factory,
+    ).mutate(
+        _PRINCIPAL,
+        operation_id=retirement.operation_id,
+        command=retirement.command,
+    )
+    assert replay == retired
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 3, 1, 1, 2)
+
+
+async def test_mysql_mutation_pre_commit_failure_has_no_partial_durability(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_service_scope: _ServiceScope,
+) -> None:
+    creation = player_character_service_scope.creation("mutation-rollback")
+    created = await _service(
+        creation,
+        mysql_session_factory,
+    ).create(
+        _PRINCIPAL,
+        operation_id=creation.operation_id,
+        command=creation.command,
+    )
+    assert not isinstance(created, CharacterOperationProtocolDecision)
+
+    async with mysql_session_factory() as session:
+        initial = await SqlAlchemyPlayerCharacterRepository(session).get(
+            creation.player_character_id
+        )
+    assert initial is not None
+    retirement = _retirement_input(
+        initial,
+        label=f"{player_character_service_scope.token}-rollback",
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="controlled pre-COMMIT service failure",
+    ):
+        await _service(
+            creation,
+            mysql_session_factory,
+            uow_factory=lambda: _PreCommitFailureUnitOfWork(
+                mysql_session_factory
+            ),
+        ).mutate(
+            _PRINCIPAL,
+            operation_id=retirement.operation_id,
+            command=retirement.command,
+        )
+
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 1, 1, 1, 0)
+    async with mysql_session_factory() as session:
+        reloaded = await SqlAlchemyPlayerCharacterRepository(session).get(
+            creation.player_character_id
+        )
+        receipt = (
+            await SqlAlchemyPlayerCharacterMutationReceiptRepository(
+                session
+            ).get(retirement.receipt.key)
+        )
+    assert reloaded == initial
+    assert receipt is None
+
+
+async def test_mysql_locked_duplicate_mutations_commit_once_then_replay(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_service_scope: _ServiceScope,
+) -> None:
+    creation = player_character_service_scope.creation("mutation-locked")
+    created = await _service(
+        creation,
+        mysql_session_factory,
+    ).create(
+        _PRINCIPAL,
+        operation_id=creation.operation_id,
+        command=creation.command,
+    )
+    assert not isinstance(created, CharacterOperationProtocolDecision)
+
+    async with mysql_session_factory() as session:
+        initial = await SqlAlchemyPlayerCharacterRepository(session).get(
+            creation.player_character_id
+        )
+    assert initial is not None
+    retirement = _retirement_input(
+        initial,
+        label=f"{player_character_service_scope.token}-locked",
+    )
+
+    tasks = tuple(
+        asyncio.create_task(
+            _service(
+                creation,
+                mysql_session_factory,
+            ).mutate(
+                _PRINCIPAL,
+                operation_id=retirement.operation_id,
+                command=retirement.command,
+            )
+        )
+        for _ in range(2)
+    )
+    try:
+        results = await asyncio.wait_for(
+            asyncio.gather(*tasks),
+            timeout=_TIMEOUT,
+        )
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    assert results == [retirement.receipt.result] * 2
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 2, 1, 1, 1)
+
+
+class _RaceMutationReceiptRepository(
+    SqlAlchemyPlayerCharacterMutationReceiptRepository
+):
+    def __init__(
+        self,
+        session: AsyncSession,
+        coordinator: _RaceCoordinator,
+    ) -> None:
+        super().__init__(session)
+        self._coordinator = coordinator
+
+    async def _flush_row(
+        self,
+        row: Any,
+        *,
+        conflict_message: str,
+        conflict_type: type[PlayerCharacterRepositoryConflictError] = (
+            PlayerCharacterRepositoryConflictError
+        ),
+    ) -> None:
+        self._coordinator.arrivals += 1
+        if self._coordinator.arrivals == 2:
+            self._coordinator.ready.set()
+        await asyncio.wait_for(
+            self._coordinator.start.wait(),
+            timeout=_TIMEOUT,
+        )
+        await super()._flush_row(
+            row,
+            conflict_message=conflict_message,
+            conflict_type=conflict_type,
+        )
+
+
+async def test_mysql_only_final_mutation_receipt_flush_is_narrow(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_service_scope: _ServiceScope,
+) -> None:
+    creation = player_character_service_scope.creation(
+        "mutation-flush-race"
+    )
+    created = await _service(
+        creation,
+        mysql_session_factory,
+    ).create(
+        _PRINCIPAL,
+        operation_id=creation.operation_id,
+        command=creation.command,
+    )
+    assert not isinstance(created, CharacterOperationProtocolDecision)
+
+    async with mysql_session_factory() as session:
+        repository = SqlAlchemyPlayerCharacterRepository(session)
+        initial = await repository.get_for_update(
+            creation.player_character_id
+        )
+        assert initial is not None
+        retirement = _retirement_input(
+            initial,
+            label=f"{player_character_service_scope.token}-flush-race",
+        )
+        await repository.append_revision(
+            retirement.successor,
+            created_at=_NOW,
+        )
+        assert await repository.compare_and_swap_current(
+            retirement.successor,
+            expected_revision=initial.record_revision.value,
+            created_at=_NOW,
+        )
+        await session.commit()
+
+    coordinator = _RaceCoordinator()
+
+    async def insert_receipt() -> BaseException | None:
+        async with mysql_session_factory() as session:
+            try:
+                await _RaceMutationReceiptRepository(
+                    session,
+                    coordinator,
+                ).add(
+                    retirement.receipt,
+                    created_at=_NOW,
+                )
+                await session.commit()
+                return None
+            except BaseException as exc:
+                await session.rollback()
+                return exc
+
+    tasks = tuple(
+        asyncio.create_task(insert_receipt())
+        for _ in range(2)
+    )
+    try:
+        await asyncio.wait_for(coordinator.ready.wait(), timeout=_TIMEOUT)
+        coordinator.start.set()
+        outcomes = await asyncio.wait_for(
+            asyncio.gather(*tasks),
+            timeout=_TIMEOUT,
+        )
+    finally:
+        coordinator.start.set()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+    conflicts = [outcome for outcome in outcomes if outcome is not None]
+    assert len(conflicts) == 1
+    conflict = conflicts[0]
+    assert type(conflict) is PlayerCharacterMutationReceiptConflictError
+    assert isinstance(
+        conflict,
+        MutationReceiptUniquenessConflictError,
+    )
+    assert isinstance(conflict, PlayerCharacterRepositoryConflictError)
+    assert await _family_counts(
+        mysql_session_factory,
+        creation,
+    ) == (1, 1, 2, 1, 1, 1)

@@ -61,6 +61,7 @@ from deviation_protocol.domain.models import GameSession
 from deviation_protocol.infrastructure.errors import (
     OptimisticLockError,
     PlayerCharacterControllerBindingConflictError,
+    PlayerCharacterMutationReceiptConflictError,
     PlayerCharacterRepositoryConflictError,
     PlayerCharacterRepositoryError,
 )
@@ -1598,6 +1599,7 @@ class SqlAlchemyPlayerCharacterMutationReceiptRepository(
         await self._flush_row(
             row,
             conflict_message="mutation receipt unique-race conflict",
+            conflict_type=PlayerCharacterMutationReceiptConflictError,
         )
 
 

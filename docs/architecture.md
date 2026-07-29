@@ -152,12 +152,12 @@ reused, no automatic retry was added, and connection-loss or uncertain-COMMIT
 recovery and exactly-once behavior remain excluded. The test-only orchestration
 is not a production application service. No runtime service, API, public route,
 frontend, Provider, Demo, Session, Run, story-line, narrative, content, or
-gameplay integration was activated. P3-S1 canonical creation orchestration is
-implemented and complete; the remaining Phase 3 slices and runtime activation
-remain unimplemented, so Phase 3 as a whole remains incomplete. The complete
-frozen implementation plan remains partially implemented.
+gameplay integration was activated. Structured player-character Phase 3 is now
+implemented and complete: P3-S1 through P3-S4 are complete, and the complete
+code candidate received independent read-only approval with no implementation
+finding remaining open. Phase 4 has not started.
 
-## Structured player-character Phase 3–5 planned boundaries
+## Structured player-character Phase 3–5 boundaries
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -167,9 +167,14 @@ correction completed final independent implementation review and preserves the
 boundary described below. The earlier recovery-provenance defect, typed-conflict
 ownership contradiction, and rejected first amendment are historical; the
 implemented correction requires exact exception-instance provenance and fails
-closed when the initial Unit of Work suppresses the original conflict. Phase 3
-remains incomplete: P3-S2 is next, has not started, and requires its own frozen
-scope, candidate, independent review, commit, and push gates.
+closed when the initial Unit of Work suppresses the original conflict. The
+three-document P3-S1 closure status synchronization was then committed and
+pushed at the pre-closure `main`/local-`origin/main` baseline
+`150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+(`docs(player-character): close phase 3 slice 1 status sync`). P3-S2 mutation
+orchestration, P3-S3 owned read and detached projection, and P3-S4 production
+composition are implemented. The complete Phase 3 code candidate received
+independent read-only approval, and no implementation finding remains open.
 
 Structured player-character Phase 3 owns trusted application orchestration and
 its later normal production composition. Its independently reviewable order is
@@ -207,8 +212,28 @@ after binding authorization and the exact receipt protocol returns
 `READY_FOR_NEW_OPERATION`. Exact replay never calls the issuer. The allocation
 Repository remains the uniqueness backstop; an allocation collision propagates
 the existing repository conflict, causes rollback, and never triggers another
-identity issuance. The production resolver backing source and ID-generation
-algorithm remain P3-S4 composition decisions.
+identity issuance.
+
+The production controller resolver uses an explicit configured allowlist and
+matches only the complete exact `(authentication_scheme, player_id)`
+`RequestPrincipal` identity. It returns only the configured `controller_id`;
+unknown or invalid principals receive no authority. Configuration is immutable
+or defensively copied, strict, duplicate-safe, and value-free in errors.
+Resolution performs no database or UnitOfWork work, automatic registration,
+development-principal fallback, partial matching, or ownership derivation.
+When typed bindings are not supplied directly,
+`PLAYER_CHARACTER_CONTROLLER_BINDINGS` is required runtime JSON. Missing,
+empty, malformed, incomplete, non-canonical, duplicate-principal, or
+shared-controller configuration fails closed before catalog, engine, database,
+or UnitOfWork construction.
+
+The production issuer directly uses Python standard-library `uuid.uuid4()`;
+operating-system randomness supplies the UUID entropy. It formats the result as
+`pc.<32 lowercase UUIDv4 hexadecimal digits>` and validates it through
+`PlayerCharacterId`. The ID contains no principal, controller, timestamp,
+sequence, or other user information. Production exposes no injection seam
+that can replace UUIDv4 generation. Persistence uniqueness failures continue
+to fail closed, and no generalized creation retry was introduced.
 
 The application service owns `UnitOfWorkFactory` use, UoW entry and the one
 explicit success-path `commit()`. Repository adapters own only their accepted
@@ -308,8 +333,10 @@ synchronization changes were permitted only in `PLANS.md`, this document, and
 schema, migration, ORM, UoW, API, composition, Demo, frontend, Provider, Run,
 narrative, scenario, content, or gameplay path was authorized. Commit
 `7606e51523338247ea33ed9329346fdba046d29b` satisfied this historical gate; its
-documentation synchronization did not include the current uncommitted
-three-document status-synchronization candidate.
+documentation synchronization was later committed and pushed as
+`150074d58cdbf3aee08bea9c1084325b2b0f0a3f`. The present documentation
+synchronization records the completed Phase 3 milestone without claiming that
+its local closure commit has been pushed.
 
 The completed P3-S1 implementation stays within that boundary. It adds
 the injectable creation service and the two typed conflict symbols, selects the
@@ -319,7 +346,93 @@ suppression, and supplies focused unit and MySQL integration tests. It changes
 no schema, migration, ORM, UoW, composition root, API, Demo, Provider, Run,
 narrative, scenario, content, or gameplay path. It completed final independent
 review, commit, and push; no further P3-S1 implementation review is pending.
-This closure does not approve or begin P3-S2 implementation.
+
+The implemented P3-S2 boundary is one
+`PlayerCharacterService.mutate` method on the existing service. It resolves
+the trusted controller before one initial UoW, locks and reconstructs the
+target current record, authorizes that record's stored controller binding
+before disclosure, defensively validates the typed command, operation ID, and
+revision domain, constructs the mutation receipt key only afterward, and
+evaluates the already-read immutable receipt before stale rejection. Exact
+replay returns only the original committed safe result without policy,
+history, CAS, receipt insertion, or commit. A new operation verifies the exact
+target, contract, applicable reference, and expected revision, evaluates
+exactly one existing mutation policy, validates the complete detached
+successor, appends immutable history, performs the existing version-checked
+current-row CAS, adds the immutable success receipt, commits once, and returns
+success only after commit returns. P3-S2 applies no Run/story-line continuity
+effect and activates no public runtime path.
+
+`compare_and_swap_current(...) == False` has one outcome:
+`CharacterOperationProtocolDecision` for
+`player-character.mutate/v1` with code `STALE_REVISION`. It is returned from
+inside the still-uncommitted initial UoW, whose normal exit rolls back the
+already-flushed successor history and closes the session. CAS loss performs no
+receipt add, commit, recovery read, generic retry, state reuse, or
+uncertain-commit recovery.
+
+The existing locked-current workflow serializes compliant P3-S2 writers, so a
+mutation-receipt insert race is not the normal same-service concurrency path.
+The physical mutation-receipt table nevertheless has both its exact operation
+primary key and its one-result-per-revision unique key, and the existing
+Repository reports duplicate-key insertion through the shared
+`PlayerCharacterRepositoryConflictError`. P3-S2 uses one defensive,
+application-owned
+`MutationReceiptUniquenessConflictError` and one concrete
+`PlayerCharacterMutationReceiptConflictError`, selected only by the exact
+row-only `_flush_row` call in
+`SqlAlchemyPlayerCharacterMutationReceiptRepository.add`. Existing preflight
+key/result conflicts, revision/current conflicts, and every other Repository
+operation retain their original shared identities.
+
+The service may catch the narrow application contract only immediately around
+that exact `mutation_receipts.add` call. It must record and re-raise the exact
+exception through the failed initial UoW, then confirm that the same object
+escaped after rollback, close, and disposal. Only then may at most one
+different fresh UoW re-resolve authority, lock and validate the current
+record, revalidate the operation ID before key construction or lookup, read
+the exact durable receipt, and call the existing
+`recover_mutation_unique_race_winner`. Compatible evidence returns only the
+already committed winner; incompatible reuse returns
+`IDEMPOTENCY_CONFLICT`; missing or invalid winner evidence fails closed.
+Suppression, a different same-type exception, any shared conflict, commit
+failure, or uncertain commit outcome authorizes no recovery. There is no third
+UoW, write retry, policy retry, commit in recovery, or exactly-once claim.
+
+The historical P3-S2 gate capped implementation at `4 + 2 + 3` paths:
+`src/deviation_protocol/application/player_character_service.py`,
+`src/deviation_protocol/application/ports.py`,
+`src/deviation_protocol/infrastructure/errors.py`,
+`src/deviation_protocol/infrastructure/repositories.py`,
+`tests/unit/test_player_character_service.py`,
+`tests/integration/test_mysql_player_character_service.py`, `PLANS.md`, this
+document, and
+`docs/structured_player_character_implementation_plan.md`. No domain,
+operation-helper, persistence-codec, ORM, migration, UoW, dependency,
+composition, API, Demo, frontend, Provider, Run, narrative, scenario, content,
+or gameplay path was authorized. The implementation completed within that
+boundary and received independent read-only approval as part of the complete
+Phase 3 candidate.
+
+P3-S3 implements `get_owned`. Controller authority resolves before UnitOfWork
+construction. Missing and wrong-owner characters both return `None`; stored
+identity and state are revalidated. Success is a detached, frozen, allowlisted
+projection containing only ID, contract version, current revision, and
+lifecycle. The read performs no write, lock, receipt operation, commit, retry,
+or recovery.
+
+P3-S4 makes the canonical service available from
+`build_default_services()` as `ApiServices.player_character_service`. It
+reuses the established lazy `SqlAlchemyUnitOfWork` factory and the existing
+repositories and policies; create, mutate, and `get_owned` remain available.
+Composition itself performs no UnitOfWork, SQL, ID issuance, or mutation.
+Supported startup fails closed when required controller-binding configuration
+is absent, and no fake or development resolver or fake issuer is installed.
+
+API routes, frontend activation, Demo behavior, Provider behavior, Run
+Protocol integration, narrative integration, scenario integration, combat
+integration, and public gameplay activation remain deferred. Phase 4 has not
+started.
 
 ## Current composition roots and Provider boundaries
 

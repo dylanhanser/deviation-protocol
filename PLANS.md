@@ -16,10 +16,10 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Current structured player-character implementation baseline and local
-  `origin/main`: `7606e51523338247ea33ed9329346fdba046d29b`
+- Pre-closure structured player-character baseline and unchanged local
+  `origin/main`: `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
 - Baseline subject:
-  `feat(player-character): add race-safe creation recovery`
+  `docs(player-character): close phase 3 slice 1 status sync`
 - Historical structured player-character Phase 2 closure baseline:
   `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
   (`feat(player-character): wire repositories into unit of work`)
@@ -31,13 +31,21 @@ documents.
   The approved nine-path candidate was committed as
   `7606e51523338247ea33ed9329346fdba046d29b`
   (`feat(player-character): add race-safe creation recovery`) and pushed to
-  `main`. P3-S1 is implemented, approved, complete, and closed.
-- The current three-document status-synchronization candidate is unstaged and
-  uncommitted; it is not part of commit `7606e51523338247ea33ed9329346fdba046d29b`.
-- Phase 3 remains incomplete. P3-S2 canonical mutation orchestration is next,
-  has not started, and requires its own frozen scope, candidate, independent
-  review, commit, and push gates; this status synchronization does not approve
-  or begin P3-S2 implementation.
+  `main`. Its three-document closure status synchronization was subsequently
+  committed and pushed as the current baseline
+  `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+  (`docs(player-character): close phase 3 slice 1 status sync`). P3-S1 is
+  implemented, independently approved, committed, pushed, complete, and
+  closed.
+- Structured player-character Phase 3 is implemented and complete. P3-S1
+  through P3-S4 are complete, and the complete Phase 3 code candidate received
+  independent read-only approval with no implementation finding remaining
+  open. This documentation synchronization and the approved code candidate
+  remain local until the user pushes the milestone commit.
+- Phase 4 has not started. API routes, frontend activation, Demo behavior,
+  Provider behavior, Run Protocol integration, narrative integration, scenario
+  integration, combat integration, and public gameplay activation remain
+  deferred.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -284,8 +292,8 @@ passed. Phase 2 is independently accepted, committed, pushed, and closed at
 public route, frontend, Demo, Provider, Run, narrative, content, or gameplay
 integration was activated.
 
-The corrected structured player-character roadmap is now a written planning
-candidate. It preserves the repository-authoritative stages:
+The structured player-character roadmap preserves the repository-authoritative
+stages:
 
 1. **Phase 3 — Trusted canonical application service**
    - P3-S1 canonical creation orchestration;
@@ -340,14 +348,68 @@ synchronization may change only `PLANS.md`, `docs/architecture.md`, and
 amendment changed documentation only and did not itself authorize
 implementation. The later separately authorized implementation and bounded
 correction completed final independent review, commit, and push. P3-S1 is
-closed; Phase 3 remains incomplete and P3-S2 is next but has not started.
+closed. At that historical point Phase 3 remained incomplete and P3-S2 had not
+started.
 
-Mutation, owned read/projection, normal production composition, production
-resolver/issuer adapter selection, Run/continuous-line binding, every public
-route, frontend and Demo parity remain deferred to their listed independently
-reviewable slices. Provider, narrative, content, gameplay, account-system, and
-unselected identity-generation or controller-authority designs remain outside
-P3-S1.
+The subsequent P3-S1 status synchronization was committed and pushed at the
+pre-closure baseline `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
+(`docs(player-character): close phase 3 slice 1 status sync`). The present
+milestone candidate completes P3-S2 mutation orchestration, P3-S3 owned read
+and detached projection, and P3-S4 normal production composition. The complete
+Phase 3 code candidate received independent read-only approval with no open
+implementation finding. Phase 3 is complete; Phase 4 has not started.
+
+Production controller authority is an explicit configured allowlist matched by
+the complete exact `(authentication_scheme, player_id)` `RequestPrincipal`
+identity. It returns only the configured `controller_id`; unknown or invalid
+principals receive no authority. Configuration is immutable or defensively
+copied, strict, duplicate-safe, and value-free in errors. Resolution performs
+no database or UnitOfWork work and never auto-registers, falls back to a
+development principal, partially matches, or derives ownership.
+`PLAYER_CHARACTER_CONTROLLER_BINDINGS` supplies the required runtime JSON when
+typed bindings are not provided directly. Missing, empty, malformed,
+incomplete, non-canonical, duplicate-principal, or shared-controller
+configuration fails closed before catalog, engine, database, or UnitOfWork
+construction.
+
+Production character-ID issuance directly uses standard-library
+`uuid.uuid4()`, whose entropy comes from operating-system randomness. It emits
+`pc.<32 lowercase UUIDv4 hexadecimal digits>` and validates the result through
+`PlayerCharacterId`. The ID contains no principal, controller, timestamp,
+sequence, or other user information, and production exposes no injection seam
+that can replace UUIDv4 generation. Persistence uniqueness failures continue
+to fail closed; no generalized creation retry was added.
+
+Creation resolves trusted controller authority before constructing a
+UnitOfWork; ownership is never caller supplied. Allocation, initial revision
+and current state, and the creation receipt commit atomically, collisions and
+persistence failures fail closed, and success is returned only after commit.
+Mutation checks ownership before targeted receipt disclosure, evaluates a
+receipt before stale-revision rejection, returns compatible replay read-only,
+and conflicts safely on incompatible operation-ID reuse. A new operation
+applies exactly one policy and validates successor, history, CAS, and receipt
+persistence; CAS loss and failures roll back. Only the exact receipt-flush
+conflict permits the narrow disposed-then-fresh-UnitOfWork recovery, with no
+mutation or commit retry.
+
+Owned read resolves authority before UnitOfWork construction. Missing and
+wrong-owner characters both return `None`; stored identity and state are
+revalidated, and the detached frozen allowlisted projection returns only ID,
+contract version, current revision, and lifecycle. It performs no write, lock,
+receipt operation, commit, retry, or recovery.
+
+`build_default_services()` exposes the canonical service through
+`ApiServices.player_character_service`, reusing the lazy
+`SqlAlchemyUnitOfWork` factory and existing repositories and policies. Create,
+mutate, and `get_owned` remain available, while composition itself performs no
+UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
+required controller bindings are absent; no fake or development resolver or
+fake issuer is installed.
+
+API routes, frontend activation, Demo behavior, Provider behavior, Run
+Protocol and continuous-line integration, narrative integration, scenario
+integration, combat integration, content integration, and public gameplay
+activation remain deferred.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the

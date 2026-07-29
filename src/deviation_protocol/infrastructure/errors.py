@@ -1,5 +1,6 @@
 from deviation_protocol.application.ports import (
     ControllerBindingUniquenessConflictError,
+    MutationReceiptUniquenessConflictError,
 )
 
 
@@ -24,3 +25,10 @@ class PlayerCharacterControllerBindingConflictError(
     ControllerBindingUniquenessConflictError,
 ):
     """A duplicate at the exact controller-binding add flush."""
+
+
+class PlayerCharacterMutationReceiptConflictError(
+    PlayerCharacterRepositoryConflictError,
+    MutationReceiptUniquenessConflictError,
+):
+    """A duplicate at the exact mutation-receipt add flush."""
