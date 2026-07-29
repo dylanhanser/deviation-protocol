@@ -13,13 +13,13 @@ documents.
 - **Planned phase:** assigned to a future phase whose implementation has not
   started.
 
-## Reviewed P4-G0 baseline
+## Current P4-S1 plan-candidate baseline
 
+- Exact bounded candidate: [P4-S1 implementation plan](docs/structured_player_character_p4_s1_implementation_plan.md).
 - Branch: `main`
-- Reviewed P4-G0 parent, pre-closeout baseline, and current local
-  `origin/main`: `cafb12272e703e8751c78bb6852cec90d7d7ec8d`
-- Baseline subject:
-  `feat(player-character): complete canonical application service`
+- Current local `origin/main` and `HEAD`:
+  `e821cd922b61868097667b12c2b64cf8089a9681`
+- Baseline subject: `feat(run): implement minimum run core`
 - Historical pre-closure Phase 3 baseline:
   `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
   (`docs(player-character): close phase 3 slice 1 status sync`)
@@ -47,11 +47,12 @@ documents.
   `cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Complete Phase 3 Offline
   verification recorded `1,469 passed, 79 skipped`; the existing focused
   MySQL player-character selection recorded `42 passed`.
-- P4-G0 documentation authority is approved and closed. Its independent
-  read-only review returned
-  `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. The resulting
-  documentation milestone is local until the user manually pushes it.
-- Phase 4 implementation has not started. The minimum Run core, API routes,
+- Minimum Run Core is implemented, independently finally approved, committed,
+  and pushed on `main` as `e821cd922b61868097667b12c2b64cf8089a9681`
+  (`feat(run): implement minimum run core`). Its binding seam remains
+  null-only and unpopulated; `run.bind-player-character/v1` remains reserved
+  and rejected. P4-S1 implementation has not started.
+- Phase 4 implementation has not started. API routes,
   frontend activation, Demo behavior, Provider behavior, full Run Protocol,
   narrative integration, scenario integration, combat integration, and public
   gameplay activation remain unimplemented or deferred as assigned.
@@ -309,16 +310,15 @@ stages:
 2. **P4-G0 — Minimum Run-core authority freeze: approved and closed**
    - the independent read-only review returned
      `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; the resulting
-     documentation milestone is local until the user manually pushes it.
-3. **Minimum Phase 3.3 Run-core prerequisite: not implemented**
-   - MRC-S1 is the next implementation slice after that push and clean-baseline
-     confirmation; MRC-S2 and MRC-S3 remain later ordered slices, and none has
-     started;
-   - its required sequence is owned by [the canonical minimum Run-core
-     plan](docs/minimum_run_core_implementation_plan.md).
+     prerequisite is now implemented and pushed at
+     `e821cd922b61868097667b12c2b64cf8089a9681`.
+3. **Minimum Phase 3.3 Run-core prerequisite: implemented, approved, committed, and pushed**
+   - completed at `e821cd922b61868097667b12c2b64cf8089a9681`
+     (`feat(run): implement minimum run core`); its null-only binding seam
+     remains reserved and rejected.
 4. **P4-S1 — Run-owned continuous-story-line binding: not started**
-   - bind the canonical character and exact applicable reference only after
-     the minimum Run core is implemented and approved.
+   - [its exact bounded documentation candidate](docs/structured_player_character_p4_s1_implementation_plan.md)
+     is pending independent review; no binding behavior is implemented.
 5. **Phase 5 — Public projection and narrow boundary integration: deferred**
    - P5-S1 owned-read activation;
    - P5-S2 creation activation; and
@@ -500,18 +500,18 @@ remain Deferred.
 The canonical design is
 [Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md).
 
-P4-G0 documentation authority is approved and closed following independent
+P4-G0 documentation authority was approved and closed following independent
 read-only review with `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. It
-freezes a smaller minimum Run-core prerequisite in
+defined the smaller minimum Run-core prerequisite in
 [Minimum Run Core Implementation Plan](docs/minimum_run_core_implementation_plan.md):
 stable Run/line identity, minimum lifecycle and state version, durable
 Run-owned persistence/UoW, separate trusted Session participation, and the
-future atomic character-binding seam. The resulting documentation milestone is
-local until the user manually pushes it. MRC-S1 is next after that push and
-clean-baseline confirmation; MRC-S2 and MRC-S3 remain later ordered slices and
-none has started. P4-S1 follows only after that minimum core is implemented,
-independently approved, documented, committed, manually pushed, and confirmed
-as a clean baseline.
+future atomic character-binding seam. The prerequisite is now implemented,
+independently finally approved, committed, and pushed as
+`e821cd922b61868097667b12c2b64cf8089a9681`
+(`feat(run): implement minimum run core`). Its binding seam is still
+null-only and unpopulated, and the reserved binding operation remains
+rejected. P4-S1 remains unstarted and has no public activation.
 
 Neither P4-G0 nor the minimum prerequisite marks the full Run Protocol
 implemented. World generation, profile resolution, scenario execution,

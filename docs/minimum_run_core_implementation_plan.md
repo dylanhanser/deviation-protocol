@@ -2,15 +2,15 @@
 
 ## 1. Status
 
-Status: **P4-G0 documentation authority approved and closed — the minimum Run
-core remains planned and not implemented.**
+Status: **Minimum Run Core implemented, independently finally approved,
+committed, and pushed; P4-S1 remains unstarted.**
 
-The independent read-only review returned
-`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`, the sole operative
-P4-G0 success verdict defined in section 15. The resulting documentation
-milestone is local until the user manually pushes it. MRC-S1 is the next
-implementation slice after that push and clean-baseline confirmation; MRC-S2
-and MRC-S3 remain later ordered slices, and none has started.
+The prerequisite was implemented, independently finally approved, committed,
+and pushed as `e821cd922b61868097667b12c2b64cf8089a9681`
+(`feat(run): implement minimum run core`). The completed baseline retains the
+all-null, unpopulated binding seam and rejects the reserved
+`run.bind-player-character/v1` operation. P4-S1 is the next unstarted work;
+no public Run behavior is activated.
 
 This document freezes the smallest Phase 3.3 Run-owned prerequisite required
 before Structured Player Character Phase 4 can begin. It is an implementation
@@ -18,10 +18,10 @@ plan and authority boundary only. It does not implement the Run core, a
 player-character binding, any other Run Protocol feature, or any public
 gameplay behavior.
 
-Structured Player Character Phase 3 is complete and pushed. Phase 4
-implementation has not started. The minimum Run core described here may begin
-only after the resulting P4-G0 documentation milestone is manually pushed and
-a new clean baseline is confirmed.
+Structured Player Character Phase 3 is complete and pushed. The minimum Run
+core is its completed P4-S1 prerequisite. Phase 4 implementation remains
+unstarted; this completed prerequisite does not itself bind a character or
+activate a public surface.
 
 ## 2. Authority and ownership
 
@@ -66,12 +66,15 @@ binding must survive scenario changes and Run-authorized later-world
 transitions in that same line, and conflicting active bindings must fail
 atomically.
 
-The current repository has no canonical Run or continuous-story-line
-identity, Run aggregate, Run state version, Run Repository, Run application
-service, Run-owned transaction boundary, separate Session participation
-record, or Run-aware production composition. `GameSession`, `scenario_id`,
-`phase_visit_counts`, browser storage, controller identity, and
-`character_definition_id` cannot substitute for those missing authorities.
+Historical pre-implementation context: before Minimum Run Core, the repository
+had no canonical Run or continuous-story-line identity, Run aggregate, Run state
+version, Run Repository, Run application service, Run-owned transaction
+boundary, separate Session participation record, or Run-aware production
+composition. `GameSession`, `scenario_id`, `phase_visit_counts`, browser
+storage, controller identity, and `character_definition_id` could not
+substitute for those missing authorities. Minimum Run Core now implements that
+prerequisite and was independently approved, committed, and pushed at
+`e821cd922b61868097667b12c2b64cf8089a9681`.
 
 The minimum objective is therefore:
 

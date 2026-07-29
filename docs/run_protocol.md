@@ -4,11 +4,12 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
-P4-G0 status: **minimum Run-core documentation authority approved and closed;
-its independent read-only review returned
-`STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. The resulting
-documentation milestone is local until the user manually pushes it. The minimum
-Run core and Structured Player Character Phase 4 remain unimplemented.**
+P4-S1 prerequisite status: **Minimum Run Core is implemented, independently
+finally approved, committed, and pushed as
+`e821cd922b61868097667b12c2b64cf8089a9681`
+(`feat(run): implement minimum run core`). Its binding seam remains null-only
+and unpopulated, `run.bind-player-character/v1` remains reserved and rejected,
+and P4-S1 remains unstarted.**
 
 ## Goals
 
@@ -37,7 +38,7 @@ The complete Run Protocol remains approved product design and is not
 implemented. Before Structured Player Character P4-S1, only the smaller
 prerequisite specified by the
 [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
-must be implemented and independently reviewed.
+has been implemented, independently finally approved, committed, and pushed.
 
 That prerequisite freezes:
 
@@ -77,9 +78,9 @@ trusted Sessions may participate in the same Run, while one Session cannot
 participate in conflicting Runs. This record does not activate public resume,
 reconnect, cross-tab, browser-restart, or multi-device behavior.
 
-The minimum Run core and its production composition remain unimplemented at
-P4-G0. The reserved character-binding seam is populated only by separately
-authorized P4-S1 work.
+The completed minimum Run core and its production composition remain internal.
+The reserved character-binding seam is populated only by separately authorized
+P4-S1 work; it remains null-only and unpopulated at this baseline.
 
 ## Responsibility separation
 

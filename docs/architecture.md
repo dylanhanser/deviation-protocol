@@ -155,7 +155,12 @@ frontend, Provider, Demo, Session, Run, story-line, narrative, content, or
 gameplay integration was activated. Structured player-character Phase 3 is now
 implemented and complete: P3-S1 through P3-S4 are complete, and the complete
 code candidate received independent read-only approval with no implementation
-finding remaining open. Phase 4 has not started.
+finding remaining open. Minimum Run Core is implemented, independently finally
+approved, committed, and pushed as `e821cd922b61868097667b12c2b64cf8089a9681`
+(`feat(run): implement minimum run core`). It provides only the null-only,
+unpopulated binding seam and still rejects the reserved
+`run.bind-player-character/v1` operation. P4-S1 remains unstarted; no public
+Run or gameplay behavior is activated.
 
 ## Structured player-character Phase 3–5 boundaries
 
