@@ -152,24 +152,24 @@ reused, no automatic retry was added, and connection-loss or uncertain-COMMIT
 recovery and exactly-once behavior remain excluded. The test-only orchestration
 is not a production application service. No runtime service, API, public route,
 frontend, Provider, Demo, Session, Run, story-line, narrative, content, or
-gameplay integration was activated; Phase 3 application orchestration and
-runtime activation remain unimplemented. The complete frozen implementation plan
-remains partially implemented.
+gameplay integration was activated. P3-S1 canonical creation orchestration is
+implemented and complete; the remaining Phase 3 slices and runtime activation
+remain unimplemented, so Phase 3 as a whole remains incomplete. The complete
+frozen implementation plan remains partially implemented.
 
 ## Structured player-character Phase 3–5 planned boundaries
 
-The P3-S1 conflict authority amendment was independently approved, committed,
-and pushed at `c6d0220a2442887e89717b5b6facb14af4604236`. The first fresh
-independent implementation review found one blocking recovery-provenance
-defect when the initial Unit of Work suppresses the exact controller-binding
-add conflict. A bounded local correction candidate now realizes the boundary
-described below, but it is uncommitted, unpushed, and requires another fresh
-independent read-only implementation review. It is not accepted implemented
-architecture: P3-S1 and Phase 3 are not approved or complete, and no production
-runtime path is activated. The first implementation attempt exposed a
-typed-conflict ownership contradiction, and the rejected first amendment would
-have made a shared infrastructure conflict satisfy a controller-binding-only
-application contract.
+P3-S1 canonical creation orchestration is implemented, independently approved,
+committed, pushed, complete, and closed at
+`7606e51523338247ea33ed9329346fdba046d29b`
+(`feat(player-character): add race-safe creation recovery`). Its bounded
+correction completed final independent implementation review and preserves the
+boundary described below. The earlier recovery-provenance defect, typed-conflict
+ownership contradiction, and rejected first amendment are historical; the
+implemented correction requires exact exception-instance provenance and fails
+closed when the initial Unit of Work suppresses the original conflict. Phase 3
+remains incomplete: P3-S2 is next, has not started, and requires its own frozen
+scope, candidate, independent review, commit, and push gates.
 
 Structured player-character Phase 3 owns trusted application orchestration and
 its later normal production composition. Its independently reviewable order is
@@ -294,28 +294,32 @@ evidence; an exception with uncertain commit durability is propagated without
 a recovery read or a success/replay claim. Exactly-once execution is not
 claimed.
 
-The later implementation is capped at exactly `4 + 2 + 3` paths: production
-may change only
+The frozen P3-S1 implementation gate capped the approved implementation at
+exactly `4 + 2 + 3` paths: production changes were permitted only in
 `src/deviation_protocol/application/player_character_service.py`,
 `src/deviation_protocol/application/ports.py`,
 `src/deviation_protocol/infrastructure/errors.py`, and
-`src/deviation_protocol/infrastructure/repositories.py`; tests may change only
+`src/deviation_protocol/infrastructure/repositories.py`; test changes were
+permitted only in
 `tests/unit/test_player_character_service.py` and
 `tests/integration/test_mysql_player_character_service.py`; documentation
-synchronization may change only `PLANS.md`, this document, and
+synchronization changes were permitted only in `PLANS.md`, this document, and
 `docs/structured_player_character_implementation_plan.md`. No dependency,
 schema, migration, ORM, UoW, API, composition, Demo, frontend, Provider, Run,
-narrative, scenario, content, or gameplay path is authorized.
+narrative, scenario, content, or gameplay path was authorized. Commit
+`7606e51523338247ea33ed9329346fdba046d29b` satisfied this historical gate; its
+documentation synchronization did not include the current uncommitted
+three-document status-synchronization candidate.
 
-The current bounded correction candidate stays within that boundary. It adds
+The completed P3-S1 implementation stays within that boundary. It adds
 the injectable creation service and the two typed conflict symbols, selects the
 binding-only subtype at the exact controller-binding row flush, requires outer
 exception-instance identity after failed-UoW disposal, fails closed on
 suppression, and supplies focused unit and MySQL integration tests. It changes
 no schema, migration, ORM, UoW, composition root, API, Demo, Provider, Run,
-narrative, scenario, content, or gameplay path. The candidate remains
-uncommitted and unpushed; another fresh independent read-only implementation
-review is required before any acceptance or later Git authorization.
+narrative, scenario, content, or gameplay path. It completed final independent
+review, commit, and push; no further P3-S1 implementation review is pending.
+This closure does not approve or begin P3-S2 implementation.
 
 ## Current composition roots and Provider boundaries
 

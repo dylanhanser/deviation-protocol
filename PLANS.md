@@ -16,21 +16,28 @@ documents.
 ## Current baseline
 
 - Branch: `main`
-- Structured player-character Phase 2 closure baseline and local `origin/main`:
-  `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+- Current structured player-character implementation baseline and local
+  `origin/main`: `7606e51523338247ea33ed9329346fdba046d29b`
 - Baseline subject:
-  `feat(player-character): wire repositories into unit of work`
+  `feat(player-character): add race-safe creation recovery`
+- Historical structured player-character Phase 2 closure baseline:
+  `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
+  (`feat(player-character): wire repositories into unit of work`)
 - Structured player-character Phase 2 is independently accepted, committed,
-  pushed, and closed at this baseline.
-- The structured player-character P3-S1 authority-conflict amendment is
-  independently approved, committed, and pushed at
-  `c6d0220a2442887e89717b5b6facb14af4604236`.
-- The first fresh independent P3-S1 implementation review found one blocking
-  recovery-provenance defect when the initial Unit of Work suppresses the exact
-  controller-binding add conflict. A bounded local correction candidate now
-  exists over that baseline. It is uncommitted, unpushed, and requires another
-  fresh independent read-only implementation review; P3-S1 and Phase 3 are not
-  approved or complete.
+  pushed, and closed at that historical baseline.
+- P3-S1 canonical creation orchestration completed its bounded correction and
+  final independent implementation review with
+  `APPROVED_STRUCTURED_PLAYER_CHARACTER_PHASE_3_SLICE_1_IMPLEMENTATION`.
+  The approved nine-path candidate was committed as
+  `7606e51523338247ea33ed9329346fdba046d29b`
+  (`feat(player-character): add race-safe creation recovery`) and pushed to
+  `main`. P3-S1 is implemented, approved, complete, and closed.
+- The current three-document status-synchronization candidate is unstaged and
+  uncommitted; it is not part of commit `7606e51523338247ea33ed9329346fdba046d29b`.
+- Phase 3 remains incomplete. P3-S2 canonical mutation orchestration is next,
+  has not started, and requires its own frozen scope, candidate, independent
+  review, commit, and push gates; this status synchronization does not approve
+  or begin P3-S2 implementation.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -293,23 +300,18 @@ candidate. It preserves the repository-authoritative stages:
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
 
-P3-S1 now has a bounded, uncommitted and unpushed correction candidate
-requiring another fresh independent read-only implementation review. The prior
-fresh implementation review found one blocking control-flow defect: a locally
-recorded controller-binding add conflict could incorrectly authorize recovery
-after the initial Unit of Work suppressed that exception. The correction
-requires the same exception instance to escape the failed initial Unit of Work
-and be confirmed by the outer handler, and fails closed with the preserved
-original instance after suppression. P3-S1 is not implementation-approved or
-complete, and Phase 3 remains incomplete. The first implementation attempt
-stopped before production or test changes because the planned typed-conflict
-ownership contradicted the repository dependency direction. The first
-documentation amendment design was then rejected because the existing
-`PlayerCharacterRepositoryConflictError` is a shared infrastructure conflict
-used by controller-binding, allocation, initial-state, receipt, stale-current,
-and other Repository paths; making that shared type implement a
-controller-binding-only application contract would misclassify unrelated
-conflicts.
+P3-S1 canonical creation orchestration is implemented, independently approved,
+committed, pushed, complete, and closed at
+`7606e51523338247ea33ed9329346fdba046d29b`
+(`feat(player-character): add race-safe creation recovery`). Its bounded
+correction resolved the earlier recovery-provenance defect: the same
+controller-binding add exception instance must escape the failed initial Unit
+of Work and be confirmed by the outer handler, while suppression fails closed
+with the preserved original instance. The earlier typed-conflict ownership
+contradiction and rejected amendment design remain historical: the shared
+`PlayerCharacterRepositoryConflictError` cannot satisfy a
+controller-binding-only application contract because it is used by unrelated
+Repository paths.
 
 The revised documentation-only authority amendment was independently approved,
 committed, and pushed at
@@ -325,7 +327,7 @@ at the exact `ControllerBindingRegistryRepository.add` row flush may select the
 new subtype, and `PlayerCharacterService` may catch only the application-owned
 contract immediately around that exact call.
 
-The corrected P3-S1 implementation candidate remains within the exact
+The completed P3-S1 implementation stayed within the exact
 `4 + 2 + 3` budget: production may
 change only `src/deviation_protocol/application/player_character_service.py`,
 `src/deviation_protocol/application/ports.py`,
@@ -336,11 +338,9 @@ change only `src/deviation_protocol/application/player_character_service.py`,
 synchronization may change only `PLANS.md`, `docs/architecture.md`, and
 `docs/structured_player_character_implementation_plan.md`. The committed
 amendment changed documentation only and did not itself authorize
-implementation. A later separate authorization created the local
-implementation candidate, and this bounded correction followed the first
-changes-required review without staging, commit, or push. Another fresh
-independent read-only implementation review remains required; neither P3-S1
-nor Phase 3 is approved or complete.
+implementation. The later separately authorized implementation and bounded
+correction completed final independent review, commit, and push. P3-S1 is
+closed; Phase 3 remains incomplete and P3-S2 is next but has not started.
 
 Mutation, owned read/projection, normal production composition, production
 resolver/issuer adapter selection, Run/continuous-line binding, every public

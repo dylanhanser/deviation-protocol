@@ -18,12 +18,14 @@ committed, and pushed at
 and independently approved. Slice 4 is implemented, verified locally, and
 received new-session independent implementation approval with verdict
 `PHASE_2_SLICE_4_IMPLEMENTATION_INDEPENDENTLY_APPROVED`; no blocking findings
-remained. Phase 2 is independently accepted and complete. The first fresh
-independent P3-S1 implementation review found one blocking exception-
-suppression recovery-provenance defect. A bounded, uncommitted and unpushed
-correction candidate now exists and requires another fresh independent
-read-only implementation review; it is not approved or complete. Phase 3
-remains incomplete, and later Phase 3 slices plus Phases 4–7 remain
+remained. Phase 2 is independently accepted and complete. P3-S1 canonical
+creation orchestration completed its bounded correction and final independent
+implementation review, was committed as
+`7606e51523338247ea33ed9329346fdba046d29b`
+(`feat(player-character): add race-safe creation recovery`), and was pushed to
+`main`. P3-S1 is implemented, approved, complete, and closed. Phase 3 remains
+incomplete; P3-S2 is next, has not started, and is not independently authorized
+for implementation. Later Phase 3 slices plus Phases 4–7 remain
 unimplemented.**
 
 Phase 2 is committed, pushed, and closed at
@@ -34,13 +36,11 @@ independently approved, committed, and pushed at
 `c6d0220a2442887e89717b5b6facb14af4604236`. Its first implementation attempt
 had exposed a typed-conflict ownership contradiction, and the first
 authority-amendment design was rejected because the existing infrastructure
-conflict is shared across unrelated Repository operations. A later, separately
-authorized task created the local P3-S1 implementation candidate. Its first
-fresh independent implementation review found that a recorded binding-add
-conflict could incorrectly authorize recovery after `__aexit__` suppressed it.
-The bounded correction candidate is uncommitted, unpushed, and requires another
-fresh independent read-only implementation review; neither P3-S1 nor Phase 3
-is approved or complete.
+conflict is shared across unrelated Repository operations. The later separately
+authorized P3-S1 implementation and its bounded correction completed final
+independent implementation approval, then were committed and pushed at
+`7606e51523338247ea33ed9329346fdba046d29b`. P3-S1 is closed; Phase 3 remains
+incomplete and P3-S2 is next but has not started.
 
 The concrete Phase 2 persistence design in section 20 is a
 technical-prerequisite amendment that received the independent verdict
@@ -64,8 +64,9 @@ and known immutable/unique conflicts. Phase 2 Slice 4 now wires those four
 adapters into one entered `SqlAlchemyUnitOfWork` session and supplies bounded
 test-only cross-repository transaction evidence. Its production change is
 limited to imports and `SqlAlchemyUnitOfWork.__aenter__`; it adds no production
-orchestration. Phase 3 and every later phase remain unimplemented and require
-their own accepted plan boundary and explicit authorization.
+orchestration. P3-S1 is implemented and complete. P3-S2, P3-S3, P3-S4, and
+every later phase remain unimplemented and require their own accepted plan
+boundary and explicit authorization; Phase 3 as a whole remains incomplete.
 
 The ordered Phase 2 implementation slices introduced in section 24 were a
 separate amendment from the prior technical-freeze verdict. The section 31
@@ -203,9 +204,10 @@ boundaries below are proposed implementation inventory. They are not authority
 to edit those surfaces. Exact choices identified as `U` must be resolved before
 the affected phase begins.
 
-## 5. Current repository baseline
+## 5. Historical pre-P3-S1 authority-amendment baseline
 
-The revised P3-S1 authority-amendment candidate is written against:
+The revised P3-S1 authority-amendment candidate was written against this
+historical pre-implementation baseline:
 
 - repository root: `D:\deviation-protocol`;
 - branch: `main`;
@@ -214,16 +216,26 @@ The revised P3-S1 authority-amendment candidate is written against:
 - ahead/behind: `0/0`;
 - `HEAD` subject:
   `docs(player-character): approve phase 3 implementation plan`;
-- clean working tree; and
+- then-clean working tree; and
 - empty index.
 
-The baseline implements the deterministic Session-based vertical slice through
-Phase 3.2b plus the accepted structured player-character Phase 1 pure
-domain/protocol foundation and Phase 2 persistence boundary. It does not
+That historical baseline implemented the deterministic Session-based vertical
+slice through Phase 3.2b plus the accepted structured player-character Phase 1
+pure domain/protocol foundation and Phase 2 persistence boundary. It does not
 implement a structured player-character application service, normal production
 composition, public character route, Run aggregate, continuous-story-line
 aggregate, frontend, Demo parity, Provider integration, narrative integration,
 or gameplay activation.
+
+Commit `7606e51523338247ea33ed9329346fdba046d29b`
+(`feat(player-character): add race-safe creation recovery`) subsequently
+implemented and superseded that P3-S1 baseline. It is the current
+`HEAD`/local-`origin/main` implementation baseline, contains the structured
+player-character application service, and closed P3-S1 after final independent
+approval. The current three-document status-synchronization candidate remains
+unstaged and uncommitted and is not part of that implementation commit. No
+future session may use the historical baseline above to implement P3-S1 again;
+P3-S1 completion does not authorize P3-S2.
 
 The current completed Phase 1 implementation baseline is
 `4acb8b993f15a1fdee20edc3140324730447fc9f`
@@ -2340,14 +2352,15 @@ Demo, Provider, Run/story activation, and every Phase 3–7 responsibility.
 
 ### Phase 3 — Trusted canonical application service
 
-Status: **The revised P3-S1 narrow conflict-translation authority amendment is
-independently approved, committed, and pushed at
-`c6d0220a2442887e89717b5b6facb14af4604236`. A separately authorized local
-P3-S1 implementation candidate received one changes-required review for the
-exception-suppression recovery defect. A bounded correction candidate now
-exists. It remains uncommitted, unpushed, and requires another fresh
-independent read-only implementation review; P3-S1 and Phase 3 are not approved
-or complete.**
+Status: **P3-S1 canonical creation orchestration is implemented, independently
+approved, committed, pushed, complete, and closed at
+`7606e51523338247ea33ed9329346fdba046d29b`
+(`feat(player-character): add race-safe creation recovery`). The earlier
+changes-required review and bounded exception-suppression correction are
+complete historical stages. Phase 3 remains incomplete. P3-S2 canonical
+mutation orchestration is next, has not started, and requires its own frozen
+scope, candidate, independent review, commit, and push gates; it is not
+independently authorized for implementation by this status.**
 
 The repository-authoritative Phase 3 order is:
 
@@ -2364,8 +2377,9 @@ Objective: add one production application service that creates one canonical
 player character atomically or returns the exact stored safe result for a valid
 replay, without activating a runtime or public path.
 
-P3-S1 has the following exact `4 + 2 + 3` maximum changed-path budget for a
-later separately authorized implementation:
+P3-S1 had the following exact `4 + 2 + 3` maximum changed-path budget for its
+separately authorized implementation, which the approved implementation
+satisfied:
 
 | Category | Maximum | Exact candidate inventory |
 | --- | ---: | --- |
@@ -2378,8 +2392,9 @@ No additional path belongs to P3-S1. In particular, no dependency, schema,
 migration, ORM model, UoW interface or implementation, other infrastructure
 module, `__init__.py`, API route, composition root, Demo, frontend, Provider or
 model integration, Run Protocol implementation, narrative, scenario, content,
-or gameplay path is authorized. A later implementation must stop rather than
-exceed this budget.
+or gameplay path is authorized. The implementation was required to stop rather
+than exceed this budget; the approved implementation satisfied that historical
+gate.
 
 ##### Existing authorities that P3-S1 must reuse
 
@@ -2904,15 +2919,18 @@ Existing Phase 1 and Phase 2 tests remain unchanged regression evidence.
 Cancellation needs no duplicate real-database test because Phase 2 already
 proves real UoW cancellation rollback.
 
-A later authorized implementation must run `git diff --check`, `compileall`,
-the new focused unit test, focused existing player-character regressions, the
-new real-MySQL service test, Alembic heads/history sanity checks, and the
-repository Quick, Offline, MySQL, and Full verification modes. It must not
-enable a live Provider/model call or add/install a dependency.
+The separately authorized P3-S1 implementation was required to run
+`git diff --check`, `compileall`, the new focused unit test, focused existing
+player-character regressions, the new real-MySQL service test, Alembic
+heads/history sanity checks, and the repository Quick, Offline, MySQL, and Full
+verification modes. It was prohibited from enabling a live Provider/model call
+or adding/installing a dependency; the approved implementation satisfied this
+historical verification gate.
 
 ##### Binary P3-S1 acceptance criteria
 
-P3-S1 is acceptable only if all are true:
+P3-S1 was acceptable only if all were true; the approved implementation
+satisfied these historical acceptance gates:
 
 1. changed paths remain within the exact budget above;
 2. the four previously approved and two amendment-authorized public production
@@ -2936,7 +2954,7 @@ P3-S1 is acceptable only if all are true:
 9. uncertain commit outcome remains unknown, unsupported for recovery, and
    never described as exactly once;
 10. focused, regression, MySQL, Alembic, Offline, Quick, and Full verification
-    required by the later implementation task passes without Provider access;
+    required by the P3-S1 implementation task passed without Provider access;
 11. canonical documentation synchronization and independent implementation
     review are complete before any completion or commit request; and
 12. API, frontend, Demo, Run, Provider, narrative, content, gameplay, mutation,
@@ -3072,12 +3090,13 @@ Stop conditions: verification failure, documentation drift, unexpected changed
 paths, migration mismatch, live Provider dependency, or missing independent
 audit.
 
-## 25. Proposed file-level change inventory
+## 25. File-level implementation inventory
 
-This inventory is proposed implementation scope only. It authorizes no edit.
-Exact placement should be confirmed at each phase.
+This inventory preserves the satisfied historical P3-S1 scope and proposed
+scope for unimplemented later slices. It authorizes no edit. Exact placement
+should be confirmed for each unimplemented phase.
 
-### Existing Phase 1 baseline files and proposed later additions
+### Existing Phase 1 baseline files, implemented P3-S1 additions, and proposed later additions
 
 The following existing Phase 1 baseline files will be extended during Phase 2
 where their listed responsibility applies; they are not proposed additions and
@@ -3087,10 +3106,10 @@ their completed Phase 1 work is not pending.
 | --- | --- | --- | --- | --- |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character.py` | Domain aggregate, distinct value objects, strict field groups, lifecycle, reference, provenance | Complete canonical record, identity separation, versions, lifecycle | Existing and extended domain unit tests |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/domain/player_character_policies.py` | Independent pure policies for creation and each lifecycle route | Guardrail policy separation; transition/authority matrix | Existing and extended policy matrix unit tests |
-| Proposed P3-S1 addition, later slices may extend only under separate scope | `src/deviation_protocol/application/player_character_service.py` | Trusted creation/replay orchestration in P3-S1 | Controller resolution, existing validation/policy reuse, atomic creation/replay boundary | P3-S1 unit and MySQL service tests |
+| Implemented P3-S1 addition; later slices may extend only under separate scope | `src/deviation_protocol/application/player_character_service.py` | Trusted creation/replay orchestration in P3-S1 | Controller resolution, existing validation/policy reuse, atomic creation/replay boundary | P3-S1 unit and MySQL service tests |
 | Existing Phase 1 baseline; extend if needed | `src/deviation_protocol/application/player_character_operations.py` | Server-owned operation namespaces, canonical fingerprints, replay equivalence, and strict safe-result envelopes | Independently reviewable successful-receipt protocol before persistence | Existing and extended golden-vector and replay/conflict unit tests |
 | Proposed Phase 3 addition | `src/deviation_protocol/application/player_character_projection.py` | Detached allowlisted self projection | Privacy and non-authoritative public data | Projection/privacy unit and contract tests |
-| No P3-S1 identity module | `src/deviation_protocol/application/ports.py` | Add only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError` in P3-S1; production adapters wait for P3-S4 | Domain separation, trusted injectable boundaries, and one narrow application-owned binding-race contract without choosing a backing source or algorithm | P3-S1 strict fake, type-relationship, dependency, and service tests |
+| Existing ports path; no P3-S1 identity module; P3-S1 additions implemented | `src/deviation_protocol/application/ports.py` | P3-S1 added only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError`; production adapters wait for P3-S4 | Domain separation, trusted injectable boundaries, and one narrow application-owned binding-race contract without choosing a backing source or algorithm | P3-S1 strict fake, type-relationship, dependency, and service tests |
 | Proposed Phase 2 Slice 1 addition | `src/deviation_protocol/infrastructure/player_character_persistence.py` | Database-independent stored-record carriers, canonical codec, and integrity validation | Exact six-family conversion boundary | Persistence codec unit tests |
 | Proposed Phase 2 addition | one Phase 2 Alembic revision whose parent is actual head `20260719_0003` | Add exactly the six section 20 tables only after this amendment is independently accepted and Phase 2 separately authorized | Exact columns/types/collations, uniqueness, non-reuse, binding, revision, provenance, and distinct successful creation/mutation receipts | Migration-head/schema/upgrade tests |
 | Proposed Phase 4 addition | future Phase 4 Alembic revision, only if required by the real Run/line owner | Add the approved binding schema after the then-current head without inventing a path now | One active player-character binding per story line at a time; exact character/reference preservation | Run binding migration/concurrency tests |
@@ -3099,23 +3118,25 @@ their completed Phase 1 work is not pending.
 | Existing Phase 1 baseline; extend if needed | `tests/unit/test_player_character_operations.py` | Canonical fingerprint vectors, exact replay equivalence, conflicts, and safe-result validation | Receipt protocol before schema | Existing and extended application-boundary tests |
 | Proposed Phase 2 Slice 1 addition | `tests/unit/test_player_character_persistence.py` | Stored-record codec, canonical bytes, and integrity matrix | Fail-closed persistence conversion | Offline persistence unit tests |
 | Proposed Phase 2 Slice 3 addition | `tests/unit/test_player_character_repositories.py` | Repository capability and failure classification matrix | Exact repository behavior without commits | Repository unit tests |
-| Proposed P3-S1 addition | `tests/unit/test_player_character_service.py` | Creation/replay ordering, privacy, rollback, and narrow race recovery with strict fakes | Trusted application boundary | P3-S1 unit tests |
-| Proposed P3-S1 addition | `tests/integration/test_mysql_player_character_service.py` | Real service over accepted MySQL adapters/UoW | Durable atomic creation, replay, changed-payload conflict, and controlled pre-COMMIT rollback | Fresh-session MySQL assertions |
+| Implemented P3-S1 addition | `tests/unit/test_player_character_service.py` | Creation/replay ordering, privacy, rollback, and narrow race recovery with strict fakes | Trusted application boundary | P3-S1 unit tests |
+| Implemented P3-S1 addition | `tests/integration/test_mysql_player_character_service.py` | Real service over accepted MySQL adapters/UoW | Durable atomic creation, replay, changed-payload conflict, and controlled pre-COMMIT rollback | Fresh-session MySQL assertions |
 | Proposed Phase 2 addition | `tests/integration/test_mysql_player_character.py` | Real MySQL repositories, transactions, CAS, constraints | Persistence/atomicity | Integration tests |
 
-The exact split among the proposed application/domain additions is `T`.
+The P3-S1 placement above is implemented and frozen as satisfied historical
+inventory. The exact split among the remaining proposed application/domain
+additions is `T`.
 Repository convention supports domain, application, infrastructure, and test
 separation, but avoiding circular dependencies and keeping policy classes
 independent is more important than these filenames.
 
-### Proposed modifications
+### Modification inventory
 
 | Existing path | Purpose | Obligation | Protecting tests |
 | --- | --- | --- | --- |
-| `src/deviation_protocol/application/ports.py` | Phase 2 repository/UoW ports are complete; P3-S1 adds only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError` with the exact section 24 contracts | Trusted mapping and issuance plus one narrow binding-race catch identity without persistence access, auto-binding, or algorithm selection | Port/service type, dependency-direction, exception-relationship, and strict fake tests |
+| `src/deviation_protocol/application/ports.py` | Phase 2 repository/UoW ports are complete; P3-S1 added only `ControllerBindingResolver`, `PlayerCharacterIdIssuer`, and `ControllerBindingUniquenessConflictError` with the exact section 24 contracts | Trusted mapping and issuance plus one narrow binding-race catch identity without persistence access, auto-binding, or algorithm selection | Port/service type, dependency-direction, exception-relationship, and strict fake tests |
 | `src/deviation_protocol/infrastructure/orm_models.py` | Add private normalized persistence models | MySQL canonical ownership/constraints | Schema and repository tests |
-| `src/deviation_protocol/infrastructure/repositories.py` | Phase 2 Repository behavior remains complete; P3-S1 may only narrowly parameterize `_flush_row` and select `PlayerCharacterControllerBindingConflictError` at the exact controller-binding add flush | Preserve all other Repository behavior while translating only the approved MySQL binding duplicate | The two P3-S1 tests; existing Repository-wide dependency verification remains unchanged |
-| `src/deviation_protocol/infrastructure/errors.py` | Add only `PlayerCharacterControllerBindingConflictError`; leave `PlayerCharacterRepositoryConflictError` semantically shared and outside the narrow application contract | Preserve shared-error compatibility without reclassifying allocation, initial-state, receipt, stale-current, or other conflicts | The two P3-S1 tests |
+| `src/deviation_protocol/infrastructure/repositories.py` | Phase 2 Repository behavior remains complete; P3-S1 only narrowly parameterized `_flush_row` and selected `PlayerCharacterControllerBindingConflictError` at the exact controller-binding add flush | Preserve all other Repository behavior while translating only the approved MySQL binding duplicate | The two P3-S1 tests; existing Repository-wide dependency verification remains unchanged |
+| `src/deviation_protocol/infrastructure/errors.py` | P3-S1 added only `PlayerCharacterControllerBindingConflictError`; `PlayerCharacterRepositoryConflictError` remains semantically shared and outside the narrow application contract | Preserve shared-error compatibility without reclassifying allocation, initial-state, receipt, stale-current, or other conflicts | The two P3-S1 tests |
 | `src/deviation_protocol/infrastructure/unit_of_work.py` | Expose new repositories in one `AsyncSession` transaction | Commit/rollback ownership | UoW rollback tests |
 | `tests/unit/test_repository_and_uow.py` | Cover new repository/UoW wiring and failure restoration | Existing persistence convention | Focused unit tests |
 | `tests/integration/test_mysql_connection.py` | Advance expected Alembic head and assert exact new schema | Migration verification | Real MySQL schema test |
@@ -3124,6 +3145,10 @@ independent is more important than these filenames.
 | `tests/unit/test_session_service.py` and relevant API integration tests | Prove existing Session identity/projection is unchanged | Compatibility | Regression tests |
 | future Run-owned module/directory, not nameable today | Phase 4 only: bind exact ID/reference in the real Run aggregate and reject second/conflicting active character bindings on one line | Same-line/later-world continuity and frozen line cardinality | Run service/integration/contract tests |
 | future adjacent-system owning modules, not nameable today | Phase 6 only: accept explicit logical subject refs | Memory/NPC/consequence correctness | Compatibility/integration tests |
+
+The P3-S1-specific rows in both tables are implemented and preserve its
+satisfied historical boundary. Later-slice entries remain prospective; P3-S1
+completion does not authorize P3-S2, P3-S3, P3-S4, or any later phase.
 
 No Run-owned source path can be named reliably because no Run implementation
 exists. Inventing one here would prejudge Phase 3.3 architecture.
@@ -3463,10 +3488,11 @@ review and required new hashes and a fresh review.
 That verdict did not authorize implementation. Separate authorization staged
 and committed exactly the approved three-file amendment, the user completed
 the push, and the clean pushed baseline was confirmed before this later,
-separately authorized P3-S1 implementation task began. The resulting local
-implementation candidate is uncommitted and unpushed. It still requires fresh
-independent implementation review and does not make P3-S1 or Phase 3 approved
-or complete.
+separately authorized P3-S1 implementation task began. The resulting
+implementation and bounded correction subsequently completed final independent
+review, commit, and push as `7606e51523338247ea33ed9329346fdba046d29b`.
+P3-S1 is complete and closed; this does not make Phase 3 complete or authorize
+P3-S2 implementation.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
@@ -3520,17 +3546,17 @@ deployment, or work outside a separately authorized phase.
   correction candidate requires the same exception object to escape the failed
   initial UoW and be confirmed by the outer handler; suppression instead
   re-raises the preserved original object without recovery, receipt lookup,
-  success, or replay. Focused regression coverage was added. The candidate
-  remains uncommitted and unpushed and requires another fresh independent
-  read-only implementation review. P3-S1 and Phase 3 remain unapproved and
-  incomplete; no implementation commit or push occurred.
+  success, or replay. Focused regression coverage was added. This describes
+  the pre-correction review state; the bounded correction subsequently received
+  final approval, was committed and pushed, and closed P3-S1. Phase 3 remains
+  incomplete.
 - 2026-07-29: The revised three-file P3-S1 authority-conflict amendment
   received its exact operative independent-review verdict, was committed and
   pushed unchanged at `c6d0220a2442887e89717b5b6facb14af4604236`, and was
   confirmed as the clean `main`/`origin/main` baseline. A later separately
-  authorized task created the bounded local P3-S1 implementation candidate.
-  The candidate remains uncommitted, unpushed, and pending fresh independent
-  implementation review. P3-S1 and Phase 3 are not approved or complete, and
+  authorized task implemented P3-S1 and its bounded correction; final
+  independent approval, commit, and push closed P3-S1 at
+  `7606e51523338247ea33ed9329346fdba046d29b`. Phase 3 remains incomplete, and
   no API, composition, Demo, frontend, Provider, Run, narrative, content, or
   gameplay path was activated.
 - 2026-07-29: The first P3-S1 implementation attempt stopped with
