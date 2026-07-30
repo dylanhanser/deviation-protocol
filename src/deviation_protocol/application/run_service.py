@@ -9,14 +9,19 @@ from pydantic import BaseModel, ConfigDict
 
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import (
+    ControllerBindingResolver,
     ContinuousStoryLineIdIssuer,
+    PlayerCharacterBindingEvidenceReader,
     RunIdIssuer,
+    RunPlayerCharacterBindingUniquenessConflictError,
     RunReceiptUniquenessConflictError,
+    RunSessionAttachmentLockEvidence,
     RunSessionParticipationUniquenessConflictError,
     UnitOfWorkFactory,
 )
 from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
+    BindPlayerCharacterCommand,
     CreateRunCommand,
     ReservedBindPlayerCharacterCommand,
     RunOperationNamespace,
@@ -28,11 +33,20 @@ from deviation_protocol.application.run_operations import (
     attach_session_fingerprint,
     attach_session_result,
     attach_session_to_run,
+    bind_player_character_fingerprint,
+    bind_player_character_result,
+    bind_player_character_to_run,
     construct_created_run,
     create_run_fingerprint,
     creation_result,
     evaluate_receipt,
     reject_reserved_bind_player_character,
+)
+from deviation_protocol.domain.player_character import (
+    ControllerBindingRef,
+    PlayerCharacterLifecycle,
+    revalidate_player_character_model,
+    validate_applicable_character_reference,
 )
 from deviation_protocol.domain.run import (
     CanonicalRun,
@@ -56,6 +70,10 @@ class RunServiceDecisionCode(StrEnum):
     VERSION_EXHAUSTED = "VERSION_EXHAUSTED"
     SESSION_PARTICIPATION_CONFLICT = "SESSION_PARTICIPATION_CONFLICT"
     CONCURRENT_STATE_CONFLICT = "CONCURRENT_STATE_CONFLICT"
+    PLAYER_CHARACTER_INELIGIBLE = "PLAYER_CHARACTER_INELIGIBLE"
+    PLAYER_CHARACTER_BINDING_CONFLICT = (
+        "PLAYER_CHARACTER_BINDING_CONFLICT"
+    )
 
 
 class RunServiceDecision(BaseModel):
@@ -76,6 +94,10 @@ class RunService:
     continuous_story_line_id_issuer: ContinuousStoryLineIdIssuer
     source_reference: RunAuthoritySourceRef
     clock: Callable[[], datetime]
+    controller_binding_resolver: ControllerBindingResolver
+    player_character_binding_evidence: (
+        PlayerCharacterBindingEvidenceReader
+    )
 
     def __post_init__(self) -> None:
         self.source_reference = revalidate_run_model(
@@ -189,16 +211,30 @@ class RunService:
             ):
                 raise ValueError("Session ownership lookup returned mismatched state")
 
-            current = await uow.runs.get_for_update(command.run_id)
-            if current is None:
+            lock_evidence = (
+                await uow.runs.get_session_attachment_lock_evidence(
+                    command.run_id,
+                    receipt_key=receipt_key,
+                )
+            )
+            if lock_evidence is None:
                 return RunServiceDecision(
                     code=RunServiceDecisionCode.RUN_NOT_FOUND
                 )
-            current = validate_canonical_run(current)
+            if type(lock_evidence) is not RunSessionAttachmentLockEvidence:
+                raise TypeError(
+                    "Run attachment lock returned invalid evidence"
+                )
+            current = validate_canonical_run(
+                lock_evidence.canonical_run
+            )
+            if current.run_id != command.run_id:
+                raise ValueError(
+                    "Run attachment lock returned mismatched evidence"
+                )
 
-            stored_receipt = await uow.run_mutation_receipts.get(receipt_key)
             replay = evaluate_receipt(
-                stored_receipt,
+                lock_evidence.attachment_receipt,
                 key=receipt_key,
                 fingerprint=fingerprint,
                 command_kind=RunMutationKind.ATTACH_SESSION,
@@ -277,6 +313,182 @@ class RunService:
                 )
             except RunReceiptUniquenessConflictError:
                 return RunReplayDecision(code=RunReplayDecisionCode.CONFLICT)
+            await uow.commit()
+            return result
+
+    async def bind_player_character_internal(
+        self,
+        principal: RequestPrincipal,
+        *,
+        operation_id: RunOperationId,
+        command: BindPlayerCharacterCommand,
+    ) -> RunSafeResult | RunReplayDecision | RunServiceDecision:
+        """Atomically bind one owned active character to one active Run line."""
+
+        principal = self._principal(principal)
+        command = self._trusted_command(
+            command,
+            BindPlayerCharacterCommand,
+        )
+        operation_id = revalidate_run_model(operation_id, RunOperationId)
+        controller_binding = await self.controller_binding_resolver.resolve(
+            principal
+        )
+        try:
+            controller_binding = revalidate_player_character_model(
+                controller_binding,
+                ControllerBindingRef,
+            )
+        except (AttributeError, TypeError, ValueError):
+            return RunServiceDecision(
+                code=RunServiceDecisionCode.AUTHORIZATION_FAILED
+            )
+
+        _, fingerprint = bind_player_character_fingerprint(
+            command,
+            operation_id=operation_id,
+        )
+        receipt_key = RunReceiptKey(
+            run_id=command.run_id,
+            operation_namespace=(
+                RunOperationNamespace.BIND_PLAYER_CHARACTER_V1
+            ),
+            operation_id=operation_id,
+        )
+
+        async with self.uow_factory() as uow:
+            character_evidence = (
+                await self.player_character_binding_evidence.lock_owned_for_binding(
+                    uow,
+                    trusted_controller_binding=controller_binding,
+                    target_player_character_id=(
+                        command.target_player_character_id
+                    ),
+                )
+            )
+            if character_evidence is None:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.AUTHORIZATION_FAILED
+                )
+            applicable_reference = validate_applicable_character_reference(
+                character_evidence.applicable_character_reference
+            )
+            lifecycle = PlayerCharacterLifecycle(
+                character_evidence.lifecycle
+            )
+
+            current = await uow.runs.get_for_update(command.run_id)
+            if current is None:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.RUN_NOT_FOUND
+                )
+            current = validate_canonical_run(current)
+
+            stored_receipt = await uow.run_mutation_receipts.get(
+                receipt_key
+            )
+            replay = evaluate_receipt(
+                stored_receipt,
+                key=receipt_key,
+                fingerprint=fingerprint,
+                command_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+            )
+            if replay.code is RunReplayDecisionCode.REPLAY:
+                result = replay.stored_success_result
+                if not isinstance(result, RunSafeResult):
+                    raise ValueError("Run binding replay has no safe result")
+                return result
+            if replay.code is RunReplayDecisionCode.CONFLICT:
+                return replay
+
+            if (
+                current.continuous_story_line_id
+                != command.continuous_story_line_id
+            ):
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.TARGET_MISMATCH
+                )
+            if not current.lifecycle_status.is_active_line:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.NON_ACTIVE_RUN
+                )
+            if not current.state_version.has_successor:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.VERSION_EXHAUSTED
+                )
+            if command.expected_state_version != current.state_version:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.STALE_VERSION
+                )
+            if lifecycle is not PlayerCharacterLifecycle.ACTIVE:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.PLAYER_CHARACTER_INELIGIBLE
+                )
+            if current.player_character_binding is not None:
+                return RunServiceDecision(
+                    code=(
+                        RunServiceDecisionCode
+                        .PLAYER_CHARACTER_BINDING_CONFLICT
+                    )
+                )
+            occupied = await uow.runs.get_active_for_player_character(
+                command.target_player_character_id
+            )
+            if occupied is not None:
+                validate_canonical_run(occupied)
+                return RunServiceDecision(
+                    code=(
+                        RunServiceDecisionCode
+                        .PLAYER_CHARACTER_BINDING_CONFLICT
+                    )
+                )
+
+            occurred_at = self._occurred_at()
+            successor = bind_player_character_to_run(
+                current,
+                command,
+                applicable_character_reference=applicable_reference,
+                operation_id=operation_id,
+                occurred_at=occurred_at,
+            )
+            successor = validate_canonical_run(successor)
+            result = bind_player_character_result(successor)
+            receipt = StoredRunSuccessReceipt(
+                key=receipt_key,
+                fingerprint=fingerprint,
+                command_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+                result=result,
+            )
+            await uow.runs.append_revision(
+                successor,
+                created_at=occurred_at,
+            )
+            try:
+                won_current = await uow.runs.compare_and_swap_current(
+                    successor,
+                    expected_state_version=current.state_version.value,
+                    updated_at=occurred_at,
+                )
+            except RunPlayerCharacterBindingUniquenessConflictError:
+                return RunServiceDecision(
+                    code=(
+                        RunServiceDecisionCode
+                        .PLAYER_CHARACTER_BINDING_CONFLICT
+                    )
+                )
+            if not won_current:
+                return RunServiceDecision(
+                    code=RunServiceDecisionCode.CONCURRENT_STATE_CONFLICT
+                )
+            try:
+                await uow.run_mutation_receipts.add(
+                    receipt,
+                    created_at=occurred_at,
+                )
+            except RunReceiptUniquenessConflictError:
+                return RunReplayDecision(
+                    code=RunReplayDecisionCode.CONFLICT
+                )
             await uow.commit()
             return result
 

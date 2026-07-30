@@ -20,9 +20,11 @@ from deviation_protocol.domain.persisted_events import PersistedEventReceipt
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.state import GameState
 from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
     CanonicalPlayerCharacter,
     ControllerBindingRef,
     PlayerCharacterId,
+    PlayerCharacterLifecycle,
 )
 from deviation_protocol.application.player_character_operations import (
     CreationReceiptKey,
@@ -259,6 +261,21 @@ class PlayerCharacterIdIssuer(Protocol):
     def issue(self) -> PlayerCharacterId: ...
 
 
+class PlayerCharacterBindingEvidence(Protocol):
+    applicable_character_reference: ApplicableCharacterReference
+    lifecycle: PlayerCharacterLifecycle
+
+
+class PlayerCharacterBindingEvidenceReader(Protocol):
+    async def lock_owned_for_binding(
+        self,
+        uow: UnitOfWork,
+        *,
+        trusted_controller_binding: ControllerBindingRef,
+        target_player_character_id: PlayerCharacterId,
+    ) -> PlayerCharacterBindingEvidence | None: ...
+
+
 class ControllerBindingRegistryRepository(ABC):
     @abstractmethod
     async def get(self, controller_binding: ControllerBindingRef) -> ControllerBindingRef | None:
@@ -331,6 +348,18 @@ class RunReceiptUniquenessConflictError(RuntimeError):
     """Only a Run successful-receipt unique-key race."""
 
 
+class RunPlayerCharacterBindingUniquenessConflictError(RuntimeError):
+    """Only the active-player-character current-row uniqueness race."""
+
+
+@dataclass(frozen=True, slots=True)
+class RunSessionAttachmentLockEvidence:
+    """Complete canonical Run-family evidence read under the Run lock."""
+
+    canonical_run: CanonicalRun
+    attachment_receipt: StoredRunSuccessReceipt | None
+
+
 class RunIdIssuer(Protocol):
     def issue(self) -> RunId: ...
 
@@ -346,6 +375,29 @@ class RunRepository(ABC):
 
     @abstractmethod
     async def get_for_update(self, run_id: RunId) -> CanonicalRun | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_session_attachment_lock_evidence(
+        self,
+        run_id: RunId,
+        *,
+        receipt_key: RunReceiptKey,
+    ) -> RunSessionAttachmentLockEvidence | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_active_for_player_character(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> CanonicalRun | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_active_for_player_character_for_update(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> CanonicalRun | None:
         raise NotImplementedError
 
     @abstractmethod

@@ -138,16 +138,26 @@ def build_player_character_service(
             value="source.production-player-character"
         ),
         clock=_player_character_clock,
+        binding_integrity_guard_enabled=True,
     )
 
 
-def build_run_service(*, uow_factory: UnitOfWorkFactory) -> RunService:
+def build_run_service(
+    *,
+    uow_factory: UnitOfWorkFactory,
+    controller_binding_resolver: ControllerBindingResolver,
+    player_character_binding_evidence: PlayerCharacterService,
+) -> RunService:
     return RunService(
         uow_factory=uow_factory,
         run_id_issuer=Uuid4RunIdIssuer(),
         continuous_story_line_id_issuer=Uuid4ContinuousStoryLineIdIssuer(),
         source_reference=RunAuthoritySourceRef(value="source.production-run"),
         clock=_run_clock,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_binding_evidence=(
+            player_character_binding_evidence
+        ),
     )
 
 
@@ -195,6 +205,10 @@ def build_default_services(
             else "deepseek-v4-flash"
         ),
     )
+    player_character_service = build_player_character_service(
+        uow_factory=uow_factory,
+        controller_binding_resolver=controller_binding_resolver,
+    )
     return ApiServices(
         session_service=SessionService(
             uow_factory=uow_factory,
@@ -202,11 +216,12 @@ def build_default_services(
             scenario_catalog=scenario_catalog,
         ),
         turn_orchestrator=orchestrator,
-        player_character_service=build_player_character_service(
+        player_character_service=player_character_service,
+        run_service=build_run_service(
             uow_factory=uow_factory,
             controller_binding_resolver=controller_binding_resolver,
+            player_character_binding_evidence=player_character_service,
         ),
-        run_service=build_run_service(uow_factory=uow_factory),
         engine=engine,
         narrative_provider=provider,
     )

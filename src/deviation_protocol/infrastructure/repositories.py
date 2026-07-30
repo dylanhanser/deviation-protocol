@@ -26,13 +26,16 @@ from deviation_protocol.application.ports import (
     NarrativeJobRepository,
     RunCreationReceiptRepository,
     RunMutationReceiptRepository,
+    RunPlayerCharacterBindingUniquenessConflictError,
     RunReceiptUniquenessConflictError,
     RunRepository,
+    RunSessionAttachmentLockEvidence,
     RunSessionParticipationRepository,
     RunSessionParticipationUniquenessConflictError,
 )
 from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
+    BindPlayerCharacterCommand,
     CreateRunCommand,
     RunOperationNamespace,
     RunReceiptKey,
@@ -58,6 +61,7 @@ from deviation_protocol.domain.player_character import (
     AuthoritySourceRef,
     CanonicalPlayerCharacter,
     ControllerBindingRef,
+    PlayerCharacterContractVersion,
     PlayerCharacterId,
     PlayerCharacterMutationKind,
     PlayerCharacterRevision,
@@ -138,6 +142,7 @@ from deviation_protocol.infrastructure.run_persistence import (
     StoredRunRevisionRecord,
     StoredRunSessionParticipationRecord,
     attach_operation_evidence_to_storage_bytes,
+    binding_operation_evidence_to_storage_bytes,
     canonical_run_from_revision_storage,
     creation_operation_evidence_to_storage_bytes as run_creation_evidence_bytes,
     creation_receipt_from_storage as run_creation_receipt_from_storage,
@@ -923,13 +928,17 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
         current_row: PlayerCharacterCurrentRow | None = None,
         creation_receipt_override: StoredCreationReceiptRecord | None = None,
         mutation_receipt_override: StoredMutationReceiptRecord | None = None,
+        lock_related: bool = False,
     ) -> CanonicalPlayerCharacter | None:
         if current_row is None:
+            current_statement = select(PlayerCharacterCurrentRow).where(
+                PlayerCharacterCurrentRow.player_character_id
+                == player_character_id.value
+            )
+            if lock_related:
+                current_statement = current_statement.with_for_update()
             current_row = await self._scalar(
-                select(PlayerCharacterCurrentRow).where(
-                    PlayerCharacterCurrentRow.player_character_id
-                    == player_character_id.value
-                )
+                current_statement
             )
         if current_row is None:
             await self._raise_if_missing_current_has_evidence(
@@ -945,10 +954,19 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
             raise PlayerCharacterStoredRecordIntegrityError(
                 "current player-character lookup identity is mismatched"
             )
-        exact_revision_row = await self._load_revision_row(
-            player_character_id,
-            current_record.record_revision.value,
+        exact_revision_statement = select(
+            PlayerCharacterRevisionRow
+        ).where(
+            PlayerCharacterRevisionRow.player_character_id
+            == player_character_id.value,
+            PlayerCharacterRevisionRow.record_revision
+            == current_record.record_revision.value,
         )
+        if lock_related:
+            exact_revision_statement = (
+                exact_revision_statement.with_for_update(read=True)
+            )
+        exact_revision_row = await self._scalar(exact_revision_statement)
         if exact_revision_row is None:
             raise PlayerCharacterStoredRecordIntegrityError(
                 "current player-character revision reference is dangling"
@@ -961,7 +979,7 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
                 "current player-character row does not match its revision"
             )
 
-        revision_rows = await self._scalars(
+        revision_statement = (
             select(PlayerCharacterRevisionRow)
             .where(
                 PlayerCharacterRevisionRow.player_character_id
@@ -969,13 +987,13 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
             )
             .order_by(PlayerCharacterRevisionRow.record_revision)
         )
-        creation_row = await self._scalar(
-            select(PlayerCharacterCreationReceiptRow).where(
-                PlayerCharacterCreationReceiptRow.result_player_character_id
-                == player_character_id.value
-            )
+        creation_statement = select(
+            PlayerCharacterCreationReceiptRow
+        ).where(
+            PlayerCharacterCreationReceiptRow.result_player_character_id
+            == player_character_id.value
         )
-        mutation_rows = await self._scalars(
+        mutation_statement = (
             select(PlayerCharacterMutationReceiptRow)
             .where(
                 PlayerCharacterMutationReceiptRow.player_character_id
@@ -986,18 +1004,31 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
                 PlayerCharacterMutationReceiptRow.operation_id,
             )
         )
-        binding_row = await self._scalar(
-            select(PlayerCharacterControllerBindingRow).where(
-                PlayerCharacterControllerBindingRow.controller_binding
-                == current_record.controller_binding.value
-            )
+        binding_statement = select(
+            PlayerCharacterControllerBindingRow
+        ).where(
+            PlayerCharacterControllerBindingRow.controller_binding
+            == current_record.controller_binding.value
         )
-        allocation_row = await self._scalar(
-            select(PlayerCharacterIdAllocationRow).where(
-                PlayerCharacterIdAllocationRow.player_character_id
-                == player_character_id.value
-            )
+        allocation_statement = select(
+            PlayerCharacterIdAllocationRow
+        ).where(
+            PlayerCharacterIdAllocationRow.player_character_id
+            == player_character_id.value
         )
+        if lock_related:
+            revision_statement = revision_statement.with_for_update(
+                read=True
+            )
+            creation_statement = creation_statement.with_for_update()
+            mutation_statement = mutation_statement.with_for_update()
+            binding_statement = binding_statement.with_for_update()
+            allocation_statement = allocation_statement.with_for_update()
+        revision_rows = await self._scalars(revision_statement)
+        creation_row = await self._scalar(creation_statement)
+        mutation_rows = await self._scalars(mutation_statement)
+        binding_row = await self._scalar(binding_statement)
+        allocation_row = await self._scalar(allocation_statement)
 
         creation_stored = (
             creation_receipt_override
@@ -1176,6 +1207,7 @@ class SqlAlchemyPlayerCharacterRepository(
         return await self._validate_complete_character(
             player_character_id,
             current_row=row,
+            lock_related=True,
         )
 
     async def add_initial(
@@ -1900,12 +1932,9 @@ class _SqlAlchemyRunRepositorySupport:
     @staticmethod
     def _run_core_values(run: CanonicalRun) -> dict[str, Any]:
         run = validate_canonical_run(run)
-        if run.player_character_binding is not None:
-            raise RunStoredRecordIntegrityError(
-                "minimum Run persistence rejects populated binding state"
-            )
         creation = run.creation_provenance
         current = run.current_mutation_provenance
+        binding = run.player_character_binding
         return {
             "run_id": run.run_id.value,
             "continuous_story_line_id": (
@@ -1925,14 +1954,40 @@ class _SqlAlchemyRunRepositorySupport:
             "operation_id": current.operation_id.value,
             "source_reference": current.source_reference.value,
             "occurred_at": current.occurred_at,
-            "binding_player_character_id": None,
-            "binding_contract_version": None,
-            "binding_record_revision": None,
-            "binding_state": None,
-            "binding_operation_id": None,
-            "binding_authority_source_ref": None,
-            "bound_at": None,
-            "inactivated_at": None,
+            "binding_player_character_id": (
+                binding.applicable_character_reference.player_character_id.value
+                if binding is not None
+                else None
+            ),
+            "binding_contract_version": (
+                binding.applicable_character_reference.contract_version.value
+                if binding is not None
+                else None
+            ),
+            "binding_record_revision": (
+                binding.applicable_character_reference.record_revision.value
+                if binding is not None
+                else None
+            ),
+            "binding_state": (
+                binding.binding_state if binding is not None else None
+            ),
+            "binding_operation_id": (
+                binding.binding_operation_id.value
+                if binding is not None
+                else None
+            ),
+            "binding_authority_source_ref": (
+                binding.binding_authority_source_ref.value
+                if binding is not None
+                else None
+            ),
+            "bound_at": (
+                binding.bound_at if binding is not None else None
+            ),
+            "inactivated_at": (
+                binding.inactivated_at if binding is not None else None
+            ),
         }
 
     @classmethod
@@ -1956,7 +2011,12 @@ class _SqlAlchemyRunRepositorySupport:
     ) -> RunCurrentRow:
         return RunCurrentRow(
             **cls._run_core_values(run),
-            active_player_character_id=None,
+            active_player_character_id=(
+                run.player_character_binding.applicable_character_reference
+                .player_character_id.value
+                if run.player_character_binding is not None
+                else None
+            ),
             created_at=created_at,
             updated_at=created_at,
         )
@@ -2038,19 +2098,105 @@ class _SqlAlchemyRunRepositorySupport:
                     "current Run row is missing"
                 )
 
-    async def _validate_complete_run(
+    async def _active_run_for_player_character(
+        self,
+        player_character_id: PlayerCharacterId,
+        *,
+        for_update: bool,
+    ) -> CanonicalRun | None:
+        try:
+            player_character_id = PlayerCharacterId(
+                value=player_character_id.value
+            )
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise RunStoredRecordIntegrityError(
+                "active-binding lookup identity is invalid"
+            ) from exc
+        evidence_statements = (
+            select(RunCurrentRow.run_id).where(
+                RunCurrentRow.active_player_character_id
+                == player_character_id.value
+            ),
+            select(RunCurrentRow.run_id).where(
+                RunCurrentRow.binding_player_character_id
+                == player_character_id.value
+            ),
+            select(RunRevisionRow.run_id).where(
+                RunRevisionRow.binding_player_character_id
+                == player_character_id.value
+            ),
+            select(RunMutationReceiptRow.run_id).where(
+                RunMutationReceiptRow.result_player_character_id
+                == player_character_id.value
+            ),
+        )
+        evidence_run_ids: set[str] = set()
+        for statement in evidence_statements:
+            evidence_run_ids.update(await self._run_scalars(statement))
+        if not evidence_run_ids:
+            return None
+        if len(evidence_run_ids) != 1:
+            raise RunStoredRecordIntegrityError(
+                "player character has contradictory surviving binding evidence"
+            )
+
+        run_id = RunId(value=next(iter(evidence_run_ids)))
+        statement = select(RunCurrentRow).where(
+            RunCurrentRow.run_id == run_id.value
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        current_row = await self._run_scalar(statement)
+        if current_row is None:
+            raise RunStoredRecordIntegrityError(
+                "active binding has no current Run row"
+            )
+        run = await self._validate_complete_run(
+            run_id,
+            current_row=current_row,
+            lock_related=for_update,
+        )
+        if run is None:
+            raise RunStoredRecordIntegrityError(
+                "active binding has no canonical Run"
+            )
+        binding = run.player_character_binding
+        if (
+            not run.lifecycle_status.is_active_line
+            or binding is None
+            or binding.binding_state != "active"
+            or binding.inactivated_at is not None
+            or binding.applicable_character_reference.player_character_id
+            != player_character_id
+        ):
+            raise RunStoredRecordIntegrityError(
+                "surviving binding evidence is not one canonical active binding"
+            )
+        return run
+
+    async def _validate_complete_run_family(
         self,
         run_id: RunId,
         *,
         current_row: RunCurrentRow | None = None,
         creation_receipt_override: StoredRunCreationReceiptRecord | None = None,
         mutation_receipt_override: StoredRunMutationReceiptRecord | None = None,
-    ) -> CanonicalRun | None:
+        lock_related: bool = False,
+    ) -> (
+        tuple[
+            CanonicalRun,
+            tuple[StoredRunMutationReceiptRecord, ...],
+        ]
+        | None
+    ):
         if current_row is None:
+            current_statement = select(RunCurrentRow).where(
+                RunCurrentRow.run_id == run_id.value
+            )
+            if lock_related:
+                current_statement = current_statement.with_for_update()
             current_row = await self._run_scalar(
-                select(RunCurrentRow).where(
-                    RunCurrentRow.run_id == run_id.value
-                )
+                current_statement
             )
         if current_row is None:
             await self._raise_if_missing_run_has_evidence(run_id)
@@ -2084,6 +2230,13 @@ class _SqlAlchemyRunRepositorySupport:
                 RunMutationReceiptRow.operation_id,
             )
         )
+        if lock_related:
+            revision_statement = revision_statement.with_for_update()
+            participation_statement = (
+                participation_statement.with_for_update()
+            )
+            creation_statement = creation_statement.with_for_update()
+            mutation_statement = mutation_statement.with_for_update()
         revision_rows = await self._run_scalars(revision_statement)
         participation_rows = await self._run_scalars(participation_statement)
         creation_row = await self._run_scalar(creation_statement)
@@ -2102,7 +2255,54 @@ class _SqlAlchemyRunRepositorySupport:
         )
         if mutation_receipt_override is not None:
             mutations += (mutation_receipt_override,)
-        return validate_stored_run_record_set(
+        referenced_player_character_revision = None
+        if (
+            current.binding_player_character_id is not None
+            and current.binding_contract_version is not None
+            and current.binding_record_revision is not None
+        ):
+            try:
+                reference = ApplicableCharacterReference(
+                    player_character_id=PlayerCharacterId(
+                        value=current.binding_player_character_id
+                    ),
+                    contract_version=PlayerCharacterContractVersion(
+                        current.binding_contract_version
+                    ),
+                    record_revision=PlayerCharacterRevision(
+                        value=current.binding_record_revision
+                    ),
+                )
+            except (AttributeError, TypeError, ValueError) as exc:
+                raise RunStoredRecordIntegrityError(
+                    "stored Run binding reference is invalid"
+                ) from exc
+            reference_statement = select(
+                PlayerCharacterRevisionRow
+            ).where(
+                PlayerCharacterRevisionRow.player_character_id
+                == reference.player_character_id.value,
+                PlayerCharacterRevisionRow.record_revision
+                == reference.record_revision.value,
+            )
+            referenced_row = await self._run_scalar(
+                reference_statement
+            )
+            if referenced_row is not None:
+                try:
+                    referenced_player_character_revision = (
+                        canonical_record_from_revision_storage(
+                            _SqlAlchemyPlayerCharacterRepositorySupport._revision_record(
+                                referenced_row
+                            )
+                        )
+                    )
+                except PlayerCharacterStoredRecordIntegrityError as exc:
+                    raise RunStoredRecordIntegrityError(
+                        "referenced immutable player-character revision "
+                        "is invalid"
+                    ) from exc
+        run = validate_stored_run_record_set(
             creation_receipt=creation,
             mutation_receipts=mutations,
             revisions=tuple(
@@ -2113,7 +2313,29 @@ class _SqlAlchemyRunRepositorySupport:
                 self._run_participation_record(row)
                 for row in participation_rows
             ),
+            referenced_player_character_revision=(
+                referenced_player_character_revision
+            ),
         )
+        return run, mutations
+
+    async def _validate_complete_run(
+        self,
+        run_id: RunId,
+        *,
+        current_row: RunCurrentRow | None = None,
+        creation_receipt_override: StoredRunCreationReceiptRecord | None = None,
+        mutation_receipt_override: StoredRunMutationReceiptRecord | None = None,
+        lock_related: bool = False,
+    ) -> CanonicalRun | None:
+        family = await self._validate_complete_run_family(
+            run_id,
+            current_row=current_row,
+            creation_receipt_override=creation_receipt_override,
+            mutation_receipt_override=mutation_receipt_override,
+            lock_related=lock_related,
+        )
+        return family[0] if family is not None else None
 
 
 class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
@@ -2124,7 +2346,10 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         if row is None:
             await self._raise_if_missing_run_has_evidence(run_id)
             return None
-        return await self._validate_complete_run(run_id, current_row=row)
+        return await self._validate_complete_run(
+            run_id,
+            current_row=row,
+        )
 
     async def get_for_update(self, run_id: RunId) -> CanonicalRun | None:
         row = await self._run_scalar(
@@ -2135,7 +2360,95 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         if row is None:
             await self._raise_if_missing_run_has_evidence(run_id)
             return None
-        return await self._validate_complete_run(run_id, current_row=row)
+        return await self._validate_complete_run(
+            run_id,
+            current_row=row,
+            lock_related=True,
+        )
+
+    async def get_session_attachment_lock_evidence(
+        self,
+        run_id: RunId,
+        *,
+        receipt_key: RunReceiptKey,
+    ) -> RunSessionAttachmentLockEvidence | None:
+        if (
+            receipt_key.run_id != run_id
+            or receipt_key.operation_namespace
+            is not RunOperationNamespace.ATTACH_SESSION_V1
+        ):
+            raise ValueError(
+                "Run attachment lock rejects mismatched receipt scope"
+            )
+        current_row = await self._run_scalar(
+            select(RunCurrentRow)
+            .where(RunCurrentRow.run_id == run_id.value)
+            .with_for_update()
+        )
+        if current_row is None:
+            await self._raise_if_missing_run_has_evidence(run_id)
+            return None
+        current_record = self._current_run_record(current_row)
+        if current_record.run_id != run_id:
+            raise RunStoredRecordIntegrityError(
+                "current Run lookup identity is mismatched"
+            )
+        family = await self._validate_complete_run_family(
+            run_id,
+            current_row=current_row,
+            lock_related=True,
+        )
+        if family is None:
+            raise RunStoredRecordIntegrityError(
+                "locked Run family is missing"
+            )
+        current, mutation_receipts = family
+        attachment_receipt_records = tuple(
+            stored
+            for stored in mutation_receipts
+            if (
+                stored.run_id == run_id
+                and stored.operation_namespace
+                == receipt_key.operation_namespace.value
+                and stored.operation_id == receipt_key.operation_id
+            )
+        )
+        if len(attachment_receipt_records) > 1:
+            raise RunStoredRecordIntegrityError(
+                "Run attachment receipt evidence is duplicated"
+            )
+        attachment_receipt = None
+        if attachment_receipt_records:
+            attachment_receipt = run_mutation_receipt_from_storage(
+                attachment_receipt_records[0]
+            )
+            if attachment_receipt.key != receipt_key:
+                raise RunStoredRecordIntegrityError(
+                    "Run attachment receipt lookup identity is mismatched"
+                )
+
+        return RunSessionAttachmentLockEvidence(
+            canonical_run=current,
+            attachment_receipt=attachment_receipt,
+        )
+
+    async def get_active_for_player_character(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> CanonicalRun | None:
+        return await self._active_run_for_player_character(
+            player_character_id,
+            for_update=False,
+        )
+
+    async def get_active_for_player_character_for_update(
+        self,
+        player_character_id: PlayerCharacterId,
+    ) -> CanonicalRun | None:
+        return await self._active_run_for_player_character(
+            player_character_id,
+            for_update=True,
+        )
 
     async def add_initial(
         self,
@@ -2183,11 +2496,13 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         if (
             prior is None
             or run.current_mutation_provenance.mutation_kind
-            is not RunMutationKind.ATTACH_SESSION
-            or run.player_character_binding is not None
+            not in {
+                RunMutationKind.ATTACH_SESSION,
+                RunMutationKind.BIND_PLAYER_CHARACTER,
+            }
         ):
             raise RunStoredRecordIntegrityError(
-                "successor Run revision is not an admitted attachment"
+                "successor Run revision is not an admitted mutation"
             )
         current = await self._validate_complete_run(run.run_id)
         if current is None:
@@ -2203,15 +2518,40 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         ):
             raise RunRepositoryConflictError("successor Run revision is stale")
         row = self._run_revision_row(run, created_at=created_at)
-        participation = run.trusted_participation_references[-1]
-        if (
-            participation.joined_state_version != run.state_version
-            or participation.operation_id
-            != run.current_mutation_provenance.operation_id
-        ):
-            raise RunStoredRecordIntegrityError(
-                "successor Run participation is inconsistent"
-            )
+        mutation_kind = run.current_mutation_provenance.mutation_kind
+        if mutation_kind is RunMutationKind.ATTACH_SESSION:
+            if not run.trusted_participation_references:
+                raise RunStoredRecordIntegrityError(
+                    "successor Run participation is missing"
+                )
+            participation = run.trusted_participation_references[-1]
+            if (
+                participation.joined_state_version != run.state_version
+                or participation.operation_id
+                != run.current_mutation_provenance.operation_id
+                or run.player_character_binding
+                != current.player_character_binding
+            ):
+                raise RunStoredRecordIntegrityError(
+                    "successor Run participation is inconsistent"
+                )
+        else:
+            binding = run.player_character_binding
+            if (
+                current.player_character_binding is not None
+                or binding is None
+                or run.trusted_participation_references
+                != current.trusted_participation_references
+                or binding.binding_operation_id
+                != run.current_mutation_provenance.operation_id
+                or binding.binding_authority_source_ref
+                != run.current_mutation_provenance.source_reference
+                or binding.bound_at
+                != run.current_mutation_provenance.occurred_at
+            ):
+                raise RunStoredRecordIntegrityError(
+                    "successor Run binding is inconsistent"
+                )
         await self._flush_run_row(
             row,
             conflict_message="Run revision insertion conflict",
@@ -2247,7 +2587,12 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         values = self._run_core_values(run)
         values.pop("run_id")
         values.pop("continuous_story_line_id")
-        values["active_player_character_id"] = None
+        values["active_player_character_id"] = (
+            run.player_character_binding.applicable_character_reference
+            .player_character_id.value
+            if run.player_character_binding is not None
+            else None
+        )
         values["updated_at"] = updated_at
         try:
             result = await self._session.execute(
@@ -2260,6 +2605,18 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
                 )
                 .values(**values)
             )
+        except IntegrityError as exc:
+            if (
+                run.current_mutation_provenance.mutation_kind
+                is RunMutationKind.BIND_PLAYER_CHARACTER
+                and _is_mysql_duplicate_key(exc)
+            ):
+                raise RunPlayerCharacterBindingUniquenessConflictError(
+                    "active player-character binding conflict"
+                ) from exc
+            raise RunRepositoryError(
+                "Run current compare-and-swap failed"
+            ) from exc
         except DBAPIError as exc:
             raise RunRepositoryError(
                 "Run current compare-and-swap failed"
@@ -2469,7 +2826,10 @@ class SqlAlchemyRunMutationReceiptRepository(
         self,
         key: RunReceiptKey,
     ) -> StoredRunSuccessReceipt | None:
-        if key.operation_namespace is not RunOperationNamespace.ATTACH_SESSION_V1:
+        if key.operation_namespace not in {
+            RunOperationNamespace.ATTACH_SESSION_V1,
+            RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+        }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         row = await self._run_scalar(
             select(RunMutationReceiptRow).where(
@@ -2498,18 +2858,24 @@ class SqlAlchemyRunMutationReceiptRepository(
         created_at: datetime,
     ) -> None:
         if (
-            receipt.key.operation_namespace
-            is not RunOperationNamespace.ATTACH_SESSION_V1
-            or receipt.command_kind is not RunMutationKind.ATTACH_SESSION
+            (
+                receipt.key.operation_namespace,
+                receipt.command_kind,
+            )
+            not in {
+                (
+                    RunOperationNamespace.ATTACH_SESSION_V1,
+                    RunMutationKind.ATTACH_SESSION,
+                ),
+                (
+                    RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+                    RunMutationKind.BIND_PLAYER_CHARACTER,
+                ),
+            }
             or receipt.key.run_id is None
         ):
             raise ValueError("minimum Run mutation repository rejects command")
         result = receipt.result
-        participation = result.participation_reference
-        if participation is None:
-            raise RunStoredRecordIntegrityError(
-                "Run attachment receipt has no participation"
-            )
         expected_version = result.resulting_state_version.value - 1
         before = await self._run_at_revision(
             receipt.key.run_id,
@@ -2519,13 +2885,55 @@ class SqlAlchemyRunMutationReceiptRepository(
             receipt.key.run_id,
             result.resulting_state_version.value,
         )
-        command = AttachSessionCommand(
-            run_id=after.run_id,
-            continuous_story_line_id=after.continuous_story_line_id,
-            session_id=participation.session_id,
-            expected_state_version=before.state_version,
-            source_reference=after.current_mutation_provenance.source_reference,
-        )
+        participation = result.participation_reference
+        character_reference = result.applicable_character_reference
+        if receipt.command_kind is RunMutationKind.ATTACH_SESSION:
+            if participation is None or character_reference is not None:
+                raise RunStoredRecordIntegrityError(
+                    "Run attachment receipt result shape is invalid"
+                )
+            command: AttachSessionCommand | BindPlayerCharacterCommand = (
+                AttachSessionCommand(
+                    run_id=after.run_id,
+                    continuous_story_line_id=after.continuous_story_line_id,
+                    session_id=participation.session_id,
+                    expected_state_version=before.state_version,
+                    source_reference=(
+                        after.current_mutation_provenance.source_reference
+                    ),
+                )
+            )
+            operation_evidence = attach_operation_evidence_to_storage_bytes(
+                command
+            )
+        else:
+            if participation is not None or character_reference is None:
+                raise RunStoredRecordIntegrityError(
+                    "Run binding receipt result shape is invalid"
+                )
+            if (
+                before.player_character_binding is not None
+                or after.player_character_binding is None
+                or after.player_character_binding.applicable_character_reference
+                != character_reference
+            ):
+                raise RunStoredRecordIntegrityError(
+                    "Run binding receipt does not match Run history"
+                )
+            command = BindPlayerCharacterCommand(
+                run_id=after.run_id,
+                continuous_story_line_id=after.continuous_story_line_id,
+                target_player_character_id=(
+                    character_reference.player_character_id
+                ),
+                expected_state_version=before.state_version,
+                source_reference=(
+                    after.current_mutation_provenance.source_reference
+                ),
+            )
+            operation_evidence = (
+                binding_operation_evidence_to_storage_bytes(command)
+            )
         stored = StoredRunMutationReceiptRecord(
             run_id=receipt.key.run_id,
             operation_namespace=receipt.key.operation_namespace.value,
@@ -2542,18 +2950,36 @@ class SqlAlchemyRunMutationReceiptRepository(
             ),
             resulting_lifecycle_status=result.lifecycle_status.value,
             resulting_state_version=result.resulting_state_version.value,
-            participation_session_id=participation.session_id,
-            participation_operation_id=participation.operation_id.value,
+            participation_session_id=(
+                participation.session_id if participation is not None else None
+            ),
+            participation_operation_id=(
+                participation.operation_id.value
+                if participation is not None
+                else None
+            ),
             participation_source_reference=(
                 participation.source_reference.value
+                if participation is not None
+                else None
             ),
-            result_player_character_id=None,
-            result_character_contract_version=None,
-            result_character_record_revision=None,
+            result_player_character_id=(
+                character_reference.player_character_id.value
+                if character_reference is not None
+                else None
+            ),
+            result_character_contract_version=(
+                character_reference.contract_version.value
+                if character_reference is not None
+                else None
+            ),
+            result_character_record_revision=(
+                character_reference.record_revision.value
+                if character_reference is not None
+                else None
+            ),
             receipt_canonical=run_receipt_to_storage_bytes(receipt),
-            operation_evidence_canonical=(
-                attach_operation_evidence_to_storage_bytes(command)
-            ),
+            operation_evidence_canonical=operation_evidence,
             created_at=created_at,
         )
         if run_mutation_receipt_from_storage(stored) != receipt:
@@ -2585,9 +3011,13 @@ class SqlAlchemyRunMutationReceiptRepository(
             participation_source_reference=(
                 stored.participation_source_reference
             ),
-            result_player_character_id=None,
-            result_character_contract_version=None,
-            result_character_record_revision=None,
+            result_player_character_id=stored.result_player_character_id,
+            result_character_contract_version=(
+                stored.result_character_contract_version
+            ),
+            result_character_record_revision=(
+                stored.result_character_record_revision
+            ),
             receipt_canonical=stored.receipt_canonical,
             operation_evidence_canonical=(
                 stored.operation_evidence_canonical

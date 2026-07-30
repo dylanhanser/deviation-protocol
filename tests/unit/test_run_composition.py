@@ -39,6 +39,16 @@ _CONTROLLER_BINDING = ConfiguredControllerBinding(
 _SOURCE = RunAuthoritySourceRef(value="source.production-run")
 
 
+def _build_run_service(uow_factory) -> RunService:
+    resolver = object()
+    evidence = object()
+    return main.build_run_service(
+        uow_factory=uow_factory,
+        controller_binding_resolver=resolver,  # type: ignore[arg-type]
+        player_character_binding_evidence=evidence,  # type: ignore[arg-type]
+    )
+
+
 def test_uuid4_issuers_use_separate_standard_calls_and_identity_domains(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -130,7 +140,13 @@ def test_run_service_composition_is_lazy_complete_and_trusted(
 
     monkeypatch.setattr(authority_module.uuid, "uuid4", forbidden_uuid4)
 
-    service = main.build_run_service(uow_factory=forbidden_uow)
+    resolver = object()
+    evidence = object()
+    service = main.build_run_service(
+        uow_factory=forbidden_uow,
+        controller_binding_resolver=resolver,  # type: ignore[arg-type]
+        player_character_binding_evidence=evidence,  # type: ignore[arg-type]
+    )
 
     assert type(service) is RunService
     assert service.uow_factory is forbidden_uow
@@ -145,6 +161,9 @@ def test_run_service_composition_is_lazy_complete_and_trusted(
     assert callable(service.get_run)
     assert callable(service.attach_session)
     assert callable(service.bind_player_character)
+    assert callable(service.bind_player_character_internal)
+    assert service.controller_binding_resolver is resolver
+    assert service.player_character_binding_evidence is evidence
     assert uow_calls == 0
     assert uuid_calls == 0
 
@@ -167,6 +186,8 @@ def test_run_service_keeps_deterministic_issuers_injectable_for_tests() -> None:
         continuous_story_line_id_issuer=line_issuer,  # type: ignore[arg-type]
         source_reference=RunAuthoritySourceRef(value="source.test"),
         clock=lambda: datetime(2026, 7, 29, tzinfo=UTC),
+        controller_binding_resolver=object(),  # type: ignore[arg-type]
+        player_character_binding_evidence=object(),  # type: ignore[arg-type]
     )
 
     assert service.run_id_issuer is run_issuer
@@ -221,6 +242,15 @@ def test_default_composition_reuses_one_lazy_mysql_uow_graph(
         is services.session_service.uow_factory
         is services.turn_orchestrator.uow_factory
     )
+    assert (
+        service.player_character_binding_evidence
+        is services.player_character_service
+    )
+    assert (
+        service.controller_binding_resolver
+        is services.player_character_service.controller_binding_resolver
+    )
+    assert services.player_character_service.binding_integrity_guard_enabled
     assert services.engine is engine
     assert services.narrative_provider is None
     assert constructed_with == []
@@ -235,8 +265,8 @@ def test_default_database_configuration_is_lazy_and_fails_closed(
 
     app = main.create_app()
     assert app.title == "Deviation Protocol"
-    service = main.build_run_service(
-        uow_factory=lambda: None  # type: ignore[arg-type,return-value]
+    service = _build_run_service(
+        lambda: None  # type: ignore[arg-type,return-value]
     )
     assert type(service) is RunService
 
@@ -260,7 +290,7 @@ def test_composed_binding_namespace_stays_reserved_without_uow_entry() -> None:
         uow_calls += 1
         raise AssertionError("reserved binding must not enter a UoW")
 
-    service = main.build_run_service(uow_factory=forbidden_uow)
+    service = _build_run_service(forbidden_uow)
     decision = service.bind_player_character(
         operation_id=RunOperationId(value="operation.reserved-binding"),
         command=ReservedBindPlayerCharacterCommand(

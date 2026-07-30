@@ -394,6 +394,8 @@ def _service(
         continuous_story_line_id_issuer=_Issuer(line_id),
         source_reference=SOURCE,
         clock=lambda: NOW,
+        controller_binding_resolver=object(),  # type: ignore[arg-type]
+        player_character_binding_evidence=object(),  # type: ignore[arg-type]
     )
 
 

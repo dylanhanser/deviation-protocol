@@ -527,8 +527,9 @@ def test_internal_binding_command_rejects_untrusted_or_injected_fields() -> None
             )
 
 
-def test_p4_s1a_keeps_binding_persistence_service_and_public_api_inactive() -> None:
-    source_root = Path(__file__).parents[2] / "src" / "deviation_protocol"
+def test_p4_s1b_activates_internal_binding_and_keeps_public_api_inactive() -> None:
+    repository_root = Path(__file__).parents[2]
+    source_root = repository_root / "src" / "deviation_protocol"
     repository_source = (
         source_root / "infrastructure" / "repositories.py"
     ).read_text(encoding="utf-8")
@@ -541,15 +542,53 @@ def test_p4_s1a_keeps_binding_persistence_service_and_public_api_inactive() -> N
 
     assert (
         "minimum Run persistence rejects populated binding state"
-        in repository_source
+        not in repository_source
     )
+    assert "RunMutationKind.BIND_PLAYER_CHARACTER" in repository_source
+    assert (
+        "async def bind_player_character_internal(" in run_service_source
+    )
+    assert "bind_player_character_to_run" in run_service_source
+    assert "binding_integrity_guard_enabled=True" in api_source
+
     assert (
         "command: ReservedBindPlayerCharacterCommand"
         in run_service_source
     )
-    assert "bind_player_character_to_run" not in run_service_source
-    assert "binding_integrity_guard_enabled=True" not in api_source
-    assert "run.bind-player-character/v1" not in api_source
+    assert "reject_reserved_bind_player_character(" in run_service_source
+
+    public_or_deferred_paths = {
+        *(source_root / "api").rglob("*.py"),
+        *(repository_root / "web" / "src").rglob("*.ts*"),
+        *(
+            path
+            for path in source_root.rglob("*.py")
+            if any(
+                token in path.stem.lower()
+                for token in (
+                    "deepseek",
+                    "demo",
+                    "gameplay",
+                    "narrative",
+                    "provider",
+                    "scenario",
+                    "world",
+                )
+            )
+        ),
+    }
+    public_binding_markers = (
+        "BindPlayerCharacterCommand",
+        "PlayerCharacterBinding",
+        "bind_player_character_internal",
+        "run.bind-player-character/v1",
+        "/bind-player-character",
+    )
+    for path in sorted(public_or_deferred_paths):
+        source = path.read_text(encoding="utf-8")
+        assert all(
+            marker not in source for marker in public_binding_markers
+        ), path
 
 
 def test_operation_models_reject_malformed_session_and_receipt_bindings() -> None:
