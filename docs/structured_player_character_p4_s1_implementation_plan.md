@@ -2,20 +2,28 @@
 
 ## Status and authority
 
-Status: **Bounded candidate implementation plan; not yet independently
-approved, not frozen, not implemented, and review pending.**
+Status: **P4-S1 is implemented and pushed. P4-S1a is
+`748003319ececa548b68b351746afbb2d54c66bb`; P4-S1b is
+`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The functional boundary and its
+required documentation synchronization are complete; this status candidate
+remains unstaged and requires separate independent read-only review before any
+staging or commit.**
 
-Baseline: `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). Minimum Run Core is the completed,
-independently finally approved, committed, and pushed prerequisite. Its binding seam is
-null-only and unpopulated, and `run.bind-player-character/v1` remains reserved
-and rejected. This candidate neither emits nor satisfies an approval token.
+Historical prerequisite baseline: `e821cd922b61868097667b12c2b64cf8089a9681`
+(`feat(run): implement minimum run core`). Minimum Run Core supplied the
+all-null seam later activated by P4-S1. P4-S1a completed the aggregate,
+protocol, reconstruction, evidence seam, and fail-closed lifecycle guard;
+P4-S1b completed same-UoW ports/application, persistence, composition, and
+internal binding behavior. The constructible lifecycle remains
+`pre_first_turn`; P4-S1 does not transition it to `active`. Public binding is
+not activated: no HTTP route, public DTO, dependency getter, OpenAPI operation,
+frontend, Demo, browser, scenario, world, Provider, or player-visible binding
+behavior exists, and `RunService.bind_player_character(...)` remains rejected.
 
-The sole operative future review-success token for this exact complete
-candidate is `STRUCTURED_PLAYER_CHARACTER_P4_S1_PLAN_APPROVED`. Only an
-independent read-only reviewer may return it after reviewing the complete
-candidate and its recorded hashes. Writing this candidate does not return,
-earn, or satisfy that token.
+Historical plan-review record: the sole operative approval token for the
+pre-implementation P4-S1 plan candidate was
+`STRUCTURED_PLAYER_CHARACTER_P4_S1_PLAN_APPROVED`. That historical plan gate
+does not apply to this later seven-path status-synchronization candidate.
 
 Authority precedence follows the Structured Player-Character Contract for
 character identity and lifecycle; the Run Protocol for Run and line lifecycle;
@@ -385,16 +393,29 @@ evidence with surviving immutable binding evidence; deterministically serialize
 concurrent bind versus each guarded mutation with the losing path leaving no
 partial state; and permit future authority-compliant inactivity plus a
 historicalized binding to replay the original immutable result without
-reactivating that binding. These are future tests only.
+reactivating that binding. At plan-authoring time these were future test
+requirements; the allocated P4-S1a and P4-S1b test modules are now committed.
+No tests are rerun by this documentation-only status correction.
 
 Later verification records focused unit and MySQL selections, `compileall`,
 Offline/MySQL/Full modes as required, Alembic head/history, and `git diff
 --check`. Live-model flags stay disabled. No Provider, browser, frontend, Demo,
 or public gameplay test belongs here.
 
-The required order is: create candidate; record exact inventory and SHA-256;
+The historical required order was: create candidate; record exact inventory and SHA-256;
 independent review returning the sole token; separate commit authority; user
 manual push; confirm clean remote-aligned baseline; separate P4-S1a authority
 and unstaged review; separate P4-S1b authority and complete unstaged review;
 documentation synchronization; separate milestone-commit authority; user manual
-push. This authoring task completes only candidate creation and hash evidence.
+push. P4-S1 closeout/status synchronization is complete by this candidate. No
+concrete defect requires reopening P4-S1. No repository authority defines a
+P4-S2 objective; P5-S1 Owned-read activation is the next canonical unit and
+requires separate bounded implementation planning and independent review before
+code changes. Its planning gaps require no user product or architecture
+decision merely to begin the plan-authoring task. The optional DB-001
+clarification raised during P4-S1b review is non-blocking, is not required
+before P5-S1 planning, and is neither added nor drafted here. Later lifecycle,
+scenario, world-transition, frontend, public-binding, and production-identity
+work remains deferred to its owning authority. No production-readiness or
+Internet-deployment claim is made; the fixed development principal remains
+unsuitable for Internet deployment.

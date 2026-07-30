@@ -1,9 +1,8 @@
 # Structured Player-Character Contract
 
 Status: **Approved and frozen structured player-character product
-specification — partially implemented through completed Phase 3 and Minimum
-Run Core; Run-owned continuous-story-line binding remains unimplemented P4-S1
-work.**
+specification — partially implemented through completed Phase 3, Minimum Run
+Core, and completed internal-only P4-S1 binding.**
 
 Authority scope: **Normative player-character identity, canonical record,
 revision, lifecycle, validation, projection, and adjacent-authority
@@ -16,10 +15,12 @@ specification. Its Phase 1 through Phase 3 foundation is implemented,
 independently approved, committed, and pushed. Minimum Run Core is also
 implemented, independently finally approved, committed, and pushed as
 `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). Its binding seam remains null-only
-and unpopulated, and `run.bind-player-character/v1` remains reserved and
-rejected. The Run-owned continuous-story-line binding and later public
-activation are not implemented; P4-S1 has not started.
+(`feat(run): implement minimum run core`). Its null-only seam is historical:
+P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb` and
+P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The Run-owned binding is
+implemented internally only. Later public activation is not implemented; the
+reserved public `RunService.bind_player_character(...)` command remains
+rejected.
 
 The approved and frozen
 [Final Narrative Experience and Long-Term Systems](final_narrative_experience.md)
@@ -547,8 +548,10 @@ character contract owns only the character identity/revision side of that
 binding and the rule that a binding MUST be explicit and validated. The
 [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 froze the prerequisite persistence and transaction seam. That core is now
-implemented at `e821cd922b61868097667b12c2b64cf8089a9681`; its binding seam
-remains null-only and unpopulated, while P4-S1 binding remains unimplemented.
+implemented at `e821cd922b61868097667b12c2b64cf8089a9681`; that null-only seam
+was activated internally by P4-S1a
+(`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+(`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`).
 
 Active binding cardinality is no longer unresolved:
 
@@ -606,7 +609,7 @@ Runs, separate continuous story lines, or accounts. Run reset, browser reset,
 Session loss, transport failure, or Provider failure MUST NOT create, delete,
 retire, reactivate, or replace a player character.
 
-The future P4-S1 binding is a Run-owned mutation. The Run application service
+The implemented P4-S1 binding is a Run-owned mutation. The Run application service
 MUST resolve trusted controller authority, obtain the canonical owned
 character and exact applicable reference through the narrow Phase 3-owned
 internal read seam defined by the minimum Run-core plan, and commit the
@@ -923,8 +926,10 @@ does not push.
 The structured player-character contract is approved and frozen and partially
 implemented through completed, independently approved, committed, and pushed
 Phase 3 plus the completed Minimum Run Core at
-`e821cd922b61868097667b12c2b64cf8089a9681`. The Run-owned
-continuous-story-line binding remains unimplemented; P4-S1 has not started.
+`e821cd922b61868097667b12c2b64cf8089a9681`. P4-S1a
+(`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+(`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) complete the internal Run-owned
+continuous-story-line binding; public activation remains unimplemented.
 Approval and freeze do not authorize later runtime work. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

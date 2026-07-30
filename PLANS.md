@@ -13,13 +13,13 @@ documents.
 - **Planned phase:** assigned to a future phase whose implementation has not
   started.
 
-## Current P4-S1 plan-candidate baseline
+## Current P4-S1 completion baseline
 
-- Exact bounded candidate: [P4-S1 implementation plan](docs/structured_player_character_p4_s1_implementation_plan.md).
+- Exact completed boundary: [P4-S1 implementation plan](docs/structured_player_character_p4_s1_implementation_plan.md).
 - Branch: `main`
 - Current local `origin/main` and `HEAD`:
-  `e821cd922b61868097667b12c2b64cf8089a9681`
-- Baseline subject: `feat(run): implement minimum run core`
+  `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`
+- Baseline subject: `feat(player-character): implement P4-S1b run binding`
 - Historical pre-closure Phase 3 baseline:
   `150074d58cdbf3aee08bea9c1084325b2b0f0a3f`
   (`docs(player-character): close phase 3 slice 1 status sync`)
@@ -47,12 +47,19 @@ documents.
   `cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Complete Phase 3 Offline
   verification recorded `1,469 passed, 79 skipped`; the existing focused
   MySQL player-character selection recorded `42 passed`.
-- Minimum Run Core is implemented, independently finally approved, committed,
-  and pushed on `main` as `e821cd922b61868097667b12c2b64cf8089a9681`
-  (`feat(run): implement minimum run core`). Its binding seam remains
-  null-only and unpopulated; `run.bind-player-character/v1` remains reserved
-  and rejected. P4-S1 implementation has not started.
-- Phase 4 implementation has not started. API routes,
+- Minimum Run Core is the historical prerequisite implemented at
+  `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum
+  run core`). P4-S1a is implemented at
+  `748003319ececa548b68b351746afbb2d54c66bb`
+  (`feat(player-character): guard active binding lifecycle transitions`), and
+  P4-S1b is implemented and pushed at
+  `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`
+  (`feat(player-character): implement P4-S1b run binding`). The functional
+  P4-S1 boundary is complete: binding is internal-only, the constructible Run
+  lifecycle remains `pre_first_turn`, and the reserved public
+  `RunService.bind_player_character(...)` command remains rejected.
+- Except for completed P4-S1, Phase 4 work remains unimplemented or deferred.
+  API routes,
   frontend activation, Demo behavior, Provider behavior, full Run Protocol,
   narrative integration, scenario integration, combat integration, and public
   gameplay activation remain unimplemented or deferred as assigned.
@@ -312,15 +319,17 @@ stages:
      `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; the resulting
      prerequisite is now implemented and pushed at
      `e821cd922b61868097667b12c2b64cf8089a9681`.
-3. **Minimum Phase 3.3 Run-core prerequisite: implemented, approved, committed, and pushed**
+3. **Minimum Phase 3.3 Run-core prerequisite: historically completed**
    - completed at `e821cd922b61868097667b12c2b64cf8089a9681`
-     (`feat(run): implement minimum run core`); its null-only binding seam
-     remains reserved and rejected.
-4. **P4-S1 — Run-owned continuous-story-line binding: not started**
-   - [its exact bounded documentation candidate](docs/structured_player_character_p4_s1_implementation_plan.md)
-     is pending independent review; no binding behavior is implemented.
+      (`feat(run): implement minimum run core`); its all-null seam was the
+      historical pre-P4-S1 baseline.
+4. **P4-S1 — Run-owned continuous-story-line binding: complete**
+   - P4-S1a is `748003319ececa548b68b351746afbb2d54c66bb`; P4-S1b is
+     `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. No concrete defect requires
+     reopening P4-S1.
 5. **Phase 5 — Public projection and narrow boundary integration: deferred**
-   - P5-S1 owned-read activation;
+   - P5-S1 owned-read activation is the next canonical unit and requires a
+     separate bounded implementation plan and independent review before code;
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
 
@@ -375,8 +384,13 @@ detached projection, and P3-S4 normal production composition. It received
 independent read-only approval with no open implementation finding and was
 committed and pushed at
 `cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Phase 3 is complete. Phase 4
-implementation has not started; P4-G0 documentation authority is approved and
-closed.
+has started only through completed P4-S1: P4-S1a is complete at
+`748003319ececa548b68b351746afbb2d54c66bb`, and P4-S1b is complete at
+`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. P4-G0 documentation authority is
+approved and closed. The implemented P4-S1 boundary is the internal Run-owned
+continuous-story-line binding only; broader Phase 4 and the full Run Protocol
+remain incomplete. The constructible Run lifecycle remains `pre_first_turn`,
+and transition to `active` is not implemented.
 
 Production controller authority is an explicit configured allowlist matched by
 the complete exact `(authentication_scheme, player_id)` `RequestPrincipal`
@@ -425,10 +439,11 @@ UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
 required controller bindings are absent; no fake or development resolver or
 fake issuer is installed.
 
-API routes, frontend activation, Demo behavior, Provider behavior, Run
-Protocol and continuous-line integration, narrative integration, scenario
-integration, combat integration, content integration, and public gameplay
-activation remain deferred.
+API routes, frontend activation, Demo behavior, Provider behavior, broader Run
+Protocol and lifecycle integration, narrative integration, scenario and world
+integration, combat integration, content integration, public binding, and
+player-visible gameplay activation remain deferred. The internal Run-owned
+continuous-story-line binding is implemented only through P4-S1.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
@@ -509,9 +524,10 @@ Run-owned persistence/UoW, separate trusted Session participation, and the
 future atomic character-binding seam. The prerequisite is now implemented,
 independently finally approved, committed, and pushed as
 `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). Its binding seam is still
-null-only and unpopulated, and the reserved binding operation remains
-rejected. P4-S1 remains unstarted and has no public activation.
+  (`feat(run): implement minimum run core`). That all-null seam is historical:
+  P4-S1a (`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+  (`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) complete the internal binding
+  boundary. No public binding activation exists.
 
 Neither P4-G0 nor the minimum prerequisite marks the full Run Protocol
 implemented. World generation, profile resolution, scenario execution,

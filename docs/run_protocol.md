@@ -4,12 +4,13 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
-P4-S1 prerequisite status: **Minimum Run Core is implemented, independently
-finally approved, committed, and pushed as
-`e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). Its binding seam remains null-only
-and unpopulated, `run.bind-player-character/v1` remains reserved and rejected,
-and P4-S1 remains unstarted.**
+P4-S1 status: **Minimum Run Core is the historical prerequisite at
+`e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
+core`). P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb`
+and P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The completed binding
+is internal-only; no public route exists, the reserved public
+`RunService.bind_player_character(...)` command remains rejected, and the
+constructible lifecycle remains `pre_first_turn`.**
 
 ## Goals
 
@@ -79,8 +80,9 @@ participate in conflicting Runs. This record does not activate public resume,
 reconnect, cross-tab, browser-restart, or multi-device behavior.
 
 The completed minimum Run core and its production composition remain internal.
-The reserved character-binding seam is populated only by separately authorized
-P4-S1 work; it remains null-only and unpopulated at this baseline.
+The reserved character-binding seam was populated by the completed separately
+authorized P4-S1 work. That internal completion does not activate a public
+binding route or the `active` lifecycle transition.
 
 ## Responsibility separation
 

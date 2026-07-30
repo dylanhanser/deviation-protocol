@@ -156,11 +156,15 @@ gameplay integration was activated. Structured player-character Phase 3 is now
 implemented and complete: P3-S1 through P3-S4 are complete, and the complete
 code candidate received independent read-only approval with no implementation
 finding remaining open. Minimum Run Core is implemented, independently finally
-approved, committed, and pushed as `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). It provides only the null-only,
-unpopulated binding seam and still rejects the reserved
-`run.bind-player-character/v1` operation. P4-S1 remains unstarted; no public
-Run or gameplay behavior is activated.
+  approved, committed, and pushed as `e821cd922b61868097667b12c2b64cf8089a9681`
+  (`feat(run): implement minimum run core`). That null-only seam is the
+  historical prerequisite baseline. P4-S1a is implemented at
+  `748003319ececa548b68b351746afbb2d54c66bb`, and P4-S1b is implemented and
+  pushed at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The completed P4-S1
+  boundary provides internal Run-owned binding only; the constructible Run
+  lifecycle remains `pre_first_turn`, the reserved public
+  `RunService.bind_player_character(...)` command remains rejected, and no
+  public Run or gameplay behavior is activated.
 
 ## Structured player-character Phase 3–5 boundaries
 
@@ -436,8 +440,8 @@ is absent, and no fake or development resolver or fake issuer is installed.
 
 API routes, frontend activation, Demo behavior, Provider behavior, Run
 Protocol integration, narrative integration, scenario integration, combat
-integration, and public gameplay activation remain deferred. Phase 4 has not
-started.
+integration, and public gameplay activation remain deferred. P4-S1 alone is
+complete; no broader Phase 4 completion is implied.
 
 ## Current composition roots and Provider boundaries
 

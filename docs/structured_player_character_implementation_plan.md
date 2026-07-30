@@ -37,10 +37,13 @@ complete, committed, and pushed at
 (`feat(player-character): complete canonical application service`). Minimum
 Run Core is implemented, independently finally approved, committed, and pushed
 at `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). Its binding seam is null-only and
-unpopulated, and `run.bind-player-character/v1` remains reserved and rejected.
-P4-S1 implementation has not started; Phases 4–7 remain otherwise
-unimplemented.**
+(`feat(run): implement minimum run core`). Its null-only seam is historical:
+P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb` and
+P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. P4-S1 is complete,
+internal-only, and publicly inactive. No P4-S2 objective is defined by
+repository authority. P5-S1 owned-read activation is the next canonical unit,
+but requires separate bounded implementation planning and independent review
+before code; Phases 4–7 otherwise remain unimplemented or deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -88,9 +91,11 @@ orchestration. P3-S1 through P3-S4 are implemented, complete, committed, and
 pushed. P4-G0 documentation authority is approved and closed. Its minimum Run
 core prerequisite is implemented, independently finally approved, committed,
 and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; its null-only
-binding seam remains unpopulated and rejected. P4-S1 and every later phase
-remain unimplemented and require their own accepted plan boundary,
-predecessor approval, and explicit authorization.
+binding seam was the historical pre-P4-S1 baseline. P4-S1a
+  (`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+  (`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) are complete; later units retain
+  their own accepted plan boundary, predecessor approval, and explicit
+  authorization.
 
 The ordered Phase 2 implementation slices introduced in section 24 were a
 separate amendment from the prior technical-freeze verdict. The section 31
@@ -243,7 +248,8 @@ decisions are current authority rather than unresolved inventory: the minimum
 Run core comes first; one character may occupy at most one active line while
 one line has one active character binding once bound; and Session participation
 uses a separate Run-owned record. The minimum Run core is implemented at
-`e821cd922b61868097667b12c2b64cf8089a9681`, while P4-S1 remains unimplemented.
+`e821cd922b61868097667b12c2b64cf8089a9681`; its historical seam was activated
+internally by completed P4-S1a and P4-S1b.
 
 ## 5. Historical baselines and pre-closure Phase 3 baseline
 
@@ -317,24 +323,30 @@ location, facts, clues, clocks, decisions, ending, evidence, and visit counters.
 `GameSession` carries `scenario_id` and `scenario_version`. The database stores
 those values on `game_sessions`; snapshots also carry scenario state.
 
-No current source model or persistence record defines `run_id`,
-`continuous_story_line_id`, `world_id`, `visit_id`, or `scenario_run_id`.
-`phase_visit_counts` is a counter, not a stable visit identity. Phase 3.3's Run
-design is approved but not implemented. Therefore:
+Minimum Run Core now defines and persists distinct `RunId` and
+`ContinuousStoryLineId` values through `CanonicalRun`, `RunService`, five
+Run-owned ORM/persistence families, migration `20260729_0005`, and normal
+production composition. Completed P4-S1a/P4-S1b activate the exact internal
+Run-owned character/reference binding seam in that composition. No current
+source model or persistence record defines `world_id`, `visit_id`, or
+`scenario_run_id`; `phase_visit_counts` is a counter, not a stable visit
+identity. The broader Phase 3.3 Run Protocol remains approved but not
+implemented. Therefore:
 
 - a `GameSession` must not be relabeled as a Run (`A`, `N`);
 - a scenario ID or version must not be treated as a world or visit ID (`A`);
-- same-story-line and later-world integration must be stop-gated on a real
-  Run-owned binding surface (`T`), whose minimum prerequisite is now frozen in
-  `docs/minimum_run_core_implementation_plan.md`;
+- same-story-line binding now uses the internal
+  `RunService.bind_player_character_internal` surface; scenario, world, and
+  later-world integration remains stop-gated on its owning future surfaces
+  (`T`);
 - that prerequisite uses distinct `RunId` and `ContinuousStoryLineId`
   carriers, with one Run permanently owning exactly one line (`A/T`);
 - each line has exactly one active character binding once bound, and one
   canonical character belongs to at most one active line (`A`);
 - trusted Session participation must use a separate Run-owned record and must
   not add Run/binding columns to `game_sessions` (`A/T`); and
-- the domain can define the character side of a typed binding before Run
-  integration, but cannot invent Run lifecycle or movement mechanics (`E`).
+- the implemented character side of the typed internal binding cannot invent
+  later Run lifecycle or movement mechanics (`E`).
 
 ### Request and action lifecycle
 
@@ -355,11 +367,16 @@ finalizing. The orchestrator and
 `src/deviation_protocol/infrastructure/repositories.py` use compare-and-swap
 job transitions. There is no `NarrativeJobService` symbol.
 
-These remain pattern evidence (`N`). Structured player-character Phase 1 now
-owns its typed operation/replay protocol, and Phase 2 owns the dedicated
-aggregate lock, revision history/current state, operation receipts,
-Repositories, and same-session UoW wiring. What remains absent is the trusted
-production application service that sequences those accepted authorities.
+These Session and narrative orchestrators remain pattern evidence (`N`).
+Structured player-character Phase 1 owns its typed operation/replay protocol,
+Phase 2 owns the dedicated aggregate lock, revision history/current state,
+operation receipts, Repositories, and same-session UoW wiring, and completed
+Phase 3 supplies the trusted `PlayerCharacterService` plus normal production
+composition for create, mutate, and `get_owned`. Minimum Run Core supplies its
+Run models, persistence, service, and composition; completed P4-S1 activates
+the separately named internal binding seam. Public character/Run routes, DTOs,
+dependency getters, and OpenAPI operations; frontend and Demo behavior;
+scenario/world execution; and the Run transition to `active` remain absent.
 
 ### Canonical state ownership
 
@@ -392,8 +409,12 @@ SQLAlchemy `AsyncSession` and `asyncmy`; there is no SQLite fallback.
 - `PlayerCharacterRevisionRow` (`player_character_revisions`);
 - `PlayerCharacterCurrentRow` (`player_character_current`);
 - `PlayerCharacterCreationReceiptRow` (`player_character_creation_receipts`);
-  and
-- `PlayerCharacterMutationReceiptRow` (`player_character_mutation_receipts`).
+- `PlayerCharacterMutationReceiptRow` (`player_character_mutation_receipts`);
+- `RunRevisionRow` (`run_revisions`);
+- `RunCurrentRow` (`run_current`);
+- `RunSessionParticipationRow` (`run_session_participations`);
+- `RunCreationReceiptRow` (`run_creation_receipts`); and
+- `RunMutationReceiptRow` (`run_mutation_receipts`).
 
 `SqlAlchemyUnitOfWork` in
 `src/deviation_protocol/infrastructure/unit_of_work.py` owns commit/rollback.
@@ -409,13 +430,18 @@ any Demo adapter needs explicit later scope and must preserve production domain
 invariants without turning deterministic Demo identities into production ID
 policy.
 
-The directly inspected Alembic chain is linear:
-`20260719_0001 -> 20260719_0002 -> 20260719_0003 -> 20260728_0004`. Revision
-`20260719_0001` has no parent, `20260719_0002` revises
-`20260719_0001`, `20260719_0003` revises `20260719_0002`, and
-`20260728_0004` revises `20260719_0003`. The relevant current ancestry is
-`20260719_0003 -> 20260728_0004`, with `20260728_0004` as the actual current
-head. `alembic/env.py` uses the same metadata and async MySQL URL.
+The directly inspected current Alembic chain is linear:
+`20260719_0001 -> 20260719_0002 -> 20260719_0003 -> 20260728_0004 ->
+20260729_0005`. Revision `20260719_0001` has no parent; each later revision
+directly revises its predecessor, including `20260729_0005` directly revising
+`20260728_0004`. Revision `20260729_0005` is the actual current linear head.
+It adds the five Run-owned families and already supplies the P4-S1 persistence
+representation: the nullable binding envelope on `run_revisions` and
+`run_current`, the unique non-NULL `run_current.active_player_character_id`
+backstop, the binding result/evidence form in `run_mutation_receipts`, and
+restrictive character-revision references from both Run state families and the
+mutation receipt. P4-S1b introduced no ORM or Alembic change.
+`alembic/env.py` uses the same metadata and async MySQL URL.
 `tests/integration/test_mysql_connection.py` asserts the exact current head,
 tables, columns, JSON types, foreign keys, and indexes.
 
@@ -505,10 +531,10 @@ disabled unless separately authorized.
 | Player character | `PlayerCharacterId`; permanent allocation ledger, current record, and immutable revisions | The production issuer supplies a validated canonical UUIDv4-based ID | Equality only by exact canonical ID |
 | Static character definition | `DefinitionId`, `character_definition_id` | Retained as content/template reference where separately relevant | Reuse never establishes character equality |
 | Session | String-valued `GameSession.session_id` with strict bounded request/DTO fields | Retained narrower identity plus a separate immutable Run-owned participation record | Never establishes character identity, Run selection, or controller authority |
-| Run | Implemented by Minimum Run Core | A distinct strict opaque `RunId` and one Run-owned canonical aggregate are implemented at `e821cd922b61868097667b12c2b64cf8089a9681`; its binding carrier remains null-only and unpopulated | Owns one line and later its binding transaction; never equals Session, line, character, controller, world, or operation identity |
-| Continuous story line | Implemented by Minimum Run Core | A distinct strict opaque `ContinuousStoryLineId` is permanently owned one-to-one by its Run; P4-S1 binding remains unimplemented | Once bound, one active character per line; one character belongs to at most one active line; historical non-active references do not count |
+| Run | Implemented by Minimum Run Core and P4-S1 | A distinct strict opaque `RunId` and one Run-owned canonical aggregate are implemented at `e821cd922b61868097667b12c2b64cf8089a9681`; P4-S1a/P4-S1b activate its internal binding carrier | Owns one line and its binding transaction; never equals Session, line, character, controller, world, or operation identity |
+| Continuous story line | Implemented by Minimum Run Core and P4-S1 | A distinct strict opaque `ContinuousStoryLineId` is permanently owned one-to-one by its Run; P4-S1 binding is internal-only | Once bound, one active character per line; one character belongs to at most one active line; historical non-active references do not count |
 | World / scenario / visit | Scenario only; no world or visit identity | Run-owned references when implemented | Context/provenance only, never character identity |
-| Applicable character reference | `ApplicableCharacterReference` in the accepted Phase 1 domain | Phase 4 later binds the exact typed reference through the Run-owned aggregate | Exact match; distinct from current revision and every other version |
+| Applicable character reference | `ApplicableCharacterReference` in the accepted Phase 1 domain | Completed P4-S1 stores the exact typed reference through `RunService.bind_player_character_internal`; the binding remains internal-only and `RunService.bind_player_character(...)` remains rejected | Exact match; distinct from current revision and every other version |
 | Stable logical NPC | Scenario-local memory subject key only | Existing key retained; future cross-scenario identity remains deferred | Never runtime NPC ID, definition, name, or player character |
 | Runtime NPC | `NpcState.npc_id` | Unchanged | Session/scenario local only |
 | Client operation | Session `client_request_id`; turn and job IDs | Dedicated creation operation under a controller-binding scope, or a dedicated mutation operation under a player-character scope | Idempotency only, never subject identity; creation and mutation scopes are not interchangeable |
@@ -1042,8 +1068,8 @@ owning one line; current state and immutable revisions with monotonic CAS;
 separate trusted Session participation; a Run application transaction owner;
 and an all-null future character-binding envelope. It was implemented,
 independently finally approved, committed, and pushed at
-`e821cd922b61868097667b12c2b64cf8089a9681`; the envelope remains unpopulated
-and the reserved operation remains rejected. P4-S1 remains unimplemented.
+`e821cd922b61868097667b12c2b64cf8089a9681`; its all-null envelope is the
+historical baseline before P4-S1a/P4-S1b activated the internal binding.
 `GameSession` must not masquerade as Run, and no Run or binding column may be
 added to `game_sessions`.
 
@@ -2428,8 +2454,9 @@ owned read and detached projection, and P3-S4 normal production composition
 are implemented. P3-S1 through P3-S4 are complete. The complete Phase 3 code
 candidate received independent read-only approval, and no implementation
 finding remains open. Phase 3 is complete, committed, and pushed at
-`cafb12272e703e8751c78bb6852cec90d7d7ec8d`. Phase 4 implementation has not
-started; P4-G0 documentation authority is approved and closed.**
+`cafb12272e703e8751c78bb6852cec90d7d7ec8d`. P4-G0 documentation authority is
+approved and closed; P4-S1 is subsequently complete, without implying broader
+Phase 4 completion.**
 
 The repository-authoritative Phase 3 order is:
 
@@ -3447,9 +3474,10 @@ deferred.
 ### Phase 4 — Run and continuous-story-line binding
 
 Minimum Run Core is implemented, independently finally approved, committed,
-and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; its binding seam
-remains null-only and unpopulated, with the reserved operation rejected.
-P4-S1 implementation has not started.
+and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; its null-only seam is
+historical. P4-S1a is complete at `748003319ececa548b68b351746afbb2d54c66bb`
+and P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. P4-S1 is complete;
+the internal binding remains publicly inactive.
 
 #### P4-G0 — Minimum Run-core authority and implementation-plan freeze
 
@@ -3480,9 +3508,10 @@ was closed before Minimum Run Core implementation and did not itself authorize
 that implementation. Present state: Minimum Run Core is implemented,
 independently approved, committed, and pushed at
 `e821cd922b61868097667b12c2b64cf8089a9681`; its Run-to-Player-Character
-binding carrier remains null-only and unpopulated, and
-`run.bind-player-character/v1` remains reserved and rejected. P4-S1 remains
-unimplemented, with no public Run or gameplay behavior active.
+binding carrier was the null-only historical baseline. P4-S1a and P4-S1b
+complete its internal activation, while the reserved public
+`RunService.bind_player_character(...)` command remains rejected and no public
+Run or gameplay behavior is active.
 
 #### Minimum Phase 3.3 Run-core prerequisite
 
@@ -3500,9 +3529,10 @@ character binding or implement the full Run Protocol.
 #### P4-S1 — Canonical character and applicable-reference binding
 
 P4-S1 has the completed minimum Run-core baseline at
-`e821cd922b61868097667b12c2b64cf8089a9681`, but remains unstarted pending its
-[exact bounded implementation candidate `docs/structured_player_character_p4_s1_implementation_plan.md`](structured_player_character_p4_s1_implementation_plan.md),
-independent review, and separate implementation authority.
+`e821cd922b61868097667b12c2b64cf8089a9681` and is complete through P4-S1a
+(`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+(`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`). No concrete defect requires
+reopening it.
 
 Scope:
 
@@ -3553,6 +3583,16 @@ composition:
 | P5-S1 — Owned-read activation | Thin authenticated public read over the accepted detached projection | P3-S3 and P3-S4 | Create, mutation, UI |
 | P5-S2 — Creation activation | Thin authenticated creation/replay route | P3-S1, P3-S4, and accepted public contract | Mutation, frontend, Demo, Run behavior |
 | P5-S3 — Admitted controller-mutation activation | Expose only independently authorized mutation kinds | P3-S2 and P3-S4; Phase 4 where Run binding is required | Final death without owner, unavailable reactivation/return, frontend |
+
+No repository authority defines a P4-S2 objective. P5-S1 is the next canonical
+unit. Its existing authority is only a thin authenticated public read over the
+accepted detached Player Character projection; it is not implementation-ready.
+It requires a separate bounded implementation-plan document and independent
+review before code changes. That later planning task needs no user product or
+architecture decision merely to begin; it must not decide its endpoint/path
+carrier, DTO placement, safe not-found/non-enumeration classification,
+dependency/transport-principal boundary, budgets, OpenAPI contract, or
+acceptance-to-test allocation without separate authority.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3666,13 +3706,14 @@ independent is more important than these filenames.
 | `tests/integration/conftest.py` | Slice 4 only: add owned cleanup for the six Phase 2 families in restrictive-FK-safe order | Isolated integration cleanup | Phase 2 MySQL integration tests |
 | `src/deviation_protocol/api/main.py` and `src/deviation_protocol/api/dependencies.py` | P3-S4 production composition only; Phase 5 later owns narrow public routes | Expose the canonical service without activating HTTP behavior | Composition tests |
 | `tests/unit/test_session_service.py` and relevant API integration tests | Prove existing Session identity/projection is unchanged | Compatibility | Regression tests |
-| Run-owned paths budgeted by `docs/minimum_run_core_implementation_plan.md` | Minimum prerequisite first; P4-S1 later activates the exact binding seam | Same-line/later-world exact-reference continuity and both active cardinality directions | Run service/integration/contract tests |
+| Run-owned paths implemented under `docs/minimum_run_core_implementation_plan.md` and P4-S1 | Minimum prerequisite and P4-S1a/P4-S1b are complete; `RunService.bind_player_character_internal` activates the exact internal binding seam while the reserved public command remains rejected | Same-line/later-world exact-reference continuity and both active cardinality directions | Run service/integration/contract tests |
 | future adjacent-system owning modules, not nameable today | Phase 6 only: accept explicit logical subject refs | Memory/NPC/consequence correctness | Compatibility/integration tests |
 
 The Phase 3-specific rows in both tables are implemented and preserve the
 independently approved boundary. P4-G0 now delegates the exact minimum
-Run-core path budgets to its owning plan. The prerequisite, Phase 4, and all
-later phases remain unimplemented.
+Run-core path budgets to its owning plan. The prerequisite and P4-S1 are
+implemented; broader Phase 4 lifecycle, scenario, and world integration and all
+Phase 5–7 work remain unimplemented or deferred.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -4024,15 +4065,17 @@ authorization, privacy, transaction, composition, or material test-coverage
 finding remains open. The complete milestone was committed and pushed at
 `cafb12272e703e8751c78bb6852cec90d7d7ec8d`
 (`feat(player-character): complete canonical application service`). Phase 3 is
-complete. Phase 4 implementation has not started. P4-G0 later received
+complete. P4-G0 later received
 `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`; its documentation
 authority is approved and closed. Historical pre-push wording that described
 that P4-G0 milestone as local is superseded: Minimum Run Core is now
 implemented, independently approved, committed, and pushed at
 `e821cd922b61868097667b12c2b64cf8089a9681`. Its Run-to-Player-Character
-binding carrier remains null-only and unpopulated; `run.bind-player-character/v1`
-remains reserved and rejected; P4-S1 remains unimplemented; and no public Run
-or gameplay behavior is active.
+binding carrier was null-only and unpopulated at that historical baseline.
+P4-S1a (`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
+(`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) later completed internal binding;
+the reserved public command remains rejected and no public Run or gameplay
+behavior is active.
 
 The substantive Phase 2 technical prerequisites in section 20 were
 historically accepted and frozen under
@@ -4088,8 +4131,9 @@ deployment, or work outside a separately authorized phase.
   authority is approved and closed. This is historical pre-implementation
   review context: the P4-G0 documentation milestone was then local pending a
   user push. Minimum Run Core is now implemented, independently approved,
-  committed, and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; P4-S1,
-  Phase 5, and all later implementation remain unstarted. Nothing in this
+committed, and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; P4-S1 is
+subsequently complete, while Phase 5 and later implementation remain unstarted
+or deferred. Nothing in this
   entry is implementation authorization.
 - 2026-07-29: The completed P3-S2 implementation-readiness review reported
   three blockers: no operative service/path/acceptance boundary, indeterminate

@@ -2,15 +2,17 @@
 
 ## 1. Status
 
-Status: **Minimum Run Core implemented, independently finally approved,
-committed, and pushed; P4-S1 remains unstarted.**
+Status: **Minimum Run Core is historically complete; P4-S1a and P4-S1b are
+implemented, and P4-S1 closeout/status synchronization is complete.**
 
 The prerequisite was implemented, independently finally approved, committed,
 and pushed as `e821cd922b61868097667b12c2b64cf8089a9681`
-(`feat(run): implement minimum run core`). The completed baseline retains the
-all-null, unpopulated binding seam and rejects the reserved
-`run.bind-player-character/v1` operation. P4-S1 is the next unstarted work;
-no public Run behavior is activated.
+(`feat(run): implement minimum run core`). Its all-null seam was the historical
+baseline. P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb`
+and P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`; the completed
+binding remains internal-only and the reserved public
+`RunService.bind_player_character(...)` command remains rejected. No public
+Run behavior is activated.
 
 This document freezes the smallest Phase 3.3 Run-owned prerequisite required
 before Structured Player Character Phase 4 can begin. It is an implementation
@@ -19,9 +21,9 @@ player-character binding, any other Run Protocol feature, or any public
 gameplay behavior.
 
 Structured Player Character Phase 3 is complete and pushed. The minimum Run
-core is its completed P4-S1 prerequisite. Phase 4 implementation remains
-unstarted; this completed prerequisite does not itself bind a character or
-activate a public surface.
+core was the completed P4-S1 prerequisite. This plan's completed prerequisite
+did not itself bind a character or activate a public surface; P4-S1 later
+completed the internal binding boundary without public activation.
 
 ## 2. Authority and ownership
 
@@ -60,7 +62,7 @@ NPC relationship and residence behavior.
 
 ## 3. Motivation and Phase 4 dependency
 
-P4-S1 must eventually bind one canonical player character and its exact
+P4-S1 was required to bind one canonical player character and its exact
 `ApplicableCharacterReference` to one Run-owned continuous story line. The
 binding must survive scenario changes and Run-authorized later-world
 transitions in that same line, and conflicting active bindings must fail
@@ -1022,8 +1024,8 @@ The prerequisite is complete only when implemented code and evidence prove:
 11. a single then-current Alembic head and complete required verification;
 12. synchronized implementation documentation and fresh independent review;
     and
-13. truthful status that only the minimum prerequisite is implemented while
-    P4-S1 and the full Run Protocol remain unimplemented.
+13. truthful status at the MRC closeout that only the minimum prerequisite was
+     implemented while P4-S1 and the full Run Protocol remained unimplemented.
 
 ## 18. Deferred work
 
