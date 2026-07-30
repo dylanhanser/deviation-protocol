@@ -6,6 +6,28 @@ deployment, a browser application, or a desktop adapter. The default principal
 is still the fixed `demo-player`/`demo-dev-only` identity and is unsafe for an
 Internet-facing deployment.
 
+## Owned Player Character read
+
+The normal application exposes `GET /v1/player-characters/{player_character_id}`
+for one controller-owned canonical Player Character. The required opaque path
+carrier is ASCII, 1–128 characters, and matches
+`^[A-Za-z0-9][A-Za-z0-9_.:-]*$`; it has no request body or query authority.
+Success returns only the detached `PlayerCharacterSelfProjection`: nested
+`player_character_id`, closed `contract_version`, nested `record_revision`, and
+closed `lifecycle`. No profile, controller binding, provenance, receipt, Run,
+ORM, repository, or persistence detail is public.
+
+The trusted principal comes only from the application dependency and the
+existing configured controller resolver plus owned-read service remains the
+ownership authority. Absent, foreign-owned, unmapped, noncanonical, and
+otherwise unavailable targets return the identical 404 `ErrorResponse` with
+`PLAYER_CHARACTER_NOT_FOUND` and `Player character was not found`. Invalid path
+syntax returns the existing sanitized 422 envelope. Integrity, repository,
+composition, and unexpected failures return only the sanitized 500 envelope.
+The current fixed development principal is not production authentication and
+does not make the normal application Internet-ready. The independent Demo does
+not register this route.
+
 ## Public scenario discovery
 
 `GET /v1/scenarios` returns a bounded catalog sorted by `scenario_id`. Only a

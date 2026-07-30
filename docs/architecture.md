@@ -194,6 +194,19 @@ Run and continuous-story-line binding. Phase 5 retains public projection and
 narrow authenticated activation. API routes, frontend and Demo parity are not
 ordinary Phase 3 composition, and Run binding is not moved into it.
 
+The P5-S1 scope, represented by the exact candidate or commit identified by
+applicable exact-candidate review evidence and Git history, is limited to
+`GET /v1/player-characters/{player_character_id}`. In the normal application,
+the route receives the development-only trusted-principal dependency, delegates
+unchanged ownership enforcement and strict reconstruction to
+`PlayerCharacterService.get_owned`, and returns its detached
+`PlayerCharacterSelfProjection`. The route is registered only when normal
+composition supplies that service; the independent Demo composition supplies no
+Player Character service and does not register the path. Missing, foreign, or
+unmapped access converges on the same public 404 envelope. This does not make
+the fixed development principal production authentication or permit Internet
+deployment; `AUTH-001` remains mandatory.
+
 P3-S1 adds only an injectable application service boundary over the accepted
 Phase 1 and Phase 2 authorities. Typed `RequestPrincipal`,
 `PlayerCharacterOperationId`, and `CharacterCreationCommand` construction owns
@@ -438,10 +451,11 @@ Composition itself performs no UnitOfWork, SQL, ID issuance, or mutation.
 Supported startup fails closed when required controller-binding configuration
 is absent, and no fake or development resolver or fake issuer is installed.
 
-API routes, frontend activation, Demo behavior, Provider behavior, Run
-Protocol integration, narrative integration, scenario integration, combat
-integration, and public gameplay activation remain deferred. P4-S1 alone is
-complete; no broader Phase 4 completion is implied.
+Except for P5-S1's narrow owned-read API activation, Player Character API
+activation beyond P5-S1, frontend activation, Demo behavior, Provider behavior,
+Run Protocol integration, narrative integration, scenario integration, combat
+integration, and broader public gameplay activation remain deferred. P4-S1
+alone is complete; no broader Phase 4 completion is implied.
 
 ## Current composition roots and Provider boundaries
 

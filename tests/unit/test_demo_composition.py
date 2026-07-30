@@ -43,6 +43,17 @@ from deviation_protocol.infrastructure.deterministic_narrative import (
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 
 
+def test_demo_composition_does_not_register_player_character_read() -> None:
+    runtime = build_demo_runtime()
+    app = create_app(services=runtime.services)
+
+    assert runtime.services.player_character_service is None
+    assert "/v1/player-characters/{player_character_id}" not in {
+        route.path for route in app.routes
+    }
+    assert "/v1/player-characters/{player_character_id}" not in app.openapi()["paths"]
+
+
 class CountingProvider(DeterministicDemoNarrativeProvider):
     def __init__(self, events: list[str] | None = None) -> None:
         self.calls = 0

@@ -11,6 +11,7 @@ from fastapi import Depends, FastAPI, Path, Response, status
 from deviation_protocol.api.dependencies import (
     ApiServices,
     get_current_principal,
+    get_player_character_service,
     get_session_service,
     get_turn_orchestrator,
 )
@@ -22,7 +23,11 @@ from deviation_protocol.api.schemas import (
     ErrorResponse,
     NarrativeRequestStatusResponse,
 )
+from deviation_protocol.application.errors import PlayerCharacterNotFoundError
 from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.player_character_projection import (
+    PlayerCharacterSelfProjection,
+)
 from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
 )
@@ -55,7 +60,10 @@ from deviation_protocol.infrastructure.deepseek_narrative import (
     DeepSeekSettings,
 )
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
-from deviation_protocol.domain.player_character import AuthoritySourceRef
+from deviation_protocol.domain.player_character import (
+    AuthoritySourceRef,
+    PlayerCharacterId,
+)
 from deviation_protocol.domain.run import RunAuthoritySourceRef
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
@@ -92,6 +100,14 @@ RequestPathId = Annotated[
     Path(
         min_length=1,
         max_length=64,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    ),
+]
+PlayerCharacterPathId = Annotated[
+    str,
+    Path(
+        min_length=1,
+        max_length=128,
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
     ),
 ]
@@ -252,6 +268,27 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok", "phase": "3.0"}
+
+    if services is None or services.player_character_service is not None:
+
+        @app.get(
+            "/v1/player-characters/{player_character_id}",
+            response_model=PlayerCharacterSelfProjection,
+            responses=_public_error_responses(404, 422, 500),
+            tags=["player-characters"],
+        )
+        async def get_owned_player_character(
+            player_character_id: PlayerCharacterPathId,
+            principal: RequestPrincipal = Depends(get_current_principal),
+            service: PlayerCharacterService = Depends(get_player_character_service),
+        ) -> PlayerCharacterSelfProjection:
+            projection = await service.get_owned(
+                principal,
+                player_character_id=PlayerCharacterId(value=player_character_id),
+            )
+            if projection is None:
+                raise PlayerCharacterNotFoundError(player_character_id)
+            return projection
 
     @app.get(
         "/v1/scenarios",

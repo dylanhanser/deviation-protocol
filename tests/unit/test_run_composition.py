@@ -307,7 +307,7 @@ def test_composed_binding_namespace_stays_reserved_without_uow_entry() -> None:
     assert uow_calls == 0
 
 
-def test_run_composition_activates_no_public_route() -> None:
+def test_run_composition_activates_only_the_owned_player_character_read() -> None:
     app = main.create_app()
     public_paths = {
         route.path
@@ -317,6 +317,7 @@ def test_run_composition_activates_no_public_route() -> None:
 
     assert public_paths == {
         "/health",
+        "/v1/player-characters/{player_character_id}",
         "/v1/scenarios",
         "/v1/sessions",
         "/v1/sessions/{session_id}",

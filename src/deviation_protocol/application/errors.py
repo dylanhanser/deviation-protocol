@@ -15,6 +15,10 @@ class SessionNotFoundError(TurnApplicationError):
     code = "SESSION_NOT_FOUND"
 
 
+class PlayerCharacterNotFoundError(TurnApplicationError):
+    code = "PLAYER_CHARACTER_NOT_FOUND"
+
+
 class SnapshotNotFoundError(TurnApplicationError):
     code = "SNAPSHOT_NOT_FOUND"
 

@@ -41,9 +41,10 @@ at `e821cd922b61868097667b12c2b64cf8089a9681`
 P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb` and
 P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. P4-S1 is complete,
 internal-only, and publicly inactive. No P4-S2 objective is defined by
-repository authority. P5-S1 owned-read activation is the next canonical unit,
-but requires separate bounded implementation planning and independent review
-before code; Phases 4–7 otherwise remain unimplemented or deferred.**
+repository authority. P5-S1 owned-read activation is represented by the exact
+candidate or commit identified by applicable exact-candidate review evidence
+and Git history; it activates only the approved single-resource read and does not complete Phase
+5. Phases 4–7 otherwise remain unimplemented or deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -374,9 +375,13 @@ operation receipts, Repositories, and same-session UoW wiring, and completed
 Phase 3 supplies the trusted `PlayerCharacterService` plus normal production
 composition for create, mutate, and `get_owned`. Minimum Run Core supplies its
 Run models, persistence, service, and composition; completed P4-S1 activates
-the separately named internal binding seam. Public character/Run routes, DTOs,
-dependency getters, and OpenAPI operations; frontend and Demo behavior;
-scenario/world execution; and the Run transition to `active` remain absent.
+the separately named internal binding seam. Except for P5-S1's one owned-read
+Player Character route, configured service dependency getter, public exposure
+of the existing `PlayerCharacterSelfProjection` DTO, and corresponding OpenAPI
+operation, all other Player Character public routes, Run binding routes,
+creation, mutation, listing, search, and administration surfaces; frontend and
+Demo behavior; scenario/world execution; and the Run transition to `active`
+remain absent.
 
 ### Canonical state ownership
 
@@ -3584,15 +3589,11 @@ composition:
 | P5-S2 — Creation activation | Thin authenticated creation/replay route | P3-S1, P3-S4, and accepted public contract | Mutation, frontend, Demo, Run behavior |
 | P5-S3 — Admitted controller-mutation activation | Expose only independently authorized mutation kinds | P3-S2 and P3-S4; Phase 4 where Run binding is required | Final death without owner, unavailable reactivation/return, frontend |
 
-No repository authority defines a P4-S2 objective. P5-S1 is the next canonical
-unit. Its existing authority is only a thin authenticated public read over the
-accepted detached Player Character projection; it is not implementation-ready.
-It requires a separate bounded implementation-plan document and independent
-review before code changes. That later planning task needs no user product or
-architecture decision merely to begin; it must not decide its endpoint/path
-carrier, DTO placement, safe not-found/non-enumeration classification,
-dependency/transport-principal boundary, budgets, OpenAPI contract, or
-acceptance-to-test allocation without separate authority.
+No repository authority defines a P4-S2 objective. P5-S1's approved bounded
+plan defines the exact candidate or commit identified by applicable
+exact-candidate review evidence and Git history. It activates only a thin authenticated public read
+over the accepted detached Player Character projection; it does not activate
+creation, mutation, UI, Demo, Run behavior, or broader Phase 5 work.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3712,8 +3713,11 @@ independent is more important than these filenames.
 The Phase 3-specific rows in both tables are implemented and preserve the
 independently approved boundary. P4-G0 now delegates the exact minimum
 Run-core path budgets to its owning plan. The prerequisite and P4-S1 are
-implemented; broader Phase 4 lifecycle, scenario, and world integration and all
-Phase 5–7 work remain unimplemented or deferred.
+implemented; broader Phase 4 lifecycle, scenario, and world integration remain
+deferred. P5-S1 is the sole Phase 5 implementation slice represented by the
+exact candidate or commit identified by applicable exact-candidate review
+evidence and Git history; all remaining Phase 5 work and all Phase 6–7 work
+remain unimplemented or deferred.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 

@@ -2,10 +2,14 @@
 
 ## 1. Status and purpose
 
-Status: **Approved for implementation after a fresh independent read-only review
-returned the required successful verdict for the exact pre-record candidate
-(SHA-256 `a5f66316265fcf996f8aa683595c41e710bc849b09be1128d63bc02d611fe986`).
-Implementation has not started and remains separately authorized.**
+Status: **The approved scope is represented by the exact P5-S1 candidate or
+commit identified by applicable exact-candidate review evidence and Git history.
+Acceptance
+must be established by the applicable exact-candidate review record; repository
+integration and publication state must be established from Git history.
+P5-S1 does not complete Phase 5. The pre-implementation plan review returned
+the required successful verdict for the exact pre-record candidate
+(SHA-256 `a5f66316265fcf996f8aa683595c41e710bc849b09be1128d63bc02d611fe986`).**
 
 This document defines the smallest coherent P5-S1 unit: expose one
 authenticated-controller read of one already committed canonical Player

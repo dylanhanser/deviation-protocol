@@ -48,3 +48,10 @@ def get_session_service(request: Request) -> SessionService:
 
 def get_turn_orchestrator(request: Request) -> TurnOrchestrator:
     return get_api_services(request).turn_orchestrator
+
+
+def get_player_character_service(request: Request) -> PlayerCharacterService:
+    service = get_api_services(request).player_character_service
+    if service is None:
+        raise RuntimeError("Player Character service is not configured")
+    return service

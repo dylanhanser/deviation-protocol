@@ -13,11 +13,11 @@ documents.
 - **Planned phase:** assigned to a future phase whose implementation has not
   started.
 
-## Current P4-S1 completion baseline
+## P4-S1 completion baseline
 
 - Exact completed boundary: [P4-S1 implementation plan](docs/structured_player_character_p4_s1_implementation_plan.md).
 - Branch: `main`
-- Current local `origin/main` and `HEAD`:
+- P4-S1b implementation commit:
   `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`
 - Baseline subject: `feat(player-character): implement P4-S1b run binding`
 - Historical pre-closure Phase 3 baseline:
@@ -328,8 +328,10 @@ stages:
      `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. No concrete defect requires
      reopening P4-S1.
 5. **Phase 5 — Public projection and narrow boundary integration: deferred**
-   - P5-S1 owned-read activation is the next canonical unit and requires a
-     separate bounded implementation plan and independent review before code;
+   - P5-S1 owned-read activation is represented by the exact candidate or
+     commit identified by applicable exact-candidate review evidence and Git
+     history; it exposes only the approved owned single-resource read and does not complete
+     Phase 5;
    - P5-S2 creation activation; and
    - P5-S3 activation of only independently admitted controller mutations.
 
@@ -439,8 +441,9 @@ UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
 required controller bindings are absent; no fake or development resolver or
 fake issuer is installed.
 
-API routes, frontend activation, Demo behavior, Provider behavior, broader Run
-Protocol and lifecycle integration, narrative integration, scenario and world
+Player Character API routes beyond P5-S1's sole narrow owned-read activation,
+frontend activation, Demo behavior, Provider behavior, broader Run Protocol
+and lifecycle integration, narrative integration, scenario and world
 integration, combat integration, content integration, public binding, and
 player-visible gameplay activation remain deferred. The internal Run-owned
 continuous-story-line binding is implemented only through P4-S1.
@@ -560,8 +563,9 @@ The canonical decision is
 ## Deferred
 
 - Full Run Protocol behavior beyond the minimum prerequisite; Phase 3.4 NPC
-  residence; structured-character API/frontend/Demo activation; Provider,
-  narrative, scenario, combat, and public gameplay integration.
+  residence; structured-character API activation beyond the sole narrow P5-S1
+  owned-read API exception; frontend and Demo activation; Provider, narrative,
+  scenario, combat, and public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
   progression, and priority-injection details.
 - Exact Phase 3.3 parameter values, serialization, and compatibility policy.

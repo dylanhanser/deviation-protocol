@@ -11,6 +11,7 @@ from deviation_protocol.application.errors import (
     IdempotencyConflictError,
     InvalidCharacterDefinitionError,
     InvalidScenarioDefinitionError,
+    PlayerCharacterNotFoundError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
     SnapshotInvalidError,
@@ -52,6 +53,16 @@ def install_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(SessionNotFoundError)
     async def not_found_handler(_: Request, __: SessionNotFoundError) -> JSONResponse:
         return error_response(404, "SESSION_NOT_FOUND", "Session was not found")
+
+    @app.exception_handler(PlayerCharacterNotFoundError)
+    async def player_character_not_found_handler(
+        _: Request, __: PlayerCharacterNotFoundError
+    ) -> JSONResponse:
+        return error_response(
+            404,
+            "PLAYER_CHARACTER_NOT_FOUND",
+            "Player character was not found",
+        )
 
     @app.exception_handler(NarrativeRequestNotFoundError)
     async def narrative_request_not_found_handler(

@@ -760,6 +760,18 @@ used as unbounded path material.
 
 ## 25. Downstream implementation obligations
 
+### P5-S1 implementation-candidate status
+
+The P5-S1 scope represented by the exact candidate or commit identified by
+applicable exact-candidate review evidence and Git history activates only the
+controller-owned detached read at
+`GET /v1/player-characters/{player_character_id}`. It does not
+alter this contract's identity, lifecycle, canonical validation, privacy,
+Run-binding, or mutation rules. Acceptance must be established by the
+applicable exact-candidate review record, and repository integration and
+publication state must be established from Git history. It must not be
+represented as a completed Phase 5 or production-authentication milestone.
+
 Before any runtime implementation is accepted, the owning implementation
 specification MUST define and verify:
 
