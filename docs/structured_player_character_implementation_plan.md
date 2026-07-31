@@ -41,10 +41,17 @@ at `e821cd922b61868097667b12c2b64cf8089a9681`
 P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb` and
 P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. P4-S1 is complete,
 internal-only, and publicly inactive. No P4-S2 objective is defined by
-repository authority. P5-S1 owned-read activation is represented by the exact
-candidate or commit identified by applicable exact-candidate review evidence
-and Git history; it activates only the approved single-resource read and does not complete Phase
-5. Phases 4–7 otherwise remain unimplemented or deferred.**
+repository authority. P5-S1 owned-read activation is completed and published
+at `5955c47eac07429107b93ef85da6a055bd2044ef`
+(`feat(player-character): activate owned-read API`); it activates only the
+approved single-resource read and does not complete Phase 5. The P5-S2 public
+creation/replay contract is frozen and published at
+`245caff3903666fcd2dd9a318785f323117deb24`
+(`docs(player-character): define P5-S2 public contract`). P5-S2 implementation
+is planned by the dedicated
+[P5-S2 implementation plan](structured_player_character_p5_s2_implementation_plan.md)
+but remains unimplemented and unactivated. P5-S3 and Phases 6–7 remain
+deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -3589,11 +3596,16 @@ composition:
 | P5-S2 — Creation activation | Thin authenticated creation/replay route | P3-S1, P3-S4, and accepted public contract | Mutation, frontend, Demo, Run behavior |
 | P5-S3 — Admitted controller-mutation activation | Expose only independently authorized mutation kinds | P3-S2 and P3-S4; Phase 4 where Run binding is required | Final death without owner, unavailable reactivation/return, frontend |
 
-No repository authority defines a P4-S2 objective. P5-S1's approved bounded
-plan defines the exact candidate or commit identified by applicable
-exact-candidate review evidence and Git history. It activates only a thin authenticated public read
-over the accepted detached Player Character projection; it does not activate
-creation, mutation, UI, Demo, Run behavior, or broader Phase 5 work.
+No repository authority defines a P4-S2 objective. P5-S1 is completed and
+published at `5955c47eac07429107b93ef85da6a055bd2044ef`. It activates only a
+thin authenticated public read over the accepted detached Player Character
+projection. The P5-S2 public creation/replay contract is frozen and published
+at `245caff3903666fcd2dd9a318785f323117deb24`; its exact later implementation
+is bounded by the dedicated
+[P5-S2 implementation plan](structured_player_character_p5_s2_implementation_plan.md).
+P5-S2 is not implemented or activated by that planning candidate. Creation,
+P5-S3 mutation, UI, Demo, Run behavior, and broader Phase 5 work remain
+inactive or deferred.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3714,10 +3726,11 @@ The Phase 3-specific rows in both tables are implemented and preserve the
 independently approved boundary. P4-G0 now delegates the exact minimum
 Run-core path budgets to its owning plan. The prerequisite and P4-S1 are
 implemented; broader Phase 4 lifecycle, scenario, and world integration remain
-deferred. P5-S1 is the sole Phase 5 implementation slice represented by the
-exact candidate or commit identified by applicable exact-candidate review
-evidence and Git history; all remaining Phase 5 work and all Phase 6–7 work
-remain unimplemented or deferred.
+deferred. P5-S1 is the sole completed and published Phase 5 implementation
+slice. P5-S2 has a frozen, published public contract and a dedicated
+implementation-plan candidate, but its code and runtime activation remain
+deferred pending the plan's approval and publication gates. P5-S3 and all
+Phase 6–7 work remain unimplemented or deferred.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -4135,10 +4148,10 @@ deployment, or work outside a separately authorized phase.
   authority is approved and closed. This is historical pre-implementation
   review context: the P4-G0 documentation milestone was then local pending a
   user push. Minimum Run Core is now implemented, independently approved,
-committed, and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; P4-S1 is
-subsequently complete, while Phase 5 and later implementation remain unstarted
-or deferred. Nothing in this
-  entry is implementation authorization.
+ committed, and pushed at `e821cd922b61868097667b12c2b64cf8089a9681`; P4-S1 is
+ subsequently complete. At that historical review point, Phase 5 and later
+ implementation were unstarted or deferred; section 1 records the superseding
+ P5-S1/P5-S2 status. Nothing in this entry is implementation authorization.
 - 2026-07-29: The completed P3-S2 implementation-readiness review reported
   three blockers: no operative service/path/acceptance boundary, indeterminate
   CAS-loss and mutation-receipt uniqueness-conflict behavior, and operative

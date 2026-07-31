@@ -59,10 +59,21 @@ documents.
   lifecycle remains `pre_first_turn`, and the reserved public
   `RunService.bind_player_character(...)` command remains rejected.
 - Except for completed P4-S1, Phase 4 work remains unimplemented or deferred.
-  API routes,
+  No repository authority defines a P4-S2 objective. API routes,
   frontend activation, Demo behavior, Provider behavior, full Run Protocol,
   narrative integration, scenario integration, combat integration, and public
   gameplay activation remain unimplemented or deferred as assigned.
+- P5-S1 owned-read API activation is completed and published at
+  `5955c47eac07429107b93ef85da6a055bd2044ef`
+  (`feat(player-character): activate owned-read API`). It remains the only
+  activated Player Character API surface.
+- The P5-S2 creation/replay public contract is frozen and published at
+  `245caff3903666fcd2dd9a318785f323117deb24`
+  (`docs(player-character): define P5-S2 public contract`). Its implementation
+  is bounded by the dedicated
+  [P5-S2 implementation plan](docs/structured_player_character_p5_s2_implementation_plan.md),
+  which does not implement or activate P5-S2. P5-S3 and later work remain
+  deferred.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -327,13 +338,17 @@ stages:
    - P4-S1a is `748003319ececa548b68b351746afbb2d54c66bb`; P4-S1b is
      `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. No concrete defect requires
      reopening P4-S1.
-5. **Phase 5 — Public projection and narrow boundary integration: deferred**
-   - P5-S1 owned-read activation is represented by the exact candidate or
-     commit identified by applicable exact-candidate review evidence and Git
-     history; it exposes only the approved owned single-resource read and does not complete
-     Phase 5;
-   - P5-S2 creation activation; and
-   - P5-S3 activation of only independently admitted controller mutations.
+5. **Phase 5 — Public projection and narrow boundary integration: partially implemented**
+   - P5-S1 owned-read activation is completed and published at
+     `5955c47eac07429107b93ef85da6a055bd2044ef`; it exposes only the approved
+     owned single-resource read and does not complete Phase 5;
+   - P5-S2's public creation/replay contract is frozen and published at
+     `245caff3903666fcd2dd9a318785f323117deb24`, and its unimplemented,
+     unactivated code slice is bounded by the
+     [P5-S2 implementation plan](docs/structured_player_character_p5_s2_implementation_plan.md);
+     and
+   - P5-S3 activation of only independently admitted controller mutations
+     remains deferred.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -441,12 +456,16 @@ UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
 required controller bindings are absent; no fake or development resolver or
 fake issuer is installed.
 
-Player Character API routes beyond P5-S1's sole narrow owned-read activation,
-frontend activation, Demo behavior, Provider behavior, broader Run Protocol
-and lifecycle integration, narrative integration, scenario and world
+P5-S1's sole narrow owned-read is the only activated Player Character API
+surface. P5-S2 has a frozen, published public contract and an
+implementation-plan candidate but remains unimplemented and unactivated.
+P5-S3, frontend activation, Demo behavior, Provider behavior, broader Run
+Protocol and lifecycle integration, narrative integration, scenario and world
 integration, combat integration, content integration, public binding, and
 player-visible gameplay activation remain deferred. The internal Run-owned
-continuous-story-line binding is implemented only through P4-S1.
+continuous-story-line binding is implemented only through P4-S1. DB-001,
+schema, migrations, dependencies, persistence behavior, and transaction
+behavior remain unchanged.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
@@ -563,9 +582,10 @@ The canonical decision is
 ## Deferred
 
 - Full Run Protocol behavior beyond the minimum prerequisite; Phase 3.4 NPC
-  residence; structured-character API activation beyond the sole narrow P5-S1
-  owned-read API exception; frontend and Demo activation; Provider, narrative,
-  scenario, combat, and public gameplay integration.
+  residence; P5-S2 implementation and activation; P5-S3 and later
+  structured-character API activation; frontend and Demo activation; Provider,
+  narrative, scenario, world, NPC, memory, relationship, combat, content, and
+  broader public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
   progression, and priority-injection details.
 - Exact Phase 3.3 parameter values, serialization, and compatibility policy.
