@@ -207,6 +207,27 @@ unmapped access converges on the same public 404 envelope. This does not make
 the fixed development principal production authentication or permit Internet
 deployment; `AUTH-001` remains mandatory.
 
+The P5-S2 implementation and assigned local verification are complete in the
+current unstaged working-tree candidate, pending fresh independent read-only
+review and separate staging and commit authorization. The normal application
+adds only `POST /v1/player-characters` beside the preserved P5-S1 GET. It
+derives controller identity only from the trusted dependency, validates the
+frozen JSON and `Idempotency-Key` transport boundary, and delegates one create
+call to the existing service. First creation and exact replay share the same
+200 detached projection; conflicting operation reuse is 409, unavailable
+authority is non-enumerating 404, and validation, corrupt-receipt,
+unsupported-recovery, ordinary persistence, and uncertain-commit failures are
+sanitized without a success claim or generic retry. Cancellation propagates and
+the existing Unit of Work rolls back. The durable creation family remains the
+controller binding, allocation, revision-one history, current state, and
+creation receipt; only the admitted controller-binding uniqueness race permits
+one fresh read-only winner recovery. Normal composition reuses the existing
+controller resolver and lazy MySQL Unit-of-Work graph, including the internal
+Run evidence seam. Demo supplies no Player Character service and exposes
+neither Player Character route or OpenAPI path; frontend creation remains
+inactive, P5-S3 remains deferred, production authentication is incomplete,
+and Internet deployment remains unsupported.
+
 P3-S1 adds only an injectable application service boundary over the accepted
 Phase 1 and Phase 2 authorities. Typed `RequestPrincipal`,
 `PlayerCharacterOperationId`, and `CharacterCreationCommand` construction owns

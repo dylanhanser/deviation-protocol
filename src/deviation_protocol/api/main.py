@@ -2,11 +2,15 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
+from copy import deepcopy
 from datetime import datetime, timezone
 from pathlib import Path as FilePath
-from typing import Annotated, Any
+import re
+from typing import Annotated, Any, NoReturn
 
-from fastapi import Depends, FastAPI, Path, Response, status
+from fastapi import Depends, FastAPI, Header, Path, Request, Response, status
+from fastapi.exceptions import RequestValidationError
+from pydantic import ValidationError
 
 from deviation_protocol.api.dependencies import (
     ApiServices,
@@ -23,8 +27,18 @@ from deviation_protocol.api.schemas import (
     ErrorResponse,
     NarrativeRequestStatusResponse,
 )
-from deviation_protocol.application.errors import PlayerCharacterNotFoundError
+from deviation_protocol.application.errors import (
+    IdempotencyConflictError,
+    PlayerCharacterNotFoundError,
+)
 from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.player_character_operations import (
+    CharacterCreationCommand,
+    CharacterOperationNamespace,
+    CharacterOperationProtocolCode,
+    CharacterOperationProtocolDecision,
+    CreationSuccessResult,
+)
 from deviation_protocol.application.player_character_projection import (
     PlayerCharacterSelfProjection,
 )
@@ -63,6 +77,7 @@ from deviation_protocol.infrastructure.database import create_engine, create_ses
 from deviation_protocol.domain.player_character import (
     AuthoritySourceRef,
     PlayerCharacterId,
+    PlayerCharacterOperationId,
 )
 from deviation_protocol.domain.run import RunAuthoritySourceRef
 from deviation_protocol.domain.player_character_policies import (
@@ -111,6 +126,30 @@ PlayerCharacterPathId = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
     ),
 ]
+_PLAYER_CHARACTER_IDEMPOTENCY_KEY_PATTERN = re.compile(
+    r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+)
+PlayerCharacterIdempotencyKeyHeader = Annotated[
+    str,
+    Header(
+        alias="Idempotency-Key",
+        min_length=1,
+        max_length=128,
+        pattern=_PLAYER_CHARACTER_IDEMPOTENCY_KEY_PATTERN.pattern,
+    ),
+]
+_PLAYER_CHARACTER_CREATION_OPENAPI_EXTRA: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "$ref": "#/components/schemas/CharacterCreationCommand",
+                }
+            }
+        },
+    }
+}
 
 _PUBLIC_ERROR_DESCRIPTIONS = {
     400: "Domain rule violation",
@@ -130,6 +169,215 @@ def _public_error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
         }
         for status_code in status_codes
     }
+
+
+def _raw_header_values(request: Request, raw_name: bytes) -> tuple[bytes, ...]:
+    return tuple(
+        raw_value
+        for header_name, raw_value in request.scope.get("headers", ())
+        if header_name.lower() == raw_name
+    )
+
+
+def _request_validation_failure() -> NoReturn:
+    raise RequestValidationError([])
+
+
+def _validate_player_character_creation_transport(
+    request: Request,
+    idempotency_key: str,
+) -> PlayerCharacterOperationId:
+    raw_content_types = _raw_header_values(request, b"content-type")
+    if len(raw_content_types) != 1:
+        _request_validation_failure()
+    try:
+        content_type = raw_content_types[0].decode("ascii")
+    except UnicodeDecodeError:
+        _request_validation_failure()
+    media_type = content_type.split(";", 1)[0].strip(" \t").lower()
+    if media_type != "application/json":
+        _request_validation_failure()
+
+    raw_idempotency_keys = _raw_header_values(request, b"idempotency-key")
+    if len(raw_idempotency_keys) != 1:
+        _request_validation_failure()
+    raw_idempotency_key = raw_idempotency_keys[0]
+    try:
+        raw_value = raw_idempotency_key.decode("ascii")
+    except UnicodeDecodeError:
+        _request_validation_failure()
+    if (
+        not 1 <= len(raw_idempotency_key) <= 128
+        or _PLAYER_CHARACTER_IDEMPOTENCY_KEY_PATTERN.fullmatch(raw_value) is None
+        or raw_value != idempotency_key
+    ):
+        _request_validation_failure()
+    try:
+        return PlayerCharacterOperationId(value=raw_value)
+    except ValueError:
+        _request_validation_failure()
+
+
+def _parse_player_character_creation_command(
+    raw_body: bytes,
+) -> CharacterCreationCommand:
+    try:
+        return CharacterCreationCommand.model_validate_json(raw_body)
+    except ValidationError:
+        _request_validation_failure()
+
+
+def _install_player_character_creation_openapi_schema(
+    app: FastAPI,
+) -> None:
+    default_openapi = app.openapi
+    installed_schema: dict[str, Any] | None = None
+
+    def _openapi() -> dict[str, Any]:
+        nonlocal installed_schema
+        if installed_schema is not None:
+            return installed_schema
+
+        original_openapi_schema = app.openapi_schema
+        published = False
+        try:
+            base_schema = default_openapi()
+            command_schema = CharacterCreationCommand.model_json_schema(
+                mode="validation",
+                ref_template="#/components/schemas/{model}",
+            )
+            definitions = command_schema.pop("$defs", {})
+            generated_components = {
+                "CharacterCreationCommand": command_schema,
+                **definitions,
+            }
+
+            if not isinstance(base_schema, dict) or not isinstance(
+                definitions,
+                dict,
+            ):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+            if any(
+                not isinstance(name, str) or not isinstance(definition, dict)
+                for name, definition in generated_components.items()
+            ):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+
+            base_components = base_schema.get("components", {})
+            if not isinstance(base_components, dict):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+            base_schemas = base_components.get("schemas", {})
+            if not isinstance(base_schemas, dict):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+            for name, definition in generated_components.items():
+                if name in base_schemas and base_schemas[name] != definition:
+                    raise RuntimeError(
+                        "Player Character OpenAPI component collision"
+                    )
+
+            candidate_schema = deepcopy(base_schema)
+            candidate_components = candidate_schema.setdefault(
+                "components",
+                {},
+            )
+            if not isinstance(candidate_components, dict):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+            candidate_schemas = candidate_components.setdefault("schemas", {})
+            if not isinstance(candidate_schemas, dict):
+                raise RuntimeError(
+                    "Player Character OpenAPI schema integrity failure"
+                )
+            for name, definition in generated_components.items():
+                if name not in candidate_schemas:
+                    candidate_schemas[name] = deepcopy(definition)
+
+            for name, definition in generated_components.items():
+                if candidate_schemas.get(name) != definition:
+                    raise RuntimeError(
+                        "Player Character OpenAPI schema integrity failure"
+                    )
+
+            pending: list[Any] = [candidate_schema]
+            while pending:
+                current = pending.pop()
+                if isinstance(current, dict):
+                    for key, value in current.items():
+                        if key != "$ref":
+                            pending.append(value)
+                            continue
+                        if not isinstance(value, str) or not value.startswith("#/"):
+                            raise RuntimeError(
+                                "Player Character OpenAPI reference integrity "
+                                "failure"
+                            )
+                        target: Any = candidate_schema
+                        for encoded_part in value[2:].split("/"):
+                            part = encoded_part.replace("~1", "/").replace(
+                                "~0",
+                                "~",
+                            )
+                            if isinstance(target, dict) and part in target:
+                                target = target[part]
+                            elif (
+                                isinstance(target, list)
+                                and part.isdigit()
+                                and int(part) < len(target)
+                            ):
+                                target = target[int(part)]
+                            else:
+                                raise RuntimeError(
+                                    "Player Character OpenAPI reference integrity "
+                                    "failure"
+                                )
+                elif isinstance(current, list):
+                    pending.extend(current)
+
+            app.openapi_schema = candidate_schema
+            installed_schema = candidate_schema
+            published = True
+            return candidate_schema
+        finally:
+            if not published:
+                app.openapi_schema = original_openapi_schema
+
+    app.openapi = _openapi
+
+
+def _project_creation_success(
+    result: CreationSuccessResult,
+) -> PlayerCharacterSelfProjection:
+    return PlayerCharacterSelfProjection(
+        player_character_id=result.player_character_id,
+        contract_version=result.contract_version,
+        record_revision=result.resulting_revision,
+        lifecycle=result.resulting_lifecycle,
+    )
+
+
+def _translate_creation_decision(
+    decision: CharacterOperationProtocolDecision,
+) -> NoReturn:
+    if (
+        decision.operation_namespace is CharacterOperationNamespace.CREATE_V1
+        and decision.code is CharacterOperationProtocolCode.AUTHORIZATION_FAILED
+    ):
+        raise PlayerCharacterNotFoundError("player-character.create")
+    if (
+        decision.operation_namespace is CharacterOperationNamespace.CREATE_V1
+        and decision.code is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT
+    ):
+        raise IdempotencyConflictError("player-character.create")
+    raise RuntimeError("unexpected Player Character creation decision")
 
 
 def _player_character_clock() -> datetime:
@@ -271,6 +519,49 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
 
     if services is None or services.player_character_service is not None:
 
+        @app.post(
+            "/v1/player-characters",
+            status_code=status.HTTP_200_OK,
+            response_model=PlayerCharacterSelfProjection,
+            response_description="Player Character created or exactly replayed.",
+            operation_id="create_player_character",
+            summary="Create or replay a Player Character",
+            description=(
+                "Controller identity is derived only from the trusted server-side "
+                "principal. Idempotency-Key is required and is not authorization. "
+                "First success and exact replay share HTTP 200 and the same body "
+                "semantics. Replay returns the original creation result; clients use "
+                "the owned GET for current state. No controller binding, receipt, "
+                "fingerprint, provenance, Run, persistence, transaction, or recovery "
+                "data is public. The fixed development principal is not production "
+                "authentication; production authentication and Internet deployment "
+                "are unsupported."
+            ),
+            tags=["player-characters"],
+            responses=_public_error_responses(404, 409, 422, 500),
+            openapi_extra=_PLAYER_CHARACTER_CREATION_OPENAPI_EXTRA,
+        )
+        async def create_player_character(
+            http_request: Request,
+            idempotency_key: PlayerCharacterIdempotencyKeyHeader,
+            principal: RequestPrincipal = Depends(get_current_principal),
+            service: PlayerCharacterService = Depends(get_player_character_service),
+        ) -> PlayerCharacterSelfProjection:
+            operation_id = _validate_player_character_creation_transport(
+                http_request,
+                idempotency_key,
+            )
+            raw_body = await http_request.body()
+            command = _parse_player_character_creation_command(raw_body)
+            result = await service.create(
+                principal,
+                operation_id=operation_id,
+                command=command,
+            )
+            if isinstance(result, CreationSuccessResult):
+                return _project_creation_success(result)
+            _translate_creation_decision(result)
+
         @app.get(
             "/v1/player-characters/{player_character_id}",
             response_model=PlayerCharacterSelfProjection,
@@ -289,6 +580,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
             if projection is None:
                 raise PlayerCharacterNotFoundError(player_character_id)
             return projection
+
+        _install_player_character_creation_openapi_schema(app)
 
     @app.get(
         "/v1/scenarios",

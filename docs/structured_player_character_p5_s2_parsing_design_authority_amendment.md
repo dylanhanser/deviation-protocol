@@ -1,24 +1,41 @@
 # Structured Player Character P5-S2 Parsing-Design Authority Amendment
 
-Status: **Corrected draft parsing-design authority amendment — initial
-independent review completed with changes required; corrected bytes have not
-been independently reviewed; not approved or operative.**
+Status: **Underlying parsing-design amendment approved, published, and
+operative; this administrative status-correction candidate is unreviewed,
+unstaged, uncommitted, and unpublished.**
 
-This document is an authority-amendment candidate only. It does not authorize
-implementation, staging, commit, publication, or any other repository change.
-It does not mark P5-S2 complete. It records the smallest exact correction that
-may become controlling only after the separate fresh review, approval, commit,
-and publication sequence in section 14. The completed initial independent
-review returned
-`CHANGES_REQUIRED_P5_S2_PARSING_AUTHORITY_AMENDMENT`. This correction addresses
-exactly its four material findings F1 through F4 and no others. Correction
-completion is not review or approval.
+The sole successful verdict for a fresh independent review of this exact
+administrative status correction is:
+
+`STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_STATUS_CORRECTION_REVIEW_APPROVED`
+
+That verdict approves only the administrative correction of the amendment's
+historical lifecycle status. It does not approve or authorize the underlying
+parsing design, the P5-S2 implementation candidate, Demo or frontend
+activation, P5-S3, staging, commit, push, release, or deployment. Every other
+approval or review token in this document is non-operative for this exact
+administrative-correction review.
+
+The underlying parsing-design amendment identified by SHA-256
+`19da01fea29abd215a16f51f20a73a07af44406f01688ca73ed44b53f5a9c9d1`
+received the separate approval verdict
+`STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_AMENDMENT_APPROVED` and
+was intentionally committed and published as
+`606e86534ef7fdd87f21efbb54de68b346bb5a7e`. The approved bytes became
+operative on that publication, with only the narrow precedence recorded in
+section 3.
+
+This working-tree diff is a new administrative status-correction candidate.
+It records that historical lifecycle accurately and changes no normative
+parsing design. It remains unreviewed, unstaged, uncommitted, and unpublished.
+It does not authorize or approve the P5-S2 implementation candidate, staging,
+commit, Demo or frontend activation, P5-S3, or any other repository change.
 
 ## 1. Identity, baseline, and narrow purpose
 
-This candidate addresses only Structured Player Character Phase 5 Slice 2
-(P5-S2) request parsing and the descriptive OpenAPI request-schema declaration
-for:
+The approved underlying amendment addresses only Structured Player Character
+Phase 5 Slice 2 (P5-S2) request parsing and the descriptive OpenAPI
+request-schema declaration for:
 
 `POST /v1/player-characters`
 
@@ -29,7 +46,8 @@ The independently established contradiction-review verdict is:
 That verdict established the direct-binding contradiction only. It is not and
 cannot become an approval of this amendment.
 
-The candidate was authored against this exact repository baseline:
+The approved amendment candidate was authored against this exact repository
+baseline:
 
 | Property | Exact identity |
 | --- | --- |
@@ -63,9 +81,9 @@ The frozen public contract being preserved has this exact identity:
 | --- | ---: | ---: | --- | --- |
 | `docs/public_client_contract.md` | 569 | 33,251 | `6fa3a58bb922a706a8e8722647aadaad19519a1bdbafea55217c84fad5d2f660` | `3d50100e2ccc9950b2b27e97cf3d57dbd4ee058e` |
 
-The implementation candidate remains exactly the two pre-existing unstaged
-tracked modifications below. The identities recorded before creating this
-amendment were:
+At that historical authoring baseline, the implementation candidate comprised
+exactly the two pre-existing unstaged tracked modifications below. The
+identities recorded before creating the amendment were:
 
 | Candidate path | Bytes | SHA-256 | Unstaged diff statistic |
 | --- | ---: | --- | ---: |
@@ -73,16 +91,16 @@ amendment were:
 | `tests/unit/test_player_character_api.py` | 36,033 | `be30f4c657fb6786c8e652034759565d960a96c92ea5b22fba8fe96f3a15342b` | 937 insertions, 13 deletions |
 | Total | — | — | 1,080 insertions, 16 deletions |
 
-Those two candidate files are evidence and preserved work. This document does
-not correct them. No existing file is part of this amendment-candidate write.
-The two-file implementation candidate remains unaccepted and was not modified
-by this correction session. Its implementation is incomplete.
+Those two candidate files were evidence and preserved work. The approved
+amendment did not correct them, and no existing file was part of the historical
+amendment-candidate write. The two-file implementation candidate remained
+unaccepted and unmodified by that correction session.
 
 The narrow purpose is to correct the invalid executable FastAPI body-binding
 design while preserving the frozen request, the shared strict application
 model, the public response protocol, and every unrelated P5-S2 decision.
 
-### 1.1 Review receipt and prospective approval gate
+### 1.1 Historical review, approval, and publication receipt
 
 The completed initial independent review of the prior amendment bytes returned
 this exact failure verdict:
@@ -92,27 +110,37 @@ this exact failure verdict:
 Its four material findings were F1, inconsistent approval-token authority; F2,
 incorrect request-order and header-boundary claims; F3, a non-failure-atomic
 OpenAPI wrapper design; and F4, inaccurate claims about the emitted validation
-schema. This corrected candidate addresses exactly F1, F2, F3, and F4. The
-corrected bytes have not received a fresh independent read-only review. No
-approval has been issued.
+schema. The corrected candidate addressed exactly F1, F2, F3, and F4 and had
+this exact identity:
 
-This draft defines exactly one prospective amendment-specific operative
-approval verdict for a later, separate approval task:
+| Path | Lines | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `docs/structured_player_character_p5_s2_parsing_design_authority_amendment.md` | 1,095 | 53,429 | `19da01fea29abd215a16f51f20a73a07af44406f01688ca73ed44b53f5a9c9d1` |
+
+Those exact corrected bytes completed the required fresh independent
+read-only review and remained unchanged through the later, separate amendment
+approval. That approval issued the sole amendment-specific operative verdict:
 
 `STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_AMENDMENT_APPROVED`
 
-Its definition and textual presence in this draft are non-operative. A later
-approval task may issue that verdict only for the exact corrected candidate
-identity that:
+The token's textual presence in the approved candidate was prospective and
+non-operative by itself. The separately issued verdict is the operative
+approval evidence because it bound the exact corrected candidate identity
+that:
 
 1. completed a fresh independent read-only review;
 2. had no unresolved material finding;
 3. remained byte-identical from review through approval; and
-4. is bound by future external evidence to its exact path, line count, byte
-   count, and SHA-256.
+4. was bound by external evidence to its exact path, line count, byte count,
+   and SHA-256.
 
-This document deliberately does not embed its own hash. The following are
-explicitly non-operative for amendment approval:
+The approved candidate deliberately did not embed its own hash; its identity
+was bound by the external review and approval record. It was then intentionally
+committed and published unchanged as
+`606e86534ef7fdd87f21efbb54de68b346bb5a7e`, whose patch added only this file.
+Publication made the approved underlying amendment operative.
+
+The following remain explicitly non-operative for amendment approval:
 
 - `P5_S2_DIRECT_BINDING_CONTRADICTION_CONFIRMED`;
 - `STRUCTURED_PLAYER_CHARACTER_P5_S2_PLAN_APPROVED`;
@@ -123,13 +151,19 @@ explicitly non-operative for amendment approval:
 - candidate-completion prose;
 - review prose;
 - every failure or `BLOCKED` result; and
-- mere occurrence of the prospective approval token in this document or
-  elsewhere.
+- mere occurrence of the approval token in this document or elsewhere,
+  without the separate exact-candidate verdict.
 
 The existing `STRUCTURED_PLAYER_CHARACTER_P5_S2_PLAN_APPROVED` approval remains
-valid only for the original P5-S2 implementation plan. A future amendment
-approval would amend only the specified design authority. It would neither
-approve the implementation candidate nor implement or activate P5-S2.
+valid only for the original P5-S2 implementation plan. The amendment approval
+amends only the specified parsing-design authority. It did not approve the
+then-existing implementation candidate, the current synchronized ten-file
+implementation candidate, Demo or frontend activation, P5-S3, or later work.
+
+This administrative status-correction candidate changes the approved bytes and
+therefore is not covered by the historical amendment approval. It remains
+unreviewed, unstaged, uncommitted, and unpublished until separately reviewed
+and committed.
 
 ## 2. Established contradiction
 
@@ -192,14 +226,12 @@ Read-only source inspection confirms the relevant sequence:
 
 No framework or installed-package modification is needed or authorized.
 
-## 3. Narrow future precedence
+## 3. Narrow operative precedence
 
-This section defines prospective precedence only. This draft has no present
-precedence.
-
-Only after this exact amendment has been independently reviewed, corrected if
-necessary, separately approved, committed, and published may it supersede the
-following P5-S2 plan statements, and then only to the stated extent:
+The approved underlying amendment became operative when its exact approved
+bytes were committed and published as
+`606e86534ef7fdd87f21efbb54de68b346bb5a7e`. It supersedes the following
+P5-S2 plan statements only to the stated extent:
 
 | Approved P5-S2 plan location | Invalidated statement or implication | Narrow replacement |
 | --- | --- | --- |
@@ -211,17 +243,20 @@ following P5-S2 plan statements, and then only to the stated extent:
 | Section 15 opening sentence and request-body generation premise | The exact request body depends on “direct model annotations” | A descriptive-only `openapi_extra` request body and injected Pydantic validation-schema components declare the exact same public body without runtime binding |
 | Section 16.1 body/header/OpenAPI evidence | Tests may rely on body binding or may satisfy a header assertion through an earlier body 422 | Tests must prove the JSON-mode boundary, use otherwise-valid bodies for header cases, and inspect the exact descriptive schema |
 
-This prospective precedence also supersedes any P5-S2 prohibition that would
+This operative precedence also supersedes any P5-S2 prohibition that would
 prevent only the raw-body JSON-mode parsing and descriptive schema mechanism
 specified here. It does not supersede any prohibition against DTO duplication,
 validation duplication, public-contract changes, broad parsing
 infrastructure, or additional production paths.
 
-Every other approved P5-S2 requirement remains controlling. This amendment
-does not reopen route activation, trusted authority, idempotency semantics,
-service orchestration, result translation, replay, persistence, transaction,
-error, cancellation, non-enumeration, path-budget, Demo, frontend, or later
-slice decisions.
+Every unaffected approved P5-S2 plan requirement remains controlling. The
+narrower public-contract, application-service, persistence, recovery,
+composition, Run, and Demo authorities retain their existing ownership. This
+amendment does not reopen route activation, trusted authority, idempotency
+semantics, service orchestration, result translation, replay, persistence,
+transaction, error, cancellation, non-enumeration, path-budget, Demo,
+frontend, or later-slice decisions, and it does not approve the P5-S2
+implementation candidate.
 
 ## 4. Exact future route-boundary design
 
@@ -335,7 +370,7 @@ _translate_creation_decision(result)
 
 ## 5. Exact authorized production changes
 
-If this amendment later becomes operative, the parsing correction authorizes
+Under the operative underlying amendment, the parsing correction authorizes
 only the following changes in
 `src/deviation_protocol/api/main.py`.
 
@@ -958,9 +993,10 @@ Documentation synchronization after verified implementation:
 - `docs/structured_player_character_implementation_plan.md`
 - `docs/structured_player_character_p5_s2_implementation_plan.md`
 
-This new amendment document is authority evidence for a separate amendment
-workflow. It does not add an implementation path and is not an eleventh path.
-No new production path or test path is authorized.
+The approved amendment document is authority evidence for its completed
+separate amendment workflow. It does not add an implementation path and is not
+an eleventh path. This administrative lifecycle correction does not change
+that classification. No new production path or test path is authorized.
 
 No schema, migration, dependency, lockfile, authentication, repository,
 Unit-of-Work, application-service, domain, persistence, or transaction path is
@@ -995,8 +1031,9 @@ This amendment preserves without change:
 - all broader Run, Provider, narrative, scenario, world, NPC, memory,
   relationship, combat, content, and gameplay boundaries.
 
-P5-S2 remains incomplete. Nothing in this draft changes the completion status
-of an earlier or later phase.
+P5-S2 remains incomplete. Nothing in the approved underlying amendment or this
+administrative status correction changes the completion status of an earlier
+or later phase.
 
 ## 12. Explicit exclusions
 
@@ -1047,49 +1084,67 @@ Later implementation shall stop rather than expand scope if:
 
 No stop condition authorizes a workaround or broader design.
 
-## 14. Required future workflow
+## 14. Historical publication chain and remaining correction workflow
 
-The initial independent review and this bounded F1–F4 correction are complete.
-No later item in this sequence is complete:
+The underlying amendment's required lifecycle sequence is complete:
 
-1. Freeze the corrected candidate identity externally by exact path, line
-   count, byte count, and SHA-256, without inserting its hash into this file.
-2. Perform a fresh independent read-only review of those exact corrected bytes.
-3. If any material finding remains or any byte changes, withhold approval,
-   assign a new external identity, and repeat the fresh review.
-4. Only a later separate approval task may issue
-   `STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_AMENDMENT_APPROVED`, and
-   only when every condition in section 1.1 is satisfied.
-5. Commit and publish only the approved authority document under separate
-   authorization.
-6. Re-establish a clean authority baseline while preserving the two-file
-   implementation candidate as required by the controlling workflow.
-7. Continue the P5-S2 implementation correction under the approved
-   amendment.
-8. Run all focused, Offline, MySQL, Full, OpenAPI, documentation, and Git
-   verification required by the approved P5-S2 workflow.
-9. Perform a fresh independent read-only review of the complete
-   implementation candidate before staging or commit.
+1. The F1–F4 corrected candidate was frozen externally at the exact path,
+   1,095-line count, 53,429-byte count, and SHA-256 recorded in section 1.1.
+2. A fresh independent read-only review covered those exact bytes.
+3. The later separate approval task issued
+   `STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_AMENDMENT_APPROVED` for
+   that exact candidate.
+4. Under separate publication authorization, commit
+   `606e86534ef7fdd87f21efbb54de68b346bb5a7e` added only the approved
+   authority file with the approved bytes unchanged.
+5. Publication established the operative authority baseline and the narrow
+   precedence in section 3.
 
-Approval must bind to the exact bytes of the reviewed amendment. Review of
-this draft is not implementation authorization. Amendment approval is not
-implementation approval. Implementation verification is not commit
-authorization.
+Those completed steps approved only the underlying parsing-design amendment.
+They did not approve the P5-S2 implementation candidate or any later working-
+tree synchronization.
 
-## 15. Candidate status
+This new administrative status-correction candidate has a separate remaining
+workflow:
 
-This file records a corrected, reproducible, closed-scope future design. The
-initial review returned
-`CHANGES_REQUIRED_P5_S2_PARSING_AUTHORITY_AMENDMENT`; exactly F1 through F4 were
-corrected. The corrected bytes have not been independently reviewed. No
-approval was issued. This file is draft, unapproved, and non-operative.
+1. Freeze its exact path, physical line count, byte count, and SHA-256.
+2. Perform a fresh independent read-only review of those exact correction
+   bytes.
+3. If any byte changes, assign a new identity and repeat that review.
+4. Commit and publish the correction only under separate authorization.
+5. Re-establish the resulting authority baseline before relying on this new
+   status metadata for later approval, staging, or commit work.
+
+The historical amendment approval cannot approve this changed administrative
+candidate. Review of this correction is not implementation authorization.
+Amendment approval is not implementation approval. Implementation verification
+is not commit authorization.
+
+## 15. Operative design and administrative-correction status
+
+The underlying parsing design is corrected, reproducible, closed-scope,
+independently reviewed, separately approved, published, and operative. Its
+approved identity is SHA-256
+`19da01fea29abd215a16f51f20a73a07af44406f01688ca73ed44b53f5a9c9d1`, its
+approval verdict is
+`STRUCTURED_PLAYER_CHARACTER_P5_S2_PARSING_AUTHORITY_AMENDMENT_APPROVED`, and
+its publication commit is
+`606e86534ef7fdd87f21efbb54de68b346bb5a7e`. The earlier initial review
+returned `CHANGES_REQUIRED_P5_S2_PARSING_AUTHORITY_AMENDMENT`; exactly F1
+through F4 were corrected before the approved candidate was frozen.
+
+This working-tree change corrects only the stale lifecycle record. It is a new
+unreviewed, unstaged, uncommitted, and unpublished administrative candidate.
+It does not change the normative parsing design or the narrow operative
+precedence in section 3.
 
 P5-S1 remains implemented and activated in the normal application. P5-S2
 remains incomplete. Demo and frontend remain unactivated. P5-S3 remains
 deferred. No P4-S2 objective exists or is created here.
 
-The two-file implementation candidate remains unaccepted and unmodified by
-this correction, and its implementation remains incomplete. The immediate next
-action is a fresh independent read-only review of the exact corrected untracked
-amendment candidate. No approval, staging, commit, publication, implementation,
-or activation change is authorized by this draft.
+The amendment approval did not approve the historical two-file implementation
+candidate or the current synchronized ten-file implementation candidate. This
+administrative correction does not approve either candidate. The immediate
+next action for this file is a fresh independent read-only review of the exact
+status-correction candidate. No approval, staging, commit, publication,
+implementation, or activation change is authorized by this working-tree diff.

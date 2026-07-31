@@ -47,11 +47,12 @@ at `5955c47eac07429107b93ef85da6a055bd2044ef`
 approved single-resource read and does not complete Phase 5. The P5-S2 public
 creation/replay contract is frozen and published at
 `245caff3903666fcd2dd9a318785f323117deb24`
-(`docs(player-character): define P5-S2 public contract`). P5-S2 implementation
-is planned by the dedicated
-[P5-S2 implementation plan](structured_player_character_p5_s2_implementation_plan.md)
-but remains unimplemented and unactivated. P5-S3 and Phases 6–7 remain
-deferred.**
+(`docs(player-character): define P5-S2 public contract`). P5-S2's bounded
+normal POST implementation, focused unit/composition evidence, real-MySQL API
+evidence, and Demo non-activation evidence are complete in the current
+unstaged working-tree candidate. Documentation is synchronized there, while
+fresh independent read-only review and separate staging and commit
+authorization remain pending. P5-S3 and Phases 6–7 remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -382,13 +383,14 @@ operation receipts, Repositories, and same-session UoW wiring, and completed
 Phase 3 supplies the trusted `PlayerCharacterService` plus normal production
 composition for create, mutate, and `get_owned`. Minimum Run Core supplies its
 Run models, persistence, service, and composition; completed P4-S1 activates
-the separately named internal binding seam. Except for P5-S1's one owned-read
-Player Character route, configured service dependency getter, public exposure
-of the existing `PlayerCharacterSelfProjection` DTO, and corresponding OpenAPI
-operation, all other Player Character public routes, Run binding routes,
-creation, mutation, listing, search, and administration surfaces; frontend and
-Demo behavior; scenario/world execution; and the Run transition to `active`
-remain absent.
+the separately named internal binding seam. Except for P5-S1's owned GET and
+P5-S2's bounded normal POST creation/replay route, configured service
+dependency getter, public exposure of the existing
+`PlayerCharacterSelfProjection` DTO, and their corresponding OpenAPI
+operations, all other Player Character public routes, Run binding routes,
+mutation, listing, search, and administration surfaces; frontend and Demo
+behavior; scenario/world execution; and the Run transition to `active` remain
+absent.
 
 ### Canonical state ownership
 
@@ -3600,12 +3602,17 @@ No repository authority defines a P4-S2 objective. P5-S1 is completed and
 published at `5955c47eac07429107b93ef85da6a055bd2044ef`. It activates only a
 thin authenticated public read over the accepted detached Player Character
 projection. The P5-S2 public creation/replay contract is frozen and published
-at `245caff3903666fcd2dd9a318785f323117deb24`; its exact later implementation
-is bounded by the dedicated
-[P5-S2 implementation plan](structured_player_character_p5_s2_implementation_plan.md).
-P5-S2 is not implemented or activated by that planning candidate. Creation,
-P5-S3 mutation, UI, Demo, Run behavior, and broader Phase 5 work remain
-inactive or deferred.
+at `245caff3903666fcd2dd9a318785f323117deb24`; its exact bounded normal POST
+implementation is complete and locally verified in the current unstaged
+working-tree candidate. It reuses the P3 service's controller-first authority,
+operation namespace, receipt replay, durable creation family, and one admitted
+controller-binding-race winner recovery; ordinary, corrupt-receipt,
+unsupported-recovery, and uncertain-commit failures remain sanitized, and
+cancellation propagates through rollback. P5-S1 remains unchanged. Demo has no
+Player Character service, route, method, or OpenAPI path, and no frontend
+creation method exists. Fresh independent read-only review, staging, and commit
+remain pending. P5-S3 mutation, UI, Demo, Run behavior, and broader Phase 5
+work remain inactive or deferred.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3726,11 +3733,12 @@ The Phase 3-specific rows in both tables are implemented and preserve the
 independently approved boundary. P4-G0 now delegates the exact minimum
 Run-core path budgets to its owning plan. The prerequisite and P4-S1 are
 implemented; broader Phase 4 lifecycle, scenario, and world integration remain
-deferred. P5-S1 is the sole completed and published Phase 5 implementation
-slice. P5-S2 has a frozen, published public contract and a dedicated
-implementation-plan candidate, but its code and runtime activation remain
-deferred pending the plan's approval and publication gates. P5-S3 and all
-Phase 6–7 work remain unimplemented or deferred.
+deferred. P5-S1 remains a completed and published Phase 5 implementation
+slice. P5-S2 now exists as an implemented and locally verified, unstaged
+candidate; successful repeat final review, commit, and publication remain
+pending. P5-S2 is not independently approved, committed, published, deployed,
+or Demo/frontend-activated. P5-S3 and all Phase 6–7 work remain unimplemented
+or deferred.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 

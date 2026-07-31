@@ -2,10 +2,9 @@
 
 ## 1. Status, purpose, and approval gate
 
-This document is the implementation-ready plan for **P5-S2 — thin
-authenticated Player Character creation/replay API activation**. It plans one
-future `POST /v1/player-characters` route. It does not implement or activate
-that route.
+This document is the implementation authority for **P5-S2 — thin
+authenticated Player Character creation/replay API activation**. Its bounded
+candidate adds one normal-application `POST /v1/player-characters` route.
 
 The controlling public wire contract is
 [Public Client Contract](public_client_contract.md), frozen and published by
@@ -17,40 +16,51 @@ the accepted wire decisions.
 P5-S1 is completed and published by
 `5955c47eac07429107b93ef85da6a055bd2044ef`
 (`feat(player-character): activate owned-read API`). Its authenticated owned
-`GET /v1/player-characters/{player_character_id}` remains the only currently
-activated Player Character API surface. P5-S2 remains unimplemented and
-unactivated. P5-S3 remains deferred.
+`GET /v1/player-characters/{player_character_id}` remains preserved. P5-S2
+implementation and its assigned local verification are complete in the current
+unstaged working-tree candidate. Its fresh independent read-only review,
+separate staging and commit authorization, commit, and publication remain
+pending. P5-S3 remains deferred.
 
-This plan is approval-gated. The only operative successful independent-review
-verdict is:
+This plan's historical approval evidence is:
 
 `STRUCTURED_PLAYER_CHARACTER_P5_S2_PLAN_APPROVED`
 
-That verdict applies only to the complete three-document planning candidate
-and the exact SHA-256 hashes supplied to the independent reviewer. The planning
-session's draft-completion verdict, historical verdicts, failure outcomes, and
-prose containing the word "approved" are non-operative. Any byte change after
-review invalidates the approval. Approval of this plan is not implementation,
-staging, commit, push, or publication authorization.
+That verdict approved only the complete historical three-document planning
+candidate and its reviewed SHA-256 identities. It is non-operative for final
+review of the current implementation candidate and does not approve
+implementation, staging, commit, push, publication, activation, release, or
+deployment.
 
-The current exact candidate is not approved: its previous independent review
-returned `CHANGES_REQUIRED`. Completing these corrections is not approval. Only
-a fresh independent exact-candidate review that returns the operative verdict
-above can approve it; drafting, correction, review, approval, commit,
-publication, implementation, and activation remain distinct states.
+The sole operative successful verdict for the final P5-S2 implementation
+review is:
+
+`STRUCTURED_PLAYER_CHARACTER_P5_S2_REVIEW_APPROVED`
+
+The current implementation candidate is not independently approved. Only a
+fresh independent exact-candidate review that returns the operative verdict
+above can approve it; implementation and local verification, documentation
+synchronization, review, approval, staging, commit, and publication remain
+distinct states.
+
+The published
+[Parsing-Design Authority Amendment](structured_player_character_p5_s2_parsing_design_authority_amendment.md)
+is controlling authority only for its narrow raw-body JSON-mode parsing,
+direct-binding, and descriptive OpenAPI-schema scope. Its approval does not
+approve the P5-S2 implementation candidate or any other plan requirement.
 
 The required sequence is:
 
-1. freeze the exact three-document candidate and record all three hashes;
-2. conduct a fresh independent read-only review whose successful branch can
+1. freeze the exact complete implementation candidate and record all hashes;
+2. conduct a fresh independent final read-only implementation review whose
+   successful branch can
    return the exact operative verdict above;
 3. obtain that exact verdict;
 4. obtain separate authorization for the exact staging and local commit
    operation;
 5. verify staged and committed bytes and scope;
 6. have the user push;
-7. confirm the new clean, aligned, published baseline; and
-8. begin P5-S2 implementation only in a fresh, separately authorized session.
+7. confirm the new clean, aligned, published baseline.
 
 ## 2. Evidence classification
 
@@ -58,9 +68,9 @@ The required sequence is:
 | --- | --- |
 | Frozen authority | The complete [Public Client Contract](public_client_contract.md) at `245caff3903666fcd2dd9a318785f323117deb24` controls every P5-S2 wire decision. [Structured Player Character Contract](structured_player_character_contract.md), [Architecture](architecture.md), [engineering guardrails](engineering/guardrails.md), and [Codex workflow](engineering/codex_workflow.md) continue to control domain, authority, persistence, verification, and handoff boundaries. |
 | Implemented prerequisite | P3-S1 creation/replay and its bounded race recovery were completed at `7606e51523338247ea33ed9329346fdba046d29b`; P3-S2 through P3-S4 completed with Phase 3 at `cafb12272e703e8751c78bb6852cec90d7d7ec8d`. `PlayerCharacterService.create`, strict command models, operation identity, fingerprinting, receipts, stored-result reconstruction, controller resolution, UUID issuance, repositories, and Unit of Work behavior already exist. |
-| Currently activated behavior | P5-S1 at `5955c47eac07429107b93ef85da6a055bd2044ef` activates only the authenticated owned GET route in the normal application. The Demo composition omits the Player Character service and route. |
-| Newly planned behavior | P5-S2 adds exactly one normal-application POST route that parses the frozen transport contract, invokes `PlayerCharacterService.create` once, translates its result or decision, and returns `PlayerCharacterSelfProjection`. |
-| Deferred implementation | No P5-S2 production or test change exists in this planning candidate. Implementation begins only after the approval, publication, clean-baseline, and separate-authorization gates. P5-S3 and later phases remain deferred. |
+| Currently activated behavior | P5-S1 at `5955c47eac07429107b93ef85da6a055bd2044ef` activates the authenticated owned GET route in the normal application. The Demo composition omits the Player Character service and routes. |
+| Current implementation candidate | P5-S2 adds exactly one normal-application POST route that parses the frozen transport contract, invokes `PlayerCharacterService.create` once, translates its result or decision, and returns `PlayerCharacterSelfProjection`. Its assigned unit, composition, Demo, and real-MySQL API evidence is complete; independent review and commit remain pending. |
+| Deferred implementation | P5-S3 and later phases remain deferred. Demo/frontend creation, public Run behavior, production authentication, and Internet deployment remain unimplemented. |
 | Planner inference | The frozen contract requires exact repeated-header detection and an `application/json` boundary but does not name a framework helper. Repository dependencies provide FastAPI/Starlette `Request.scope["headers"]`; P5-S2 will use those raw ASGI header occurrences plus one documented FastAPI `Header` parameter. This is the narrow existing-framework seam that enforces the accepted contract without a DTO, dependency, or idempotency redesign. |
 
 Git history is status evidence, not a substitute for the frozen contract.
@@ -105,7 +115,7 @@ application operation.
 ### 4.1 Included
 
 - one normal-application `POST /v1/player-characters` route;
-- direct strict parsing of `CharacterCreationCommand`;
+- direct raw-body JSON-mode validation of `CharacterCreationCommand`;
 - exact `Idempotency-Key` transport enforcement and construction of
   `PlayerCharacterOperationId`;
 - reuse of the P5-S1 principal and service dependencies;
@@ -145,7 +155,7 @@ authoritative.
 
 ## 5. Exact closed future implementation path budget
 
-The later implementation candidate may change exactly the paths in sections
+The current implementation candidate changes exactly the paths in sections
 5.1 through 5.3. A need for any additional path stops implementation and
 requires a corrected, independently reviewed plan before work continues.
 
@@ -293,10 +303,11 @@ key, decision detail, or internal exception text enters the raised message.
 ### 6.8 `create_player_character`
 
 This route function is the sole new public operation. It accepts `Request`,
-`CharacterCreationCommand`, `PlayerCharacterIdempotencyKeyHeader`,
+`PlayerCharacterIdempotencyKeyHeader`,
 `RequestPrincipal = Depends(get_current_principal)`, and
 `PlayerCharacterService = Depends(get_player_character_service)`. It validates
-the transport, calls the service exactly once, projects
+the transport, reads the raw body exactly once, validates it through
+`CharacterCreationCommand.model_validate_json`, calls the service exactly once, projects
 `CreationSuccessResult`, and otherwise invokes the decision translator.
 
 Its route decorator uses
@@ -315,14 +326,13 @@ The mechanical request flow is:
 1. `create_app` registers `POST /v1/player-characters` inside the same
    `if services is None or services.player_character_service is not None`
    block that owns the P5-S1 GET route.
-2. FastAPI accepts only the declared required JSON body as
-   `CharacterCreationCommand` and the declared required header string.
-3. FastAPI/Pydantic reject malformed JSON, missing/null/wrong-type body,
-   unsupported contract version, unknown fields, invalid nested declarations,
-   and the canonical declaration-envelope violation before route execution.
-4. `_validate_player_character_creation_transport` enforces the exact raw
+2. FastAPI resolves the trusted dependencies and declared header string; it
+   does not bind `CharacterCreationCommand` as a route parameter.
+3. `_validate_player_character_creation_transport` enforces the exact raw
    content-type and idempotency-header contract and constructs
    `PlayerCharacterOperationId`.
+4. The route reads the raw body exactly once and validates the strict command
+   graph with `CharacterCreationCommand.model_validate_json`.
 5. `get_current_principal` supplies the fixed development principal. No body,
    header, query, or path value supplies authority.
 6. `get_player_character_service` retrieves the already composed canonical
@@ -417,9 +427,10 @@ receipt key and does not grant access.
 
 ## 10. Request model and validation
 
-The route accepts the existing
+The route obtains the existing
 `deviation_protocol.application.player_character_operations.CharacterCreationCommand`
-directly. No public DTO or mapping copy is added.
+only through one raw-body `model_validate_json` call. No public DTO or mapping
+copy is added.
 
 The exact graph is:
 
@@ -473,8 +484,9 @@ The direct graph preserves these exact leaf decisions:
 
 The validation boundary is exact:
 
-1. FastAPI parses the required JSON body.
-2. Pydantic validates the strict frozen `CharacterCreationCommand` graph.
+1. The route reads the required JSON body once after transport validation.
+2. Pydantic JSON-mode validates the strict frozen
+   `CharacterCreationCommand` graph.
 3. `extra="forbid"` rejects unknown fields at every model level.
 4. Required top-level fields reject omission and null. Defaulted declaration
    slots preserve omission as the domain's `omitted` state; explicit null is
@@ -534,7 +546,7 @@ Field-level details are prohibited in every row.
 
 | Condition | Actual source or failure boundary | Translation location | HTTP, code, message | Non-enumeration and internal preservation |
 | --- | --- | --- | --- | --- |
-| Malformed JSON; missing/null/wrong-type body; unknown field; unsupported version; invalid nested declaration; duplicate declaration item; invalid Unicode/NUL; canonical envelope over 65,536 bytes; other submitted-body creation/domain validation | FastAPI JSON parsing and the direct `CharacterCreationCommand` model graph before route execution | Existing `request_validation_handler` | 422, `REQUEST_VALIDATION_FAILED`, `Request validation failed` | No field details; service is not called and no internal validator text is returned. |
+| Malformed JSON; missing/null/wrong-type body; unknown field; unsupported version; invalid nested declaration; duplicate declaration item; invalid Unicode/NUL; canonical envelope over 65,536 bytes; other submitted-body creation/domain validation | The route's raw-body `CharacterCreationCommand.model_validate_json` boundary | Existing `request_validation_handler` | 422, `REQUEST_VALIDATION_FAILED`, `Request validation failed` | No field details; service is not called and no internal validator text is returned. |
 | Missing, empty, duplicate, non-ASCII, overlength, invalid-alphabet, normalized-only, or otherwise invalid `Idempotency-Key`; missing or ambiguous non-JSON media type | FastAPI header validation plus `_validate_player_character_creation_transport` | `_request_validation_failure` then existing request-validation handler | 422, `REQUEST_VALIDATION_FAILED`, `Request validation failed` | No operation key, receipt lookup, authority inference, or raw submitted value is disclosed. |
 | Principal cannot resolve; resolved controller is invalid; stored binding authorization fails; race recovery authority changes/disappears or cannot be relocked | `PlayerCharacterService.create` returns `AUTHORIZATION_FAILED` | `_translate_creation_decision` raises existing `PlayerCharacterNotFoundError`; existing handler serializes | 404, `PLAYER_CHARACTER_NOT_FOUND`, `Player character was not found` | One identical envelope reveals no principal, binding, receipt, key, or character existence. |
 | Same authorized controller scope and operation ID with non-equivalent command | Service receipt protocol returns `IDEMPOTENCY_CONFLICT` | `_translate_creation_decision` raises existing `IdempotencyConflictError`; existing handler serializes | 409, `IDEMPOTENCY_CONFLICT`, `Idempotency key was reused` | Stored result and fingerprint remain absent; the exception receives only a static internal operation label. |
@@ -582,7 +594,7 @@ no connection, Unit of Work, SQL session, or Provider.
 
 ## 14. Runtime activation and non-activation boundary
 
-After later implementation:
+In the current implementation candidate:
 
 - normal `deviation_protocol.api.main:app` exposes POST creation/replay and the
   existing owned GET;
@@ -602,7 +614,8 @@ Internet deployment remains unsupported.
 
 ## 15. OpenAPI implementation
 
-The future decorator and direct model annotations generate exactly:
+The current route decorator and descriptive-only OpenAPI schema mechanism
+generate exactly:
 
 | Property | Exact declaration |
 | --- | --- |
@@ -795,10 +808,16 @@ prohibits a frontend change. The normal/Demo route inventories are the focused
 runtime non-activation regressions. Run non-activation is enforced by the
 method inventory and unchanged P4-S1 tests.
 
-## 17. Future local validation sequence
+## 17. Local validation sequence and current candidate evidence
 
-This sequence is for the later implementation session. None of it is executed
-by this planning task.
+This sequence governs implementation and handoff verification. The current
+candidate completed the assigned focused evidence: syntax compilation; the
+complete MySQL API target (`11 passed`); MySQL player-character service
+regression (`8 passed`); the P5-S2 API/composition/P5-S1 unit group (`155
+passed`); the Demo composition target (`40 passed`); the direct Run composition
+target (`10 passed`); and the plan-linked Player Character unit group (`358
+passed`). `git diff --check` and `git diff --cached --check` passed. This
+documentation synchronization does not rerun those already-passing suites.
 
 1. Confirm the separately approved clean implementation baseline, exact branch
    and hashes, empty index, no untracked or unmerged paths, no active Git
@@ -893,7 +912,7 @@ by this planning task.
 CI is not a substitute for any local check. No Provider or live model call is
 permitted. `RUN_LIVE_DEEPSEEK_TEST` remains disabled.
 
-## 18. Later implementation stop conditions
+## 18. Candidate review and handoff stop conditions
 
 Stop without silently broadening scope if:
 
@@ -935,9 +954,9 @@ A stop requires an exact report and a corrected authority candidate where
 applicable. It does not authorize a partial implementation, weaker validation,
 fallback database, dependency installation, external call, or contract edit.
 
-## 19. Completion criteria
+## 19. Candidate completion and handoff criteria
 
-P5-S2 implementation is complete only when:
+The current candidate is ready for fresh independent read-only review only when:
 
 1. the exact one-production/four-test/five-document candidate is implemented;
 2. every frozen wire detail, including the exact OpenAPI 200 response
@@ -947,12 +966,14 @@ P5-S2 implementation is complete only when:
 4. first success and replay are indistinguishable at the public boundary;
 5. P5-S1 remains unchanged and passing;
 6. Demo, frontend, Run, P5-S3, and every excluded surface remain inactive;
-7. all validation in section 17 passes locally;
+7. the assigned candidate validation in section 17 is recorded;
 8. canonical documentation synchronization is complete;
-9. a fresh independent read-only implementation review has no open finding;
-   and
-10. separate staging and commit authorization is requested only after the
-    complete candidate and exact evidence are frozen.
+9. its exact bytes and evidence are frozen for independent review.
+
+Independent approval, separate staging and commit authorization, commit, and
+publication remain later handoff steps. Completion of the implementation and
+assigned local verification in this working-tree candidate does not claim any
+of those states.
 
 This plan resolves every architectural, contract, product, authentication,
 ownership, persistence, transaction, transport, error, OpenAPI, test,

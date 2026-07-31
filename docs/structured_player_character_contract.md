@@ -772,6 +772,23 @@ applicable exact-candidate review record, and repository integration and
 publication state must be established from Git history. It must not be
 represented as a completed Phase 5 or production-authentication milestone.
 
+### P5-S2 implementation-candidate status
+
+The frozen P5-S2 public creation/replay contract is implemented and has
+completed its assigned local verification in the current unstaged working-tree
+candidate. It adds only the normal application's authenticated
+`POST /v1/player-characters` boundary, preserving the existing P5-S1 owned
+read and delegating controller ownership, operation identity, durable replay,
+creation persistence, and race recovery to the existing application and
+persistence authorities. This status does not amend this product contract or
+promote any deferred lifecycle, mutation, Run, or gameplay behavior.
+
+The candidate remains pending fresh independent read-only review and separate
+staging and commit authorization; it is not committed, published, deployed, or
+a production-authentication milestone. Demo and frontend creation remain
+inactive: Demo has no Player Character service and no Player Character route or
+OpenAPI path. P5-S3 remains unstarted.
+
 Before any runtime implementation is accepted, the owning implementation
 specification MUST define and verify:
 

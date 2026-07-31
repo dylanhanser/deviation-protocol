@@ -307,23 +307,29 @@ def test_composed_binding_namespace_stays_reserved_without_uow_entry() -> None:
     assert uow_calls == 0
 
 
-def test_run_composition_activates_only_the_owned_player_character_read() -> None:
+def test_run_composition_activates_only_authorized_player_character_routes() -> None:
     app = main.create_app()
-    public_paths = {
-        route.path
+    public_routes = {
+        (route.path, frozenset(route.methods))
         for route in app.routes
         if route.path == "/health" or route.path.startswith("/v1/")
     }
 
-    assert public_paths == {
-        "/health",
-        "/v1/player-characters/{player_character_id}",
-        "/v1/scenarios",
-        "/v1/sessions",
-        "/v1/sessions/{session_id}",
-        "/v1/sessions/{session_id}/state",
-        "/v1/sessions/{session_id}/view",
-        "/v1/sessions/{session_id}/requests/{client_request_id}",
-        "/v1/sessions/{session_id}/actions",
+    assert public_routes == {
+        ("/health", frozenset({"GET"})),
+        (
+            "/v1/player-characters/{player_character_id}",
+            frozenset({"GET"}),
+        ),
+        ("/v1/player-characters", frozenset({"POST"})),
+        ("/v1/scenarios", frozenset({"GET"})),
+        ("/v1/sessions", frozenset({"POST"})),
+        ("/v1/sessions/{session_id}", frozenset({"GET"})),
+        ("/v1/sessions/{session_id}/state", frozenset({"GET"})),
+        ("/v1/sessions/{session_id}/view", frozenset({"GET"})),
+        (
+            "/v1/sessions/{session_id}/requests/{client_request_id}",
+            frozenset({"GET"}),
+        ),
+        ("/v1/sessions/{session_id}/actions", frozenset({"POST"})),
     }
-    assert all("run" not in path.casefold() for path in public_paths)
