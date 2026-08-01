@@ -72,8 +72,7 @@ documents.
   `POST /v1/player-characters` implementation was independently approved,
   committed, and published at
   `4ba66d8f277988325795c905fdf6fd9e416d7457`
-  (`feat(player-character): add creation API`). P5-S1 and P5-S2 are the only
-  published Player Character API surfaces.
+  (`feat(player-character): add creation API`).
 - [P5-S3](docs/structured_player_character_p5_s3_implementation_plan.md) has
   received `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its first
   independently reviewed local implementation candidate received
@@ -87,8 +86,8 @@ documents.
   `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`: the
   current production service instead serializes legitimate retirement writers
   at the Player Character `FOR UPDATE` lock before receipt lookup or mutation.
-  The present acceptance-boundary-corrected unstaged candidate therefore uses
-  normal concurrent HTTP requests to prove exact replay or ordinary
+  The accepted and published P5-S3 result uses normal concurrent HTTP requests
+  to prove exact replay or ordinary
   idempotency conflict after one durable mutation, and treats the existing
   receipt-add recovery only as bounded fault-injection/out-of-topology defense.
   Its correction validation completed locally: canonical Offline reported
@@ -98,10 +97,13 @@ documents.
   material scoped defect. The accepted real-MySQL evidence proves aggregate-lock
   serialization, exact replay or ordinary idempotency conflict, and one durable
   mutation; fault injection remains bounded defensive recovery evidence, and the
-  unreachable receipt-add race is not a requirement. P5-S3 is independently
-  approved and eligible for exact-scope commit; P5-S4 and all unrelated deferred
-  work have not begun. Publication, push, deployment, release, runtime
-  activation, and Provider work remain deferred.
+  unreachable receipt-add race is not a requirement. P5-S3 was committed and
+  published as `34d063e387cde69500e4dc018ff087e87f3eee74`
+  (`feat(player-character): add idempotent retirement endpoint`). P5-S3 is not
+  a current unstaged candidate, and no P5-S3 review remains pending. Phase 5
+  ended with P5-S3; no P5-S4 exists or has begun. Phase 8 planning does not
+  reopen Phase 5. Deployment, release, broader runtime activation, and Provider
+  work remain deferred.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -129,6 +131,10 @@ documents.
 | Phase 3.3 | **Approved product design — not implemented** | [Run Protocol, difficulty, and world profiles](docs/run_protocol.md) |
 | Phase 3.4 | **Approved product design — not implemented** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — not implemented** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
+| Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
+| Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
+| Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
+| Phase 8 | **Planning candidate — not implemented** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -366,7 +372,7 @@ stages:
    - P4-S1a is `748003319ececa548b68b351746afbb2d54c66bb`; P4-S1b is
      `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. No concrete defect requires
      reopening P4-S1.
-5. **Phase 5 — Public projection and narrow boundary integration: partially implemented**
+5. **Phase 5 — Public projection and narrow boundary integration: complete at P5-S3**
    - P5-S1 owned-read activation is completed and published at
      `5955c47eac07429107b93ef85da6a055bd2044ef`; it exposes only the approved
      owned single-resource read and does not complete Phase 5;
@@ -387,9 +393,23 @@ stages:
       with no material scoped defect. It accepted real-MySQL aggregate-lock
       serialization, replay/conflict, and one durable mutation, and fault
       injection only as bounded defensive recovery; the unreachable receipt-add
-      race is not a requirement. P5-S3 is eligible for exact-scope commit;
-      P5-S4 and unrelated deferred work have not begun. It is not published,
-      pushed, deployed, released, Demo-, frontend-, or Run-activated.
+      race is not a requirement. P5-S3 was committed and published as
+      `34d063e387cde69500e4dc018ff087e87f3eee74`. No review remains pending;
+      Phase 5 ended with P5-S3 and no P5-S4 exists.
+6. **Phase 6 — Subject-reference compatibility hooks: allocated, not implemented**
+   - its existing scope and prerequisites remain unchanged and are not imported
+     into Phase 8.
+7. **Phase 7 — Regression, documentation, and closeout: allocated, not implemented**
+   - its existing scope remains unchanged and is not marked complete by current
+     priority ordering.
+8. **Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop: planning candidate**
+   - explicit user allocation selects the minimum create-or-reuse, eligible
+     character discovery, authoritative Run entry/binding, existing gameplay,
+     deterministic Demo, and minimal Web backbone described in the
+     [dedicated Phase 8 plan](docs/structured_player_character_run_playable_loop_plan.md).
+   - Phase 8 is the current planning priority. It neither implements nor
+     completes Phase 6 or Phase 7, and future features remain addable through
+     later phases.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -497,20 +517,21 @@ UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
 required controller bindings are absent; no fake or development resolver or
 fake issuer is installed.
 
-P5-S1's owned GET remains published. P5-S2 adds only the normal application's
-published POST creation/replay route beside it; controller
+P5-S1's owned GET, P5-S2's creation/replay route, and P5-S3's retirement route
+are published. Controller
 identity remains server-derived, and operation identity, durable replay,
 allocation, receipts, ownership, and bounded race recovery remain in the
-existing service and persistence authorities. Demo supplies no Player Character
-service and exposes neither Player Character route or OpenAPI path; no frontend
-method calls the POST. The P5-S3 unstaged local candidate adds only the normal
-  application retirement route; its focused final independent review returned
+existing service and persistence authorities. At the Phase 5 baseline, Demo
+supplies no Player Character service and exposes no Player Character route or
+OpenAPI path; no frontend method calls the creation POST. P5-S3 adds only the
+normal-application retirement route; its focused final independent review returned
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
   material scoped defect, accepting the real-MySQL serialization/replay-conflict/
   one-durable-mutation evidence and fault injection only as bounded defensive
-  recovery. P5-S3 is eligible for exact-scope commit; publication, push,
-  deployment, and release remain deferred. Frontend
-activation, Demo behavior, Provider behavior, broader Run Protocol and
+  recovery. It was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`; Phase 5 is complete at P5-S3,
+  no P5-S4 exists, and P5-S3 remains closed. Frontend activation, Demo behavior,
+  Provider behavior, broader Run Protocol and
 lifecycle integration, narrative integration, scenario and world integration,
 combat integration, content integration, public binding, and player-visible
 gameplay activation remain deferred. The internal Run-owned continuous-story-
@@ -629,11 +650,34 @@ abuse control. Silent cross-Provider fallback is prohibited.
 The canonical decision is
 [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md).
 
+## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
+
+Status: **Planning candidate — not implemented.**
+
+Phase 8 is explicitly allocated to the next selected product priority: create
+or reuse an owned Structured Player Character, discover/select an eligible one,
+enter a server-created Run immutably bound to it, create trusted Session
+participation, and play through the existing authoritative Session lifecycle in
+the deterministic Demo and minimal existing Web client.
+
+The canonical candidate is the
+[Phase 8 implementation plan](docs/structured_player_character_run_playable_loop_plan.md).
+It preserves the existing Phase 6 subject-reference and Phase 7 closeout
+allocations exactly. Neither unfinished phase is a prerequisite for the minimum
+backbone: Phase 8 creates no new memory/relationship/consequence fact and owns
+its own bounded final evidence/status slice. Full world/profile behavior,
+later-world progression, Run termination, Provider work, production
+authentication, deployment, and broader game systems remain outside Phase 8.
+
+Planning Phase 8 does not authorize implementation. The exact seven-document
+candidate requires a separate independent planning review and published clean
+baseline before any separately authorized implementation slice begins.
+
 ## Deferred
 
-- Full Run Protocol behavior beyond the minimum prerequisite; Phase 3.4 NPC
-  residence; P5-S3 runtime activation and later structured-character API
-  activation; frontend and Demo activation; Provider,
+- Full Run Protocol behavior beyond the minimum prerequisite and the planned
+  Phase 8 Session-backed minimum admission; Phase 3.4 NPC residence; later
+  structured-character API work beyond Phase 8; Provider,
   narrative, scenario, world, NPC, memory, relationship, combat, content, and
   broader public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
@@ -681,9 +725,12 @@ manually.
 - Approved and frozen, partially implemented downstream structured
   player-character implementation plan:
   [`docs/structured_player_character_implementation_plan.md`](docs/structured_player_character_implementation_plan.md).
-- Approved P5-S3 plan and acceptance-boundary-corrected, locally validated,
-  independently approved retirement candidate eligible for exact-scope commit:
+- Approved P5-S3 plan and independently approved and published retirement
+  history:
   [`docs/structured_player_character_p5_s3_implementation_plan.md`](docs/structured_player_character_p5_s3_implementation_plan.md).
+- Phase 8 Structured Player Character Run entry and minimum playable-loop
+  candidate:
+  [`docs/structured_player_character_run_playable_loop_plan.md`](docs/structured_player_character_run_playable_loop_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:

@@ -2,8 +2,8 @@
 
 Status: **Approved and frozen structured player-character product
 specification — partially implemented through completed Phase 3, Minimum Run
-Core, completed internal-only P4-S1 binding, and published P5-S1/P5-S2 public
-activation.**
+Core, completed internal-only P4-S1 binding, and completed, published Phase 5
+through P5-S3 public activation.**
 
 Authority scope: **Normative player-character identity, canonical record,
 revision, lifecycle, validation, projection, and adjacent-authority
@@ -26,7 +26,7 @@ candidates each received `CHANGES_REQUIRED`. A later evidence candidate's
 receipt-add 1062 depended on rolling back the original mutation transaction and
 resuming stale in-memory work. The focused investigation returned
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`, so the
-present acceptance-boundary-corrected unstaged candidate proves normal HTTP
+accepted implementation proves normal HTTP
 serialization at the aggregate lock and labels defensive recovery evidence as
 fault injection. Correction validation completed locally (canonical Offline
 1,814 passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one
@@ -35,9 +35,13 @@ fault injection. Correction validation completed locally (canonical Offline
   material scoped defect. It accepted real-MySQL aggregate-lock serialization,
   exact replay or ordinary idempotency conflict, and one durable mutation; fault
   injection is bounded defensive recovery only, and the unreachable receipt-add
-  race is not a requirement. P5-S3 is independently approved and eligible for
-  exact-scope commit; P5-S4 and unrelated deferred work have not begun. Push,
-  deployment, release, runtime activation, and Provider work remain deferred.
+  race is not a requirement. P5-S3 was committed and published as
+  `34d063e387cde69500e4dc018ff087e87f3eee74`
+  (`feat(player-character): add idempotent retirement endpoint`). Phase 5 is
+  complete at P5-S3; no P5-S4 exists and no P5-S3 review remains pending.
+  P5-S3 is not a current unstaged candidate, and Phase 8 planning does not
+  reopen Phase 5. Deployment, release, broader runtime activation, and Provider
+  work remain deferred.
   Public Run binding is not implemented; the reserved public
 `RunService.bind_player_character(...)` command remains rejected.
 
@@ -808,7 +812,7 @@ P5-S2 is not deployed or a production-authentication milestone. Demo and
 frontend creation remain inactive: Demo has no Player Character service and no
 Player Character route or OpenAPI path.
 
-### P5-S3 acceptance-boundary-corrected implementation-candidate status
+### P5-S3 implementation status
 
 The dedicated
 [P5-S3 retirement activation plan](structured_player_character_p5_s3_implementation_plan.md)
@@ -820,11 +824,12 @@ and re-corrected local implementation candidates each received
 requested corrected evidence only. The later evidence candidate was followed
 by a focused receipt-add reachability investigation whose verdict was
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
-present acceptance-boundary-corrected unstaged candidate selects only explicit
+accepted implementation selects only explicit
 controller-requested retirement of an
-owned, active, unbound canonical character. It activates no deployed route and
-is not independently implementation-approved, committed, published, pushed,
-deployed, released, or production-authentication activated. It does not change
+owned, active, unbound canonical character. Its final independent review passed
+and it was committed and published as
+`34d063e387cde69500e4dc018ff087e87f3eee74`. It is not deployed, released, or
+production-authentication activated. It does not change
 the frozen lifecycle matrix: identity and controller binding remain preserved,
 revision advances once only on committed success, and an active Run binding
 continues to require the existing atomic lifecycle-transition rejection until
@@ -842,6 +847,42 @@ real receipt-add 1062 becomes mandatory only if a future composed runtime writer
 or changed transaction topology can legitimately reach that unique boundary
 without first serializing on the aggregate lock. No such topology is approved
 or required by this contract.
+
+### Phase 8 Run-entry and minimum playable-loop planning status
+
+Phase 5 ended with published P5-S3. No P5-S4 exists. The separately allocated
+Phase 8 planning candidate is the
+[Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
+It does not implement behavior and requires a separate independent planning
+review.
+
+The planned Phase 8 character-side boundary is narrow:
+
+- a bounded discovery query returns only detached projections of records owned
+  by the resolved controller, currently `active`, and without an active Run
+  binding;
+- one Run-entry-owned transaction locks and validates the exact selected
+  character and expected revision through the existing P4-S1 same-UoW seam;
+- the Run receives the existing complete active binding envelope with the exact
+  `PlayerCharacterId` and `ApplicableCharacterReference`;
+- one server-created Session receives separate Run participation and the Run
+  changes to `active` without copying the character aggregate into Session
+  state; and
+- no Phase 8 operation can replace, switch, follow, clear, historicalize, or
+  transfer the binding.
+
+The current scenario's static `character_definition_id` remains a separate
+server-selected Session-initialization fixture. It is not the Structured Player
+Character and cannot establish identity. Scenario settlement does not end the
+Run or release the active binding. Run completion/termination, binding
+historicalization, later Session/scenario movement, character-to-mechanics or
+Provider context, and post-ending reuse remain later authority.
+
+Phase 6 subject-reference compatibility hooks and Phase 7 closeout retain their
+existing allocations and remain unimplemented. Neither is a Phase 8
+prerequisite because Phase 8 creates no new memory/relationship/consequence
+fact and owns only its own bounded evidence/status closure. Phase 8 authorizes
+no schema or migration.
 
 Before any runtime implementation is accepted, the owning implementation
 specification MUST define and verify:
@@ -1012,18 +1053,18 @@ Phase 3 plus the completed Minimum Run Core at
 `e821cd922b61868097667b12c2b64cf8089a9681`. P4-S1a
 (`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
 (`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) complete the internal Run-owned
-continuous-story-line binding. P5-S1 and P5-S2 are published; public Run
-binding and all lifecycle mutation other than the P5-S3 normal-application
-unstaged retirement candidate remain unimplemented. The first,
+continuous-story-line binding. P5-S1, P5-S2, and P5-S3 are published. The first,
 first-corrected, and re-corrected P5-S3 candidates each received
 `CHANGES_REQUIRED`; the third review found no production-code defect and
 requested corrected evidence only. The later evidence candidate and focused
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH` verdict
-precede the present acceptance-boundary/test correction. This exact local
-candidate changes only the normal application's unstaged retirement boundary;
-correction validation passed with the canonical counts above, and fresh
-independent review still remains required.
-Demo, public Run, frontend, Web, and administration remain excluded.
+preceded the accepted correction. Correction validation passed with the
+canonical counts above, final independent review passed, and the result was
+committed and published as `34d063e387cde69500e4dc018ff087e87f3eee74`.
+Phase 5 is complete at P5-S3, no P5-S4 exists, and P5-S3 remains closed. Demo,
+public Run, frontend, Web, and administration were not activated by Phase 5.
+Phase 8 now has the separate planning candidate described above; it is not
+implemented. Phase 6 and Phase 7 remain allocated and unimplemented.
 Approval and freeze do not authorize later runtime work. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

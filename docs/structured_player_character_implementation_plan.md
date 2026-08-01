@@ -44,7 +44,7 @@ internal-only, and publicly inactive. No P4-S2 objective is defined by
 repository authority. P5-S1 owned-read activation is completed and published
 at `5955c47eac07429107b93ef85da6a055bd2044ef`
 (`feat(player-character): activate owned-read API`); it activates only the
-approved single-resource read and does not complete Phase 5. The P5-S2 public
+approved single-resource read. The P5-S2 public
 creation/replay contract is frozen and published at
 `245caff3903666fcd2dd9a318785f323117deb24`
 (`docs(player-character): define P5-S2 public contract`). P5-S2's bounded
@@ -59,19 +59,24 @@ and requested corrected evidence only. A later evidence candidate's receipt-add
 1062 depended on a mid-operation rollback-and-resume topology. The focused
 investigation returned
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
-present acceptance-boundary-corrected unstaged candidate now requires normal
-HTTP serialization evidence plus explicitly labelled defensive fault
-injection. Correction validation completed locally (canonical Offline 1,814
+accepted and published P5-S3 result uses normal HTTP serialization evidence
+plus explicitly labelled defensive fault injection. Correction validation
+completed locally (canonical Offline 1,814
 passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   Provider skip); its focused final independent review returned
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`, finding no
   material scoped defect. It accepted real-MySQL aggregate-lock serialization,
   exact replay or ordinary idempotency conflict, and one durable mutation; fault
   injection is bounded defensive recovery only, and the unreachable receipt-add
-  race is not a requirement. P5-S3 is independently approved and eligible for
-  exact-scope commit; P5-S4 and unrelated deferred work have not begun. Push,
-  deployment, release, runtime activation, Provider work, and Phases 6–7 remain
-  deferred.**
+  race is not a requirement. P5-S3 was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`
+  (`feat(player-character): add idempotent retirement endpoint`). P5-S3 is not
+  a current unstaged candidate. Phase 5 ended with P5-S3; no P5-S4 exists or has
+  begun, and Phase 8 planning does not reopen Phase 5. Phase 6 and Phase 7
+  retain their allocations and remain unimplemented. Phase 8 — Structured
+  Player Character Run Entry and Minimum Playable Loop — is the selected
+  planning priority under its dedicated candidate plan. Push by Codex,
+  deployment, release, runtime activation, and Provider work remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -402,28 +407,27 @@ operation receipts, Repositories, and same-session UoW wiring, and completed
 Phase 3 supplies the trusted `PlayerCharacterService` plus normal production
 composition for create, mutate, and `get_owned`. Minimum Run Core supplies its
 Run models, persistence, service, and composition; completed P4-S1 activates
-the separately named internal binding seam. Except for P5-S1's owned GET,
-P5-S2's bounded normal POST creation/replay route, and the present unstaged
-P5-S3 normal POST retirement candidate, configured service
-dependency getter, public exposure of the existing
-`PlayerCharacterSelfProjection` DTO, and their corresponding OpenAPI
-operations, all other Player Character public routes, Run binding routes,
-mutation, listing, search, and administration surfaces; frontend and Demo
-behavior; scenario/world execution; and the Run transition to `active` remain
-absent.
+the separately named internal binding seam. P5-S1's owned GET, P5-S2's bounded
+normal POST creation/replay route, P5-S3's normal POST retirement route, the
+configured service dependency getter, public exposure of the existing
+`PlayerCharacterSelfProjection` DTO, and their corresponding OpenAPI operations
+are implemented and published. All other Player Character public routes,
+including Run binding, general mutation, listing, search, and administration
+surfaces; frontend and Demo behavior; scenario/world execution; and the Run
+transition to `active` remain absent.
 
-The acceptance-boundary-corrected P5-S3 retirement candidate is unstaged and
-locally validated after the focused
-  `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH` verdict.
+The accepted P5-S3 retirement implementation was locally validated after the
+  focused `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`
+  verdict.
   Its focused final independent review returned
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
   material scoped defect. The accepted real-MySQL evidence proves aggregate-lock
   serialization, replay/conflict, and one durable mutation; fault injection is
   bounded defensive recovery only, and the unreachable receipt-add race is not a
-  requirement. P5-S3 is independently approved and eligible for exact-scope
-  commit, not published, pushed, deployed, released, or runtime-activated.
-  P5-S4 and all unrelated deferred work have not begun; Provider work remains
-  deferred.
+  requirement. P5-S3 was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`. Phase 5 is complete at P5-S3;
+  no P5-S4 exists or has begun. Phase 8 planning does not imply deployment,
+  release, runtime activation, or Provider work.
 
 For this slice, mandatory real-MySQL evidence is normal HTTP concurrency through
 distinct connections/UoWs: the second retirement waits at the Player Character
@@ -3664,18 +3668,20 @@ unchanged. Demo has no Player Character service, route, method, or OpenAPI path,
 and no frontend creation method exists. P5-S3's first, first-corrected, and
 re-corrected local candidates each received `CHANGES_REQUIRED`; the later
 evidence candidate was followed by the focused verdict
-`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. Its
-acceptance-boundary-corrected unstaged normal-application retirement candidate
-follows `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`; correction validation
-  passed with the canonical counts above. Its focused final independent review
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
+accepted and published normal-application retirement result follows
+`STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`; correction validation passed
+  with the canonical counts above. Its focused final independent review
   returned `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`
   with no material scoped defect, accepting real-MySQL aggregate-lock
   serialization, replay/conflict, and one durable mutation, and fault injection
   only as bounded defensive recovery; the unreachable receipt-add race is not a
-  requirement. P5-S3 is independently approved and eligible for exact-scope
-  commit; P5-S4 and unrelated deferred work have not begun. UI, Demo, Run
-  behavior, runtime activation, Provider work, and broader Phase 5 work remain
-  inactive or deferred.
+  requirement. P5-S3 was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`. P5-S3 is not a current unstaged
+  candidate. Phase 5 ended with P5-S3; no P5-S4 exists or has begun. Phase 8
+  now owns the separately planned minimum playable-loop connection without
+  reopening Phase 5. Provider work, deployment, release, and every broader
+  excluded feature remain deferred.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3733,6 +3739,26 @@ product decision was selected.
 Stop conditions: verification failure, documentation drift, unexpected changed
 paths, migration mismatch, live Provider dependency, or missing independent
 audit.
+
+### Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop
+
+Phase 8 is the currently selected planning priority. It is separately defined
+by the
+[Phase 8 playable-loop plan](structured_player_character_run_playable_loop_plan.md).
+It owns only the minimum connection from owned structured-character discovery
+through authoritative Run admission and immutable character binding into the
+existing Session-backed Run progression and Demo/client experience. It does not
+rename, replace, complete, or import Phase 6 or Phase 7. Neither phase is a
+prerequisite for the planned minimum loop: no new
+memory/relationship/consequence subject fact is introduced, and Phase 7's
+whole-roadmap closeout remains deferred.
+
+Phase 8 reuses the completed P5-S1, P5-S2, and P5-S3 capabilities without
+reopening them, and it preserves the current Run and Session authority. Its
+candidate plan authorizes no implementation by itself and requires a separate
+independent planning review before any slice may begin. Later phases may add
+the explicitly deferred game, Provider, content, progression, profile, and
+production capabilities.
 
 ## 25. File-level implementation inventory
 
@@ -3801,19 +3827,20 @@ slice. P5-S2 is independently approved, committed, and published at
 `4ba66d8f277988325795c905fdf6fd9e416d7457`; it is not deployed or Demo/
 frontend-activated. P5-S3's first, first-corrected, and re-corrected
 implementation candidates each received `CHANGES_REQUIRED`; the
-later evidence candidate and focused not-reachable verdict precede the present
-acceptance-boundary-corrected unstaged candidate. It follows
+later evidence candidate and focused not-reachable verdict preceded the
+accepted implementation. It follows
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its focused final
   independent review returned
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
   material scoped defect; accepted real-MySQL evidence proves aggregate-lock
   serialization, replay/conflict, and one durable mutation, while fault injection
   is bounded defensive recovery only and the unreachable receipt-add race is not
-  a requirement. P5-S3 is independently approved and eligible for exact-scope
-  commit; P5-S4 and unrelated deferred work have not begun. Correction validation
-  passed with the canonical counts above; publication, push, deployment, release,
-  runtime activation, and Provider work remain deferred.
-All Phase 6–7 work remains unimplemented or deferred.
+  a requirement. Correction validation passed with the canonical counts above,
+  and P5-S3 was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`. Phase 5 is complete at P5-S3;
+  no P5-S4 exists or has begun. Phase 6 and Phase 7 remain separately allocated
+  and unimplemented. Phase 8 has an unstaged planning candidate only; no Phase 8
+  production, test, migration, Demo, or client implementation has begun.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 

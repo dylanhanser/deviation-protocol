@@ -19,7 +19,7 @@ later evidence candidate produced a receipt-add 1062 only through a
 mid-operation rollback-and-resume topology. The focused investigation returned
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`; normal
 production retirement writers serialize at the Player Character aggregate
-lock. The present acceptance-boundary-corrected unstaged candidate replaces the
+lock. The accepted implementation replaced the
 unreachable race claim with normal concurrent HTTP replay/conflict evidence and
 explicitly labels recovery evidence as bounded fault injection. Its correction
 validation completed locally (canonical Offline 1,814 passed/124 expected skips,
@@ -29,10 +29,12 @@ validation completed locally (canonical Offline 1,814 passed/124 expected skips,
   material scoped defect. It accepted real-MySQL aggregate-lock serialization,
   exact replay or ordinary idempotency conflict, and one durable mutation; fault
   injection is bounded defensive recovery only, and the unreachable receipt-add
-  race is not a requirement. P5-S3 is independently approved and eligible for
-  exact-scope commit; P5-S4 and unrelated deferred work have not begun. No Demo,
-  public Run, frontend, Web, administration, production-authentication, runtime,
-  deployment, release, or Provider activation follows from this candidate.
+  race is not a requirement. P5-S3 was committed and published as
+  `34d063e387cde69500e4dc018ff087e87f3eee74`
+  (`feat(player-character): add idempotent retirement endpoint`). Phase 5 is
+  complete at P5-S3; no P5-S4 exists and no P5-S3 review remains pending. No
+  Demo, public Run, frontend, Web, administration, production-authentication,
+  deployment, release, or Provider activation followed from Phase 5.
 
 ## Owned Player Character read
 
@@ -472,10 +474,11 @@ This section is the narrow public-contract amendment for the dedicated
 [approved P5-S3 plan](structured_player_character_p5_s3_implementation_plan.md).
 Its first, first-corrected, and re-corrected local implementation candidates
 each received `CHANGES_REQUIRED`; a later evidence candidate was followed by
-the focused not-reachable verdict recorded above. The present
-  acceptance-boundary-corrected candidate received
+the focused not-reachable verdict recorded above. The accepted implementation
+  candidate received
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
-  material scoped defect and is eligible for exact-scope commit. The accepted
+  material scoped defect and was committed and published at
+  `34d063e387cde69500e4dc018ff087e87f3eee74`. The accepted
   real-MySQL evidence proves aggregate-lock serialization, replay/conflict, and
   one durable mutation; fault injection proves bounded defensive recovery only,
   and the unreachable receipt-add race is not a requirement. It specifies the
@@ -809,7 +812,8 @@ change to `src/deviation_protocol/api/errors.py` or
 
 ### P5-S3 OpenAPI contract
 
-The corrected unstaged normal-application candidate operation is exactly:
+P5-S3 is not a current unstaged candidate. Its accepted and published
+normal-application operation is exactly:
 
 | OpenAPI property | Required value |
 | --- | --- |
@@ -840,8 +844,9 @@ schemas. It does not advertise final death, deletion, reactivation, continuity
 return, general update/mutation, binding changes, Run termination, controller
 data, confirmation provenance, receipts, fingerprints, persistence types, or
 internal command/result models. Framework-default validation bodies are not the
-public 422 contract. The normal route inventory gains only this unstaged-candidate POST;
-Demo and public Run inventories gain nothing.
+public 422 contract. The normal route inventory gained only this published POST;
+Demo and public Run inventories gained nothing. Phase 5 is closed at P5-S3, no
+P5-S4 exists, and Phase 8 planning does not reopen it.
 
 ### P5-S3 exclusions
 
@@ -855,6 +860,245 @@ NPC, memory, relationship, combat, content, or broader gameplay work; schema,
 ORM, migration, repository, Unit-of-Work, receipt, CAS, transaction, or
 dependency redesign; generic retry; uncertain-commit recovery; or a P4-S2
 objective.
+
+## Planned Phase 8 Player Character discovery and Run entry
+
+Status: **Phase 8 public-contract planning candidate — not implemented.**
+
+The dedicated authority is the
+[Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
+The exact seven-document candidate requires separate independent planning
+review before implementation. Phase 5 remains complete at P5-S3; no P5-S4
+exists. Existing Phase 6 and Phase 7 allocations remain unchanged.
+
+### Eligible-character collection
+
+Phase 8 plans one purpose-specific normal/Demo operation:
+
+```http
+GET /v1/player-characters/eligible-for-run-entry
+```
+
+It accepts no path parameter, query, body, filter, search, sorting, page,
+cursor, count, controller, lifecycle, binding, or administration input. The
+server resolves the trusted principal to controller authority before reading
+private data.
+
+The exact success body is:
+
+```json
+{
+  "eligible_player_characters": [
+    {
+      "player_character_id": {"value": "pc.example"},
+      "contract_version": "structured-player-character/v1",
+      "record_revision": {"value": 1},
+      "lifecycle": "active"
+    }
+  ],
+  "truncated": false
+}
+```
+
+Every item is the existing detached four-field
+`PlayerCharacterSelfProjection`. Only records owned by the resolved controller,
+currently `active`, and without an active Run binding are returned. Results use
+exact case-sensitive `player_character_id` ascending order. The service reads
+at most 33 eligible rows, returns at most 32, and sets `truncated=true` only
+when another eligible row exists. The cap is a response-safety bound, not an
+account limit. No total count or pagination contract exists.
+
+A resolved controller with no eligible character receives HTTP 200 with an
+empty tuple/list and `truncated=false`. Unavailable controller authority uses
+the existing non-enumerating 404 Player Character envelope. Invalid transport
+uses the existing safe 422 envelope; unexpected or integrity failures use the
+existing safe 500 envelope. The read performs no lock, write, receipt, commit,
+or recovery.
+
+### Run-entry request
+
+Phase 8 plans one normal/Demo mutation:
+
+```http
+POST /v1/runs
+Idempotency-Key: <opaque operation identity>
+Content-Type: application/json
+
+{
+  "player_character_id": "pc.example",
+  "expected_record_revision": 1,
+  "scenario_id": "death_certificate"
+}
+```
+
+`Idempotency-Key` uses the existing Player Character/Run opaque ASCII grammar
+and 1-through-128-character bound. It is scoped by the server-resolved
+controller and is never authority. The strict extra-forbid JSON body admits
+only:
+
+| Field | Public rule |
+| --- | --- |
+| `player_character_id` | Exact opaque `PlayerCharacterId` grammar and 1-through-128 ASCII-character bound |
+| `expected_record_revision` | Positive signed-64-bit current Player Character revision selected from an authoritative projection |
+| `scenario_id` | Exact safe opaque scenario ID selected from `GET /v1/scenarios`, then revalidated by the server |
+
+The request admits no principal, controller, ownership, Run, continuous-story-
+line, Session, world, visit, lifecycle, binding, applicable-reference object,
+character-definition, snapshot, state, receipt, operation namespace, seed,
+event, Provider, or recovery field. The server issues Run/line/Session
+identities, derives internal operation identities, selects the scenario's
+validated default static character definition for current Session
+initialization, and owns every authoritative state transition.
+
+First committed success and exact replay both return HTTP 200:
+
+```json
+{
+  "run_id": "run.example",
+  "session_id": "session-example",
+  "scenario_id": "death_certificate",
+  "player_character": {
+    "player_character_id": {"value": "pc.example"},
+    "contract_version": "structured-player-character/v1",
+    "record_revision": {"value": 1},
+    "lifecycle": "active"
+  }
+}
+```
+
+All four top-level fields are required. The response is intentionally stable
+after gameplay advances: it contains no Session phase/version/timestamps,
+initial Frame, current View, or Run state version. The client must immediately
+read `GET /v1/sessions/{session_id}/view` and then follow existing authoritative
+affordances.
+
+The response never exposes continuous-story-line identity, controller binding,
+full applicable reference, operation IDs, fingerprints, receipts, authority
+source, binding state/times, static character definition, world/visit identity,
+snapshot, hidden scenario state, SQL, Provider, transaction, lock, or recovery
+data.
+
+### Run-entry authority and replay
+
+The server proves ownership before targeted receipt disclosure. For a new
+operation it requires the exact current revision, lifecycle `active`, and no
+active Run binding under the Player Character lock. It validates the scenario
+through existing catalogue authority. One application-owned UoW then creates
+the Run/line, writes the immutable exact character binding, creates the Session
+and initial scenario state, adds separate Session participation, activates the
+Run, writes successful receipts, and commits once.
+
+Exact replay returns the original stable body without identity issuance,
+mutation, state-version advance, Session creation, or commit. Incompatible use
+of the same controller-scoped key returns the existing 409
+`IDEMPOTENCY_CONFLICT`. A different key for an already-bound character returns
+409 `PLAYER_CHARACTER_NOT_ELIGIBLE`; it does not disclose or resume the
+existing Run. A stale expected revision returns 409
+`PLAYER_CHARACTER_STALE`. A concurrency/CAS/participation conflict not
+explained by exact replay returns 409 `RUN_ENTRY_CONFLICT`.
+
+Foreign ownership, missing ownership, and unavailable authoritative ownership
+mapping converge on the same 404 `PLAYER_CHARACTER_NOT_FOUND`. Malformed or
+corrupt surviving canonical ownership evidence or state is an integrity
+failure, is never disguised as a normal ownership miss, and uses the existing
+safe 500 envelope without raw integrity or storage detail. Retired, deceased,
+bound, version-exhausted, or otherwise ineligible owned characters use
+`PLAYER_CHARACTER_NOT_ELIGIBLE`. An unavailable scenario uses the existing 422
+`INVALID_SCENARIO_DEFINITION`. Other corrupt stored evidence, impossible
+internal results, persistence errors, and uncertain commit outcomes also use
+the existing safe 500 envelope and disclose no internal detail. Cancellation
+propagates and uncommitted state rolls back. There is no generic or automatic
+retry.
+
+### OpenAPI boundary
+
+Phase 8 OpenAPI must describe exactly:
+
+- the eligible collection's 200, 404, 422, and 500 responses;
+- the Run-entry operation's required `Idempotency-Key`, exact strict body,
+  exact 200 success DTO, and 404/409/422/500 error responses;
+- the existing `ErrorResponse` envelope for every error; and
+- no internal domain, persistence, receipt, authority, or Provider model.
+
+Runtime and OpenAPI must use the same DTOs and status set. FastAPI's default
+validation body is not public contract.
+
+### Client and recovery boundary
+
+The minimal client may create a character through the existing route, render
+the eligible collection, select one item and one public scenario, submit Run
+entry as one logical attempt, store only the returned Session ID through the
+existing same-tab recovery helper, read the authoritative View, and reuse the
+current action, polling, refresh, and terminal loop.
+
+For both Player Character creation and Run entry, one logical mutation attempt
+has one exact idempotency key and one exact request body. The Web client MUST:
+
+1. generate the key before issuing the first POST and freeze the exact body at
+   the same boundary;
+2. retain that key/body pair in component/process memory while durability is
+   uncertain, never attach a different body to the retained key, and never
+   silently generate a replacement key for the unresolved attempt;
+3. perform no automatic retry; only an explicit user-triggered manual retry is
+   allowed, and it resends the exact same key and exact same body;
+4. treat a directly received contract-defined 404 as clearable only when no
+   earlier send for that retained key/body pair has produced a
+   durability-unknown outcome;
+5. clear a Player Character creation attempt after an authoritative 200
+   success/replay; subject to the history-sensitive 404 rule above, the route's
+   documented definitive 404, 409, or 422 rejection may also clear it;
+6. after an authoritative 200 Run-entry success/replay, validate the response,
+   store its `session_id` through the existing same-tab recovery helper, and
+   only then clear the retained Run-entry attempt; subject to the same
+   history-sensitive 404 rule, the route's documented definitive 404, 409, or
+   422 rejection may also clear it;
+7. after transport loss, timeout, response loss, cancellation, the sanitized
+   500 envelope, an unrecognized response, or any other outcome whose commit
+   status is unknown, mark the retained logical attempt as uncertainty-tainted
+   and retain its exact key/body pair. Because the same public 500 covers both
+   ordinary internal failure and uncertain commit durability, a client cannot
+   classify it as a definitive rejection; and
+8. while uncertainty-tainted, never treat a later authorization, ownership,
+   unavailable-authority, or non-enumerating 404 as proof that the earlier send
+   did not commit, and never clear the retained pair because of that 404. The
+   client keeps the exact same key and exact frozen body, generates no
+   replacement key, attaches no different body, performs no automatic or
+   silent retry, and permits only a later explicit user-triggered retry using
+   that exact pair. A tainted attempt may clear only when an operation-specific
+   authoritative result resolves the earlier uncertainty under this public
+   contract. The existing authoritative-success behavior and the documented
+   classification of responses other than this history-sensitive 404 remain
+   unchanged.
+
+The retained attempt exists only in component/process memory for the currently
+loaded Web experience. Reload before an authoritative response—and, for Run
+entry, before the Session recovery record is stored—cannot recover that
+pending attempt and remains unsupported. Browser close, cross-tab,
+cross-browser, cross-device, and multi-device pending-operation recovery are
+also unsupported. Phase 8 adds no `localStorage`, new `sessionStorage`
+pending-operation record, IndexedDB, receipt-discovery route, Run-discovery
+route, other server discovery route, durable pending-operation store,
+automatic recovery, or background retry.
+
+The client does not infer eligibility, binding, lifecycle, scenario outcome, or
+Run state. It adds no Run/character recovery record, optimistic state,
+`localStorage`, URL authority, automatic entry/action replay, cross-tab,
+browser-close, cross-browser, cross-device, or multi-device guarantee.
+Explicitly clearing the current tab's Session does not end a Run, detach or
+retire a character, or delete server state.
+
+Scenario settlement remains the current Session `ENDED` and
+`RESOLVED`/`FAILED` projection. It does not complete or terminate the Run,
+which remains active and bound for later separately authorized continuation.
+
+### Phase 8 public exclusions
+
+Phase 8 adds no general character list/search/filter/page/count/admin or profile
+UI; no public Run read/list/patch/bind/rebind/attach/complete/terminate/resume/
+exit/delete operation; no character switching, transfer, retirement change,
+reactivation, final death, or binding historicalization; no world/profile/
+visit contract; no new scenario/content; no Provider behavior; no production
+authentication/deployment; and no schema or migration.
 
 ## Public scenario discovery
 

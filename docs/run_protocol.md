@@ -4,6 +4,11 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
+Phase 8 planning amendment: **The separately allocated Phase 8 Structured
+Player Character Run Entry and Minimum Playable Loop candidate defines one
+narrow Session-backed activation path below. It is not implemented and does
+not mark Phase 3.3, Phase 6, or Phase 7 complete.**
+
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
 core`). P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb`
@@ -83,6 +88,109 @@ The completed minimum Run core and its production composition remain internal.
 The reserved character-binding seam was populated by the completed separately
 authorized P4-S1 work. That internal completion does not activate a public
 binding route or the `active` lifecycle transition.
+
+## Planned Phase 8 Session-backed minimum admission
+
+Status: **Phase 8 planning candidate — not implemented**
+
+The explicit Phase 8 allocation and detailed implementation boundary are owned
+by the
+[Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
+The exact planning candidate requires separate independent review and
+publication before implementation.
+
+### Narrow authority amendment
+
+Phase 8 authorizes one composite trusted operation for the current
+Session/scenario engine:
+
+```text
+owned active unbound Player Character
+  -> create Run revision 1 at pre_first_turn
+  -> bind exact character/reference in revision 2
+  -> create one existing gameplay Session
+  -> attach first Session participation in revision 3
+  -> change Run lifecycle to active in that same revision
+  -> one Run-entry-owned UnitOfWork commit
+```
+
+The first participation retains `ATTACH_SESSION` as its Run mutation kind. No
+new Run lifecycle value or mutation token is selected. The existing active
+binding and `ApplicableCharacterReference` remain exact and immutable across
+activation. A Run may not change character through any Phase 8 surface.
+
+This is a narrow compatibility amendment to the earlier rule that an active
+Run must already have a full resolved protocol and entry-world binding. The
+amendment applies only to Phase 8 Session-backed Runs using the current
+implemented scenario lifecycle. It does not implement, simulate, or claim:
+
+- a resolved/frozen Run Protocol;
+- `entry_world_id`, `entry_world_version`, world, visit, or region identity;
+- world/profile parameters or permitted overrides;
+- later-world selection, revisits, world-line movement, or progression; or
+- Phase 3.3-native Run acceptance.
+
+The request's `scenario_id` remains the existing versioned scenario identity
+and MUST NOT be relabelled as a world or visit. The server selects the
+scenario's already validated default static character definition for current
+Session initialization. That definition remains distinct from the Run-bound
+Structured Player Character.
+
+When full Phase 3.3 is implemented, its plan must explicitly preserve,
+version, or migrate these legacy Session-backed active Runs before applying a
+Phase 3.3-native protocol/world requirement to them. Phase 8 selects no future
+column, migration, backfill, or compatibility representation.
+
+### Admission authority and transaction
+
+The public client may submit only an owned Player Character ID, its expected
+current revision, one scenario selected from the existing bounded public
+catalogue, and an idempotency key. It cannot submit Run, line, Session, world,
+visit, lifecycle, binding, applicable-reference, static character-definition,
+state, or authority data.
+
+One application entry service resolves principal/controller authority, locks
+and validates the exact active unbound character, evaluates compatible replay
+before new-operation stale/eligibility rejection, creates all identities and
+authoritative state server-side, and commits the Run revisions/current rows,
+binding, existing Session initialization family, participation, and successful
+receipts in one UoW. Repositories flush and never commit. No nested service
+commit, generic retry, compensation, outbox, saga, or uncertain-commit recovery
+is permitted.
+
+Concurrent admissions for one character serialize at the Player Character
+lock and retain the unique active-character database backstop. Exactly one new
+Run may commit. The loser receives exact replay, incompatible-key conflict, or
+already-bound ineligibility without a second Run, Session, participation, or
+binding.
+
+### Progression, completion, recovery, and exit
+
+After admission, the existing Session View/action/request-status protocol is
+the only Phase 8 progression authority. Current stale, pending, uncertain,
+Provider-failure, rollback, and same-tab recovery rules remain unchanged.
+
+An existing scenario ending is not a Run ending. `ENDED`, `RESOLVED`, and
+`FAILED` remain Session/scenario projections. The Run remains `active`, its
+character binding remains active, and participation remains immutable. Phase 8
+does not implement `completed`, `terminated`, binding historicalization,
+later-Session attachment, later-scenario admission, Run resume/discovery, or
+line continuation. Clearing browser/sessionStorage state is client-only and
+never mutates the Run or character.
+
+### Phase relationship
+
+Phase 6 subject-reference hooks are not a prerequisite because Phase 8 creates
+no new memory/relationship/consequence fact. Phase 7 remains separately
+allocated and unimplemented; Phase 8 owns only its own bounded final evidence
+and status slice. Neither allocation is absorbed, reinterpreted, or marked
+complete.
+
+The current schema and migration `20260729_0005` already admit Run lifecycle
+`active`, the three existing mutation kinds, active binding, Session
+participation, CAS, and the required receipt families. Phase 8 therefore
+authorizes no ORM or migration change. A contrary implementation finding is a
+plan stop condition.
 
 ## Responsibility separation
 

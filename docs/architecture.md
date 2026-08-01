@@ -239,7 +239,7 @@ only by rolling back the original mutation transaction and resuming the stale
 operation. The focused investigation verdict
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH` established
 that legitimate production writers serialize at the aggregate `FOR UPDATE`
-boundary. The present acceptance-boundary-corrected unstaged candidate exposes
+boundary. The accepted implementation exposes
 only the normal-application
 `POST /v1/player-characters/{player_character_id}/retirement` boundary over
   the committed `PlayerCharacterService.mutate` and P4-S1 guard. Its focused
@@ -248,11 +248,12 @@ only the normal-application
   material scoped defect. It accepted real-MySQL aggregate-lock serialization,
   exact replay or ordinary idempotency conflict, and one durable mutation; fault
   injection is bounded defensive recovery only, and the unreachable receipt-add
-  race is not a requirement. P5-S3 is independently approved and eligible for
-  exact-scope commit; P5-S4 and unrelated deferred work have not begun. It is
-  not published, deployed, or activated in Demo, public Run, frontend, Web,
-  administration, or production; runtime activation, release, and Provider work
-  remain deferred.
+  race is not a requirement. P5-S3 was committed and published as
+  `34d063e387cde69500e4dc018ff087e87f3eee74`
+  (`feat(player-character): add idempotent retirement endpoint`). Phase 5 is
+  complete at P5-S3; no P5-S4 exists and no P5-S3 review remains pending. It is
+  not deployed or activated in Demo, public Run, frontend, Web,
+  administration, or production; release and Provider work remain deferred.
 
 P3-S1 adds only an injectable application service boundary over the accepted
 Phase 1 and Phase 2 authorities. Typed `RequestPrincipal`,
@@ -511,27 +512,74 @@ Composition itself performs no UnitOfWork, SQL, ID issuance, or mutation.
 Supported startup fails closed when required controller-binding configuration
 is absent, and no fake or development resolver or fake issuer is installed.
 
-Except for the published P5-S1 owned read and P5-S2 creation/replay route,
-and the acceptance-boundary-corrected unstaged P5-S3 normal-application
-retirement candidate,
-Player Character API activation remains deferred. P5-S3 received
+P5-S1 owned read, P5-S2 creation/replay, and P5-S3 normal-application
+retirement are published Player Character API surfaces. Other Player Character
+API activation remains deferred. P5-S3 received
 `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`; its first, first-corrected,
 and re-corrected candidates received `CHANGES_REQUIRED`; the later evidence
-candidate was followed by the focused not-reachable verdict above. The present
-correction passed local validation (canonical Offline 1,814 passed/124 expected
+  candidate was followed by the focused not-reachable verdict above. The accepted
+  correction passed local validation (canonical Offline 1,814 passed/124 expected
   skips, MySQL 136 passed, and Full 1,937 passed/one opt-in Provider skip). Its
   focused final independent review returned
   `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
   material scoped defect, accepting real-MySQL serialization, replay/conflict,
   and one durable mutation, and fault injection only as bounded defensive
-  recovery; the unreachable receipt-add race is not a requirement. P5-S3 is
-  eligible for exact-scope commit; P5-S4 has not begun. Publication, push,
-  deployment, release, runtime activation, and Provider work remain deferred.
+  recovery; the unreachable receipt-add race is not a requirement. P5-S3 was
+  committed and published at `34d063e387cde69500e4dc018ff087e87f3eee74`.
+  Phase 5 is complete at P5-S3, no P5-S4 exists, and P5-S3 remains closed. It
+  is not a current unstaged candidate, and Phase 8 planning does not reopen it.
+  Deployment, release, broader runtime activation, and Provider work remain
+  deferred.
 Frontend activation, Demo
 behavior, Provider behavior, Run Protocol integration, narrative integration,
 scenario integration, combat integration, and broader public gameplay
 activation remain deferred. P4-S1 alone is complete; no broader Phase 4
 completion is implied.
+
+## Planned Phase 8 Run-entry and playable-loop boundary
+
+Phase 8 is explicitly allocated to Structured Player Character Run Entry and
+the Minimum Playable Loop. Its unstaged planning candidate is
+[`structured_player_character_run_playable_loop_plan.md`](structured_player_character_run_playable_loop_plan.md).
+It is not implemented.
+
+The planned architecture reuses the current MySQL/`AsyncSession` Unit of Work,
+Player Character aggregate and detached projection, Run revision/current/
+receipt families, P4-S1 binding seam, separate Session participation, existing
+Session initialization/action/View lifecycle, and independent deterministic
+Demo composition. It adds only:
+
+- a bounded owned, active, currently unbound character discovery query;
+- one application-owned atomic admission transaction that creates Run/line,
+  binds the exact applicable character reference, creates one Session and
+  participation, and changes the Run from `pre_first_turn` to `active`;
+- one normal `POST /v1/runs` route plus exact public DTO/OpenAPI behavior;
+- process-local Demo adapters for the existing Player Character and Run ports;
+  and
+- the minimum existing-Web create-or-reuse/select/start connection.
+
+The planned transaction has one owner and one commit. It creates Run revisions
+1/2/3 for creation, binding, and first Session participation/activation,
+respectively. Existing schema `20260729_0005` already admits those lifecycle,
+mutation, binding, receipt, participation, and uniqueness forms; Phase 8
+therefore prohibits ORM and migration changes. A proof that the current schema
+is insufficient is a plan stop condition, not permission for a convenience
+migration.
+
+The selected `scenario_id` remains a scenario identity, never a world or visit.
+Current Session initialization uses the scenario's server-selected default
+static character definition as a compatibility fixture; that definition is not
+the Structured Player Character. Scenario settlement remains the existing
+Session `ENDED` plus `RESOLVED`/`FAILED` View. It does not complete or terminate
+the continuing Run, which remains active and bound. Full Run Protocol/world
+behavior, later Session/scenario progression, Run terminal transitions,
+binding historicalization, profile/mechanics/prompt integration, Provider work,
+and production activation remain deferred.
+
+The existing Phase 6 and Phase 7 allocations remain unchanged and
+unimplemented. Neither is a Phase 8 prerequisite: Phase 8 creates no new
+memory/relationship/consequence fact, and its own final slice supplies only the
+evidence/status closure for this stage.
 
 ## Current composition roots and Provider boundaries
 
