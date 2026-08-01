@@ -851,10 +851,16 @@ or required by this contract.
 ### Phase 8 Run-entry and minimum playable-loop planning status
 
 Phase 5 ended with published P5-S3. No P5-S4 exists. The separately allocated
-Phase 8 planning candidate is the
+Phase 8 approved and published planning authority is the
 [Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
-It does not implement behavior and requires a separate independent planning
-review.
+Its original seven-document planning candidate received
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
+It does not implement behavior. Later modifications to its canonical planning
+bytes require fresh exact-byte independent review before a separately authorized
+documentation commit; that commit precedes user publication and clean
+published-baseline confirmation. P8-S1 has not begun and requires a separate
+explicit implementation task.
 
 The planned Phase 8 character-side boundary is narrow:
 
@@ -1063,8 +1069,9 @@ canonical counts above, final independent review passed, and the result was
 committed and published as `34d063e387cde69500e4dc018ff087e87f3eee74`.
 Phase 5 is complete at P5-S3, no P5-S4 exists, and P5-S3 remains closed. Demo,
 public Run, frontend, Web, and administration were not activated by Phase 5.
-Phase 8 now has the separate planning candidate described above; it is not
-implemented. Phase 6 and Phase 7 remain allocated and unimplemented.
-Approval and freeze do not authorize later runtime work. The approved final
+Phase 8 now has the approved and published planning authority described above;
+it is not implemented, and P8-S1 through P8-S6 remain unimplemented and
+unauthorized. Phase 6 and Phase 7 remain allocated and unimplemented. Planning
+approval and publication do not authorize later runtime work. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

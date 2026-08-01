@@ -539,9 +539,14 @@ completion is implied.
 ## Planned Phase 8 Run-entry and playable-loop boundary
 
 Phase 8 is explicitly allocated to Structured Player Character Run Entry and
-the Minimum Playable Loop. Its unstaged planning candidate is
+the Minimum Playable Loop. Its approved and published planning authority is
 [`structured_player_character_run_playable_loop_plan.md`](structured_player_character_run_playable_loop_plan.md).
-It is not implemented.
+The approved planning bytes were committed and published at
+`de4d8c0e35c7864948306d751a00aaf295ff77ff`. Phase 8 is not implemented;
+P8-S1 has not begun and requires a separate explicit implementation task.
+Later modifications to the planning-authority bytes require exact-byte
+independent review before a separately authorized documentation commit; that
+commit precedes user publication and clean published-baseline confirmation.
 
 The planned architecture reuses the current MySQL/`AsyncSession` Unit of Work,
 Player Character aggregate and detached projection, Run revision/current/

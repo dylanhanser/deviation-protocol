@@ -134,7 +134,7 @@ documents.
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
 | Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
-| Phase 8 | **Planning candidate — not implemented** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
+| Phase 8 | **Approved and published planning authority — not implemented** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -402,14 +402,16 @@ stages:
 7. **Phase 7 — Regression, documentation, and closeout: allocated, not implemented**
    - its existing scope remains unchanged and is not marked complete by current
      priority ordering.
-8. **Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop: planning candidate**
-   - explicit user allocation selects the minimum create-or-reuse, eligible
-     character discovery, authoritative Run entry/binding, existing gameplay,
-     deterministic Demo, and minimal Web backbone described in the
+8. **Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop: approved and published planning authority**
+   - explicit user allocation and the approved planning authority select the
+     minimum create-or-reuse, eligible character discovery, authoritative Run
+     entry/binding, existing gameplay, deterministic Demo, and minimal Web
+     backbone described in the
      [dedicated Phase 8 plan](docs/structured_player_character_run_playable_loop_plan.md).
-   - Phase 8 is the current planning priority. It neither implements nor
-     completes Phase 6 or Phase 7, and future features remain addable through
-     later phases.
+   - Phase 8 is the current planning priority but remains unimplemented. P8-S1
+     has not begun and requires separate explicit implementation authorization.
+     Phase 8 neither implements nor completes Phase 6 or Phase 7, and future
+     features remain addable through later phases.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -652,7 +654,7 @@ The canonical decision is
 
 ## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
 
-Status: **Planning candidate — not implemented.**
+Status: **Approved and published planning authority — not implemented.**
 
 Phase 8 is explicitly allocated to the next selected product priority: create
 or reuse an owned Structured Player Character, discover/select an eligible one,
@@ -660,7 +662,7 @@ enter a server-created Run immutably bound to it, create trusted Session
 participation, and play through the existing authoritative Session lifecycle in
 the deterministic Demo and minimal existing Web client.
 
-The canonical candidate is the
+The canonical approved and published planning authority is the
 [Phase 8 implementation plan](docs/structured_player_character_run_playable_loop_plan.md).
 It preserves the existing Phase 6 subject-reference and Phase 7 closeout
 allocations exactly. Neither unfinished phase is a prerequisite for the minimum
@@ -669,9 +671,16 @@ its own bounded final evidence/status slice. Full world/profile behavior,
 later-world progression, Run termination, Provider work, production
 authentication, deployment, and broader game systems remain outside Phase 8.
 
-Planning Phase 8 does not authorize implementation. The exact seven-document
-candidate requires a separate independent planning review and published clean
-baseline before any separately authorized implementation slice begins.
+The original exact seven-document planning candidate received
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
+Planning publication does not authorize implementation. Later modifications to
+the canonical planning bytes require fresh exact-byte independent review before
+a separately authorized documentation commit; that commit precedes user
+publication and clean published-baseline confirmation. P8-S1 has not begun and
+may begin only through a separate explicit implementation task after that
+sequence. P8-S2 through P8-S6 also remain unimplemented and unauthorized, and
+Phase 8 is not complete.
 
 ## Deferred
 
@@ -728,8 +737,8 @@ manually.
 - Approved P5-S3 plan and independently approved and published retirement
   history:
   [`docs/structured_player_character_p5_s3_implementation_plan.md`](docs/structured_player_character_p5_s3_implementation_plan.md).
-- Phase 8 Structured Player Character Run entry and minimum playable-loop
-  candidate:
+- Approved and published Phase 8 Structured Player Character Run entry and
+  minimum playable-loop planning authority:
   [`docs/structured_player_character_run_playable_loop_plan.md`](docs/structured_player_character_run_playable_loop_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).

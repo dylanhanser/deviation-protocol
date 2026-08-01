@@ -4,10 +4,12 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
-Phase 8 planning amendment: **The separately allocated Phase 8 Structured
-Player Character Run Entry and Minimum Playable Loop candidate defines one
-narrow Session-backed activation path below. It is not implemented and does
-not mark Phase 3.3, Phase 6, or Phase 7 complete.**
+Phase 8 planning amendment: **The approved and published Phase 8 Structured
+Player Character Run Entry and Minimum Playable Loop planning authority defines
+one narrow Session-backed activation path below. Its planning bytes were
+published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`. It is not implemented,
+does not authorize P8-S1, and does not mark Phase 3.3, Phase 6, or Phase 7
+complete.**
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -91,13 +93,18 @@ binding route or the `active` lifecycle transition.
 
 ## Planned Phase 8 Session-backed minimum admission
 
-Status: **Phase 8 planning candidate — not implemented**
+Status: **Approved and published Phase 8 planning authority — not implemented**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
 [Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
-The exact planning candidate requires separate independent review and
-publication before implementation.
+The original exact seven-document planning candidate received
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
+Later modifications to the canonical planning bytes require fresh exact-byte
+independent review before a separately authorized documentation commit; that
+commit precedes user publication and clean published-baseline confirmation.
+P8-S1 has not begun and requires a separate explicit implementation task.
 
 ### Narrow authority amendment
 

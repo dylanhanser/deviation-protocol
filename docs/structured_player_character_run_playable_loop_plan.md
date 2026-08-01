@@ -2,22 +2,31 @@
 
 ## 1. Status and authority
 
-Status: **Unstaged planning candidate. Phase 8 is allocated by explicit user
-direction, but this plan is not approved, committed, published, or
-implementation-authorizing.**
+Status: **Approved and published Phase 8 planning authority. Its seven-document
+planning candidate received independent approval with
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`
+(`docs(player-character): approve phase 8 playable-loop plan`). This plan does
+not authorize implementation.**
 
 Phase 5 is complete at the published P5-S3 baseline
 `34d063e387cde69500e4dc018ff087e87f3eee74`
 (`feat(player-character): add idempotent retirement endpoint`). No P5-S4 exists
-or has begun. Phase 6 remains allocated to subject-reference compatibility
-hooks, and Phase 7 remains allocated to regression, documentation, and
-closeout. Neither is marked complete or absorbed by Phase 8.
+or has begun. Phase 6 remains planned and unimplemented for subject-reference
+compatibility hooks, and Phase 7 remains planned and unimplemented for
+regression, documentation, and closeout. Neither is a Phase 8 prerequisite,
+marked complete, or absorbed by Phase 8.
+
+Phase 8 implementation has not begun. P8-S1 has not been implemented,
+reviewed, accepted, committed, or published; it requires a separate explicit
+implementation task and authorization. P8-S2 through P8-S6 remain
+unimplemented and unauthorized, and Phase 8 is not complete.
 
 This document is the dedicated implementation plan for:
 
 > **Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop**
 
-It freezes a candidate boundary only. It creates no runtime capability, route,
+It records an approved planning boundary only. It creates no runtime capability, route,
 test, migration, frontend behavior, Demo behavior, Provider behavior,
 deployment, or production activation.
 
@@ -28,20 +37,31 @@ complete seven-document planning candidate is:
 STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED
 ```
 
-The accepted `P8-REV-002` correction makes this exact reachable review verdict
-the only operative token; no alias or older alternative is accepted. This
-authoring task does not issue that verdict. Candidate-complete, generic
+The historical `P8-REV-002` correction made this exact reachable review verdict
+the only operative token; no alias or older alternative is accepted. Generic
 `APPROVED`, P5-S1/P5-S2/P5-S3, Phase 6, Phase 7, implementation-review,
 historical, blocked, and differently named tokens cannot satisfy the gate.
 Review binds the exact complete candidate bytes and the SHA-256 inventory
 recorded after the candidate is frozen. Any byte change invalidates that
 inventory and requires a fresh independent planning review.
 
-The latest fresh independent read-only review returned `CHANGES_REQUIRED`.
-That verdict is not approval, and P8-G0 remains incomplete. These corrections
-produce new candidate bytes and SHA-256 identities; another fresh independent
-read-only review of the exact corrected seven-document candidate is mandatory
-before any documentation commit or any implementation.
+An earlier fresh independent read-only review returned `CHANGES_REQUIRED`.
+That is a preserved historical review record, not the operative planning
+verdict. A subsequent fresh independent read-only review returned
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED`; the
+approved exact seven-document candidate was then committed and published at
+`de4d8c0e35c7864948306d751a00aaf295ff77ff`
+(`docs(player-character): approve phase 8 playable-loop plan`). P8-G0's
+planning-approval and publication conditions are therefore satisfied.
+
+Any later modification to these published planning-authority bytes produces new
+candidate bytes and SHA-256 identities. It cannot rely on the published
+approval. Its exact changed bytes require a fresh independent read-only review
+before a separately authorized documentation commit; that authorized commit
+precedes user publication and clean published-baseline confirmation. Only then
+may the synchronized authority support a separate explicit P8-S1 implementation
+task. This later correction workflow does not reopen or become part of the
+completed original P8-G0 approval and publication gate.
 
 ## 2. Verified planning baseline
 
@@ -97,10 +117,10 @@ Authority remains divided by subject:
 | --- | --- | --- |
 | [Final Narrative Experience](final_narrative_experience.md) | Approved product authority | Persistent character and Run identity; model/server separation; minimum reading-first direction |
 | [Structured Player Character Contract](structured_player_character_contract.md) | Approved and frozen, partially implemented | Character identity, lifecycle, ownership, applicable reference, binding cardinality, privacy |
-| [Run Protocol](run_protocol.md), including the Phase 8 amendment in this candidate | Approved Phase 3.3 design plus planned Phase 8 exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
-| [Public Client Contract](public_client_contract.md), including the Phase 8 amendment in this candidate | Current public authority plus planned Phase 8 additions | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
+| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus approved, unimplemented Phase 8 planning exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
+| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus approved, unimplemented Phase 8 planning additions | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
 | [Minimum Run Core Plan](minimum_run_core_implementation_plan.md) | Completed historical implementation authority | Run schema, repositories, UoW, identities, participation, receipts, transaction precedent |
-| [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, amended by this candidate for Phase 8 placement | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
+| [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, and synchronized with the approved and published Phase 8 planning authority | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
 | [Architecture](architecture.md) and committed source | Current implemented fact | Composition, Session lifecycle, Demo isolation, persistence and dependency direction |
 | [`PLANS.md`](../PLANS.md) | Roadmap/status authority | Phase placement, completion status, selected priority |
 | [Engineering Guardrails](engineering/guardrails.md) and [Codex Workflow](engineering/codex_workflow.md) | Binding safety/workflow | Authority, persistence, public DTOs, playability evidence, review and Git gates |
@@ -732,7 +752,7 @@ behavior. An implementer must not create a convenience migration.
 
 | Slice | Canonical purpose | Prerequisite | Completion state |
 | --- | --- | --- | --- |
-| P8-G0 | Freeze this seven-document plan and exact public/Run authority amendments | Clean published P5-S3 baseline | Independent plan approval and separately authorized documentation commit/push |
+| P8-G0 | Freeze this seven-document plan and exact public/Run authority amendments | Clean published P5-S3 baseline | Planning approval and publication satisfied at `de4d8c0e35c7864948306d751a00aaf295ff77ff`; any later correction requires exact-byte independent review, a separately authorized documentation commit, user publication, and clean-baseline confirmation |
 | P8-S1 | Add bounded owned active-unbound character discovery | Approved/published P8-G0 | Accepted discovery contract and implementation; no Run entry yet |
 | P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Accepted application/domain/MySQL behavior; no public route yet |
 | P8-S3 | Activate normal-app Run-entry API and composition | Accepted P8-S2 | Accepted normal public/OpenAPI route; Demo/Web not yet connected |
@@ -781,7 +801,7 @@ its final cross-surface evidence and closure responsibility.
 **Purpose:** publish the exact plan, Phase 5 closure correction, Phase 8
 allocation, public contract, and Run lifecycle amendment before code.
 
-**Scope:** this documentation candidate only.
+**Scope:** planning documentation only; no implementation.
 
 **Exact path budget: seven documentation paths:**
 
@@ -797,12 +817,17 @@ allocation, public contract, and Run lifecycle amendment before code.
 `git diff --check`, exact seven-path diff inspection, and final Git identity.
 No runtime test or database command.
 
-**Completion gate:** P8-G0 remains incomplete until a fresh independent review
-of the corrected exact seven-document candidate returns the sole operative
-verdict
-`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED`, followed
-by separately authorized documentation publication. This correction task does
-not issue that verdict.
+**Completion gate:** P8-G0's planning approval and publication conditions were
+satisfied when the exact seven-document candidate received
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`
+(`docs(player-character): approve phase 8 playable-loop plan`). Any later
+correction is a new candidate whose exact bytes require a fresh independent
+review before a separately authorized documentation commit. That authorized
+commit precedes user publication and clean published-baseline confirmation;
+only then may the synchronized authority support a separate explicit P8-S1
+implementation task. This later workflow is not part of the completed original
+P8-G0 gate.
 
 **Exclusions:** every code, test, migration, dependency, generated, Provider,
 deployment, staging, commit, and push action.
@@ -1146,7 +1171,7 @@ The following requirements apply together with the detailed budgets above:
 
 | Slice | Public/authority effect | Persistence and transaction boundary | Slice exclusions | Local completion evidence | Review and commit boundary |
 | --- | --- | --- | --- | --- | --- |
-| P8-G0 | Freeze Phase 8 allocation plus the planned discovery, entry, and Session-backed Run amendment | Documentation only; no UoW, schema, or migration | All implementation, tests, generated output, Provider, deployment, staging, and runtime activation | Exact seven-path inspection, focused status/link/fence checks, `git diff --check`, clean index and unchanged Git identity | One independent planning review of exact hashes, then separate authorization for one documentation commit; user push only |
+| P8-G0 | Freeze Phase 8 allocation plus the planned discovery, entry, and Session-backed Run amendment | Documentation only; no UoW, schema, or migration | All implementation, tests, generated output, Provider, deployment, staging, and runtime activation | Exact seven-path inspection, focused status/link/fence checks, `git diff --check`, clean index and unchanged Git identity | Planning review and publication completed at `de4d8c0e35c7864948306d751a00aaf295ff77ff`; later changed bytes require fresh independent review, a separately authorized documentation commit, user publication, and clean-baseline confirmation |
 | P8-S1 | Implement only `GET /v1/player-characters/eligible-for-run-entry` and its exact DTO/OpenAPI contract | Read-only repository/UoW; no lock, receipt, write, commit, schema, or migration | No general list/search/filter/page/count/admin, Run mutation, Demo activation, or Web work | Focused unit/API/OpenAPI plus real-MySQL ordering/bound/ownership/no-write evidence, `compileall`, Offline, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S1 implementation review and separately authorized P8-S1 commit before P8-S2 |
 | P8-S2 | No public route; implement only trusted composite admission and the narrow Run activation authority | Existing tables; one entry-owned UoW/commit; repositories only flush | No API/composition activation, Demo/Web, terminal Run transition, later Session, Provider, schema, or migration | Focused domain/service plus real-MySQL atomicity, replay, concurrency, rollback, reconstruction, Alembic-parity, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S2 implementation review and separately authorized P8-S2 commit before P8-S3 |
 | P8-S3 | Implement only normal-app `POST /v1/runs`, exact DTO/errors/OpenAPI, and lazy composition | API/composition own no transaction; entry service remains sole UoW/commit owner; no schema or migration | No public Run read/list/bind/attach/terminal/admin, Demo/Web, Provider, deployment, or auth redesign | Focused API/OpenAPI/composition plus one real-MySQL public `POST /v1/runs`-to-terminal playthrough through every canonical action/request-status/View step and persisted Run/Session/gameplay state, cancellation, privacy, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S3 implementation review and separately authorized P8-S3 commit before P8-S4 |
@@ -1241,7 +1266,7 @@ results.
 
 ## 23. Review and commit sequence
 
-The non-circular sequence is:
+The published P8-G0 sequence was:
 
 1. freeze the exact P8-G0 seven-document candidate and record all file hashes;
 2. obtain one fresh independent read-only review with the sole operative
@@ -1260,7 +1285,11 @@ The non-circular sequence is:
 9. after P8-S6, obtain one fresh independent review of the complete Phase 8
    implementation and synchronized documentation before any completion commit.
 
-This plan pre-issues no implementation approval. Each later review prompt must
+Any post-publication correction repeats steps 1 through 6 for its exact
+corrected bytes before it may be relied upon to begin P8-S1. This plan
+pre-issues no implementation approval.
+
+Each later review prompt must
 define exactly one success verdict reachable by that review and bind it to the
 exact candidate hashes.
 

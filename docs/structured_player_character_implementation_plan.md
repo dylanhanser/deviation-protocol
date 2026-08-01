@@ -75,8 +75,12 @@ passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   begun, and Phase 8 planning does not reopen Phase 5. Phase 6 and Phase 7
   retain their allocations and remain unimplemented. Phase 8 — Structured
   Player Character Run Entry and Minimum Playable Loop — is the selected
-  planning priority under its dedicated candidate plan. Push by Codex,
-  deployment, release, runtime activation, and Provider work remain deferred.**
+  planning priority under its dedicated approved and published planning
+  authority at `de4d8c0e35c7864948306d751a00aaf295ff77ff`. Phase 8 is not
+  implemented; P8-S1 through P8-S6 remain unimplemented and unauthorized.
+  Planning publication does not authorize implementation, and P8-S1 requires a
+  separate explicit implementation task. Push by Codex, deployment, release,
+  runtime activation, and Provider work remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -3742,9 +3746,12 @@ audit.
 
 ### Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop
 
-Phase 8 is the currently selected planning priority. It is separately defined
-by the
+Phase 8 is the currently selected planning priority. Its approved and published
+planning authority is the
 [Phase 8 playable-loop plan](structured_player_character_run_playable_loop_plan.md).
+The original exact seven-document candidate received
+`STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
+committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 It owns only the minimum connection from owned structured-character discovery
 through authoritative Run admission and immutable character binding into the
 existing Session-backed Run progression and Demo/client experience. It does not
@@ -3755,10 +3762,15 @@ whole-roadmap closeout remains deferred.
 
 Phase 8 reuses the completed P5-S1, P5-S2, and P5-S3 capabilities without
 reopening them, and it preserves the current Run and Session authority. Its
-candidate plan authorizes no implementation by itself and requires a separate
-independent planning review before any slice may begin. Later phases may add
-the explicitly deferred game, Provider, content, progression, profile, and
-production capabilities.
+approved planning authority authorizes no implementation by itself. Phase 8 is
+not implemented; P8-S1 has not begun and remains separately unauthorized, and
+P8-S2 through P8-S6 remain unimplemented and unauthorized. Later modifications
+to the planning-authority bytes require fresh exact-byte independent review
+before a separately authorized documentation commit; that commit precedes user
+publication and clean published-baseline confirmation. P8-S1 may begin only
+through a separate explicit implementation task after that sequence. Later
+phases may add the explicitly deferred game, Provider, content, progression,
+profile, and production capabilities.
 
 ## 25. File-level implementation inventory
 
@@ -3839,8 +3851,10 @@ accepted implementation. It follows
   and P5-S3 was committed and published at
   `34d063e387cde69500e4dc018ff087e87f3eee74`. Phase 5 is complete at P5-S3;
   no P5-S4 exists or has begun. Phase 6 and Phase 7 remain separately allocated
-  and unimplemented. Phase 8 has an unstaged planning candidate only; no Phase 8
-  production, test, migration, Demo, or client implementation has begun.
+  and unimplemented. Phase 8 has approved and published planning authority only;
+  no Phase 8 production, test, migration, Demo, or client implementation has
+  begun. P8-S1 through P8-S6 remain unimplemented and unauthorized, and Phase 8
+  is not complete.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
