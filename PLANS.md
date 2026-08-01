@@ -134,7 +134,7 @@ documents.
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
 | Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
-| Phase 8 | **Approved and published planning authority — not implemented** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
+| Phase 8 | **Partially implemented through P8-S1 eligible-character discovery; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -408,9 +408,11 @@ stages:
      entry/binding, existing gameplay, deterministic Demo, and minimal Web
      backbone described in the
      [dedicated Phase 8 plan](docs/structured_player_character_run_playable_loop_plan.md).
-   - Phase 8 is the current planning priority but remains unimplemented. P8-S1
-     has not begun and requires separate explicit implementation authorization.
-     Phase 8 neither implements nor completes Phase 6 or Phase 7, and future
+   - Phase 8 is the current planning priority and remains incomplete. A
+     separately authorized P8-S1 task implements eligible-character discovery
+     only; P8-S2 through P8-S6 remain unimplemented and unauthorized. Planning
+     publication alone did not authorize P8-S1, which began through its separate
+     task. Phase 8 neither implements nor completes Phase 6 or Phase 7, and future
      features remain addable through later phases.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
@@ -654,7 +656,7 @@ The canonical decision is
 
 ## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
 
-Status: **Approved and published planning authority — not implemented.**
+Status: **Partially implemented through separately authorized P8-S1 eligible-character discovery — incomplete.**
 
 Phase 8 is explicitly allocated to the next selected product priority: create
 or reuse an owned Structured Player Character, discover/select an eligible one,
@@ -677,10 +679,12 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 Planning publication does not authorize implementation. Later modifications to
 the canonical planning bytes require fresh exact-byte independent review before
 a separately authorized documentation commit; that commit precedes user
-publication and clean published-baseline confirmation. P8-S1 has not begun and
-may begin only through a separate explicit implementation task after that
-sequence. P8-S2 through P8-S6 also remain unimplemented and unauthorized, and
-Phase 8 is not complete.
+publication and clean published-baseline confirmation. A separately authorized
+P8-S1 implementation task implements only eligible-character discovery. P8-S2
+may begin only after exact-byte P8-S1 independent review, a separately
+authorized commit, user publication, clean published-baseline confirmation, and
+a separate explicit P8-S2 implementation task. P8-S2 through P8-S6 remain unimplemented and
+unauthorized, and Phase 8 is not complete.
 
 ## Deferred
 

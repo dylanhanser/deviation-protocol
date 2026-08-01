@@ -85,6 +85,7 @@ class _SessionProbe:
         self.no_autoflush = nullcontext()
         self.scalar_results: list[Any] = []
         self.scalars_results: list[list[Any]] = []
+        self.row_results: list[list[Any]] = []
         self.scalar_statements: list[Any] = []
         self.execute_result: Any = SimpleNamespace(rowcount=1)
         self.execute_statements: list[Any] = []
@@ -111,6 +112,8 @@ class _SessionProbe:
         self.execute_statements.append(statement)
         if self.execute_error is not None:
             raise self.execute_error
+        if self.row_results:
+            return SimpleNamespace(all=lambda: self.row_results.pop(0))
         return self.execute_result
 
     def add(self, row: Any) -> None:
@@ -375,6 +378,7 @@ async def test_registry_lock_targets_exact_row_for_update() -> None:
 async def test_character_locked_get_targets_exact_current_row() -> None:
     character_id = PlayerCharacterId(value="pc.repository-lock")
     session = _SessionProbe()
+    session.row_results.append([])
     repository = SqlAlchemyPlayerCharacterRepository(session)
 
     assert await repository.get_for_update(character_id) is None
@@ -387,6 +391,35 @@ async def test_character_locked_get_targets_exact_current_row() -> None:
     )
     assert "FOR UPDATE" in compiled
     assert f"= '{character_id.value}'" in compiled
+
+
+@pytest.mark.asyncio
+async def test_eligible_discovery_uses_one_bounded_read_without_transaction_ownership() -> None:
+    session = _SessionProbe()
+    session.row_results.append([])
+    repository = SqlAlchemyPlayerCharacterRepository(session)
+    binding = ControllerBindingRef(value="binding.repository-eligible")
+
+    result = await repository.list_eligible_for_run_entry(binding, limit=33)
+
+    assert result == ()
+    assert len(session.execute_statements) == 1
+    sql = str(
+        session.execute_statements[0].compile(
+            dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "LEFT OUTER JOIN run_current" in sql
+    assert "player_character_current.controller_binding" in sql
+    assert "JSON_EXTRACT(CAST(player_character_current.record_canonical AS CHAR)" in sql
+    assert "player_character_current.lifecycle = 'active'" in sql
+    assert "run_current.run_id IS NULL" in sql
+    assert "ORDER BY player_character_current.player_character_id ASC" in sql
+    assert "LIMIT 33" in sql
+    assert "FOR UPDATE" not in sql
+    assert session.added == []
+    assert session.flush_calls == []
+    assert session.commit_calls == 0
 
 
 @pytest.mark.asyncio

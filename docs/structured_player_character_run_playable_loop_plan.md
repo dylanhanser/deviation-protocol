@@ -17,10 +17,12 @@ compatibility hooks, and Phase 7 remains planned and unimplemented for
 regression, documentation, and closeout. Neither is a Phase 8 prerequisite,
 marked complete, or absorbed by Phase 8.
 
-Phase 8 implementation has not begun. P8-S1 has not been implemented,
-reviewed, accepted, committed, or published; it requires a separate explicit
-implementation task and authorization. P8-S2 through P8-S6 remain
-unimplemented and unauthorized, and Phase 8 is not complete.
+At the published baseline, Phase 8 implementation had not begun. A separately
+authorized P8-S1 implementation task implements only eligible-character
+discovery. P8-S2 may begin only after exact-byte P8-S1 independent review, a
+separately authorized commit, user publication, clean published-baseline
+confirmation, and a separate explicit P8-S2 implementation task. P8-S2 through
+P8-S6 remain unimplemented and unauthorized, and Phase 8 is not complete.
 
 This document is the dedicated implementation plan for:
 
@@ -117,8 +119,8 @@ Authority remains divided by subject:
 | --- | --- | --- |
 | [Final Narrative Experience](final_narrative_experience.md) | Approved product authority | Persistent character and Run identity; model/server separation; minimum reading-first direction |
 | [Structured Player Character Contract](structured_player_character_contract.md) | Approved and frozen, partially implemented | Character identity, lifecycle, ownership, applicable reference, binding cardinality, privacy |
-| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus approved, unimplemented Phase 8 planning exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
-| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus approved, unimplemented Phase 8 planning additions | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
+| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus Phase 8 exception partially implemented through P8-S1 | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
+| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus Phase 8 additions partially implemented through P8-S1 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
 | [Minimum Run Core Plan](minimum_run_core_implementation_plan.md) | Completed historical implementation authority | Run schema, repositories, UoW, identities, participation, receipts, transaction precedent |
 | [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, and synchronized with the approved and published Phase 8 planning authority | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
 | [Architecture](architecture.md) and committed source | Current implemented fact | Composition, Session lifecycle, Demo isolation, persistence and dependency direction |

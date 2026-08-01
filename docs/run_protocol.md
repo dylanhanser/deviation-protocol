@@ -93,7 +93,7 @@ binding route or the `active` lifecycle transition.
 
 ## Planned Phase 8 Session-backed minimum admission
 
-Status: **Approved and published Phase 8 planning authority — not implemented**
+Status: **Partially implemented through separately authorized P8-S1 eligible-character discovery — Run admission and later slices unimplemented**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -104,7 +104,11 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 Later modifications to the canonical planning bytes require fresh exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
-P8-S1 has not begun and requires a separate explicit implementation task.
+A separately authorized P8-S1 implementation task implements only
+eligible-character discovery. P8-S2 may begin only after exact-byte P8-S1
+independent review, a separately authorized commit, user publication, clean
+published-baseline confirmation, and a separate explicit P8-S2 implementation
+task. P8-S2 through P8-S6 remain unimplemented and unauthorized.
 
 ### Narrow authority amendment
 

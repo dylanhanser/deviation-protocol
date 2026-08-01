@@ -859,8 +859,12 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 It does not implement behavior. Later modifications to its canonical planning
 bytes require fresh exact-byte independent review before a separately authorized
 documentation commit; that commit precedes user publication and clean
-published-baseline confirmation. P8-S1 has not begun and requires a separate
-explicit implementation task.
+published-baseline confirmation. A separately authorized P8-S1 implementation
+task implements only eligible-character discovery. P8-S2 may begin only after
+exact-byte P8-S1 independent review, a separately authorized commit, user
+publication, clean published-baseline confirmation, and a separate explicit
+P8-S2 implementation task. P8-S2 through P8-S6 remain unimplemented and
+unauthorized.
 
 The planned Phase 8 character-side boundary is narrow:
 
@@ -1070,8 +1074,10 @@ committed and published as `34d063e387cde69500e4dc018ff087e87f3eee74`.
 Phase 5 is complete at P5-S3, no P5-S4 exists, and P5-S3 remains closed. Demo,
 public Run, frontend, Web, and administration were not activated by Phase 5.
 Phase 8 now has the approved and published planning authority described above;
-it is not implemented, and P8-S1 through P8-S6 remain unimplemented and
-unauthorized. Phase 6 and Phase 7 remain allocated and unimplemented. Planning
-approval and publication do not authorize later runtime work. The approved final
+a separately authorized P8-S1 task implements eligible-character discovery only,
+while P8-S2 through P8-S6 remain unimplemented and unauthorized and Phase 8 is
+incomplete. Phase 6 and Phase 7 remain allocated and unimplemented. Planning
+approval and publication alone did not authorize P8-S1, which began through its
+separate task. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

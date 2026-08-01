@@ -30,6 +30,7 @@ from deviation_protocol.application.player_character_operations import (
     recover_mutation_unique_race_winner,
 )
 from deviation_protocol.application.player_character_projection import (
+    EligiblePlayerCharacterCollection,
     PlayerCharacterSelfProjection,
 )
 from deviation_protocol.application.ports import (
@@ -519,6 +520,37 @@ class PlayerCharacterService:
             return PlayerCharacterSelfProjection.from_validated_record(
                 current
             )
+
+    async def list_eligible_for_run_entry(
+        self,
+        principal: RequestPrincipal,
+    ) -> EligiblePlayerCharacterCollection | None:
+        controller_binding = await self.controller_binding_resolver.resolve(principal)
+        try:
+            controller_binding = revalidate_player_character_model(
+                controller_binding,
+                ControllerBindingRef,
+            )
+        except (AttributeError, TypeError, ValueError):
+            return None
+
+        async with self.uow_factory() as uow:
+            records = await uow.player_characters.list_eligible_for_run_entry(
+                controller_binding,
+                limit=33,
+            )
+            if len(records) > 33:
+                raise ValueError("eligible-character discovery exceeded its read bound")
+            projections = tuple(
+                PlayerCharacterSelfProjection.from_validated_record(
+                    validate_canonical_player_character(record)
+                )
+                for record in records[:32]
+            )
+        return EligiblePlayerCharacterCollection(
+            eligible_player_characters=projections,
+            truncated=len(records) == 33,
+        )
 
     async def lock_owned_for_binding(
         self,

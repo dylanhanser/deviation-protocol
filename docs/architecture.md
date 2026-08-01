@@ -542,8 +542,12 @@ Phase 8 is explicitly allocated to Structured Player Character Run Entry and
 the Minimum Playable Loop. Its approved and published planning authority is
 [`structured_player_character_run_playable_loop_plan.md`](structured_player_character_run_playable_loop_plan.md).
 The approved planning bytes were committed and published at
-`de4d8c0e35c7864948306d751a00aaf295ff77ff`. Phase 8 is not implemented;
-P8-S1 has not begun and requires a separate explicit implementation task.
+`de4d8c0e35c7864948306d751a00aaf295ff77ff`. Phase 8 remains incomplete. A
+separately authorized P8-S1 implementation task implements only
+eligible-character discovery. P8-S2 may begin only after exact-byte P8-S1
+independent review, a separately authorized commit, user publication, clean
+published-baseline confirmation, and a separate explicit P8-S2 implementation
+task. P8-S2 through P8-S6 remain unimplemented and unauthorized.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.

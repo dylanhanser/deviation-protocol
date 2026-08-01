@@ -308,6 +308,15 @@ class PlayerCharacterRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    async def list_eligible_for_run_entry(
+        self,
+        controller_binding: ControllerBindingRef,
+        *,
+        limit: int,
+    ) -> tuple[CanonicalPlayerCharacter, ...]:
+        raise NotImplementedError
+
+    @abstractmethod
     async def add_initial(self, record: CanonicalPlayerCharacter, *, created_at: datetime) -> None:
         raise NotImplementedError
 

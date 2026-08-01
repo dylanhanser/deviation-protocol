@@ -863,8 +863,8 @@ objective.
 
 ## Planned Phase 8 Player Character discovery and Run entry
 
-Status: **Approved and published Phase 8 public-contract planning authority —
-not implemented.**
+Status: **Partially implemented through separately authorized P8-S1
+eligible-character discovery — Run admission and later slices unimplemented.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -874,14 +874,19 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 Later modifications to those canonical planning bytes require fresh exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
-P8-S1 remains unimplemented and requires a separate explicit implementation
-task. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase 6 and
+A separately authorized P8-S1 implementation task implements only the
+eligible-character-discovery contract. P8-S2 may begin only after exact-byte
+P8-S1 independent review, a separately authorized commit, user publication,
+clean published-baseline confirmation, and a separate explicit P8-S2
+implementation task. P8-S2 through P8-S6 remain unimplemented and
+unauthorized. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase 6 and
 Phase 7 allocations remain planned and unimplemented, and neither is a Phase 8
 prerequisite.
 
 ### Eligible-character collection
 
-Phase 8 plans one purpose-specific normal/Demo operation:
+P8-S1 implements one purpose-specific normal operation; Demo parity remains
+deferred:
 
 ```http
 GET /v1/player-characters/eligible-for-run-entry

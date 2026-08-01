@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from typing import Annotated
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from deviation_protocol.domain.player_character import (
     CanonicalPlayerCharacter,
@@ -41,3 +43,19 @@ class PlayerCharacterSelfProjection(BaseModel):
             ),
             lifecycle=record.lifecycle,
         )
+
+
+class EligiblePlayerCharacterCollection(BaseModel):
+    """Bounded detached discovery result for prospective Run entry."""
+
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        strict=True,
+        revalidate_instances="always",
+    )
+
+    eligible_player_characters: Annotated[
+        tuple[PlayerCharacterSelfProjection, ...], Field(max_length=32)
+    ]
+    truncated: bool

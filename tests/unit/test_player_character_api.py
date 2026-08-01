@@ -34,6 +34,7 @@ from deviation_protocol.application.player_character_operations import (
     MutationSuccessResult,
 )
 from deviation_protocol.application.player_character_projection import (
+    EligiblePlayerCharacterCollection,
     PlayerCharacterSelfProjection,
 )
 from deviation_protocol.domain.player_character import (
@@ -56,6 +57,7 @@ _PRINCIPAL = RequestPrincipal(player_id="player.test", authentication_scheme="te
 _PATH = "/v1/player-characters/pc.test-owned"
 _CREATE_PATH = "/v1/player-characters"
 _RETIREMENT_PATH = "/v1/player-characters/pc.test-owned/retirement"
+_ELIGIBLE_PATH = "/v1/player-characters/eligible-for-run-entry"
 _VALID_KEY = "Create.Key:Case-1"
 _UNSET = object()
 
@@ -292,6 +294,11 @@ class _PlayerCharacterService:
         self.mutation_calls: list[
             tuple[RequestPrincipal, PlayerCharacterOperationId, CharacterMutationCommand]
         ] = []
+        self.eligible_result: Any = EligiblePlayerCharacterCollection(
+            eligible_player_characters=(), truncated=False
+        )
+        self.eligible_error: BaseException | None = None
+        self.eligible_calls: list[RequestPrincipal] = []
 
     async def get_owned(
         self,
@@ -303,6 +310,15 @@ class _PlayerCharacterService:
         if self.error is not None:
             raise self.error
         return self.result
+
+    async def list_eligible_for_run_entry(
+        self,
+        principal: RequestPrincipal,
+    ) -> Any:
+        self.eligible_calls.append(principal)
+        if self.eligible_error is not None:
+            raise self.eligible_error
+        return self.eligible_result
 
 
     async def create(
@@ -2876,6 +2892,101 @@ def test_read_failures_are_sanitized_without_internal_detail(error: Exception) -
     assert "mysql" not in response.text
 
 
+def test_eligible_discovery_has_exact_safe_collection_contract() -> None:
+    service = _PlayerCharacterService()
+    service.eligible_result = EligiblePlayerCharacterCollection(
+        eligible_player_characters=(_projection(PlayerCharacterLifecycle.ACTIVE),),
+        truncated=False,
+    )
+
+    response = _get(_app(service), _ELIGIBLE_PATH)
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "eligible_player_characters": [
+            {
+                "player_character_id": {"value": "pc.test-owned"},
+                "contract_version": "structured-player-character/v1",
+                "record_revision": {"value": 1},
+                "lifecycle": "active",
+            }
+        ],
+        "truncated": False,
+    }
+    assert service.eligible_calls == [_PRINCIPAL]
+    assert service.calls == []
+    assert service.creation_calls == []
+    assert service.mutation_calls == []
+
+
+def test_eligible_discovery_non_enumerates_authority_and_sanitizes_failures() -> None:
+    unavailable = _PlayerCharacterService()
+    unavailable.eligible_result = None
+    failure = _PlayerCharacterService()
+    failure.eligible_error = ValueError("corrupt binding evidence")
+
+    assert _get(_app(unavailable), _ELIGIBLE_PATH).json() == {
+        "error": {
+            "error_code": "PLAYER_CHARACTER_NOT_FOUND",
+            "message": "Player character was not found",
+        }
+    }
+    response = _get(_app(failure), _ELIGIBLE_PATH)
+    assert response.status_code == 500
+    assert response.json()["error"]["error_code"] == "INTERNAL_SERVER_ERROR"
+    assert "corrupt" not in response.text
+
+
+def test_eligible_discovery_openapi_has_no_input_or_duplicate_route() -> None:
+    schema = _app(_PlayerCharacterService()).openapi()
+    operation = schema["paths"][_ELIGIBLE_PATH]["get"]
+
+    assert operation["operationId"] == "list_eligible_player_characters_for_run_entry"
+    assert operation["tags"] == ["player-characters"]
+    assert operation["summary"] == "List eligible Player Characters for Run entry"
+    assert "parameters" not in operation
+    assert "requestBody" not in operation
+    assert set(operation["responses"]) == {"200", "404", "422", "500"}
+    assert operation["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/EligiblePlayerCharacterCollection"
+    }
+    assert list(schema["paths"][_ELIGIBLE_PATH]) == ["get"]
+    for status_code in ("404", "422", "500"):
+        assert operation["responses"][status_code]["content"]["application/json"]["schema"] == {
+            "$ref": "#/components/schemas/ErrorResponse"
+        }
+    component = schema["components"]["schemas"]["EligiblePlayerCharacterCollection"]
+    assert component["type"] == "object"
+    assert component["additionalProperties"] is False
+    assert component["required"] == ["eligible_player_characters", "truncated"]
+    assert component["properties"]["eligible_player_characters"] == {
+        "items": {"$ref": "#/components/schemas/PlayerCharacterSelfProjection"},
+        "type": "array",
+        "maxItems": 32,
+        "title": "Eligible Player Characters",
+    }
+    assert component["properties"]["truncated"] == {
+        "type": "boolean", "title": "Truncated"
+    }
+
+
+def test_eligible_discovery_exact_empty_and_truncated_serialization_and_query_nonselection() -> None:
+    empty_service = _PlayerCharacterService()
+    empty = _get(_app(empty_service), _ELIGIBLE_PATH + "?controller=other")
+    assert empty.status_code == 200
+    assert empty.json() == {"eligible_player_characters": [], "truncated": False}
+    assert empty_service.eligible_calls == [_PRINCIPAL]
+    truncated_service = _PlayerCharacterService()
+    truncated_service.eligible_result = EligiblePlayerCharacterCollection(
+        eligible_player_characters=tuple(_projection(PlayerCharacterLifecycle.ACTIVE) for _ in range(32)),
+        truncated=True,
+    )
+    truncated = _get(_app(truncated_service), _ELIGIBLE_PATH)
+    assert truncated.status_code == 200
+    assert len(truncated.json()["eligible_player_characters"]) == 32
+    assert truncated.json()["truncated"] is True
+
+
 def test_dependency_fails_closed_when_service_is_not_composed() -> None:
     app = _app(None)
     request = Request({"type": "http", "app": app})
@@ -3041,7 +3152,7 @@ def test_creation_openapi_injects_the_exact_validation_schema_inventory() -> Non
     }
 
     assert set(generated) == expected_generated_names
-    assert len(schemas) == 74
+    assert len(schemas) == 75
     assert all(schemas[name] == definition for name, definition in generated.items())
     assert "$defs" not in schemas["CharacterCreationCommand"]
     assert schemas["CharacterCreationCommand"]["required"] == [
@@ -3388,6 +3499,7 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
     assert public_routes == {
         ("/health", ("GET",)),
         ("/v1/player-characters", ("POST",)),
+        ("/v1/player-characters/eligible-for-run-entry", ("GET",)),
         ("/v1/player-characters/{player_character_id}", ("GET",)),
         (
             "/v1/player-characters/{player_character_id}/retirement",
@@ -3405,7 +3517,7 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
         ("/v1/sessions/{session_id}/actions", ("POST",)),
     }
     assert all(
-        "run" not in path.casefold()
+        (path == _ELIGIBLE_PATH or "run" not in path.casefold())
         and "mutation" not in path.casefold()
         and "bind" not in path.casefold()
         for path, _ in public_routes

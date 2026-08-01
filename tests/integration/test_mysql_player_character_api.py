@@ -1458,6 +1458,526 @@ async def test_mysql_owned_read_is_non_enumerating_and_has_no_write_side_effect(
     assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == before
 
 
+async def test_mysql_eligible_discovery_is_binary_ordered_bounded_isolated_and_read_only(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.eligible-{token}", authentication_scheme="test"
+    )
+    binding = ControllerBindingRef(value=f"binding.eligible-{token}")
+    foreign_binding = ControllerBindingRef(value=f"binding.eligible-foreign-{token}")
+    player_character_api_scope.bindings.update((binding.value, foreign_binding.value))
+    ids = [
+        PlayerCharacterId(value=f"pc.eligible-{token}-{suffix}")
+        for suffix in ("A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "a", "b", "c", "d", "e", "f", "g", "h", "i")
+    ]
+    foreign_id = PlayerCharacterId(value=f"pc.eligible-{token}-foreign")
+    player_character_api_scope.character_ids.update(
+        [character_id.value for character_id in ids] + [foreign_id.value]
+    )
+    command = CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(),
+        narration_preferences=NarrationPreferences(),
+    )
+    for index, player_character_id in enumerate(ids):
+        service = _service(mysql_session_factory, binding, player_character_id)
+        result = await service.create(
+            principal,
+            operation_id=PlayerCharacterOperationId(
+                value=f"operation.eligible-{token}-{index}"
+            ),
+            command=command,
+        )
+        assert result.player_character_id == player_character_id
+    foreign_service = _service(mysql_session_factory, foreign_binding, foreign_id)
+    await foreign_service.create(
+        principal,
+        operation_id=PlayerCharacterOperationId(value=f"operation.eligible-foreign-{token}"),
+        command=command,
+    )
+    run_id = RunId(value=f"run.eligible-{token}")
+    line_id = ContinuousStoryLineId(value=f"line.eligible-{token}")
+    player_character_api_scope.run_ids.add(run_id.value)
+    binding_service = _service(mysql_session_factory, binding, ids[0])
+    run_service = RunService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        run_id_issuer=_Issuer(run_id),
+        continuous_story_line_id_issuer=_Issuer(line_id),
+        source_reference=RunAuthoritySourceRef(value="source.mysql-eligible-run"),
+        clock=lambda: _NOW,
+        controller_binding_resolver=_Resolver(binding),
+        player_character_binding_evidence=binding_service,
+    )
+    await run_service.create_run(
+        operation_id=RunOperationId(value=f"create-eligible-run-{token}"),
+        command=CreateRunCommand(
+            source_reference=RunAuthoritySourceRef(value="source.mysql-eligible-run")
+        ),
+    )
+    await run_service.bind_player_character_internal(
+        principal,
+        operation_id=RunOperationId(value=f"bind-eligible-run-{token}"),
+        command=BindPlayerCharacterCommand(
+            run_id=run_id,
+            continuous_story_line_id=line_id,
+            target_player_character_id=ids[0],
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=RunAuthoritySourceRef(value="source.mysql-eligible-run"),
+        ),
+    )
+    retirement_app = _app(binding_service, principal)
+    retired = await _retire(
+        retirement_app,
+        ids[1],
+        key=f"retire-eligible-{token}",
+    )
+    assert retired.status_code == 200
+
+    commits: list[int] = []
+    discovery = _service(
+        mysql_session_factory,
+        binding,
+        ids[0],
+        uow_factory=lambda: _CountingUnitOfWork(mysql_session_factory, commits),
+    )
+    app = _app(discovery, principal)
+    observed_sql: list[str] = []
+
+    def observe_statement(
+        _connection, _cursor, statement, _parameters, _context, _executemany
+    ) -> None:
+        observed_sql.append(statement)
+
+    engine = mysql_session_factory.kw["bind"].sync_engine
+    sa.event.listen(engine, "before_cursor_execute", observe_statement)
+    try:
+        response = await _get(app, "/v1/player-characters/eligible-for-run-entry")
+    finally:
+        sa.event.remove(engine, "before_cursor_execute", observe_statement)
+
+    assert response.status_code == 200
+    body = response.json()
+    returned_ids = [item["player_character_id"]["value"] for item in body["eligible_player_characters"]]
+    expected_ids = sorted(
+        character_id.value for character_id in ids if character_id not in (ids[0], ids[1])
+    )
+    assert returned_ids == expected_ids[:32]
+    assert len(returned_ids) == 32
+    assert foreign_id.value not in returned_ids
+    assert ids[0].value not in returned_ids
+    assert ids[1].value not in returned_ids
+    assert body["truncated"] is True
+    assert commits == []
+    assert len(observed_sql) == 1
+    assert observed_sql[0].lstrip().upper().startswith("SELECT")
+    assert "FOR UPDATE" not in observed_sql[0].upper()
+
+    # The previous query discarded every active binding before decoding it.  A
+    # current/revision disagreement must instead become the sanitized integrity
+    # result for this owner, while the foreign row remains outside the query.
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(RunRevisionRow)
+            .where(
+                RunRevisionRow.run_id == run_id.value,
+                RunRevisionRow.state_version == 2,
+            )
+            .values(binding_authority_source_ref="source.mysql-corrupt-binding")
+        )
+    corrupt_response = await _get(app, "/v1/player-characters/eligible-for-run-entry")
+    assert corrupt_response.status_code == 500
+    assert corrupt_response.json() == {
+        "error": {
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "Internal server error",
+        }
+    }
+
+
+@pytest.mark.parametrize("count", (0, 1, 32, 33))
+async def test_mysql_eligible_discovery_has_exact_zero_one_thirty_two_and_thirty_three_boundaries(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+    count: int,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.bound-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.bound-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    command = CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(),
+        narration_preferences=NarrationPreferences(),
+    )
+    ids = [PlayerCharacterId(value=f"pc.bound-{token}-{index:02d}") for index in range(count)]
+    player_character_api_scope.character_ids.update(item.value for item in ids)
+    for index, player_character_id in enumerate(ids):
+        await _service(mysql_session_factory, binding, player_character_id).create(
+            principal,
+            operation_id=PlayerCharacterOperationId(value=f"operation.bound-{token}-{index}"),
+            command=command,
+        )
+
+    observed_sql: list[str] = []
+
+    def observe_statement(
+        _connection, _cursor, statement, _parameters, _context, _executemany
+    ) -> None:
+        observed_sql.append(statement)
+
+    engine = mysql_session_factory.kw["bind"].sync_engine
+    app = _app(
+        _service(
+            mysql_session_factory,
+            binding,
+            PlayerCharacterId(value=f"pc.bound-issuer-{token}"),
+        ),
+        principal,
+    )
+    sa.event.listen(engine, "before_cursor_execute", observe_statement)
+    try:
+        response = await _get(app, "/v1/player-characters/eligible-for-run-entry")
+    finally:
+        sa.event.remove(engine, "before_cursor_execute", observe_statement)
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [item["player_character_id"]["value"] for item in body["eligible_player_characters"]] == [
+        item.value for item in ids[:32]
+    ]
+    assert body["truncated"] is (count == 33)
+    assert len(observed_sql) == 1
+    assert observed_sql[0].lstrip().upper().startswith("SELECT")
+
+
+async def test_mysql_eligible_discovery_fails_closed_for_owned_scalar_and_active_binding_contradictions(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.corrupt-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.corrupt-{token}")
+    foreign_binding = ControllerBindingRef(value=f"binding.corrupt-foreign-{token}")
+    owned_id = PlayerCharacterId(value=f"pc.corrupt-{token}")
+    foreign_id = PlayerCharacterId(value=f"pc.corrupt-foreign-{token}")
+    player_character_api_scope.bindings.update((binding.value, foreign_binding.value))
+    player_character_api_scope.character_ids.update((owned_id.value, foreign_id.value))
+    await _service(mysql_session_factory, binding, owned_id).create(principal, operation_id=PlayerCharacterOperationId(value=f"operation.corrupt-{token}"), command=CharacterCreationCommand(contract_version=PlayerCharacterContractVersion.V1, character_core=CharacterCore(), narration_preferences=NarrationPreferences()))
+    await _service(mysql_session_factory, foreign_binding, foreign_id).create(principal, operation_id=PlayerCharacterOperationId(value=f"operation.corrupt-foreign-{token}"), command=CharacterCreationCommand(contract_version=PlayerCharacterContractVersion.V1, character_core=CharacterCore(), narration_preferences=NarrationPreferences()))
+    app = _app(_service(mysql_session_factory, binding, owned_id), principal)
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(PlayerCharacterCurrentRow)
+            .where(PlayerCharacterCurrentRow.player_character_id == foreign_id.value)
+            .values(lifecycle="retired")
+        )
+
+    isolated_response = await _get(app, "/v1/player-characters/eligible-for-run-entry")
+    assert isolated_response.status_code == 200
+    assert [item["player_character_id"]["value"] for item in isolated_response.json()["eligible_player_characters"]] == [owned_id.value]
+
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(PlayerCharacterCurrentRow)
+            .where(PlayerCharacterCurrentRow.player_character_id == owned_id.value)
+            .values(lifecycle="retired")
+        )
+
+    response = await _get(app, "/v1/player-characters/eligible-for-run-entry")
+
+    assert response.status_code == 500
+    assert response.json() == {"error": {"error_code": "INTERNAL_SERVER_ERROR", "message": "Internal server error"}}
+    assert owned_id.value not in response.text
+    assert foreign_id.value not in response.text
+
+
+async def test_mysql_eligible_discovery_rejects_stale_current_behind_later_retirement(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.stale-current-{token}",
+        authentication_scheme="test",
+    )
+    binding = ControllerBindingRef(value=f"binding.stale-current-{token}")
+    character_id = PlayerCharacterId(value=f"pc.stale-current-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(character_id.value)
+    service = _service(mysql_session_factory, binding, character_id)
+    app = _app(service, principal)
+    created = await _post(app, key=f"create-stale-current-{token}")
+    assert created.status_code == 200
+    retired = await _retire(
+        app,
+        character_id,
+        key=f"retire-stale-current-{token}",
+    )
+    assert retired.status_code == 200
+
+    async with mysql_session_factory.begin() as session:
+        revision_one = (
+            await session.execute(
+                sa.select(
+                    PlayerCharacterRevisionRow.contract_version,
+                    PlayerCharacterRevisionRow.record_revision,
+                    PlayerCharacterRevisionRow.controller_binding,
+                    PlayerCharacterRevisionRow.lifecycle,
+                    PlayerCharacterRevisionRow.record_canonical,
+                    PlayerCharacterRevisionRow.created_at,
+                ).where(
+                    PlayerCharacterRevisionRow.player_character_id
+                    == character_id.value,
+                    PlayerCharacterRevisionRow.record_revision == 1,
+                )
+            )
+        ).one()
+        await session.execute(
+            sa.update(PlayerCharacterCurrentRow)
+            .where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character_id.value
+            )
+            .values(
+                contract_version=revision_one.contract_version,
+                record_revision=revision_one.record_revision,
+                controller_binding=revision_one.controller_binding,
+                lifecycle=revision_one.lifecycle,
+                record_canonical=revision_one.record_canonical,
+                updated_at=revision_one.created_at,
+            )
+        )
+
+    response = await _get(
+        app,
+        "/v1/player-characters/eligible-for-run-entry",
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "Internal server error",
+        }
+    }
+    assert all(
+        value not in response.text
+        for value in (
+            character_id.value,
+            binding.value,
+            PlayerCharacterContractVersion.V1.value,
+            "1",
+            "2",
+        )
+    )
+    assert all(
+        detail not in response.text.casefold()
+        for detail in (
+            "select ",
+            "player_character_current",
+            "player_character_revisions",
+            "record_revision",
+            "binding_contract_version",
+            "retired",
+        )
+    )
+
+
+async def test_mysql_eligible_discovery_rejects_equal_unsupported_binding_contract_versions(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.unsupported-binding-{token}",
+        authentication_scheme="test",
+    )
+    binding = ControllerBindingRef(value=f"binding.unsupported-{token}")
+    character_id = PlayerCharacterId(value=f"pc.unsupported-{token}")
+    run_id = RunId(value=f"run.unsupported-{token}")
+    line_id = ContinuousStoryLineId(value=f"line.unsupported-{token}")
+    unsupported_version = "structured-player-character/unsupported"
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(character_id.value)
+    player_character_api_scope.run_ids.add(run_id.value)
+    character_service = _service(mysql_session_factory, binding, character_id)
+    await character_service.create(
+        principal,
+        operation_id=PlayerCharacterOperationId(
+            value=f"operation.unsupported-{token}"
+        ),
+        command=CharacterCreationCommand(
+            contract_version=PlayerCharacterContractVersion.V1,
+            character_core=CharacterCore(),
+            narration_preferences=NarrationPreferences(),
+        ),
+    )
+    run_service = RunService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        run_id_issuer=_Issuer(run_id),
+        continuous_story_line_id_issuer=_Issuer(line_id),
+        source_reference=RunAuthoritySourceRef(
+            value="source.mysql-unsupported-binding"
+        ),
+        clock=lambda: _NOW,
+        controller_binding_resolver=_Resolver(binding),
+        player_character_binding_evidence=character_service,
+    )
+    await run_service.create_run(
+        operation_id=RunOperationId(value=f"create-unsupported-run-{token}"),
+        command=CreateRunCommand(
+            source_reference=RunAuthoritySourceRef(
+                value="source.mysql-unsupported-binding"
+            )
+        ),
+    )
+    await run_service.bind_player_character_internal(
+        principal,
+        operation_id=RunOperationId(value=f"bind-unsupported-run-{token}"),
+        command=BindPlayerCharacterCommand(
+            run_id=run_id,
+            continuous_story_line_id=line_id,
+            target_player_character_id=character_id,
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=RunAuthoritySourceRef(
+                value="source.mysql-unsupported-binding"
+            ),
+        ),
+    )
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(RunCurrentRow)
+            .where(RunCurrentRow.run_id == run_id.value)
+            .values(binding_contract_version=unsupported_version)
+        )
+        await session.execute(
+            sa.update(RunRevisionRow)
+            .where(
+                RunRevisionRow.run_id == run_id.value,
+                RunRevisionRow.state_version == 2,
+            )
+            .values(binding_contract_version=unsupported_version)
+        )
+
+    response = await _get(
+        _app(character_service, principal),
+        "/v1/player-characters/eligible-for-run-entry",
+    )
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "error": {
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "Internal server error",
+        }
+    }
+    assert all(
+        value not in response.text
+        for value in (
+            character_id.value,
+            binding.value,
+            run_id.value,
+            line_id.value,
+            unsupported_version,
+            "1",
+            "2",
+        )
+    )
+    assert all(
+        detail not in response.text.casefold()
+        for detail in (
+            "select ",
+            "run_current",
+            "run_revisions",
+            "binding_contract_version",
+            "unsupported",
+        )
+    )
+
+
+async def test_mysql_eligible_discovery_includes_a_character_after_its_run_binding_is_historical(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.historical-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.historical-{token}")
+    character_id = PlayerCharacterId(value=f"pc.historical-{token}")
+    run_id = RunId(value=f"run.historical-{token}")
+    line_id = ContinuousStoryLineId(value=f"line.historical-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(character_id.value)
+    player_character_api_scope.run_ids.add(run_id.value)
+    character_service = _service(mysql_session_factory, binding, character_id)
+    await character_service.create(
+        principal,
+        operation_id=PlayerCharacterOperationId(value=f"operation.historical-{token}"),
+        command=CharacterCreationCommand(
+            contract_version=PlayerCharacterContractVersion.V1,
+            character_core=CharacterCore(),
+            narration_preferences=NarrationPreferences(),
+        ),
+    )
+    run_service = RunService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        run_id_issuer=_Issuer(run_id),
+        continuous_story_line_id_issuer=_Issuer(line_id),
+        source_reference=RunAuthoritySourceRef(value="source.mysql-historical-run"),
+        clock=lambda: _NOW,
+        controller_binding_resolver=_Resolver(binding),
+        player_character_binding_evidence=character_service,
+    )
+    await run_service.create_run(
+        operation_id=RunOperationId(value=f"create-historical-run-{token}"),
+        command=CreateRunCommand(source_reference=RunAuthoritySourceRef(value="source.mysql-historical-run")),
+    )
+    await run_service.bind_player_character_internal(
+        principal,
+        operation_id=RunOperationId(value=f"bind-historical-run-{token}"),
+        command=BindPlayerCharacterCommand(
+            run_id=run_id,
+            continuous_story_line_id=line_id,
+            target_player_character_id=character_id,
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=RunAuthoritySourceRef(value="source.mysql-historical-run"),
+        ),
+    )
+    terminal_values = {
+        "lifecycle_status": "completed",
+        "binding_state": "historical",
+        "inactivated_at": _NOW,
+    }
+    async with mysql_session_factory.begin() as session:
+        await session.execute(
+            sa.update(RunRevisionRow)
+            .where(RunRevisionRow.run_id == run_id.value, RunRevisionRow.state_version == 2)
+            .values(**terminal_values)
+        )
+        await session.execute(
+            sa.update(RunCurrentRow)
+            .where(RunCurrentRow.run_id == run_id.value)
+            .values(**terminal_values, active_player_character_id=None)
+        )
+
+    response = await _get(_app(character_service, principal), "/v1/player-characters/eligible-for-run-entry")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "eligible_player_characters": [
+            {
+                "player_character_id": {"value": character_id.value},
+                "contract_version": "structured-player-character/v1",
+                "record_revision": {"value": 1},
+                "lifecycle": "active",
+            }
+        ],
+        "truncated": False,
+    }
+
+
 async def test_mysql_create_replay_conflict_and_durable_owned_read(
     mysql_session_factory: async_sessionmaker[AsyncSession],
     player_character_api_scope: _Scope,

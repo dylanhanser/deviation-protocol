@@ -13,6 +13,7 @@ from deviation_protocol.application.player_character_operations import (
     evaluate_mutation_policy,
 )
 from deviation_protocol.application.player_character_projection import (
+    EligiblePlayerCharacterCollection,
     PlayerCharacterSelfProjection,
 )
 from deviation_protocol.application.player_character_service import (
@@ -119,10 +120,14 @@ class _Repository:
         self,
         current: Any,
         events: list[str],
+        *,
+        eligible: Any = (),
     ) -> None:
         self.current = current
+        self.eligible = eligible
         self.events = events
         self.requests: list[PlayerCharacterId] = []
+        self.eligible_requests: list[tuple[ControllerBindingRef, int]] = []
 
     async def get(
         self,
@@ -133,6 +138,18 @@ class _Repository:
         if isinstance(self.current, BaseException):
             raise self.current
         return self.current
+
+    async def list_eligible_for_run_entry(
+        self,
+        controller_binding: ControllerBindingRef,
+        *,
+        limit: int,
+    ) -> Any:
+        self.eligible_requests.append((controller_binding, limit))
+        self.events.append("eligible-list")
+        if isinstance(self.eligible, BaseException):
+            raise self.eligible
+        return self.eligible
 
 
 class _ReadUnitOfWork:
@@ -216,6 +233,7 @@ def _read_scope(
     resolved_binding: Any = _BINDING,
     enter_error: BaseException | None = None,
     exit_error: BaseException | None = None,
+    eligible: Any = (),
 ) -> tuple[
     PlayerCharacterService,
     _Resolver,
@@ -226,7 +244,7 @@ def _read_scope(
 ]:
     events: list[str] = []
     resolver = _Resolver(resolved_binding, events)
-    repository = _Repository(current, events)
+    repository = _Repository(current, events, eligible=eligible)
     uow = _ReadUnitOfWork(
         repository,
         events,
@@ -429,4 +447,84 @@ async def test_get_owned_propagates_repository_and_uow_failures(
             player_character_id=_CHARACTER_ID,
         )
 
+    assert uow.commit_calls == 0
+
+
+async def test_list_eligible_for_run_entry_is_bounded_detached_and_read_only() -> None:
+    records = tuple(
+        _created_record(player_character_id=PlayerCharacterId(value=f"pc.read-{index:02d}"))
+        for index in range(33)
+    )
+    service, resolver, repository, uow, factory, events = _read_scope(
+        _created_record(),
+        eligible=records,
+    )
+
+    result = await service.list_eligible_for_run_entry(_PRINCIPAL)
+
+    assert isinstance(result, EligiblePlayerCharacterCollection)
+    assert len(result.eligible_player_characters) == 32
+    assert result.truncated is True
+    assert [
+        projection.player_character_id.value
+        for projection in result.eligible_player_characters
+    ] == [f"pc.read-{index:02d}" for index in range(32)]
+    assert all(
+        projection.player_character_id is not records[index].player_character_id
+        for index, projection in enumerate(result.eligible_player_characters)
+    )
+    assert resolver.calls == 1
+    assert repository.eligible_requests == [(_BINDING, 33)]
+    assert factory.calls == 1
+    assert uow.commit_calls == 0
+    assert events == ["resolve", "factory", "enter", "eligible-list", "exit:none"]
+
+
+async def test_list_eligible_for_run_entry_non_enumerates_unavailable_authority() -> None:
+    service, resolver, repository, uow, factory, events = _read_scope(
+        _created_record(),
+        resolved_binding=None,
+    )
+
+    assert await service.list_eligible_for_run_entry(_PRINCIPAL) is None
+    assert resolver.calls == 1
+    assert repository.eligible_requests == []
+    assert factory.calls == 0
+    assert uow.commit_calls == 0
+    assert events == ["resolve"]
+
+
+@pytest.mark.parametrize(
+    ("count", "truncated"),
+    ((0, False), (1, False), (32, False), (33, True)),
+)
+async def test_list_eligible_for_run_entry_has_exact_cap_and_empty_semantics(
+    count: int,
+    truncated: bool,
+) -> None:
+    records = tuple(
+        _created_record(player_character_id=PlayerCharacterId(value=f"pc.cap-{index:02d}"))
+        for index in range(count)
+    )
+    service, _, repository, uow, _, _ = _read_scope(
+        _created_record(), eligible=records
+    )
+
+    result = await service.list_eligible_for_run_entry(_PRINCIPAL)
+
+    assert result is not None
+    assert len(result.eligible_player_characters) == min(count, 32)
+    assert result.truncated is truncated
+    assert repository.eligible_requests == [(_BINDING, 33)]
+    assert uow.commit_calls == 0
+
+
+async def test_list_eligible_for_run_entry_propagates_corrupt_evidence() -> None:
+    corrupt = _created_record().model_copy(
+        update={"record_revision": PlayerCharacterRevision(value=2)}
+    )
+    service, _, _, uow, _, _ = _read_scope(_created_record(), eligible=(corrupt,))
+
+    with pytest.raises(ValueError):
+        await service.list_eligible_for_run_entry(_PRINCIPAL)
     assert uow.commit_calls == 0

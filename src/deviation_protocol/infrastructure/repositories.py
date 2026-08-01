@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
-from sqlalchemy import func, select, update
+from sqlalchemy import String, and_, cast, func, or_, select, update
 from sqlalchemy.exc import DBAPIError, IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -144,6 +144,7 @@ from deviation_protocol.infrastructure.run_persistence import (
     attach_operation_evidence_to_storage_bytes,
     binding_operation_evidence_to_storage_bytes,
     canonical_run_from_revision_storage,
+    canonical_run_from_current_storage,
     creation_operation_evidence_to_storage_bytes as run_creation_evidence_bytes,
     creation_receipt_from_storage as run_creation_receipt_from_storage,
     fingerprint_to_storage_bytes as run_fingerprint_to_storage_bytes,
@@ -647,6 +648,18 @@ class _SqlAlchemyPlayerCharacterRepositorySupport:
         try:
             with self._session.no_autoflush:
                 result = await self._session.scalars(statement)
+            return tuple(result.all())
+        except DBAPIError as exc:
+            raise PlayerCharacterRepositoryError(
+                "structured player-character repository read failed"
+            ) from exc
+
+    async def _rows(self, statement: Any) -> tuple[Any, ...]:
+        """Read a bounded multi-entity result without lazy follow-up queries."""
+
+        try:
+            with self._session.no_autoflush:
+                result = await self._session.execute(statement)
             return tuple(result.all())
         except DBAPIError as exc:
             raise PlayerCharacterRepositoryError(
@@ -1209,6 +1222,185 @@ class SqlAlchemyPlayerCharacterRepository(
             current_row=row,
             lock_related=True,
         )
+
+    async def list_eligible_for_run_entry(
+        self,
+        controller_binding: ControllerBindingRef,
+        *,
+        limit: int,
+    ) -> tuple[CanonicalPlayerCharacter, ...]:
+        if type(limit) is not int or limit < 1 or limit > 33:
+            raise ValueError("eligible-character discovery limit is outside its bound")
+        try:
+            controller_binding = ControllerBindingRef(value=controller_binding.value)
+        except (AttributeError, TypeError, ValueError) as exc:
+            raise PlayerCharacterStoredRecordIntegrityError(
+                "eligible-character discovery controller binding is invalid"
+            ) from exc
+        canonical_record = cast(
+            PlayerCharacterCurrentRow.record_canonical,
+            String,
+        )
+        canonical_lifecycle = func.JSON_UNQUOTE(
+            func.JSON_EXTRACT(
+                canonical_record,
+                "$.lifecycle",
+            )
+        )
+        canonical_controller_binding = func.JSON_UNQUOTE(
+            func.JSON_EXTRACT(
+                canonical_record,
+                "$.controller_binding.value",
+            )
+        )
+        authoritative_later_revision_exists = (
+            select(PlayerCharacterRevisionRow.player_character_id)
+            .where(
+                PlayerCharacterRevisionRow.player_character_id
+                == PlayerCharacterCurrentRow.player_character_id,
+                PlayerCharacterRevisionRow.record_revision
+                > PlayerCharacterCurrentRow.record_revision,
+            )
+            .correlate(PlayerCharacterCurrentRow)
+            .exists()
+        )
+        active_binding_is_consistent = and_(
+            RunCurrentRow.binding_state == "active",
+            RunCurrentRow.inactivated_at.is_(None),
+            RunCurrentRow.binding_player_character_id
+            == PlayerCharacterCurrentRow.player_character_id,
+            RunCurrentRow.lifecycle_status.in_(("pre_first_turn", "active")),
+            RunRevisionRow.run_id.is_not(None),
+            RunRevisionRow.lifecycle_status == RunCurrentRow.lifecycle_status,
+            RunRevisionRow.state_version == RunCurrentRow.state_version,
+            RunRevisionRow.binding_player_character_id
+            == RunCurrentRow.binding_player_character_id,
+            RunCurrentRow.binding_contract_version
+            == PlayerCharacterContractVersion.V1.value,
+            RunRevisionRow.binding_contract_version
+            == PlayerCharacterContractVersion.V1.value,
+            RunRevisionRow.binding_contract_version
+            == RunCurrentRow.binding_contract_version,
+            RunRevisionRow.binding_record_revision
+            == RunCurrentRow.binding_record_revision,
+            RunRevisionRow.binding_state == RunCurrentRow.binding_state,
+            RunRevisionRow.binding_operation_id
+            == RunCurrentRow.binding_operation_id,
+            RunRevisionRow.binding_authority_source_ref
+            == RunCurrentRow.binding_authority_source_ref,
+            RunRevisionRow.bound_at == RunCurrentRow.bound_at,
+            RunRevisionRow.inactivated_at == RunCurrentRow.inactivated_at,
+        )
+        rows = await self._rows(
+            select(
+                PlayerCharacterCurrentRow,
+                RunCurrentRow,
+                RunRevisionRow,
+                authoritative_later_revision_exists,
+            )
+            .outerjoin(
+                RunCurrentRow,
+                RunCurrentRow.active_player_character_id
+                == PlayerCharacterCurrentRow.player_character_id,
+            )
+            .outerjoin(
+                RunRevisionRow,
+                and_(
+                    RunRevisionRow.run_id == RunCurrentRow.run_id,
+                    RunRevisionRow.state_version == RunCurrentRow.state_version,
+                ),
+            )
+            .where(
+                PlayerCharacterCurrentRow.controller_binding
+                == controller_binding.value,
+                or_(
+                    and_(
+                        PlayerCharacterCurrentRow.lifecycle == "active",
+                        RunCurrentRow.run_id.is_(None),
+                    ),
+                    canonical_lifecycle.is_(None),
+                    canonical_controller_binding.is_(None),
+                    canonical_lifecycle != PlayerCharacterCurrentRow.lifecycle,
+                    canonical_controller_binding
+                    != PlayerCharacterCurrentRow.controller_binding,
+                    authoritative_later_revision_exists,
+                    and_(
+                        RunCurrentRow.run_id.is_not(None),
+                        ~active_binding_is_consistent,
+                    ),
+                ),
+            )
+            .order_by(PlayerCharacterCurrentRow.player_character_id.asc())
+            .limit(limit)
+        )
+        if len(rows) > limit:
+            raise PlayerCharacterStoredRecordIntegrityError(
+                "eligible-character discovery exceeded its query bound"
+            )
+        records: list[CanonicalPlayerCharacter] = []
+        for (
+            row,
+            active_run_row,
+            active_run_revision_row,
+            has_authoritative_later_revision,
+        ) in rows:
+            player_character_id = PlayerCharacterId(value=row.player_character_id)
+            current_stored = self._current_record(row)
+            current_record = canonical_record_from_current_storage(current_stored)
+            if current_record.player_character_id != player_character_id:
+                raise PlayerCharacterStoredRecordIntegrityError(
+                    "eligible-character discovery row has a mismatched identity"
+                )
+            if current_record.controller_binding != controller_binding:
+                raise PlayerCharacterStoredRecordIntegrityError(
+                    "eligible-character discovery row does not match query evidence"
+                )
+            if has_authoritative_later_revision:
+                raise PlayerCharacterStoredRecordIntegrityError(
+                    "eligible-character discovery current row is not the latest revision"
+                )
+            if active_run_row is not None:
+                try:
+                    active_run = canonical_run_from_current_storage(
+                        _SqlAlchemyRunRepositorySupport._current_run_record(
+                            active_run_row
+                        ),
+                        participations=(),
+                    )
+                    if active_run_revision_row is None:
+                        raise RunStoredRecordIntegrityError(
+                            "active Run has no matching current revision"
+                        )
+                    canonical_run_from_revision_storage(
+                        _SqlAlchemyRunRepositorySupport._run_revision_record(
+                            active_run_revision_row
+                        ),
+                        participations=(),
+                    )
+                except RunStoredRecordIntegrityError as exc:
+                    raise PlayerCharacterStoredRecordIntegrityError(
+                        "eligible-character discovery active binding evidence is invalid"
+                    ) from exc
+                binding = active_run.player_character_binding
+                if (
+                    binding is None
+                    or not active_run.lifecycle_status.is_active_line
+                    or binding.binding_state != "active"
+                    or binding.applicable_character_reference.player_character_id
+                    != player_character_id
+                ):
+                    raise PlayerCharacterStoredRecordIntegrityError(
+                        "eligible-character discovery active binding evidence is inconsistent"
+                    )
+                raise PlayerCharacterStoredRecordIntegrityError(
+                    "eligible-character discovery included an active binding"
+                )
+            if current_record.lifecycle.value != "active":
+                raise PlayerCharacterStoredRecordIntegrityError(
+                    "eligible-character discovery row does not match query evidence"
+                )
+            records.append(current_record)
+        return tuple(records)
 
     async def add_initial(
         self,

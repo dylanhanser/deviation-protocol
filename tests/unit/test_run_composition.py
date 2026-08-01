@@ -318,6 +318,10 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
     assert public_routes == {
         ("/health", frozenset({"GET"})),
         (
+            "/v1/player-characters/eligible-for-run-entry",
+            frozenset({"GET"}),
+        ),
+        (
             "/v1/player-characters/{player_character_id}",
             frozenset({"GET"}),
         ),

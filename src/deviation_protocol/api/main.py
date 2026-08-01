@@ -44,6 +44,7 @@ from deviation_protocol.application.player_character_operations import (
     MutationSuccessResult,
 )
 from deviation_protocol.application.player_character_projection import (
+    EligiblePlayerCharacterCollection,
     PlayerCharacterSelfProjection,
 )
 from deviation_protocol.application.player_character_service import (
@@ -729,6 +730,30 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         return {"status": "ok", "phase": "3.0"}
 
     if services is None or services.player_character_service is not None:
+
+        @app.get(
+            "/v1/player-characters/eligible-for-run-entry",
+            response_model=EligiblePlayerCharacterCollection,
+            response_description="Eligible Player Characters for prospective Run entry.",
+            operation_id="list_eligible_player_characters_for_run_entry",
+            summary="List eligible Player Characters for Run entry",
+            description=(
+                "Controller identity is derived only from the trusted server-side "
+                "principal. This bounded discovery read returns only active, unbound "
+                "characters owned by that controller. It does not reserve a character "
+                "or authorize Run entry; entry revalidates eligibility atomically."
+            ),
+            tags=["player-characters"],
+            responses=_public_error_responses(404, 422, 500),
+        )
+        async def list_eligible_player_characters_for_run_entry(
+            principal: RequestPrincipal = Depends(get_current_principal),
+            service: PlayerCharacterService = Depends(get_player_character_service),
+        ) -> EligiblePlayerCharacterCollection:
+            collection = await service.list_eligible_for_run_entry(principal)
+            if collection is None:
+                raise PlayerCharacterNotFoundError("eligible-for-run-entry")
+            return collection
 
         @app.post(
             "/v1/player-characters",
