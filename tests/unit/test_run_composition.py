@@ -322,6 +322,10 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
             frozenset({"GET"}),
         ),
         ("/v1/player-characters", frozenset({"POST"})),
+        (
+            "/v1/player-characters/{player_character_id}/retirement",
+            frozenset({"POST"}),
+        ),
         ("/v1/scenarios", frozenset({"GET"})),
         ("/v1/sessions", frozenset({"POST"})),
         ("/v1/sessions/{session_id}", frozenset({"GET"})),

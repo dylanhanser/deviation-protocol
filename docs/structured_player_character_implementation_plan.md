@@ -48,11 +48,30 @@ approved single-resource read and does not complete Phase 5. The P5-S2 public
 creation/replay contract is frozen and published at
 `245caff3903666fcd2dd9a318785f323117deb24`
 (`docs(player-character): define P5-S2 public contract`). P5-S2's bounded
-normal POST implementation, focused unit/composition evidence, real-MySQL API
-evidence, and Demo non-activation evidence are complete in the current
-unstaged working-tree candidate. Documentation is synchronized there, while
-fresh independent read-only review and separate staging and commit
-authorization remain pending. P5-S3 and Phases 6–7 remain deferred.**
+normal POST implementation was independently approved, committed, and
+published at `4ba66d8f277988325795c905fdf6fd9e416d7457`
+(`feat(player-character): add creation API`). The dedicated
+[P5-S3 retirement plan](structured_player_character_p5_s3_implementation_plan.md)
+received `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its first,
+first-corrected, and re-corrected local implementation candidates each
+received `CHANGES_REQUIRED`; the third review found no production-code defect
+and requested corrected evidence only. A later evidence candidate's receipt-add
+1062 depended on a mid-operation rollback-and-resume topology. The focused
+investigation returned
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
+present acceptance-boundary-corrected unstaged candidate now requires normal
+HTTP serialization evidence plus explicitly labelled defensive fault
+injection. Correction validation completed locally (canonical Offline 1,814
+passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
+  Provider skip); its focused final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`, finding no
+  material scoped defect. It accepted real-MySQL aggregate-lock serialization,
+  exact replay or ordinary idempotency conflict, and one durable mutation; fault
+  injection is bounded defensive recovery only, and the unreachable receipt-add
+  race is not a requirement. P5-S3 is independently approved and eligible for
+  exact-scope commit; P5-S4 and unrelated deferred work have not begun. Push,
+  deployment, release, runtime activation, Provider work, and Phases 6–7 remain
+  deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -383,14 +402,42 @@ operation receipts, Repositories, and same-session UoW wiring, and completed
 Phase 3 supplies the trusted `PlayerCharacterService` plus normal production
 composition for create, mutate, and `get_owned`. Minimum Run Core supplies its
 Run models, persistence, service, and composition; completed P4-S1 activates
-the separately named internal binding seam. Except for P5-S1's owned GET and
-P5-S2's bounded normal POST creation/replay route, configured service
+the separately named internal binding seam. Except for P5-S1's owned GET,
+P5-S2's bounded normal POST creation/replay route, and the present unstaged
+P5-S3 normal POST retirement candidate, configured service
 dependency getter, public exposure of the existing
 `PlayerCharacterSelfProjection` DTO, and their corresponding OpenAPI
 operations, all other Player Character public routes, Run binding routes,
 mutation, listing, search, and administration surfaces; frontend and Demo
 behavior; scenario/world execution; and the Run transition to `active` remain
 absent.
+
+The acceptance-boundary-corrected P5-S3 retirement candidate is unstaged and
+locally validated after the focused
+  `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH` verdict.
+  Its focused final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
+  material scoped defect. The accepted real-MySQL evidence proves aggregate-lock
+  serialization, replay/conflict, and one durable mutation; fault injection is
+  bounded defensive recovery only, and the unreachable receipt-add race is not a
+  requirement. P5-S3 is independently approved and eligible for exact-scope
+  commit, not published, pushed, deployed, released, or runtime-activated.
+  P5-S4 and all unrelated deferred work have not begun; Provider work remains
+  deferred.
+
+For this slice, mandatory real-MySQL evidence is normal HTTP concurrency through
+distinct connections/UoWs: the second retirement waits at the Player Character
+`FOR UPDATE` lock, then exact-replays an identical fingerprint or returns the
+ordinary idempotency conflict for a different fingerprint after exactly one
+durable revision advance and mutation receipt. Fresh independent reads prove no
+duplicate policy mutation, recovery UoW, receipt-add conflict, or 1062. The
+existing bounded recovery branch is defensive and remains covered by explicitly
+labelled narrow service fault injection with no mutation retry, third UoW,
+recovery write/commit, generic retry, or uncertain-commit recovery. Real
+receipt-add 1062 evidence becomes mandatory only if a future composed runtime
+writer or changed transaction topology can legitimately reach receipt
+uniqueness without first serializing on the aggregate lock; this plan does not
+approve or require such a topology.
 
 ### Canonical state ownership
 
@@ -998,7 +1045,9 @@ fingerprint is SHA-256 over UTF-8 canonical JSON with stable separators. Phase
 declaration-state tag, confirmation/evidence bindings, and every admitted
 command kind before Phase 2 creates a receipt schema.
 
-After current controller authorization:
+After current controller authorization and all operation-specific
+pre-fingerprint gates have succeeded, including the mutation
+successor-capacity gate described above:
 
 - an existing receipt under the exact scope key with the exact fingerprint,
   command kind, target/result binding, and result-schema version is an exact
@@ -3208,8 +3257,10 @@ The method must perform this order exactly:
 8. Call `evaluate_mutation_receipt_protocol` with the already-read value
    supplied by an exact-key synchronous callback. This existing authority
    revalidates the command, computes the canonical fingerprint, evaluates an
-   immutable receipt before expected-revision rejection, and validates exact
-   target/result/contract/reference semantics.
+   immutable receipt before current-state stale-revision rejection, and
+   validates exact target/result/contract/reference semantics. The
+   successor-capacity rejection in step 6 remains earlier than both fingerprint
+   construction and receipt lookup.
 9. On `EXACT_REPLAY`, type-check and return only the stored
    `MutationSuccessResult`. Return every other non-ready protocol decision,
    including `IDEMPOTENCY_CONFLICT`, `STORED_RECEIPT_INTEGRITY_FAILURE`,
@@ -3274,7 +3325,7 @@ evaluation, history append, current-state mutation, receipt add, or commit.
 | Invalid untyped construction input | Existing constructor `ValidationError`, `TypeError`, or `ValueError` | Service is not called |
 | Corrupted typed command, operation ID, or current record | Original defensive validation exception | No translation, success, or recovery |
 | Unrepresentable revision successor | Existing `REVISION_EXHAUSTED` protocol decision | Before receipt key/lookup and all writes |
-| Same operation ID with incompatible command/result binding | Existing `IDEMPOTENCY_CONFLICT` protocol decision | Receipt-before-stale; no policy/write/commit |
+| Same operation ID with incompatible command/result binding after the pre-receipt gates succeed for a valid non-exhausted request | Existing `IDEMPOTENCY_CONFLICT` protocol decision | Receipt-before-current-state-stale; no policy/write/commit |
 | Malformed or inconsistent stored receipt | Existing `STORED_RECEIPT_INTEGRITY_FAILURE`, or the Repository's original stored-record integrity exception | No stored success disclosure |
 | Initially stale expected revision | Existing `STALE_REVISION` protocol decision | Receipt evaluated first; no policy/write/commit |
 | Applicable-reference or target-contract mismatch on a new operation | Existing unchanged `PlayerCharacterPolicyDecision(code=APPLICABLE_REFERENCE_MISMATCH)` | The selected existing policy rejects before candidate construction |
@@ -3406,13 +3457,13 @@ migration tests remain regression evidence and are not copied.
 | Invalid command and operation identity | Original validation exception; key constructor and receipt lookup are fail-if-called | None; deterministic validation is not duplicated |
 | Receipt before stale | A stale command with a stored compatible receipt returns replay; incompatible receipt returns idempotency conflict; no policy | Real replay after a later committed revision returns the earlier stored result |
 | Compatible replay without second mutation | No policy/history/CAS/add/commit/clock | Revision and receipt counts remain unchanged after fresh-service replay |
-| Incompatible operation-ID reuse | Exact `IDEMPOTENCY_CONFLICT`, no stored result/write | Fresh-session counts remain unchanged |
+| Incompatible operation-ID reuse after pre-receipt gates | Exact `IDEMPOTENCY_CONFLICT` for a valid non-exhausted request, no stored result/write | Fresh-session counts remain unchanged |
 | Initially stale expected revision | Exact `STALE_REVISION` after one receipt lookup and before policy | Locked current state and counts remain unchanged |
 | Unchanged policy denial | The exact same `PlayerCharacterPolicyDecision` object is returned; all write/commit spies fail if called | Representative unavailable transition leaves durable state unchanged |
 | History/current/receipt atomicity | Ordered append, CAS, add, one commit | Fresh sessions see all three or none; before/after fingerprints reconstruct |
 | CAS false | Exact `STALE_REVISION`; appended fake history rolled back by UoW exit; no receipt, commit, recovery, or second UoW | Existing real Repository CAS-loser evidence remains authoritative; new locked service concurrency proves production writers normally serialize before CAS |
-| Supported receipt uniqueness conflict | Static subtype relationships; only the exact receipt-add narrow exception and same-object provenance enter recovery | A coordinated real row-only mutation-receipt flush race yields one commit and one `PlayerCharacterMutationReceiptConflictError`; loser rollback is clean |
-| Compatible uniqueness recovery | Original UoW exit/disposal precedes one fresh UoW; helper returns only stored winner; no recovery commit | Normal locked duplicate service calls serialize to one mutation plus replay, demonstrating why the defensive flush recovery is not the normal path |
+| Supported receipt uniqueness conflict | Static subtype relationships; only explicitly labelled narrow receipt-add fault injection with same-object provenance enters recovery | A synthetic direct-repository, out-of-topology row-only flush race proves MySQL constraint translation; it is not production-service reachability evidence |
+| Compatible uniqueness recovery | Fault-injected original UoW exit/disposal precedes one fresh UoW; helper returns only stored winner; no recovery commit, write, retry, or third UoW | Normal locked duplicate service calls serialize to one mutation plus replay, demonstrating why the defensive flush recovery is not the current production path |
 | Incompatible/missing/invalid recovery evidence | `IDEMPOTENCY_CONFLICT` for incompatible same-key reuse; missing/invalid evidence fails closed; no third UoW | Exact constraint and reconstruction behavior only; helper outcomes remain unit-owned |
 | Rollback for every pre-commit failure | Parameterized failure at validation, policy, history, CAS exception/false, receipt add, and before commit; no success | Controlled failures after history and after CAS publish no partial row to a fresh session |
 | Commit failure | Original exception, no recovery lookup or success | Controlled commit failure publishes no claimed success; only safe pre-COMMIT failure may assert zero durable rows |
@@ -3596,23 +3647,35 @@ composition:
 | --- | --- | --- | --- |
 | P5-S1 — Owned-read activation | Thin authenticated public read over the accepted detached projection | P3-S3 and P3-S4 | Create, mutation, UI |
 | P5-S2 — Creation activation | Thin authenticated creation/replay route | P3-S1, P3-S4, and accepted public contract | Mutation, frontend, Demo, Run behavior |
-| P5-S3 — Admitted controller-mutation activation | Expose only independently authorized mutation kinds | P3-S2 and P3-S4; Phase 4 where Run binding is required | Final death without owner, unavailable reactivation/return, frontend |
+| P5-S3 — Retirement-only controller-mutation activation | One thin authenticated retirement/replay route for an owned, active, unbound character | P3-S2, P3-S4, completed P4-S1 guard, and an independently approved [dedicated P5-S3 plan](structured_player_character_p5_s3_implementation_plan.md) | Bound-character retirement, Run ending/historicalization, final death, reactivation/return, general mutation, frontend |
 
 No repository authority defines a P4-S2 objective. P5-S1 is completed and
 published at `5955c47eac07429107b93ef85da6a055bd2044ef`. It activates only a
 thin authenticated public read over the accepted detached Player Character
 projection. The P5-S2 public creation/replay contract is frozen and published
 at `245caff3903666fcd2dd9a318785f323117deb24`; its exact bounded normal POST
-implementation is complete and locally verified in the current unstaged
-working-tree candidate. It reuses the P3 service's controller-first authority,
-operation namespace, receipt replay, durable creation family, and one admitted
-controller-binding-race winner recovery; ordinary, corrupt-receipt,
-unsupported-recovery, and uncertain-commit failures remain sanitized, and
-cancellation propagates through rollback. P5-S1 remains unchanged. Demo has no
-Player Character service, route, method, or OpenAPI path, and no frontend
-creation method exists. Fresh independent read-only review, staging, and commit
-remain pending. P5-S3 mutation, UI, Demo, Run behavior, and broader Phase 5
-work remain inactive or deferred.
+implementation was independently approved, committed, and published at
+`4ba66d8f277988325795c905fdf6fd9e416d7457`. It reuses the P3 service's
+controller-first authority, operation namespace, receipt replay, durable
+creation family, and one admitted controller-binding-race winner recovery;
+ordinary, corrupt-receipt, unsupported-recovery, and uncertain-commit failures
+remain sanitized, and cancellation propagates through rollback. P5-S1 remains
+unchanged. Demo has no Player Character service, route, method, or OpenAPI path,
+and no frontend creation method exists. P5-S3's first, first-corrected, and
+re-corrected local candidates each received `CHANGES_REQUIRED`; the later
+evidence candidate was followed by the focused verdict
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. Its
+acceptance-boundary-corrected unstaged normal-application retirement candidate
+follows `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`; correction validation
+  passed with the canonical counts above. Its focused final independent review
+  returned `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`
+  with no material scoped defect, accepting real-MySQL aggregate-lock
+  serialization, replay/conflict, and one durable mutation, and fault injection
+  only as bounded defensive recovery; the unreachable receipt-add race is not a
+  requirement. P5-S3 is independently approved and eligible for exact-scope
+  commit; P5-S4 and unrelated deferred work have not begun. UI, Demo, Run
+  behavior, runtime activation, Provider work, and broader Phase 5 work remain
+  inactive or deferred.
 
 Every Phase 5 slice must preserve current Session recovery and safe public
 error envelopes, explicit allowlists, privacy, non-enumeration, detachment, and
@@ -3734,11 +3797,23 @@ independently approved boundary. P4-G0 now delegates the exact minimum
 Run-core path budgets to its owning plan. The prerequisite and P4-S1 are
 implemented; broader Phase 4 lifecycle, scenario, and world integration remain
 deferred. P5-S1 remains a completed and published Phase 5 implementation
-slice. P5-S2 now exists as an implemented and locally verified, unstaged
-candidate; successful repeat final review, commit, and publication remain
-pending. P5-S2 is not independently approved, committed, published, deployed,
-or Demo/frontend-activated. P5-S3 and all Phase 6–7 work remain unimplemented
-or deferred.
+slice. P5-S2 is independently approved, committed, and published at
+`4ba66d8f277988325795c905fdf6fd9e416d7457`; it is not deployed or Demo/
+frontend-activated. P5-S3's first, first-corrected, and re-corrected
+implementation candidates each received `CHANGES_REQUIRED`; the
+later evidence candidate and focused not-reachable verdict precede the present
+acceptance-boundary-corrected unstaged candidate. It follows
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its focused final
+  independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
+  material scoped defect; accepted real-MySQL evidence proves aggregate-lock
+  serialization, replay/conflict, and one durable mutation, while fault injection
+  is bounded defensive recovery only and the unreachable receipt-add race is not
+  a requirement. P5-S3 is independently approved and eligible for exact-scope
+  commit; P5-S4 and unrelated deferred work have not begun. Correction validation
+  passed with the canonical counts above; publication, push, deployment, release,
+  runtime activation, and Provider work remain deferred.
+All Phase 6–7 work remains unimplemented or deferred.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -3815,7 +3890,7 @@ changes a reusable rule.
 | Duplicate exact mutation operation after later revisions | Service + persistence | Original stored safe result returned without reconstructing from current state; no second revision/history entry |
 | Canonical state-record fingerprint | Persistence unit | Deterministic canonical record serialization yields stable SHA-256 bytes for logically identical normalized revisions, changes for authoritative state changes, and remains distinct from unchanged Phase 1 `CharacterOperationFingerprint` semantics |
 | Receipt/history cross-record integrity | Persistence/integration | Creation receipt binds its exact revision-1 result record; each mutation receipt binds its exact before/after records; parameterized corruption tests detect and fail closed on cross-character/controller substitution, missing history, extra history where prohibited, contradictory history, broken continuity, declaration/provenance/lifecycle/mutation-metadata mismatch, authority mismatch where authority applies, source-reference mismatch where source reference applies, and before/after/result fingerprint mismatch at both write and reconstruction/read boundaries before replay or disclosure |
-| Conflicting replay | Service + persistence | Same exact scope key with different fingerprint, command, target/result binding, or result-schema version conflicts; no allocation or mutation |
+| Conflicting replay after operation-specific pre-receipt gates | Service + persistence | A valid non-exhausted request using the same exact scope key with different fingerprint, command, target/result binding, or result-schema version conflicts; no allocation or mutation. Maximum-revision mutation requests reject before fingerprint or receipt evaluation as frozen above |
 | Rejected operation receipt absence | Service + persistence | Rejections create no first-slice character receipt and may be re-evaluated without ever duplicating a successful effect |
 | Current Session replay separation | Application/contract + persistence | Character operations neither reuse nor mutate `turn_requests`; Session action/request status authority remains unchanged |
 | Provider failure | Application regression | Last canonical record/revision unchanged |

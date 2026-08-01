@@ -24,10 +24,14 @@ from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_operations import (
     CREATION_RESULT_SCHEMA_VERSION,
     CharacterCreationCommand,
+    CharacterMutationCommand,
     CharacterOperationNamespace,
     CharacterOperationProtocolCode,
     CharacterOperationProtocolDecision,
     CreationSuccessResult,
+    MUTATION_RESULT_SCHEMA_VERSION,
+    MutationCommandResult,
+    MutationSuccessResult,
 )
 from deviation_protocol.application.player_character_projection import (
     PlayerCharacterSelfProjection,
@@ -38,14 +42,20 @@ from deviation_protocol.domain.player_character import (
     PlayerCharacterContractVersion,
     PlayerCharacterId,
     PlayerCharacterLifecycle,
+    PlayerCharacterMutationKind,
     PlayerCharacterOperationId,
     PlayerCharacterRevision,
+)
+from deviation_protocol.domain.player_character_policies import (
+    PlayerCharacterPolicyCode,
+    PlayerCharacterPolicyDecision,
 )
 
 
 _PRINCIPAL = RequestPrincipal(player_id="player.test", authentication_scheme="test")
 _PATH = "/v1/player-characters/pc.test-owned"
 _CREATE_PATH = "/v1/player-characters"
+_RETIREMENT_PATH = "/v1/player-characters/pc.test-owned/retirement"
 _VALID_KEY = "Create.Key:Case-1"
 _UNSET = object()
 
@@ -130,6 +140,7 @@ async def _raw_asgi_request(
     *,
     headers: list[tuple[bytes, bytes]],
     body: bytes,
+    path: str = _CREATE_PATH,
     events: list[str] | None = None,
 ) -> _Response:
     request_sent = False
@@ -162,8 +173,8 @@ async def _raw_asgi_request(
         "http_version": "1.1",
         "method": "POST",
         "scheme": "http",
-        "path": _CREATE_PATH,
-        "raw_path": _CREATE_PATH.encode("ascii"),
+        "path": path,
+        "raw_path": path.encode("ascii"),
         "query_string": b"",
         "headers": headers,
         "client": ("127.0.0.1", 12345),
@@ -189,8 +200,31 @@ def _creation_route(app: FastAPI) -> APIRoute:
     )
 
 
+def _retirement_route(app: FastAPI) -> APIRoute:
+    return next(
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path == "/v1/player-characters/{player_character_id}/retirement"
+        and route.methods == {"POST"}
+    )
+
+
 def _mark_creation_route_entry(app: FastAPI, events: list[str]) -> None:
     route = _creation_route(app)
+    original_endpoint = route.dependant.call
+    assert original_endpoint is not None
+
+    async def traced_endpoint(**values: Any) -> Any:
+        events.append("route")
+        return await original_endpoint(**values)
+
+    route.endpoint = traced_endpoint
+    route.dependant.call = traced_endpoint
+
+
+def _mark_retirement_route_entry(app: FastAPI, events: list[str]) -> None:
+    route = _retirement_route(app)
     original_endpoint = route.dependant.call
     assert original_endpoint is not None
 
@@ -253,6 +287,11 @@ class _PlayerCharacterService:
                 CharacterCreationCommand,
             ]
         ] = []
+        self.mutation_result: Any = None
+        self.mutation_error: BaseException | None = None
+        self.mutation_calls: list[
+            tuple[RequestPrincipal, PlayerCharacterOperationId, CharacterMutationCommand]
+        ] = []
 
     async def get_owned(
         self,
@@ -278,6 +317,18 @@ class _PlayerCharacterService:
             raise self.creation_error
         return self.creation_result
 
+    async def mutate(
+        self,
+        principal: RequestPrincipal,
+        *,
+        operation_id: PlayerCharacterOperationId,
+        command: CharacterMutationCommand,
+    ) -> Any:
+        self.mutation_calls.append((principal, operation_id, command))
+        if self.mutation_error is not None:
+            raise self.mutation_error
+        return self.mutation_result
+
 
 def _projection(lifecycle: PlayerCharacterLifecycle) -> PlayerCharacterSelfProjection:
     return PlayerCharacterSelfProjection(
@@ -296,6 +347,35 @@ def _creation_success() -> CreationSuccessResult:
         resulting_revision=PlayerCharacterRevision(value=1),
         resulting_lifecycle=PlayerCharacterLifecycle.ACTIVE,
     )
+
+
+def _retirement_success() -> MutationSuccessResult:
+    return MutationSuccessResult(
+        result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+        player_character_id=PlayerCharacterId(value="pc.test-owned"),
+        contract_version=PlayerCharacterContractVersion.V1,
+        command_kind=PlayerCharacterMutationKind.RETIRE,
+        command_result=MutationCommandResult.RETIRED,
+        resulting_revision=PlayerCharacterRevision(value=2),
+        resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+    )
+
+
+def _retirement_body(revision: int = 1) -> dict[str, Any]:
+    return {
+        "contract_version": "structured-player-character/v1",
+        "expected_revision": {"value": revision},
+        "confirm_retirement": True,
+    }
+
+
+def _mutated_retirement_success(**changes: Any) -> MutationSuccessResult:
+    """Construct an otherwise typed result whose actual state crosses the API seam."""
+
+    result = _retirement_success()
+    for name, value in changes.items():
+        object.__setattr__(result, name, value)
+    return result
 
 
 def _minimal_creation_body() -> dict[str, Any]:
@@ -493,6 +573,1199 @@ def test_create_and_exact_replay_have_identical_public_semantics() -> None:
     assert "replay" not in first.text.casefold()
     assert len(service.creation_calls) == 2
     assert service.creation_calls[0] == service.creation_calls[1]
+
+
+def test_retirement_success_binds_the_exact_command_and_projects_only_safe_fields() -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = _retirement_success()
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/json"
+    assert response.json() == {
+        "player_character_id": {"value": "pc.test-owned"},
+        "contract_version": "structured-player-character/v1",
+        "record_revision": {"value": 2},
+        "lifecycle": "retired",
+    }
+    assert len(service.mutation_calls) == 1
+    principal, operation_id, command = service.mutation_calls[0]
+    assert principal == _PRINCIPAL
+    assert operation_id == PlayerCharacterOperationId(value=_VALID_KEY)
+    assert command.command_kind is PlayerCharacterMutationKind.RETIRE
+    assert command.target_player_character_id == PlayerCharacterId(value="pc.test-owned")
+    assert command.confirmation is not None
+    assert command.confirmation.source_reference == main._PUBLIC_RETIREMENT_SOURCE_REFERENCE
+
+
+def test_retirement_request_model_rejects_json_numeric_confirmation_before_literal_coercion() -> None:
+    for confirmation in (b"1", b"1.0", b"0", b"-1", b'"true"', b'"1"', b"[]", b"{}", b"null", b"false"):
+        raw = (
+            b'{"contract_version":"structured-player-character/v1",'
+            b'"expected_revision":{"value":1},"confirm_retirement":'
+            + confirmation
+            + b"}"
+        )
+        with pytest.raises(ValidationError):
+            main.PlayerCharacterRetirementRequest.model_validate_json(raw)
+
+    parsed = main.PlayerCharacterRetirementRequest.model_validate_json(
+        b'{"contract_version":"structured-player-character/v1",'
+        b'"expected_revision":{"value":1},"confirm_retirement":true}'
+    )
+    assert parsed.confirm_retirement is True
+
+
+@pytest.mark.parametrize("confirmation", (1, 1.0, 2, 2.5))
+def test_retirement_request_model_rejects_python_numeric_confirmation_before_coercion(
+    confirmation: int | float,
+) -> None:
+    body: dict[str, Any] = {
+        "contract_version": PlayerCharacterContractVersion.V1,
+        "expected_revision": PlayerCharacterRevision(value=1),
+        "confirm_retirement": True,
+    }
+    body["confirm_retirement"] = confirmation
+
+    with pytest.raises(ValidationError):
+        main.PlayerCharacterRetirementRequest.model_validate(body)
+
+
+@pytest.mark.parametrize(
+    ("confirmation", "accepted"),
+    (
+        (True, True),
+        (False, False),
+        (None, False),
+        (_UNSET, False),
+        ("true", False),
+        ("false", False),
+        ([], False),
+        ([True], False),
+        ({}, False),
+        ({"value": True}, False),
+        (1, False),
+        (1.0, False),
+        (2, False),
+        (-7, False),
+        (2.5, False),
+        (-0.5, False),
+    ),
+    ids=(
+        "literal-true",
+        "literal-false",
+        "null",
+        "missing",
+        "string-true",
+        "string-false",
+        "empty-array",
+        "nonempty-array",
+        "empty-object",
+        "nonempty-object",
+        "integer-one",
+        "float-one",
+        "other-positive-integer",
+        "other-negative-integer",
+        "other-positive-float",
+        "other-negative-float",
+    ),
+)
+def test_retirement_request_model_literal_confirmation_matrix_is_complete(
+    confirmation: Any,
+    accepted: bool,
+) -> None:
+    body: dict[str, Any] = {
+        "contract_version": PlayerCharacterContractVersion.V1,
+        "expected_revision": PlayerCharacterRevision(value=1),
+        "confirm_retirement": True,
+    }
+    if confirmation is _UNSET:
+        del body["confirm_retirement"]
+    else:
+        body["confirm_retirement"] = confirmation
+
+    if accepted:
+        parsed = main.PlayerCharacterRetirementRequest.model_validate(body)
+        assert parsed.confirm_retirement is True
+    else:
+        with pytest.raises(ValidationError):
+            main.PlayerCharacterRetirementRequest.model_validate(body)
+
+
+@pytest.mark.parametrize(
+    ("confirmation", "accepted"),
+    (
+        (b"true", True),
+        (b"false", False),
+        (b"null", False),
+        (None, False),
+        (b'"true"', False),
+        (b'"false"', False),
+        (b"[]", False),
+        (b"[true]", False),
+        (b"{}", False),
+        (b'{"value":true}', False),
+        (b"1", False),
+        (b"1.0", False),
+        (b"2", False),
+        (b"-7", False),
+        (b"2.5", False),
+        (b"-0.5", False),
+    ),
+    ids=(
+        "literal-true",
+        "literal-false",
+        "null",
+        "missing",
+        "string-true",
+        "string-false",
+        "empty-array",
+        "nonempty-array",
+        "empty-object",
+        "nonempty-object",
+        "integer-one",
+        "float-one",
+        "other-positive-integer",
+        "other-negative-integer",
+        "other-positive-float",
+        "other-negative-float",
+    ),
+)
+def test_retirement_http_literal_confirmation_matrix_precedes_mutation(
+    confirmation: bytes | None,
+    accepted: bool,
+) -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = _retirement_success()
+    member = (
+        b""
+        if confirmation is None
+        else b',"confirm_retirement":' + confirmation
+    )
+    raw = (
+        b'{"contract_version":"structured-player-character/v1",'
+        b'"expected_revision":{"value":1}' + member + b"}"
+    )
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        content=raw,
+        headers=_valid_headers(),
+    )
+
+    if accepted:
+        assert response.status_code == 200
+        assert len(service.mutation_calls) == 1
+    else:
+        _assert_error(
+            response,
+            422,
+            "REQUEST_VALIDATION_FAILED",
+            "Request validation failed",
+        )
+        assert service.mutation_calls == []
+
+
+@pytest.mark.parametrize(
+    "result",
+    (
+        MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=PlayerCharacterId(value="pc.someone-else"),
+            contract_version=PlayerCharacterContractVersion.V1,
+            command_kind=PlayerCharacterMutationKind.RETIRE,
+            command_result=MutationCommandResult.RETIRED,
+            resulting_revision=PlayerCharacterRevision(value=2),
+            resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+        ),
+        _mutated_retirement_success(contract_version="not-a-contract"),
+        _mutated_retirement_success(resulting_revision=PlayerCharacterRevision(value=1)),
+        _mutated_retirement_success(resulting_revision=PlayerCharacterRevision(value=3)),
+        _mutated_retirement_success(resulting_lifecycle=PlayerCharacterLifecycle.ACTIVE),
+        MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=PlayerCharacterId(value="pc.test-owned"),
+            contract_version=PlayerCharacterContractVersion.V1,
+            command_kind=PlayerCharacterMutationKind.FINAL_DEATH,
+            command_result=MutationCommandResult.DECEASED,
+            resulting_revision=PlayerCharacterRevision(value=2),
+            resulting_lifecycle=PlayerCharacterLifecycle.DECEASED,
+        ),
+    ),
+    ids=(
+        "other-character",
+        "malformed-contract",
+        "unchanged-revision",
+        "skipped-revision",
+        "active-lifecycle",
+        "wrong-command-kind",
+    ),
+)
+def test_retirement_impossible_success_result_is_sanitized_and_not_retried(
+    result: MutationSuccessResult,
+) -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = result
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert len(service.mutation_calls) == 1
+    assert service.calls == []
+    assert service.creation_calls == []
+
+
+def test_retirement_malformed_constructed_success_result_is_sanitized_and_not_retried() -> None:
+    malformed = object.__new__(MutationSuccessResult)
+    service = _PlayerCharacterService()
+    service.mutation_result = malformed
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert len(service.mutation_calls) == 1
+    assert service.calls == []
+    assert service.creation_calls == []
+
+
+def test_retirement_exact_replay_result_is_projected_when_bound_to_the_same_command() -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = _retirement_success()
+    app = _app(service)
+
+    first = _post(app, path=_RETIREMENT_PATH, json_body=_retirement_body(), headers=_valid_headers())
+    replay = _post(app, path=_RETIREMENT_PATH, json_body=_retirement_body(), headers=_valid_headers())
+
+    assert first.status_code == replay.status_code == 200
+    assert replay.body == first.body
+    assert len(service.mutation_calls) == 2
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        b"",
+        b"null",
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":1},"confirm_retirement":false}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":1},"confirm_retirement":true,"unexpected":1}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":1,"value":1},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":1},"confirm_retirement":true,"confirm_retirement":true}',
+    ),
+)
+def test_retirement_strict_body_validation_fails_before_mutate(content: bytes) -> None:
+    service = _PlayerCharacterService()
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        content=content,
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 422, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+    assert service.mutation_calls == []
+
+
+@pytest.mark.parametrize(
+    "content",
+    (
+        b'{"expected_revision":{"value":1},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":1,"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"extra":1,"value":1},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":true},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":0},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v1","expected_revision":{"value":1.0},"confirm_retirement":true}',
+        b'{"contract_version":"structured-player-character/v2","expected_revision":{"value":1},"confirm_retirement":true}',
+    ),
+)
+def test_retirement_complete_contract_and_revision_shape_fail_before_mutate(content: bytes) -> None:
+    service = _PlayerCharacterService()
+    response = _post(_app(service), path=_RETIREMENT_PATH, content=content, headers=_valid_headers())
+
+    _assert_error(response, 422, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+    assert service.mutation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_retirement_raw_transport_header_matrix_precedes_body_and_mutate() -> None:
+    body = json.dumps(_retirement_body(), separators=(",", ":")).encode()
+    valid_content_type = (b"content-type", b"application/json")
+    valid_key = (b"idempotency-key", _VALID_KEY.encode("ascii"))
+    invalid_headers = (
+        ("content-type-missing", [valid_key]),
+        ("content-type-empty", [(b"content-type", b""), valid_key]),
+        (
+            "content-type-duplicate-occurrences",
+            [valid_content_type, valid_content_type, valid_key],
+        ),
+        (
+            "content-type-combined-values",
+            [(b"content-type", b"application/json,application/json"), valid_key],
+        ),
+        (
+            "content-type-invalid-media-type",
+            [(b"content-type", b"text/plain"), valid_key],
+        ),
+        (
+            "content-type-combined-mixed-values",
+            [(b"content-type", b"application/json, text/plain"), valid_key],
+        ),
+        (
+            "content-type-malformed-token",
+            [(b"content-type", b"application /json"), valid_key],
+        ),
+        (
+            "content-type-non-ascii-token",
+            [(b"content-type", b"\xff"), valid_key],
+        ),
+        (
+            "content-type-non-ascii-parameter",
+            [(b"content-type", b"application/json;\xff"), valid_key],
+        ),
+        ("idempotency-key-missing", [valid_content_type]),
+        (
+            "idempotency-key-empty",
+            [valid_content_type, (b"idempotency-key", b"")],
+        ),
+        (
+            "idempotency-key-duplicate-occurrences",
+            [valid_content_type, valid_key, (b"idempotency-key", b"other")],
+        ),
+        (
+            "idempotency-key-combined-values",
+            [valid_content_type, (b"idempotency-key", _VALID_KEY.encode() + b",other")],
+        ),
+        (
+            "idempotency-key-malformed-space",
+            [valid_content_type, (b"idempotency-key", b"bad key")],
+        ),
+        (
+            "idempotency-key-invalid-leading-character",
+            [valid_content_type, (b"idempotency-key", b".leading")],
+        ),
+        (
+            "idempotency-key-non-ascii",
+            [valid_content_type, (b"idempotency-key", b"\xff")],
+        ),
+        (
+            "idempotency-key-overlength",
+            [valid_content_type, (b"idempotency-key", b"a" * 129)],
+        ),
+        (
+            "idempotency-key-wrong-namespace-syntax",
+            [valid_content_type, (b"idempotency-key", b"player-character.create/v1")],
+        ),
+    )
+    for case_id, headers in invalid_headers:
+        service = _PlayerCharacterService()
+        body_events: list[str] = []
+        response = await _raw_asgi_request(
+            _app(service),
+            headers=headers,
+            body=body,
+            path=_RETIREMENT_PATH,
+            events=body_events,
+        )
+        _assert_error(response, 422, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+        assert service.mutation_calls == [], case_id
+        assert body_events == [], case_id
+
+    # Parameters are deliberately opaque under the frozen P5-S2 contract; the
+    # raw media-type token before the first semicolon is the only authority.
+    for content_type, operation_id in (
+        (b"application/json", _VALID_KEY.encode("ascii")),
+        (b"application/json", b"A" * 128),
+        (b"application/json", b"A.z_9:-case"),
+        (b"Application/Json; charset=utf-8", _VALID_KEY.encode("ascii")),
+        (b" application/json\t; charset=utf-8", _VALID_KEY.encode("ascii")),
+        (b"application/json; =", _VALID_KEY.encode("ascii")),
+        (b"application/json; charset", _VALID_KEY.encode("ascii")),
+        (b"application/json; ; malformed", _VALID_KEY.encode("ascii")),
+    ):
+        valid_service = _PlayerCharacterService()
+        valid_service.mutation_result = _retirement_success()
+        body_events = []
+        response = await _raw_asgi_request(
+            _app(valid_service),
+            headers=[
+                (b"content-type", content_type),
+                (b"idempotency-key", operation_id),
+            ],
+            body=body,
+            path=_RETIREMENT_PATH,
+            events=body_events,
+        )
+        assert response.status_code == 200
+        assert len(valid_service.mutation_calls) == 1
+        assert body_events == ["body-receive"]
+
+
+@pytest.mark.parametrize(
+    ("path", "status_code"),
+    (
+        ("/v1/player-characters//retirement", 422),
+        ("/v1/player-characters/.leading-dot/retirement", 422),
+        ("/v1/player-characters/pc%20space/retirement", 422),
+        ("/v1/player-characters/pc%E2%98%83/retirement", 422),
+        ("/v1/player-characters/" + "p" * 129 + "/retirement", 422),
+    ),
+)
+def test_retirement_invalid_path_never_reaches_mutate(path: str, status_code: int) -> None:
+    service = _PlayerCharacterService()
+    response = _post(_app(service), path=path, json_body=_retirement_body(), headers=_valid_headers())
+    _assert_error(response, status_code, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+    assert service.mutation_calls == []
+
+
+def test_empty_retirement_identifier_is_sanitized_without_a_public_route() -> None:
+    service = _PlayerCharacterService()
+    app = _app(service)
+
+    empty = _post(
+        app,
+        path="/v1/player-characters//retirement",
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+    unrelated = _post(
+        app,
+        path="/v1/unrelated-missing-route",
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(empty, 422, "REQUEST_VALIDATION_FAILED", "Request validation failed")
+    assert unrelated.status_code == 404
+    assert unrelated.json() == {"detail": "Not Found"}
+    assert all(
+        not isinstance(route, APIRoute)
+        or route.path != "/v1/player-characters//retirement"
+        for route in app.routes
+    )
+    assert "/v1/player-characters//retirement" not in app.openapi()["paths"]
+    assert service.mutation_calls == []
+
+
+def test_retirement_path_boundary_is_preserved_without_normalization() -> None:
+    identifier = "p" + "a" * 127
+    service = _PlayerCharacterService()
+    service.mutation_result = MutationSuccessResult(
+        result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+        player_character_id=PlayerCharacterId(value=identifier),
+        contract_version=PlayerCharacterContractVersion.V1,
+        command_kind=PlayerCharacterMutationKind.RETIRE,
+        command_result=MutationCommandResult.RETIRED,
+        resulting_revision=PlayerCharacterRevision(value=2),
+        resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+    )
+    response = _post(
+        _app(service),
+        path=f"/v1/player-characters/{identifier}/retirement",
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+    assert response.status_code == 200
+    assert service.mutation_calls[0][2].target_player_character_id.value == identifier
+
+
+@pytest.mark.parametrize(
+    ("decision", "code", "message"),
+    (
+        (
+            CharacterOperationProtocolDecision(
+                operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+                code=CharacterOperationProtocolCode.AUTHORIZATION_FAILED,
+            ),
+            "PLAYER_CHARACTER_NOT_FOUND",
+            "Player character was not found",
+        ),
+        (
+            CharacterOperationProtocolDecision(
+                operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+                code=CharacterOperationProtocolCode.REVISION_EXHAUSTED,
+            ),
+            "PLAYER_CHARACTER_REVISION_CONFLICT",
+            "Player character revision does not permit retirement",
+        ),
+        (
+            CharacterOperationProtocolDecision(
+                operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+                code=CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT,
+            ),
+            "IDEMPOTENCY_CONFLICT",
+            "Idempotency key was reused",
+        ),
+        (
+            PlayerCharacterPolicyDecision(
+                code=PlayerCharacterPolicyCode.INVALID_TRANSITION,
+            ),
+            "PLAYER_CHARACTER_LIFECYCLE_CONFLICT",
+            "Player character cannot be retired",
+        ),
+        (
+            PlayerCharacterPolicyDecision(
+                code=(
+                    PlayerCharacterPolicyCode.ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED
+                ),
+            ),
+            "PLAYER_CHARACTER_ACTIVE_BINDING_CONFLICT",
+            "Player character is bound to an active Run",
+        ),
+    ),
+)
+def test_retirement_safe_decision_mappings(
+    decision: Any,
+    code: str,
+    message: str,
+) -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = decision
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(9223372036854775807),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 404 if code.endswith("NOT_FOUND") else 409, code, message)
+    assert len(service.mutation_calls) == 1
+
+
+@pytest.mark.parametrize(
+    "decision",
+    (
+        CharacterOperationProtocolDecision(
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            code=CharacterOperationProtocolCode.STORED_RECEIPT_INTEGRITY_FAILURE,
+        ),
+        CharacterOperationProtocolDecision(
+            operation_namespace=CharacterOperationNamespace.CREATE_V1,
+            code=CharacterOperationProtocolCode.AUTHORIZATION_FAILED,
+        ),
+        _mutated_retirement_success(command_kind="not-a-mutation-kind"),
+    ),
+    ids=("stored-receipt-integrity", "wrong-operation-namespace", "impossible-result-kind"),
+)
+def test_retirement_impossible_protocol_or_result_is_fail_closed_once(decision: Any) -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = decision
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert len(service.mutation_calls) == 1
+    assert service.calls == []
+    assert service.creation_calls == []
+
+
+def test_retirement_impossible_policy_decision_is_fail_closed_once() -> None:
+    decision = PlayerCharacterPolicyDecision(
+        code=PlayerCharacterPolicyCode.INVALID_TRANSITION,
+    )
+    object.__setattr__(decision, "code", "IMPOSSIBLE_POLICY_DECISION")
+    service = _PlayerCharacterService()
+    service.mutation_result = decision
+
+    response = _post(
+        _app(service),
+        path=_RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+
+    _assert_error(response, 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert len(service.mutation_calls) == 1
+    assert service.calls == []
+    assert service.creation_calls == []
+
+
+def test_retirement_controlled_and_unexpected_failures_are_sanitized_once() -> None:
+    for error in (RuntimeError("private failure"), ValueError("private invalid result")):
+        service = _PlayerCharacterService()
+        service.mutation_error = error
+        response = _post(
+            _app(service),
+            path=_RETIREMENT_PATH,
+            json_body=_retirement_body(),
+            headers=_valid_headers(),
+        )
+        _assert_error(response, 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+        assert len(service.mutation_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_retirement_cancellation_propagates_without_a_public_translation() -> None:
+    service = _PlayerCharacterService()
+    cancellation = asyncio.CancelledError()
+    service.mutation_error = cancellation
+    with pytest.raises(asyncio.CancelledError) as exc_info:
+        await _request_async(
+            _app(service),
+            "POST",
+            _RETIREMENT_PATH,
+            json_body=_retirement_body(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+    assert exc_info.value is cancellation
+    assert len(service.mutation_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_retirement_unexpected_service_exception_preserves_identity() -> None:
+    error = RuntimeError("retirement service identity")
+    service = _PlayerCharacterService()
+    service.mutation_error = error
+
+    with pytest.raises(RuntimeError) as exc_info:
+        await _request_async(
+            _app(service),
+            "POST",
+            _RETIREMENT_PATH,
+            json_body=_retirement_body(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+
+    assert exc_info.value is error
+    assert len(service.mutation_calls) == 1
+
+
+def test_retirement_openapi_and_route_inventory_are_exact() -> None:
+    app = _app(_PlayerCharacterService())
+    schema = app.openapi()
+    retirement_path = "/v1/player-characters/{player_character_id}/retirement"
+    assert set(schema["paths"][retirement_path]) == {"post"}
+    operation = schema["paths"][retirement_path]["post"]
+
+    assert set(operation) == {
+        "tags",
+        "summary",
+        "description",
+        "operationId",
+        "parameters",
+        "responses",
+        "requestBody",
+    }
+    assert operation["operationId"] == "retire_player_character"
+    assert operation["summary"] == "Retire a Player Character"
+    assert operation["tags"] == ["player-characters"]
+    assert set(operation["responses"]) == {"200", "404", "409", "422", "500"}
+    assert operation["requestBody"] == {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "$ref": (
+                        "#/components/schemas/"
+                        "PlayerCharacterRetirementRequest"
+                    )
+                }
+            }
+        },
+    }
+    parameter = operation["parameters"]
+    assert parameter == [
+        {
+            "name": "player_character_id",
+            "in": "path",
+            "required": True,
+            "schema": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$", "title": "Player Character Id"},
+        },
+        {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": True,
+            "schema": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$", "title": "Idempotency-Key"},
+        },
+    ]
+    retirement_schema = schema["components"]["schemas"]["PlayerCharacterRetirementRequest"]
+    assert retirement_schema == {
+        "additionalProperties": False,
+        "properties": {
+            "contract_version": {
+                "$ref": "#/components/schemas/PlayerCharacterContractVersion"
+            },
+            "expected_revision": {
+                "$ref": "#/components/schemas/PlayerCharacterRevision"
+            },
+            "confirm_retirement": {
+                "const": True,
+                "title": "Confirm Retirement",
+                "type": "boolean",
+            },
+        },
+        "required": [
+            "contract_version",
+            "expected_revision",
+            "confirm_retirement",
+        ],
+        "title": "PlayerCharacterRetirementRequest",
+        "type": "object",
+    }
+    assert schema["components"]["schemas"]["PlayerCharacterContractVersion"] == {
+        "enum": ["structured-player-character/v1"],
+        "title": "PlayerCharacterContractVersion",
+        "type": "string",
+    }
+    assert schema["components"]["schemas"]["PlayerCharacterRevision"] == {
+        "additionalProperties": False,
+        "properties": {
+            "value": {
+                "maximum": 9223372036854775807,
+                "minimum": 1,
+                "title": "Value",
+                "type": "integer",
+            }
+        },
+        "required": ["value"],
+        "title": "PlayerCharacterRevision",
+        "type": "object",
+    }
+    assert "security" not in operation
+    assert "security" not in schema
+    assert operation["responses"]["200"]["description"] == "Player Character retired or exactly replayed."
+    assert operation["responses"]["404"]["description"] == "Public resource not found"
+    assert operation["responses"]["409"]["description"] == "Request or session state conflict"
+    assert operation["responses"]["422"]["description"] == "Request validation failed"
+    assert operation["responses"]["500"]["description"] == "Internal server error"
+    assert operation["responses"]["200"]["content"] == {
+        "application/json": {
+            "schema": {
+                "$ref": "#/components/schemas/PlayerCharacterSelfProjection"
+            }
+        }
+    }
+    for status, description in {
+        "404": "Public resource not found",
+        "409": "Request or session state conflict",
+        "422": "Request validation failed",
+        "500": "Internal server error",
+    }.items():
+        assert operation["responses"][status] == {
+            "description": description,
+            "content": {
+                "application/json": {
+                    "schema": {
+                        "$ref": "#/components/schemas/ErrorResponse"
+                    }
+                }
+            },
+        }
+    projection = schema["components"]["schemas"]["PlayerCharacterSelfProjection"]
+    assert projection == {
+        "properties": {
+            "player_character_id": {
+                "$ref": "#/components/schemas/PlayerCharacterId"
+            },
+            "contract_version": {
+                "$ref": "#/components/schemas/PlayerCharacterContractVersion"
+            },
+            "record_revision": {
+                "$ref": "#/components/schemas/PlayerCharacterRevision"
+            },
+            "lifecycle": {
+                "$ref": "#/components/schemas/PlayerCharacterLifecycle"
+            },
+        },
+        "additionalProperties": False,
+        "type": "object",
+        "required": [
+            "player_character_id",
+            "contract_version",
+            "record_revision",
+            "lifecycle",
+        ],
+        "title": "PlayerCharacterSelfProjection",
+        "description": (
+            "Detached, allowlisted current state for an authorized controller."
+        ),
+    }
+    assert schema["components"]["schemas"]["ErrorResponse"] == {
+        "properties": {
+            "error": {"$ref": "#/components/schemas/ErrorDetail"}
+        },
+        "additionalProperties": False,
+        "type": "object",
+        "required": ["error"],
+        "title": "ErrorResponse",
+    }
+    assert schema["components"]["schemas"]["ErrorDetail"] == {
+        "properties": {
+            "error_code": {"type": "string", "title": "Error Code"},
+            "message": {"type": "string", "title": "Message"},
+        },
+        "additionalProperties": False,
+        "type": "object",
+        "required": ["error_code", "message"],
+        "title": "ErrorDetail",
+    }
+    assert all(
+        forbidden not in schema["components"]["schemas"]
+        for forbidden in (
+            "MutationReceipt",
+            "OperationEvidence",
+            "ControllerBinding",
+            "Run",
+            "PlayerCharacterRunBinding",
+            "Transaction",
+            "PolicyDecision",
+            "Repository",
+            "UnitOfWork",
+            "OrmModel",
+            "Migration",
+            "ReplayMetadata",
+            "Administration",
+        )
+    )
+    reachable_components: set[str] = set()
+    pending: list[Any] = [operation]
+    while pending:
+        value = pending.pop()
+        if isinstance(value, list):
+            pending.extend(value)
+        elif isinstance(value, dict):
+            reference = value.get("$ref")
+            if isinstance(reference, str) and reference.startswith(
+                "#/components/schemas/"
+            ):
+                component = reference.rsplit("/", 1)[1]
+                if component not in reachable_components:
+                    reachable_components.add(component)
+                    pending.append(schema["components"]["schemas"][component])
+            pending.extend(
+                item for key, item in value.items() if key != "$ref"
+            )
+    assert reachable_components == {
+        "ErrorDetail",
+        "ErrorResponse",
+        "PlayerCharacterContractVersion",
+        "PlayerCharacterId",
+        "PlayerCharacterLifecycle",
+        "PlayerCharacterRetirementRequest",
+        "PlayerCharacterRevision",
+        "PlayerCharacterSelfProjection",
+    }
+    assert "/v1/player-characters//retirement" not in schema["paths"]
+    assert not any(path.startswith("/v1/runs") for path in schema["paths"])
+    assert sum(
+        isinstance(route, APIRoute)
+        and route.path == retirement_path
+        and route.methods == {"POST"}
+        for route in app.routes
+    ) == 1
+    demo_schema = main.create_app(
+        services=ApiServices(
+            session_service=object(),  # type: ignore[arg-type]
+            turn_orchestrator=object(),  # type: ignore[arg-type]
+            player_character_service=None,
+        )
+    ).openapi()
+    assert all("retirement" not in path for path in demo_schema["paths"])
+    assert "PlayerCharacterRetirementRequest" not in demo_schema["components"]["schemas"]
+
+
+def test_retirement_route_uses_raw_request_body_and_exact_signature() -> None:
+    route = _retirement_route(_app(_PlayerCharacterService()))
+    signature = inspect.signature(route.endpoint)
+
+    assert tuple(signature.parameters) == (
+        "http_request",
+        "player_character_id",
+        "idempotency_key",
+        "principal",
+        "service",
+    )
+    assert route.body_field is None
+    assert route.dependant.body_params == []
+    assert route.dependant.request_param_name == "http_request"
+    assert [field.name for field in route.dependant.path_params] == ["player_character_id"]
+    assert [field.name for field in route.dependant.header_params] == ["idempotency_key"]
+    assert [dependency.call for dependency in route.dependant.dependencies] == [
+        get_current_principal,
+        get_player_character_service,
+    ]
+    assert route.openapi_extra == main._PLAYER_CHARACTER_RETIREMENT_OPENAPI_EXTRA
+
+
+@pytest.mark.asyncio
+async def test_retirement_reads_the_raw_body_once_after_dependencies_and_before_mutate(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    events: list[str] = []
+    service = _PlayerCharacterService()
+    service.mutation_result = _retirement_success()
+    app = _app(service)
+
+    def principal_dependency() -> RequestPrincipal:
+        events.append("principal")
+        return _PRINCIPAL
+
+    def service_dependency() -> _PlayerCharacterService:
+        events.append("service-dependency")
+        return service
+
+    app.dependency_overrides[get_current_principal] = principal_dependency
+    app.dependency_overrides[get_player_character_service] = service_dependency
+    _mark_retirement_route_entry(app, events)
+    original_body = Request.body
+
+    async def traced_body(request: Request) -> bytes:
+        events.append("body")
+        return await original_body(request)
+
+    monkeypatch.setattr(Request, "body", traced_body)
+    raw_body = json.dumps(_retirement_body(), separators=(",", ":")).encode()
+    response = await _raw_asgi_request(
+        app,
+        path=_RETIREMENT_PATH,
+        headers=[
+            (b"content-type", b"application/json"),
+            (b"idempotency-key", _VALID_KEY.encode("ascii")),
+        ],
+        body=raw_body,
+        events=events,
+    )
+
+    assert response.status_code == 200
+    assert events == [
+        "principal",
+        "service-dependency",
+        "route",
+        "body",
+        "body-receive",
+    ]
+    assert events.count("body") == events.count("body-receive") == 1
+    assert len(service.mutation_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_retirement_body_and_dependency_failures_do_not_mutate_and_cancellation_propagates(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _PlayerCharacterService()
+    app = _app(service)
+    body_calls = 0
+
+    async def body_must_not_run(_: Request) -> bytes:
+        nonlocal body_calls
+        body_calls += 1
+        raise AssertionError("dependency failure must precede body acquisition")
+
+    monkeypatch.setattr(Request, "body", body_must_not_run)
+
+    def failing_principal() -> RequestPrincipal:
+        raise RuntimeError("private dependency failure")
+
+    app.dependency_overrides[get_current_principal] = failing_principal
+    dependency_failure = await _request_async(
+        app,
+        "POST",
+        _RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+    _assert_error(_Response(dependency_failure.status_code, dependency_failure.content, dependency_failure.headers), 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert service.mutation_calls == []
+    assert body_calls == 0
+
+    app = _app(service)
+
+    async def failing_body(_: Request) -> bytes:
+        raise RuntimeError("private body failure")
+
+    monkeypatch.setattr(Request, "body", failing_body)
+    body_failure = await _request_async(
+        app,
+        "POST",
+        _RETIREMENT_PATH,
+        json_body=_retirement_body(),
+        headers=_valid_headers(),
+    )
+    _assert_error(_Response(body_failure.status_code, body_failure.content, body_failure.headers), 500, "INTERNAL_SERVER_ERROR", "Internal server error")
+    assert service.mutation_calls == []
+
+    async def cancelled_body(_: Request) -> bytes:
+        raise asyncio.CancelledError()
+
+    monkeypatch.setattr(Request, "body", cancelled_body)
+    with pytest.raises(asyncio.CancelledError):
+        await _request_async(
+            app,
+            "POST",
+            _RETIREMENT_PATH,
+            json_body=_retirement_body(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+    assert service.mutation_calls == []
+
+
+@pytest.mark.parametrize(
+    "outcome",
+    ("success", "validation-failure", "service-failure"),
+)
+@pytest.mark.asyncio
+async def test_retirement_reads_request_body_exactly_once_on_every_body_reading_path(
+    monkeypatch: pytest.MonkeyPatch,
+    outcome: str,
+) -> None:
+    service = _PlayerCharacterService()
+    service.mutation_result = _retirement_success()
+    if outcome == "service-failure":
+        service.mutation_error = RuntimeError("private service failure")
+    body_calls = 0
+    original_body = Request.body
+
+    async def counted_body(request: Request) -> bytes:
+        nonlocal body_calls
+        body_calls += 1
+        return await original_body(request)
+
+    monkeypatch.setattr(Request, "body", counted_body)
+    content = (
+        b'{"confirm_retirement":false}'
+        if outcome == "validation-failure"
+        else json.dumps(_retirement_body(), separators=(",", ":")).encode()
+    )
+    response = await _request_async(
+        _app(service),
+        "POST",
+        _RETIREMENT_PATH,
+        content=content,
+        headers=_valid_headers(),
+    )
+
+    assert body_calls == 1
+    if outcome == "success":
+        assert response.status_code == 200
+        assert len(service.mutation_calls) == 1
+    elif outcome == "validation-failure":
+        assert response.status_code == 422
+        assert service.mutation_calls == []
+    else:
+        assert response.status_code == 500
+        assert len(service.mutation_calls) == 1
+
+
+@pytest.mark.parametrize(
+    "error",
+    (RuntimeError("retirement body identity"), asyncio.CancelledError()),
+    ids=("runtime-error", "cancellation"),
+)
+@pytest.mark.asyncio
+async def test_retirement_body_failure_preserves_original_exception_identity_once(
+    monkeypatch: pytest.MonkeyPatch,
+    error: BaseException,
+) -> None:
+    service = _PlayerCharacterService()
+    body_calls = 0
+
+    async def failing_body(_: Request) -> bytes:
+        nonlocal body_calls
+        body_calls += 1
+        raise error
+
+    monkeypatch.setattr(Request, "body", failing_body)
+    with pytest.raises(type(error)) as exc_info:
+        await _request_async(
+            _app(service),
+            "POST",
+            _RETIREMENT_PATH,
+            content=json.dumps(_retirement_body()).encode(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+
+    assert exc_info.value is error
+    assert body_calls == 1
+    assert service.mutation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_retirement_dependency_failure_preserves_identity_before_body_and_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = RuntimeError("retirement dependency identity")
+    service = _PlayerCharacterService()
+    app = _app(service)
+    body_calls = 0
+
+    async def forbidden_body(_: Request) -> bytes:
+        nonlocal body_calls
+        body_calls += 1
+        raise AssertionError("body parsing must follow dependencies")
+
+    def failing_dependency() -> RequestPrincipal:
+        raise error
+
+    monkeypatch.setattr(Request, "body", forbidden_body)
+    app.dependency_overrides[get_current_principal] = failing_dependency
+    with pytest.raises(RuntimeError) as exc_info:
+        await _request_async(
+            app,
+            "POST",
+            _RETIREMENT_PATH,
+            content=json.dumps(_retirement_body()).encode(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+
+    assert exc_info.value is error
+    assert body_calls == 0
+    assert service.mutation_calls == []
+
+
+@pytest.mark.asyncio
+async def test_retirement_unexpected_validator_failure_preserves_identity_without_mutation(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    error = RuntimeError("retirement validator identity")
+    service = _PlayerCharacterService()
+
+    def fail_validation(cls: Any, raw_body: bytes, **kwargs: Any) -> Any:
+        del cls, raw_body, kwargs
+        raise error
+
+    monkeypatch.setattr(
+        main.PlayerCharacterRetirementRequest,
+        "model_validate_json",
+        classmethod(fail_validation),
+    )
+    with pytest.raises(RuntimeError) as exc_info:
+        await _request_async(
+            _app(service),
+            "POST",
+            _RETIREMENT_PATH,
+            content=json.dumps(_retirement_body()).encode(),
+            headers=_valid_headers(),
+            raise_app_exceptions=True,
+        )
+
+    assert exc_info.value is error
+    assert service.mutation_calls == []
 
 
 def test_route_uses_exact_request_signature_without_executable_body_binding() -> None:
@@ -1768,7 +3041,7 @@ def test_creation_openapi_injects_the_exact_validation_schema_inventory() -> Non
     }
 
     assert set(generated) == expected_generated_names
-    assert len(schemas) == 73
+    assert len(schemas) == 74
     assert all(schemas[name] == definition for name, definition in generated.items())
     assert "$defs" not in schemas["CharacterCreationCommand"]
     assert schemas["CharacterCreationCommand"]["required"] == [
@@ -1950,7 +3223,7 @@ def test_openapi_wrapper_detaches_preserves_aliases_and_repeats_stably(
             in_default = False
 
     app.openapi = default_openapi
-    main._install_player_character_creation_openapi_schema(app)
+    main._install_player_character_openapi_schemas(app)
 
     first = app.openapi()
     second = app.openapi()
@@ -2003,7 +3276,7 @@ def test_openapi_collision_preflight_is_failure_atomic(
         return base_schema
 
     app.openapi = default_openapi
-    main._install_player_character_creation_openapi_schema(app)
+    main._install_player_character_openapi_schemas(app)
 
     with pytest.raises(
         RuntimeError,
@@ -2064,7 +3337,7 @@ def test_openapi_reference_failure_is_atomic_and_does_not_poison_cache(
         return base_schema
 
     app.openapi = default_openapi
-    main._install_player_character_creation_openapi_schema(app)
+    main._install_player_character_openapi_schemas(app)
 
     with pytest.raises(
         RuntimeError,
@@ -2081,7 +3354,7 @@ def test_openapi_installer_runs_once_only_for_normal_player_character_routes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     installations: list[FastAPI] = []
-    original_installer = main._install_player_character_creation_openapi_schema
+    original_installer = main._install_player_character_openapi_schemas
 
     def recording_installer(app: FastAPI) -> None:
         installations.append(app)
@@ -2089,7 +3362,7 @@ def test_openapi_installer_runs_once_only_for_normal_player_character_routes(
 
     monkeypatch.setattr(
         main,
-        "_install_player_character_creation_openapi_schema",
+        "_install_player_character_openapi_schemas",
         recording_installer,
     )
     normal = _app(_PlayerCharacterService())
@@ -2116,6 +3389,10 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
         ("/health", ("GET",)),
         ("/v1/player-characters", ("POST",)),
         ("/v1/player-characters/{player_character_id}", ("GET",)),
+        (
+            "/v1/player-characters/{player_character_id}/retirement",
+            ("POST",),
+        ),
         ("/v1/scenarios", ("GET",)),
         ("/v1/sessions", ("POST",)),
         ("/v1/sessions/{session_id}", ("GET",)),

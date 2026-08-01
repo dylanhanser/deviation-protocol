@@ -16,10 +16,17 @@ from deviation_protocol.api.main import create_app
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_operations import (
     CharacterCreationCommand,
+    CharacterOperationNamespace,
 )
+from deviation_protocol.application import player_character_service as player_character_service_module
 from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
 )
+from deviation_protocol.application.run_operations import (
+    BindPlayerCharacterCommand,
+    CreateRunCommand,
+)
+from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.ports import ControllerBindingUniquenessConflictError
 from deviation_protocol.domain.player_character import (
     AuthoritySourceRef,
@@ -29,6 +36,13 @@ from deviation_protocol.domain.player_character import (
     PlayerCharacterContractVersion,
     PlayerCharacterId,
     PlayerCharacterOperationId,
+)
+from deviation_protocol.domain.run import (
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+    RunOperationId,
+    RunStateVersion,
 )
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
@@ -40,9 +54,16 @@ from deviation_protocol.infrastructure.orm_models import (
     PlayerCharacterIdAllocationRow,
     PlayerCharacterMutationReceiptRow,
     PlayerCharacterRevisionRow,
+    RunCreationReceiptRow,
+    RunCurrentRow,
+    RunMutationReceiptRow,
+    RunRevisionRow,
 )
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
-from deviation_protocol.infrastructure.repositories import SqlAlchemyControllerBindingRegistryRepository
+from deviation_protocol.infrastructure.repositories import (
+    SqlAlchemyControllerBindingRegistryRepository,
+    SqlAlchemyPlayerCharacterRepository,
+)
 
 
 pytestmark = [pytest.mark.integration, pytest.mark.asyncio]
@@ -55,6 +76,7 @@ class _Scope:
     token: str
     character_ids: set[str] = field(default_factory=set)
     bindings: set[str] = field(default_factory=set)
+    run_ids: set[str] = field(default_factory=set)
 
 
 @pytest.fixture
@@ -66,6 +88,16 @@ async def player_character_api_scope(
         yield scope
     finally:
         async with mysql_session_factory.begin() as session:
+            if scope.run_ids:
+                for row, column in (
+                    (RunMutationReceiptRow, RunMutationReceiptRow.run_id),
+                    (RunCreationReceiptRow, RunCreationReceiptRow.result_run_id),
+                    (RunCurrentRow, RunCurrentRow.run_id),
+                    (RunRevisionRow, RunRevisionRow.run_id),
+                ):
+                    await session.execute(
+                        sa.delete(row).where(column.in_(scope.run_ids))
+                    )
             if scope.character_ids:
                 for row, column in (
                     (PlayerCharacterMutationReceiptRow, PlayerCharacterMutationReceiptRow.player_character_id),
@@ -112,14 +144,21 @@ def _service(
     session_factory: async_sessionmaker[AsyncSession],
     binding: ControllerBindingRef,
     player_character_id: PlayerCharacterId,
+    *,
+    uow_factory: Any | None = None,
 ) -> PlayerCharacterService:
     return PlayerCharacterService(
-        uow_factory=lambda: SqlAlchemyUnitOfWork(session_factory),
+        uow_factory=(
+            uow_factory
+            if uow_factory is not None
+            else lambda: SqlAlchemyUnitOfWork(session_factory)
+        ),
         controller_binding_resolver=_Resolver(binding),
         player_character_id_issuer=_Issuer(player_character_id),
         create_policy=CreatePlayerCharacterPolicy(),
         source_reference=AuthoritySourceRef(value="source.mysql-api"),
         clock=lambda: _NOW,
+        binding_integrity_guard_enabled=True,
     )
 
 
@@ -150,6 +189,116 @@ async def _counts(
         return tuple(counts)  # type: ignore[return-value]
 
 
+@dataclass(frozen=True, slots=True)
+class _DurableCharacterSnapshot:
+    current: Any
+    controller_binding: str | None
+    revisions: tuple[tuple[Any, ...], ...]
+    creation_receipts: tuple[tuple[Any, ...], ...]
+    mutation_receipts: tuple[tuple[Any, ...], ...]
+
+
+async def _durable_character_snapshot(
+    session_factory: async_sessionmaker[AsyncSession],
+    player_character_id: PlayerCharacterId,
+    controller_binding: ControllerBindingRef,
+) -> _DurableCharacterSnapshot:
+    """Reload every asserted family through a fresh independent DB session."""
+
+    async with session_factory() as session:
+        current = await SqlAlchemyPlayerCharacterRepository(session).get(
+            player_character_id
+        )
+        stored_binding = await session.scalar(
+            sa.select(
+                PlayerCharacterControllerBindingRow.controller_binding
+            ).where(
+                PlayerCharacterControllerBindingRow.controller_binding
+                == controller_binding.value
+            )
+        )
+        revisions = tuple(
+            tuple(row)
+            for row in (
+                await session.execute(
+                    sa.select(
+                        PlayerCharacterRevisionRow.record_revision,
+                        PlayerCharacterRevisionRow.contract_version,
+                        PlayerCharacterRevisionRow.controller_binding,
+                        PlayerCharacterRevisionRow.lifecycle,
+                        PlayerCharacterRevisionRow.prior_revision,
+                        PlayerCharacterRevisionRow.mutation_kind,
+                        PlayerCharacterRevisionRow.authority_class,
+                        PlayerCharacterRevisionRow.source_reference,
+                        PlayerCharacterRevisionRow.record_canonical,
+                    )
+                    .where(
+                        PlayerCharacterRevisionRow.player_character_id
+                        == player_character_id.value
+                    )
+                    .order_by(PlayerCharacterRevisionRow.record_revision)
+                )
+            ).all()
+        )
+        creation_receipts = tuple(
+            tuple(row)
+            for row in (
+                await session.execute(
+                    sa.select(
+                        PlayerCharacterCreationReceiptRow.operation_namespace,
+                        PlayerCharacterCreationReceiptRow.operation_id,
+                        PlayerCharacterCreationReceiptRow.fingerprint,
+                        PlayerCharacterCreationReceiptRow.result_contract_version,
+                        PlayerCharacterCreationReceiptRow.resulting_revision,
+                        PlayerCharacterCreationReceiptRow.resulting_lifecycle,
+                        PlayerCharacterCreationReceiptRow.receipt_canonical,
+                    ).where(
+                        PlayerCharacterCreationReceiptRow.result_player_character_id
+                        == player_character_id.value
+                    )
+                )
+            ).all()
+        )
+        mutation_receipts = tuple(
+            tuple(row)
+            for row in (
+                await session.execute(
+                    sa.select(
+                        PlayerCharacterMutationReceiptRow.operation_namespace,
+                        PlayerCharacterMutationReceiptRow.operation_id,
+                        PlayerCharacterMutationReceiptRow.fingerprint,
+                        PlayerCharacterMutationReceiptRow.command_kind,
+                        PlayerCharacterMutationReceiptRow.result_schema_version,
+                        PlayerCharacterMutationReceiptRow.expected_revision,
+                        PlayerCharacterMutationReceiptRow.result_player_character_id,
+                        PlayerCharacterMutationReceiptRow.result_contract_version,
+                        PlayerCharacterMutationReceiptRow.result_command_kind,
+                        PlayerCharacterMutationReceiptRow.command_result,
+                        PlayerCharacterMutationReceiptRow.resulting_revision,
+                        PlayerCharacterMutationReceiptRow.resulting_lifecycle,
+                        PlayerCharacterMutationReceiptRow.receipt_canonical,
+                        PlayerCharacterMutationReceiptRow.operation_evidence_canonical,
+                    )
+                    .where(
+                        PlayerCharacterMutationReceiptRow.player_character_id
+                        == player_character_id.value
+                    )
+                    .order_by(
+                        PlayerCharacterMutationReceiptRow.resulting_revision,
+                        PlayerCharacterMutationReceiptRow.operation_id,
+                    )
+                )
+            ).all()
+        )
+    return _DurableCharacterSnapshot(
+        current=current,
+        controller_binding=stored_binding,
+        revisions=revisions,
+        creation_receipts=creation_receipts,
+        mutation_receipts=mutation_receipts,
+    )
+
+
 async def _get(app, path: str) -> httpx.Response:
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
@@ -176,6 +325,28 @@ async def _post(
                 "contract_version": "structured-player-character/v1",
                 "character_core": {},
                 "narration_preferences": {},
+            },
+        )
+
+
+async def _retire(
+    app,
+    player_character_id: PlayerCharacterId,
+    *,
+    key: str,
+    revision: int = 1,
+) -> httpx.Response:
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+        base_url="http://testserver",
+    ) as client:
+        return await client.post(
+            f"/v1/player-characters/{player_character_id.value}/retirement",
+            headers={"Idempotency-Key": key},
+            json={
+                "contract_version": "structured-player-character/v1",
+                "expected_revision": {"value": revision},
+                "confirm_retirement": True,
             },
         )
 
@@ -211,6 +382,16 @@ class _UncertainCommitUnitOfWork(SqlAlchemyUnitOfWork):
     async def commit(self) -> None:
         await super().commit()
         raise RuntimeError("controlled uncertain COMMIT")
+
+
+def _recording_uow(
+    uow_type: type[SqlAlchemyUnitOfWork],
+    factory: async_sessionmaker[AsyncSession],
+    created: list[Any],
+) -> SqlAlchemyUnitOfWork:
+    uow = uow_type(factory)
+    created.append(uow)
+    return uow
 
 
 class _CancelledCommitUnitOfWork(SqlAlchemyUnitOfWork):
@@ -334,6 +515,879 @@ class _RecoveryFailureUnitOfWork(SqlAlchemyUnitOfWork):
         self._commits.append(1)
         await super().commit()
 
+
+class _ReceiptLookupRecorder:
+    def __init__(self, repository: Any, reads: list[Any]) -> None:
+        self._repository = repository
+        self._reads = reads
+
+    async def get(self, key: Any) -> Any:
+        self._reads.append(key)
+        return await self._repository.get(key)
+
+    async def add(self, receipt: Any, *, created_at: datetime) -> None:
+        await self._repository.add(receipt, created_at=created_at)
+
+
+class _ReceiptLookupRecordingUnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(self, factory: Any, reads: list[Any]) -> None:
+        super().__init__(factory)
+        self._reads = reads
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        self.mutation_receipts = _ReceiptLookupRecorder(
+            self.mutation_receipts,
+            self._reads,
+        )  # type: ignore[assignment]
+        return self
+
+
+@dataclass(slots=True)
+class _SerializedRetirementProbe:
+    """Observe normal retirement serialization without replacing production work."""
+
+    counts: dict[str, int] = field(default_factory=dict)
+    events: list[str] = field(default_factory=list)
+    first_lock_acquired: asyncio.Event = field(default_factory=asyncio.Event)
+    release_first: asyncio.Event = field(default_factory=asyncio.Event)
+    second_lock_entered: asyncio.Event = field(default_factory=asyncio.Event)
+    second_lock_completed: asyncio.Event = field(default_factory=asyncio.Event)
+    session_ids: dict[str, int] = field(default_factory=dict)
+    connection_ids: dict[str, int] = field(default_factory=dict)
+    receipt_reads: dict[str, list[bool]] = field(default_factory=dict)
+    receipt_errors: list[BaseException] = field(default_factory=list)
+    exit_errors: list[BaseException] = field(default_factory=list)
+
+    def observe(self, event: str, *, role: str | None = None) -> None:
+        key = f"{role}.{event}" if role is not None else event
+        self.counts[key] = self.counts.get(key, 0) + 1
+        self.events.append(key)
+
+
+class _SerializedRetirementCharacters:
+    """Pause after the real aggregate lock and delegate every repository call."""
+
+    def __init__(
+        self,
+        repository: Any,
+        session: AsyncSession,
+        probe: _SerializedRetirementProbe,
+        *,
+        role: str,
+    ) -> None:
+        self._repository = repository
+        self._session = session
+        self._probe = probe
+        self._role = role
+
+    async def get_for_update(self, player_character_id: PlayerCharacterId) -> Any:
+        self._probe.observe("character-get-for-update-entry", role=self._role)
+        if self._role == "second":
+            self._probe.second_lock_entered.set()
+        result = await self._repository.get_for_update(player_character_id)
+        connection_id = await self._session.scalar(sa.text("SELECT CONNECTION_ID()"))
+        assert connection_id is not None
+        self._probe.connection_ids[self._role] = int(connection_id)
+        self._probe.observe("character-get-for-update-completion", role=self._role)
+        if self._role == "first":
+            self._probe.first_lock_acquired.set()
+            await asyncio.wait_for(
+                self._probe.release_first.wait(),
+                timeout=5,
+            )
+            self._probe.observe("character-lock-release", role=self._role)
+        else:
+            self._probe.second_lock_completed.set()
+        return result
+
+    async def append_revision(self, record: Any, *, created_at: datetime) -> None:
+        self._probe.observe("append-revision-entry", role=self._role)
+        await self._repository.append_revision(record, created_at=created_at)
+        self._probe.observe("append-revision-completion", role=self._role)
+
+    async def compare_and_swap_current(
+        self,
+        record: Any,
+        *,
+        expected_revision: int,
+        created_at: datetime,
+    ) -> bool:
+        self._probe.observe("compare-and-swap-entry", role=self._role)
+        result = await self._repository.compare_and_swap_current(
+            record,
+            expected_revision=expected_revision,
+            created_at=created_at,
+        )
+        self._probe.observe("compare-and-swap-completion", role=self._role)
+        return result
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._repository, name)
+
+
+class _SerializedRetirementReceipts:
+    """Record receipt calls while delegating to the production repository."""
+
+    def __init__(
+        self,
+        repository: Any,
+        probe: _SerializedRetirementProbe,
+        *,
+        role: str,
+    ) -> None:
+        self._repository = repository
+        self._probe = probe
+        self._role = role
+
+    async def get(self, key: Any) -> Any:
+        self._probe.observe("receipt-get-entry", role=self._role)
+        result = await self._repository.get(key)
+        self._probe.receipt_reads.setdefault(self._role, []).append(
+            result is not None
+        )
+        self._probe.observe("receipt-get-completion", role=self._role)
+        return result
+
+    async def add(self, receipt: Any, *, created_at: datetime) -> None:
+        self._probe.observe("receipt-add-entry", role=self._role)
+        try:
+            await self._repository.add(receipt, created_at=created_at)
+        except BaseException as exc:
+            self._probe.observe("receipt-add-error", role=self._role)
+            self._probe.receipt_errors.append(exc)
+            raise
+        self._probe.observe("receipt-add-completion", role=self._role)
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._repository, name)
+
+
+class _SerializedRetirementUnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(
+        self,
+        factory: Any,
+        probe: _SerializedRetirementProbe,
+        created: list[Any],
+    ) -> None:
+        super().__init__(factory)
+        self._probe = probe
+        self._role = (
+            "first"
+            if len(created) == 0
+            else "second"
+            if len(created) == 1
+            else f"unexpected-{len(created) + 1}"
+        )
+        created.append(self)
+        self._probe.observe("uow-created", role=self._role)
+
+    async def __aenter__(self):
+        self._probe.observe("uow-entry", role=self._role)
+        await super().__aenter__()
+        assert self._session is not None
+        self._probe.session_ids[self._role] = id(self._session)
+        self.player_characters = _SerializedRetirementCharacters(
+            self.player_characters,
+            self._session,
+            self._probe,
+            role=self._role,
+        )  # type: ignore[assignment]
+        self.mutation_receipts = _SerializedRetirementReceipts(
+            self.mutation_receipts,
+            self._probe,
+            role=self._role,
+        )  # type: ignore[assignment]
+        self._probe.observe("uow-entry-completion", role=self._role)
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        self._probe.observe("uow-exit", role=self._role)
+        if exc is not None:
+            self._probe.exit_errors.append(exc)
+        await super().__aexit__(exc_type, exc, traceback)
+        self._probe.observe("uow-exit-completion", role=self._role)
+
+    async def commit(self) -> None:
+        self._probe.observe("uow-commit-entry", role=self._role)
+        await super().commit()
+        self._probe.observe("uow-commit-completion", role=self._role)
+
+
+async def _run_serialized_retirements(
+    app: Any,
+    player_character_id: PlayerCharacterId,
+    *,
+    key: str,
+    second_revision: int,
+    probe: _SerializedRetirementProbe,
+) -> tuple[httpx.Response, httpx.Response]:
+    """Hold only the first delegated aggregate lock while the second queues."""
+
+    first = asyncio.create_task(
+        _retire(app, player_character_id, key=key, revision=1)
+    )
+    second: asyncio.Task[httpx.Response] | None = None
+    try:
+        await asyncio.wait_for(probe.first_lock_acquired.wait(), timeout=5)
+        assert not first.done()
+        second = asyncio.create_task(
+            _retire(
+                app,
+                player_character_id,
+                key=key,
+                revision=second_revision,
+            )
+        )
+        await asyncio.wait_for(probe.second_lock_entered.wait(), timeout=5)
+        with pytest.raises(asyncio.TimeoutError):
+            await asyncio.wait_for(
+                probe.second_lock_completed.wait(),
+                timeout=0.25,
+            )
+        assert not first.done()
+        assert not second.done()
+        probe.release_first.set()
+        responses = await asyncio.wait_for(
+            asyncio.gather(first, second),
+            timeout=5,
+        )
+        return responses[0], responses[1]
+    finally:
+        probe.release_first.set()
+        tasks = [first, *([second] if second is not None else [])]
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+def _assert_one_serialized_retirement(
+    probe: _SerializedRetirementProbe,
+    uows: list[Any],
+    *,
+    policy_calls: int,
+) -> None:
+    assert len(uows) == 2
+    assert [uow._role for uow in uows] == ["first", "second"]
+    assert len(set(probe.session_ids.values())) == 2
+    assert len(set(probe.connection_ids.values())) == 2
+    assert probe.receipt_reads == {"first": [False], "second": [True]}
+    assert probe.receipt_errors == []
+    assert probe.exit_errors == []
+    assert policy_calls == 1
+    for role in ("first", "second"):
+        assert probe.counts[f"{role}.uow-created"] == 1
+        assert probe.counts[f"{role}.uow-entry"] == 1
+        assert probe.counts[f"{role}.uow-entry-completion"] == 1
+        assert probe.counts[f"{role}.uow-exit"] == 1
+        assert probe.counts[f"{role}.uow-exit-completion"] == 1
+        assert probe.counts[f"{role}.character-get-for-update-entry"] == 1
+        assert probe.counts[f"{role}.character-get-for-update-completion"] == 1
+        assert probe.counts[f"{role}.receipt-get-entry"] == 1
+        assert probe.counts[f"{role}.receipt-get-completion"] == 1
+    assert probe.counts["first.character-lock-release"] == 1
+    assert probe.counts["first.append-revision-entry"] == 1
+    assert probe.counts["first.append-revision-completion"] == 1
+    assert probe.counts["first.compare-and-swap-entry"] == 1
+    assert probe.counts["first.compare-and-swap-completion"] == 1
+    assert probe.counts["first.receipt-add-entry"] == 1
+    assert probe.counts["first.receipt-add-completion"] == 1
+    assert probe.counts["first.uow-commit-entry"] == 1
+    assert probe.counts["first.uow-commit-completion"] == 1
+    assert not any(key.startswith("second.append-revision") for key in probe.counts)
+    assert not any(key.startswith("second.compare-and-swap") for key in probe.counts)
+    assert not any(key.startswith("second.receipt-add") for key in probe.counts)
+    assert "second.uow-commit-entry" not in probe.counts
+    assert not any(key.startswith("unexpected-") for key in probe.counts)
+
+
+async def test_mysql_retirement_replay_and_precedence_preserve_durable_state(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.retirement-{token}",
+        authentication_scheme="test",
+    )
+    binding = ControllerBindingRef(value=f"binding.retirement-{token}")
+    player_character_id = PlayerCharacterId(value=f"pc.retirement-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    app = _app(_service(mysql_session_factory, binding, player_character_id), principal)
+
+    created = await _post(app, key=f"create-{token}")
+    assert created.status_code == 200
+    retired = await _retire(app, player_character_id, key=f"retire-{token}")
+    assert retired.status_code == 200
+    assert retired.json() == {
+        "player_character_id": {"value": player_character_id.value},
+        "contract_version": "structured-player-character/v1",
+        "record_revision": {"value": 2},
+        "lifecycle": "retired",
+    }
+    after_success = await _counts(
+        mysql_session_factory, player_character_id.value, binding.value
+    )
+    assert after_success == (1, 1, 2, 1, 1, 1)
+    success_snapshot = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+    assert success_snapshot.current is not None
+    assert success_snapshot.current.player_character_id == player_character_id
+    assert success_snapshot.current.controller_binding == binding
+    assert success_snapshot.current.contract_version is PlayerCharacterContractVersion.V1
+    assert success_snapshot.current.record_revision.value == 2
+    assert success_snapshot.current.lifecycle.value == "retired"
+    assert success_snapshot.controller_binding == binding.value
+    assert len(success_snapshot.revisions) == 2
+    assert [row[0] for row in success_snapshot.revisions] == [1, 2]
+    assert [row[3] for row in success_snapshot.revisions] == ["active", "retired"]
+    assert len(success_snapshot.creation_receipts) == 1
+    assert len(success_snapshot.mutation_receipts) == 1
+    original_receipt = success_snapshot.mutation_receipts[0]
+    assert original_receipt[0] == CharacterOperationNamespace.MUTATE_V1.value
+    assert original_receipt[1] == f"retire-{token}"
+    assert len(original_receipt[2]) == 32
+    assert original_receipt[3:12] == (
+        "RETIRE",
+        "player-character.mutate-result/v1",
+        1,
+        player_character_id.value,
+        PlayerCharacterContractVersion.V1.value,
+        "RETIRE",
+        "RETIRED",
+        2,
+        "retired",
+    )
+    assert original_receipt[12]
+    assert original_receipt[13]
+
+    replay = await _retire(app, player_character_id, key=f"retire-{token}")
+    assert replay.status_code == 200
+    assert replay.json() == retired.json()
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == after_success
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == success_snapshot
+
+    differing_reuse = await _retire(
+        app, player_character_id, key=f"retire-{token}", revision=2
+    )
+    assert differing_reuse.status_code == 409
+    assert differing_reuse.json()["error"]["error_code"] == "IDEMPOTENCY_CONFLICT"
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == success_snapshot
+    reused_maximum = await _retire(
+        app,
+        player_character_id,
+        key=f"retire-{token}",
+        revision=9223372036854775807,
+    )
+    assert reused_maximum.status_code == 409
+    assert reused_maximum.json()["error"]["error_code"] == "PLAYER_CHARACTER_REVISION_CONFLICT"
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == success_snapshot
+    lifecycle = await _retire(
+        app, player_character_id, key=f"retire-new-{token}", revision=2
+    )
+    assert lifecycle.status_code == 409
+    assert lifecycle.json()["error"]["error_code"] == "PLAYER_CHARACTER_LIFECYCLE_CONFLICT"
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == success_snapshot
+    new_maximum = await _retire(
+        app,
+        player_character_id,
+        key=f"retire-maximum-{token}",
+        revision=9223372036854775807,
+    )
+    assert new_maximum.status_code == 409
+    assert new_maximum.json()["error"]["error_code"] == "PLAYER_CHARACTER_REVISION_CONFLICT"
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == after_success
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == success_snapshot
+
+
+async def test_mysql_retirement_maximum_revision_does_not_lookup_a_receipt(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.receipt-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.receipt-{token}")
+    player_character_id = PlayerCharacterId(value=f"pc.receipt-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    normal = _service(mysql_session_factory, binding, player_character_id)
+    app = _app(normal, principal)
+    assert (await _post(app, key=f"create-{token}")).status_code == 200
+    assert (await _retire(app, player_character_id, key=f"retire-{token}")).status_code == 200
+    before = await _counts(mysql_session_factory, player_character_id.value, binding.value)
+
+    receipt_reads: list[Any] = []
+    recorded = _service(
+        mysql_session_factory,
+        binding,
+        player_character_id,
+        uow_factory=lambda: _ReceiptLookupRecordingUnitOfWork(
+            mysql_session_factory,
+            receipt_reads,
+        ),
+    )
+    response = await _retire(
+        _app(recorded, principal),
+        player_character_id,
+        key=f"retire-{token}",
+        revision=9223372036854775807,
+    )
+
+    assert response.status_code == 409
+    assert response.json() == {
+        "error": {
+            "error_code": "PLAYER_CHARACTER_REVISION_CONFLICT",
+            "message": "Player character revision does not permit retirement",
+        }
+    }
+    assert receipt_reads == []
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == before
+
+
+async def test_mysql_concurrent_identical_retirements_serialize_to_one_mutation_and_exact_replay(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Prove the reachable production path queues at the aggregate lock."""
+
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.concurrent-replay-{token}",
+        authentication_scheme="test",
+    )
+    binding = ControllerBindingRef(value=f"binding.concurrent-replay-{token}")
+    player_character_id = PlayerCharacterId(
+        value=f"pc.concurrent-replay-{token}"
+    )
+    key = f"retire-concurrent-replay-{token}"
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    normal = _service(mysql_session_factory, binding, player_character_id)
+    normal_app = _app(normal, principal)
+    assert (await _post(normal_app, key=f"create-{token}")).status_code == 200
+
+    probe = _SerializedRetirementProbe()
+    uows: list[Any] = []
+    policy_calls = 0
+    original_evaluate_policy = player_character_service_module.evaluate_mutation_policy
+
+    def recording_evaluate_policy(*args: Any, **kwargs: Any) -> Any:
+        nonlocal policy_calls
+        policy_calls += 1
+        result = original_evaluate_policy(*args, **kwargs)
+        return result
+
+    monkeypatch.setattr(
+        player_character_service_module,
+        "evaluate_mutation_policy",
+        recording_evaluate_policy,
+    )
+    service = _service(
+        mysql_session_factory,
+        binding,
+        player_character_id,
+        uow_factory=lambda: _SerializedRetirementUnitOfWork(
+            mysql_session_factory,
+            probe,
+            uows,
+        ),
+    )
+
+    first, replay = await _run_serialized_retirements(
+        _app(service, principal),
+        player_character_id,
+        key=key,
+        second_revision=1,
+        probe=probe,
+    )
+
+    expected_projection = {
+        "player_character_id": {"value": player_character_id.value},
+        "contract_version": "structured-player-character/v1",
+        "record_revision": {"value": 2},
+        "lifecycle": "retired",
+    }
+    assert first.status_code == replay.status_code == 200
+    assert first.json() == replay.json() == expected_projection
+    _assert_one_serialized_retirement(
+        probe,
+        uows,
+        policy_calls=policy_calls,
+    )
+
+    final_snapshot = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+    assert final_snapshot.current is not None
+    assert final_snapshot.current.player_character_id == player_character_id
+    assert final_snapshot.current.controller_binding == binding
+    assert (
+        final_snapshot.current.contract_version
+        is PlayerCharacterContractVersion.V1
+    )
+    assert final_snapshot.current.record_revision.value == 2
+    assert final_snapshot.current.lifecycle.value == "retired"
+    assert final_snapshot.controller_binding == binding.value
+    assert len(final_snapshot.revisions) == 2
+    assert len(final_snapshot.creation_receipts) == 1
+    assert len(final_snapshot.mutation_receipts) == 1
+    stored_row = final_snapshot.mutation_receipts[0]
+    assert stored_row[0] == CharacterOperationNamespace.MUTATE_V1.value
+    assert stored_row[1] == key
+    assert stored_row[3:12] == (
+        "RETIRE",
+        "player-character.mutate-result/v1",
+        1,
+        player_character_id.value,
+        PlayerCharacterContractVersion.V1.value,
+        "RETIRE",
+        "RETIRED",
+        2,
+        "retired",
+    )
+    assert await _counts(
+        mysql_session_factory,
+        player_character_id.value,
+        binding.value,
+    ) == (1, 1, 2, 1, 1, 1)
+
+
+async def test_mysql_concurrent_different_retirement_fingerprints_serialize_to_idempotency_conflict(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A differing normal HTTP request waits at the same aggregate boundary."""
+
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(
+        player_id=f"player.concurrent-conflict-{token}",
+        authentication_scheme="test",
+    )
+    binding = ControllerBindingRef(value=f"binding.concurrent-conflict-{token}")
+    player_character_id = PlayerCharacterId(
+        value=f"pc.concurrent-conflict-{token}"
+    )
+    key = f"retire-concurrent-conflict-{token}"
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    normal = _service(mysql_session_factory, binding, player_character_id)
+    assert (
+        await _post(_app(normal, principal), key=f"create-{token}")
+    ).status_code == 200
+
+    probe = _SerializedRetirementProbe()
+    uows: list[Any] = []
+    policy_calls = 0
+    original_evaluate_policy = player_character_service_module.evaluate_mutation_policy
+
+    def recording_evaluate_policy(*args: Any, **kwargs: Any) -> Any:
+        nonlocal policy_calls
+        policy_calls += 1
+        return original_evaluate_policy(*args, **kwargs)
+
+    monkeypatch.setattr(
+        player_character_service_module,
+        "evaluate_mutation_policy",
+        recording_evaluate_policy,
+    )
+    service = _service(
+        mysql_session_factory,
+        binding,
+        player_character_id,
+        uow_factory=lambda: _SerializedRetirementUnitOfWork(
+            mysql_session_factory,
+            probe,
+            uows,
+        ),
+    )
+
+    first, conflict = await _run_serialized_retirements(
+        _app(service, principal),
+        player_character_id,
+        key=key,
+        second_revision=2,
+        probe=probe,
+    )
+
+    assert first.status_code == 200
+    assert first.json() == {
+        "player_character_id": {"value": player_character_id.value},
+        "contract_version": "structured-player-character/v1",
+        "record_revision": {"value": 2},
+        "lifecycle": "retired",
+    }
+    assert conflict.status_code == 409
+    assert conflict.json() == {
+        "error": {
+            "error_code": "IDEMPOTENCY_CONFLICT",
+            "message": "Idempotency key was reused",
+        }
+    }
+    _assert_one_serialized_retirement(
+        probe,
+        uows,
+        policy_calls=policy_calls,
+    )
+
+    final_snapshot = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+    assert final_snapshot.current is not None
+    assert final_snapshot.current.record_revision.value == 2
+    assert final_snapshot.current.lifecycle.value == "retired"
+    assert len(final_snapshot.revisions) == 2
+    assert len(final_snapshot.creation_receipts) == 1
+    assert len(final_snapshot.mutation_receipts) == 1
+    assert final_snapshot.mutation_receipts[0][1] == key
+    assert await _counts(
+        mysql_session_factory,
+        player_character_id.value,
+        binding.value,
+    ) == (1, 1, 2, 1, 1, 1)
+
+
+async def test_mysql_retirement_active_binding_rejects_without_mutating_run_or_character(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.bound-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.bound-{token}")
+    player_character_id = PlayerCharacterId(value=f"pc.bound-{token}")
+    run_id = RunId(value=f"run.bound-{token}")
+    line_id = ContinuousStoryLineId(value=f"line.bound-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    player_character_api_scope.run_ids.add(run_id.value)
+    service = _service(mysql_session_factory, binding, player_character_id)
+    app = _app(service, principal)
+    assert (await _post(app, key=f"create-{token}")).status_code == 200
+    run_service = RunService(
+        uow_factory=lambda: SqlAlchemyUnitOfWork(mysql_session_factory),
+        run_id_issuer=_Issuer(run_id),
+        continuous_story_line_id_issuer=_Issuer(line_id),
+        source_reference=RunAuthoritySourceRef(value="source.mysql-api-run"),
+        clock=lambda: _NOW,
+        controller_binding_resolver=_Resolver(binding),
+        player_character_binding_evidence=service,
+    )
+    await run_service.create_run(
+        operation_id=RunOperationId(value=f"create-run-{token}"),
+        command=CreateRunCommand(
+            source_reference=RunAuthoritySourceRef(value="source.mysql-api-run")
+        ),
+    )
+    await run_service.bind_player_character_internal(
+        principal,
+        operation_id=RunOperationId(value=f"bind-run-{token}"),
+        command=BindPlayerCharacterCommand(
+            run_id=run_id,
+            continuous_story_line_id=line_id,
+            target_player_character_id=player_character_id,
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=RunAuthoritySourceRef(value="source.mysql-api-run"),
+        ),
+    )
+    character_before = await _counts(mysql_session_factory, player_character_id.value, binding.value)
+    durable_character_before = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+    async with mysql_session_factory() as session:
+        run_before = await session.get(RunCurrentRow, run_id.value)
+        assert run_before is not None
+        run_before_state = (
+            run_before.state_version,
+            run_before.lifecycle_status,
+            run_before.binding_player_character_id,
+            run_before.binding_record_revision,
+            run_before.binding_state,
+            run_before.active_player_character_id,
+            run_before.operation_id,
+        )
+
+    response = await _retire(app, player_character_id, key=f"retire-{token}")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["error_code"] == "PLAYER_CHARACTER_ACTIVE_BINDING_CONFLICT"
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == character_before
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == durable_character_before
+    async with mysql_session_factory() as session:
+        run_after = await session.get(RunCurrentRow, run_id.value)
+        assert run_after is not None
+        assert (
+            run_after.state_version,
+            run_after.lifecycle_status,
+            run_after.binding_player_character_id,
+            run_after.binding_record_revision,
+            run_after.binding_state,
+            run_after.active_player_character_id,
+            run_after.operation_id,
+        ) == run_before_state
+
+
+async def test_mysql_retirement_missing_and_foreign_targets_are_non_enumerating(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.owner-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.owner-{token}")
+    player_character_id = PlayerCharacterId(value=f"pc.owner-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    owner_app = _app(_service(mysql_session_factory, binding, player_character_id), principal)
+    assert (await _post(owner_app, key=f"create-{token}")).status_code == 200
+    foreign_app = _app(
+        _service(
+            mysql_session_factory,
+            ControllerBindingRef(value=f"binding.foreign-{token}"),
+            player_character_id,
+        ),
+        principal,
+    )
+    missing = await _retire(
+        owner_app,
+        PlayerCharacterId(value=f"pc.missing-{token}"),
+        key=f"missing-{token}",
+    )
+    foreign = await _retire(foreign_app, player_character_id, key=f"foreign-{token}")
+
+    assert missing.status_code == foreign.status_code == 404
+    assert missing.json() == foreign.json() == {
+        "error": {
+            "error_code": "PLAYER_CHARACTER_NOT_FOUND",
+            "message": "Player character was not found",
+        }
+    }
+
+
+async def test_mysql_retirement_precommit_and_uncertain_commit_are_sanitized_without_recovery(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    player_character_api_scope: _Scope,
+) -> None:
+    token = player_character_api_scope.token
+    principal = RequestPrincipal(player_id=f"player.failure-{token}", authentication_scheme="test")
+    binding = ControllerBindingRef(value=f"binding.failure-{token}")
+    player_character_id = PlayerCharacterId(value=f"pc.failure-{token}")
+    player_character_api_scope.bindings.add(binding.value)
+    player_character_api_scope.character_ids.add(player_character_id.value)
+    normal_app = _app(_service(mysql_session_factory, binding, player_character_id), principal)
+    assert (await _post(normal_app, key=f"create-{token}")).status_code == 200
+    before = await _counts(mysql_session_factory, player_character_id.value, binding.value)
+    durable_before = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+
+    precommit_uows: list[Any] = []
+    precommit = _service(
+        mysql_session_factory,
+        binding,
+        player_character_id,
+        uow_factory=lambda: _recording_uow(
+            _PreCommitFailureUnitOfWork,
+            mysql_session_factory,
+            precommit_uows,
+        ),
+    )
+    precommit_response = await _retire(
+        _app(precommit, principal), player_character_id, key=f"precommit-{token}"
+    )
+    assert precommit_response.status_code == 500
+    assert precommit_response.json()["error"]["error_code"] == "INTERNAL_SERVER_ERROR"
+    assert len(precommit_uows) == 1
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == before
+    assert await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    ) == durable_before
+
+    uncertain_uows: list[Any] = []
+    uncertain = _service(
+        mysql_session_factory,
+        binding,
+        player_character_id,
+        uow_factory=lambda: _recording_uow(
+            _UncertainCommitUnitOfWork,
+            mysql_session_factory,
+            uncertain_uows,
+        ),
+    )
+    uncertain_response = await _retire(
+        _app(uncertain, principal), player_character_id, key=f"uncertain-{token}"
+    )
+    assert uncertain_response.status_code == 500
+    assert uncertain_response.json()["error"]["error_code"] == "INTERNAL_SERVER_ERROR"
+    assert len(uncertain_uows) == 1
+    assert await _counts(mysql_session_factory, player_character_id.value, binding.value) == (1, 1, 2, 1, 1, 1)
+    uncertain_snapshot = await _durable_character_snapshot(
+        mysql_session_factory,
+        player_character_id,
+        binding,
+    )
+    assert uncertain_snapshot.current is not None
+    assert uncertain_snapshot.current.player_character_id == player_character_id
+    assert uncertain_snapshot.current.controller_binding == binding
+    assert uncertain_snapshot.current.contract_version is PlayerCharacterContractVersion.V1
+    assert uncertain_snapshot.current.record_revision.value == 2
+    assert uncertain_snapshot.current.lifecycle.value == "retired"
+    assert uncertain_snapshot.controller_binding == binding.value
+    assert len(uncertain_snapshot.revisions) == 2
+    assert len(uncertain_snapshot.creation_receipts) == 1
+    assert len(uncertain_snapshot.mutation_receipts) == 1
+    uncertain_receipt = uncertain_snapshot.mutation_receipts[0]
+    assert uncertain_receipt[0] == CharacterOperationNamespace.MUTATE_V1.value
+    assert uncertain_receipt[1] == f"uncertain-{token}"
+    assert uncertain_receipt[3:12] == (
+        "RETIRE",
+        "player-character.mutate-result/v1",
+        1,
+        player_character_id.value,
+        PlayerCharacterContractVersion.V1.value,
+        "RETIRE",
+        "RETIRED",
+        2,
+        "retired",
+    )
 
 async def test_mysql_owned_read_is_non_enumerating_and_has_no_write_side_effect(
     mysql_session_factory: async_sessionmaker[AsyncSession],

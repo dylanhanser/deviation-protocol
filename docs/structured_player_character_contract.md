@@ -2,7 +2,8 @@
 
 Status: **Approved and frozen structured player-character product
 specification — partially implemented through completed Phase 3, Minimum Run
-Core, and completed internal-only P4-S1 binding.**
+Core, completed internal-only P4-S1 binding, and published P5-S1/P5-S2 public
+activation.**
 
 Authority scope: **Normative player-character identity, canonical record,
 revision, lifecycle, validation, projection, and adjacent-authority
@@ -18,9 +19,27 @@ implemented, independently finally approved, committed, and pushed as
 (`feat(run): implement minimum run core`). Its null-only seam is historical:
 P4-S1a is implemented at `748003319ececa548b68b351746afbb2d54c66bb` and
 P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The Run-owned binding is
-implemented internally only. Later public activation is not implemented; the
-reserved public `RunService.bind_player_character(...)` command remains
-rejected.
+implemented internally only. P5-S1 owned read and P5-S2 creation/replay are
+published. P5-S3 received `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`.
+Its first, first-corrected, and re-corrected local retirement implementation
+candidates each received `CHANGES_REQUIRED`. A later evidence candidate's
+receipt-add 1062 depended on rolling back the original mutation transaction and
+resuming stale in-memory work. The focused investigation returned
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`, so the
+present acceptance-boundary-corrected unstaged candidate proves normal HTTP
+serialization at the aggregate lock and labels defensive recovery evidence as
+fault injection. Correction validation completed locally (canonical Offline
+1,814 passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one
+  opt-in Provider skip). Its focused final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`, finding no
+  material scoped defect. It accepted real-MySQL aggregate-lock serialization,
+  exact replay or ordinary idempotency conflict, and one durable mutation; fault
+  injection is bounded defensive recovery only, and the unreachable receipt-add
+  race is not a requirement. P5-S3 is independently approved and eligible for
+  exact-scope commit; P5-S4 and unrelated deferred work have not begun. Push,
+  deployment, release, runtime activation, and Provider work remain deferred.
+  Public Run binding is not implemented; the reserved public
+`RunService.bind_player_character(...)` command remains rejected.
 
 The approved and frozen
 [Final Narrative Experience and Long-Term Systems](final_narrative_experience.md)
@@ -772,22 +791,57 @@ applicable exact-candidate review record, and repository integration and
 publication state must be established from Git history. It must not be
 represented as a completed Phase 5 or production-authentication milestone.
 
-### P5-S2 implementation-candidate status
+### P5-S2 implementation status
 
-The frozen P5-S2 public creation/replay contract is implemented and has
-completed its assigned local verification in the current unstaged working-tree
-candidate. It adds only the normal application's authenticated
+The frozen P5-S2 public creation/replay contract was independently approved,
+committed, and published at
+`4ba66d8f277988325795c905fdf6fd9e416d7457`
+(`feat(player-character): add creation API`). It adds only the normal
+application's authenticated
 `POST /v1/player-characters` boundary, preserving the existing P5-S1 owned
 read and delegating controller ownership, operation identity, durable replay,
 creation persistence, and race recovery to the existing application and
 persistence authorities. This status does not amend this product contract or
 promote any deferred lifecycle, mutation, Run, or gameplay behavior.
 
-The candidate remains pending fresh independent read-only review and separate
-staging and commit authorization; it is not committed, published, deployed, or
-a production-authentication milestone. Demo and frontend creation remain
-inactive: Demo has no Player Character service and no Player Character route or
-OpenAPI path. P5-S3 remains unstarted.
+P5-S2 is not deployed or a production-authentication milestone. Demo and
+frontend creation remain inactive: Demo has no Player Character service and no
+Player Character route or OpenAPI path.
+
+### P5-S3 acceptance-boundary-corrected implementation-candidate status
+
+The dedicated
+[P5-S3 retirement activation plan](structured_player_character_p5_s3_implementation_plan.md)
+and its narrow amendment to the
+[Public Client Contract](public_client_contract.md) received
+`STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. The first, first-corrected,
+and re-corrected local implementation candidates each received
+`CHANGES_REQUIRED`; the third review found no production-code defect and
+requested corrected evidence only. The later evidence candidate was followed
+by a focused receipt-add reachability investigation whose verdict was
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
+present acceptance-boundary-corrected unstaged candidate selects only explicit
+controller-requested retirement of an
+owned, active, unbound canonical character. It activates no deployed route and
+is not independently implementation-approved, committed, published, pushed,
+deployed, released, or production-authentication activated. It does not change
+the frozen lifecycle matrix: identity and controller binding remain preserved,
+revision advances once only on committed success, and an active Run binding
+continues to require the existing atomic lifecycle-transition rejection until
+later Run-owned line ending and binding historicalization exist.
+
+Current mandatory concurrency evidence uses normal HTTP requests, distinct
+real MySQL connections/UoWs, and the existing aggregate `FOR UPDATE` boundary.
+It must prove one durable mutation/receipt/revision advance followed by exact
+replay for an identical fingerprint or ordinary idempotency conflict for a
+different fingerprint, with no duplicate policy mutation, recovery, or 1062.
+The existing receipt-add recovery branch remains bounded defensive behavior and
+is covered through explicitly labelled narrow service fault injection; direct
+repository uniqueness evidence is synthetic out-of-topology translation. A
+real receipt-add 1062 becomes mandatory only if a future composed runtime writer
+or changed transaction topology can legitimately reach that unique boundary
+without first serializing on the aggregate lock. No such topology is approved
+or required by this contract.
 
 Before any runtime implementation is accepted, the owning implementation
 specification MUST define and verify:
@@ -958,7 +1012,18 @@ Phase 3 plus the completed Minimum Run Core at
 `e821cd922b61868097667b12c2b64cf8089a9681`. P4-S1a
 (`748003319ececa548b68b351746afbb2d54c66bb`) and P4-S1b
 (`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) complete the internal Run-owned
-continuous-story-line binding; public activation remains unimplemented.
+continuous-story-line binding. P5-S1 and P5-S2 are published; public Run
+binding and all lifecycle mutation other than the P5-S3 normal-application
+unstaged retirement candidate remain unimplemented. The first,
+first-corrected, and re-corrected P5-S3 candidates each received
+`CHANGES_REQUIRED`; the third review found no production-code defect and
+requested corrected evidence only. The later evidence candidate and focused
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH` verdict
+precede the present acceptance-boundary/test correction. This exact local
+candidate changes only the normal application's unstaged retirement boundary;
+correction validation passed with the canonical counts above, and fresh
+independent review still remains required.
+Demo, public Run, frontend, Web, and administration remain excluded.
 Approval and freeze do not authorize later runtime work. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

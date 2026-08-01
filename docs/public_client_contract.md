@@ -6,12 +6,33 @@ deployment, a browser application, or a desktop adapter. The default principal
 is still the fixed `demo-player`/`demo-dev-only` identity and is unsafe for an
 Internet-facing deployment.
 
-This document also defines the bounded public-contract candidate for the
-P5-S2 Player Character creation/replay route. The document does not itself
-implement or activate that route. At this candidate's authoring baseline,
-P5-S1's owned read is the only activated public Player Character operation;
-later acceptance, implementation, integration, and publication state must be
-established from applicable exact-candidate review evidence and Git history.
+This document also defines the published P5-S2 Player Character creation/replay
+contract and the bounded P5-S3 retirement-contract amendment. P5-S2 was
+independently approved, committed, and published at
+`4ba66d8f277988325795c905fdf6fd9e416d7457`. P5-S3 received
+`STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its first local
+implementation candidate received `CHANGES_REQUIRED`; its first corrected and
+re-corrected candidates each received a further fresh `CHANGES_REQUIRED`
+review. The third review found no production-code defect and requested corrected
+SQL-race, durable-state, unit/OpenAPI, and documentation-history evidence. The
+later evidence candidate produced a receipt-add 1062 only through a
+mid-operation rollback-and-resume topology. The focused investigation returned
+`P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`; normal
+production retirement writers serialize at the Player Character aggregate
+lock. The present acceptance-boundary-corrected unstaged candidate replaces the
+unreachable race claim with normal concurrent HTTP replay/conflict evidence and
+explicitly labels recovery evidence as bounded fault injection. Its correction
+validation completed locally (canonical Offline 1,814 passed/124 expected skips,
+  MySQL 136 passed, and Full 1,937 passed/one opt-in Provider skip). Its focused
+  final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`, finding no
+  material scoped defect. It accepted real-MySQL aggregate-lock serialization,
+  exact replay or ordinary idempotency conflict, and one durable mutation; fault
+  injection is bounded defensive recovery only, and the unreachable receipt-add
+  race is not a requirement. P5-S3 is independently approved and eligible for
+  exact-scope commit; P5-S4 and unrelated deferred work have not begun. No Demo,
+  public Run, frontend, Web, administration, production-authentication, runtime,
+  deployment, release, or Provider activation follows from this candidate.
 
 ## Owned Player Character read
 
@@ -382,8 +403,8 @@ cross-request timing guarantee is claimed.
 
 ### P5-S2 OpenAPI contract
 
-Any separately authorized P5-S2 implementation must expose exactly this normal
-application OpenAPI operation:
+The published P5-S2 implementation exposes exactly this normal-application
+OpenAPI operation:
 
 | OpenAPI property | Required value |
 | --- | --- |
@@ -417,13 +438,10 @@ UnitOfWork, ORM, Run, Provider, snapshot, or other internal schemas.
 Framework-default validation bodies are not part of the contract; every
 declared 422 references the existing `ErrorResponse`.
 
-This is the exact P5-S2 OpenAPI shape proposed by this contract candidate.
-Candidate acceptance is established only by applicable
-exact-candidate review evidence. It is distinct from runtime exposure: this
-document does not register the operation, and whether a later normal
-application exposes it must be established from applicable implementation and
-Git history. The independent Demo does not gain the route or advertise it
-merely because this contract exists.
+This is the exact published P5-S2 OpenAPI shape. This document does not register
+the operation; runtime exposure is established by the implementation and Git
+history. The independent Demo does not gain the route or advertise it merely
+because this contract exists.
 
 ### Preserved deferrals
 
@@ -445,6 +463,398 @@ P5-S2 changes no existing Session/action contract and does not authorize:
   repository/UoW transaction design, schema, migration, dependency, or DB-001
   change; or
 - any P4-S2 objective.
+
+## P5-S3 Player Character retirement contract amendment
+
+### Status and exact boundary
+
+This section is the narrow public-contract amendment for the dedicated
+[approved P5-S3 plan](structured_player_character_p5_s3_implementation_plan.md).
+Its first, first-corrected, and re-corrected local implementation candidates
+each received `CHANGES_REQUIRED`; a later evidence candidate was followed by
+the focused not-reachable verdict recorded above. The present
+  acceptance-boundary-corrected candidate received
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
+  material scoped defect and is eligible for exact-scope commit. The accepted
+  real-MySQL evidence proves aggregate-lock serialization, replay/conflict, and
+  one durable mutation; fault injection proves bounded defensive recovery only,
+  and the unreachable receipt-add race is not a requirement. It specifies the
+  one normal-application operation:
+
+```http
+POST /v1/player-characters/{player_character_id}/retirement
+```
+
+This is a retirement-only command endpoint under the existing
+`player-characters` tag. It is not a general mutation, update, action, delete,
+binding, Run, administration, or lifecycle endpoint. It is registered only in
+the normal application's existing Player Character route block when the
+canonical service is composed. It is absent from the independent Demo, public
+Run routes, frontend, Web, browser, and administration surfaces.
+
+The route accepts one opaque path identifier, one strict JSON body, and one
+required `Idempotency-Key`. It receives the trusted principal and existing
+`PlayerCharacterService` through the established dependencies, constructs the
+existing retirement `CharacterMutationCommand`, calls
+`PlayerCharacterService.mutate` at most once, and projects only an existing
+`MutationSuccessResult` into `PlayerCharacterSelfProjection`.
+
+### Path, authentication, ownership, and non-enumeration
+
+`player_character_id` uses the same public carrier as the owned read: the
+framework-decoded value must be ASCII, 1–128 characters, and match
+`^[A-Za-z0-9][A-Za-z0-9_.:-]*$`. The accepted decoded string is revalidated as
+`PlayerCharacterId` without trimming, case-folding, Unicode normalization,
+semantic parsing, or another decode. It appears only in the path; no body,
+query, or header fallback may target another character.
+
+Controller identity comes only from the dependency-derived
+`RequestPrincipal` and the existing configured resolver. The route passes that
+principal unchanged to the service. It accepts no controller, owner, account,
+player, role, authentication scheme, binding, administrator, or authority
+field. The existing service locks the target, verifies the current stored
+controller binding, and performs receipt disclosure only after ownership.
+
+An invalid or unmapped principal, absent character, foreign-owned character,
+invalid stored ownership, or changed ownership during the existing narrow
+receipt-race recovery receives the same 404 response. Malformed path syntax
+receives the sanitized 422 response before resource lookup and discloses no
+existence fact. Operation-ID possession is never authorization.
+
+The repository still has no production authentication transport. P5-S3 does
+not invent credentials, a challenge, a cookie, a bearer token, a `401`, a
+`403`, or an OpenAPI security scheme. A missing or invalid principal that
+reaches the existing controller-resolution boundary maps to the same
+non-enumerating 404. A future pre-route production-authentication contract
+would require separate authority before Internet deployment.
+
+### Operation identity
+
+`Idempotency-Key` is the only public carrier for the retirement operation ID.
+It inherits the complete P5-S2 convention:
+
+| Property | Exact P5-S3 contract |
+| --- | --- |
+| Header name | `Idempotency-Key`; header-name matching is case-insensitive |
+| Requiredness | Exactly one occurrence; no body, path, or query fallback |
+| Value | ASCII string, 1–128 bytes/characters, matching `^[A-Za-z0-9][A-Za-z0-9_.:-]*$` |
+| Normalization | None: no trim, case-fold, Unicode normalization, decoding, or semantic parsing; comparison is exact and case-sensitive |
+| Internal operation ID | `PlayerCharacterOperationId(value=<exact header value>)` |
+| Internal namespace | Existing server-selected `player-character.mutate/v1`; never client-supplied |
+| Durable receipt scope | Existing exact `(player_character_id, player-character.mutate/v1, operation_id)` key, after current-owner authorization |
+
+Missing, empty, duplicate, non-ASCII, overlength, alphabet-invalid,
+comma-combined, normalized-only, or otherwise invalid values fail with the
+sanitized 422 before service invocation. The header value is not a capability
+and is never returned.
+
+### Strict request body and explicit confirmation
+
+The required media type is `application/json`. Exactly one raw `Content-Type`
+header must be present. Its ASCII media-type token, before the first semicolon
+and after stripping only HTTP SP/HTAB, is compared case-insensitively with
+`application/json`; parameters are accepted and carry no authority. Missing,
+duplicate, non-ASCII, or other media types fail with the sanitized 422.
+
+The public request DTO is `PlayerCharacterRetirementRequest` with exactly these
+fields and no defaults:
+
+```json
+{
+  "contract_version": "structured-player-character/v1",
+  "expected_revision": {
+    "value": 1
+  },
+  "confirm_retirement": true
+}
+```
+
+| JSON field | Type | Required/null | Exact meaning |
+| --- | --- | --- | --- |
+| `contract_version` | String enum | Required; null forbidden | Must equal `structured-player-character/v1`; becomes the existing command contract version and applicable-reference version |
+| `expected_revision` | `PlayerCharacterRevision` object | Required; null forbidden | Contains exactly `value`, a strict JSON integer from 1 through 9223372036854775807; becomes both the command expected revision and applicable-reference revision |
+| `confirm_retirement` | Boolean literal | Required; null forbidden | Must be the JSON literal `true`; it is the transport-visible explicit controller confirmation from which the server constructs the existing bound `PlayerConfirmation` |
+
+The DTO and nested revision object forbid unknown fields. Missing fields,
+`confirm_retirement=false`, strings such as `"true"`, numeric `1`, null,
+wrong types, unsupported versions, malformed JSON, scalar or array top levels,
+unknown fields, and any duplicate JSON object-member name at any depth fail the
+complete request with the sanitized 422. Duplicate-member rejection occurs
+before typed command construction so conflicting confirmation members cannot
+be resolved by last-value behavior. No subset is salvaged and the service is
+not called.
+
+The route inherits P5-S2 raw-body acquisition: after dependency, path, media
+type, and operation-header acceptance and one operation-ID construction, it
+calls `await Request.body()` exactly once and buffers the complete raw body.
+There is no raw transport-size or `Content-Length` limit. A narrow duplicate-
+member preflight is followed by JSON-mode validation through
+`PlayerCharacterRetirementRequest.model_validate_json(raw_body)`; neither step
+reads the request body again. The absence of a raw body cap and full buffering
+are explicit residual risks, not permission to add a different limit during
+implementation.
+
+### Exact command construction and application boundary
+
+The API constructs one existing `CharacterMutationCommand` as follows:
+
+| Command field | Exact value/source |
+| --- | --- |
+| `contract_version` | Parsed request `contract_version` |
+| `command_kind` | Server-selected `PlayerCharacterMutationKind.RETIRE` |
+| `target_player_character_id` | Validated path `PlayerCharacterId` |
+| `expected_revision` | Parsed request `expected_revision` |
+| `applicable_reference` | Existing `ApplicableCharacterReference` built from the exact target ID, contract version, and expected revision |
+| `confirmation.player_character_id` | Exact target ID |
+| `confirmation.expected_revision` | Exact expected revision |
+| `confirmation.operation_id` | Exact `PlayerCharacterOperationId` from `Idempotency-Key` |
+| `confirmation.mutation_kind` | Server-selected `RETIRE` |
+| `confirmation.source_reference` | Fixed trusted `AuthoritySourceRef(value="source.public-player-character-retirement")` |
+| `final_death_evidence` | `None` |
+
+The public boolean is evidence of an explicit transport choice; it is not
+itself canonical authority. The server binds that accepted choice to the exact
+character, revision, operation ID, mutation kind, and fixed trusted source in
+the already validated command.
+
+The API owns only raw transport validation, strict DTO parsing, safe command
+construction, dependency resolution, one service call, decision-to-public-
+error translation, and field-by-field success projection. It owns no
+repository, Unit of Work, transaction, receipt, fingerprint, replay lookup,
+CAS, active-binding query, rollback, retry, race recovery, or domain policy.
+
+### Mutation, replay, and active-binding behavior
+
+The route reuses the existing `player-character.mutate/v1` command protocol.
+Strict transport and DTO validation remain at the API boundary. After the
+service has resolved current-owner authority and revalidated the current record,
+typed command, and operation ID, the existing signed-64-bit successor-capacity
+gate runs before fingerprint construction or durable receipt lookup.
+
+For `expected_revision = 9223372036854775807`, that gate returns the internal
+`REVISION_EXHAUSTED` outcome before request-fingerprint construction, receipt
+lookup, exact-replay evaluation, different-fingerprint comparison,
+current-state stale-revision evaluation, active-binding evaluation, or
+lifecycle evaluation. The public route maps the outcome to the existing 409
+`PLAYER_CHARACTER_REVISION_CONFLICT` envelope with no details. No successful
+mutation or durable success receipt can be created from that rejected request.
+
+Only after all existing pre-receipt validation and revision-capacity gates
+succeed does the existing fingerprint bind the exact applicable reference,
+`RETIRE` kind, contract version, expected revision, target ID, namespace, and
+complete server-constructed confirmation: target ID, expected revision,
+operation ID, `RETIRE` kind, and fixed source reference. The public
+confirmation boolean has no alternate successful value and is represented by
+those bound confirmation facts.
+
+After current-owner authorization:
+
+- for a valid, non-exhausted request that passes every pre-receipt gate, the
+  same operation ID and exact fingerprint return the stored original
+  `MutationSuccessResult` without policy evaluation, history append, CAS,
+  receipt insertion, revision increment, or commit;
+- for a valid, non-exhausted request that passes every pre-receipt gate, the
+  same operation ID with a different fingerprint returns the fixed 409
+  idempotency conflict and performs no mutation;
+- for a new operation ID with an ordinary, non-exhausted applicable revision,
+  a character already `retired` or `deceased` reaches the existing retirement
+  policy, returns the fixed invalid-lifecycle 409, creates no receipt, and
+  changes no revision;
+- any request carrying the maximum expected revision returns the revision 409
+  before receipt or lifecycle evaluation, regardless of whether its operation
+  ID was used successfully before or the character is already retired; and
+- an exact replay remains valid after later canonical revisions and returns the
+  original retirement result rather than claiming to be current state.
+
+A successfully executed retirement cannot have used the exhausted maximum as
+its expected revision. Its exact replay therefore continues to carry the
+original valid, non-exhausted request and reaches normal receipt evaluation.
+
+The normative precedence cases are:
+
+| Case | Request conditions and ordering | Public result | Preservation |
+| --- | --- | --- | --- |
+| A — ordinary exact replay | Original successful operation ID; identical valid request; non-exhausted expected revision; pre-receipt gates pass; stored fingerprint matches | 200 exact replay of the stored original retirement projection | No second mutation, receipt, commit, or revision increment |
+| B — ordinary different-request reuse | Existing operation ID; valid non-exhausted request; fields differ from the stored successful request; pre-receipt gates pass; stored fingerprint differs | 409 `IDEMPOTENCY_CONFLICT` | No mutation, new receipt, or revision change |
+| C — existing operation ID with maximum revision | Existing operation ID; request carries `expected_revision = 9223372036854775807`; its fields would differ from the earlier successful request, but the revision-capacity gate rejects before fingerprint construction or receipt lookup | 409 `PLAYER_CHARACTER_REVISION_CONFLICT`, from internal `REVISION_EXHAUSTED`; not idempotency conflict | Original receipt and canonical state remain unchanged |
+| D — new operation after retirement, ordinary revision | New operation ID; valid non-exhausted applicable revision; no receipt preempts evaluation; retired lifecycle is evaluated | 409 `PLAYER_CHARACTER_LIFECYCLE_CONFLICT` | No receipt or state change |
+| E — new operation after retirement, maximum revision | New operation ID; request carries the maximum expected revision; the capacity gate rejects before receipt and lifecycle evaluation | 409 `PLAYER_CHARACTER_REVISION_CONFLICT`; not lifecycle conflict | No receipt or state change |
+
+These deterministic outcomes do not expose whether a receipt exists for any
+supplied operation ID. Responses disclose only the fixed public result allowed
+for the safe request condition that wins precedence.
+
+A genuinely new accepted operation is permitted only when the current
+canonical record is owned by the resolved controller, has the exact expected
+revision and contract/reference, is `active`, has a representable successor,
+and has no current active Run binding. Success preserves the exact
+`player_character_id`, contract version, and `controller_binding`, changes only
+the admitted complete-record lifecycle/provenance consequences from `active`
+to `retired`, appends one immutable revision, CAS-updates current state,
+inserts one durable mutation success receipt, commits once, and advances the
+canonical revision exactly once.
+
+The P4-S1 seam remains authoritative for current active-binding evidence. If a
+valid current active binding exists, the existing internal
+`ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED` policy decision maps to
+the fixed public binding-conflict response below. The character, revision,
+receipt families, Run, binding, and Run version remain unchanged. The API does
+not end or terminate a Run, historicalize or remove a binding, issue a Run
+command, perform a compensating action, or retry retirement. Those operations
+remain later Run-owned atomic work.
+
+Persistence and transaction behavior is unchanged. Any rejected, stale,
+invalid, bound, CAS-losing, or pre-commit-failing operation exits without a
+successful receipt or revision change and rolls back uncommitted work. Only the
+existing exact mutation-receipt-add uniqueness conflict may dispose the failed
+initial Unit of Work and open at most one fresh read-only recovery Unit of Work
+to return a durable winner or conflict. There is no third Unit of Work, policy
+retry, write retry, commit retry, generic retry, or uncertain-commit recovery.
+All other persistence and commit exceptions preserve their original internal
+identity and reach the sanitized public boundary.
+
+That recovery is bounded defensive behavior, not a currently reachable race
+between two legitimate retirement requests. Through the normal HTTP route and
+production service/UoW graph, distinct real database connections first contend
+on the existing Player Character `FOR UPDATE` lock. The waiter cannot look up a
+receipt, evaluate policy, write a revision, perform CAS, or add a receipt until
+the winner commits. It then returns the stored projection for an identical
+fingerprint or the ordinary public idempotency conflict for a different
+fingerprint. Exactly one durable revision advance and one mutation receipt
+remain, with no duplicate policy mutation, recovery UoW, receipt-add conflict,
+or MySQL 1062. Fresh independent reads must prove that state.
+
+The defensive branch remains covered by explicitly labelled narrow
+receipt-add fault injection in the service tests, including failed-UoW disposal,
+one fresh read-only recovery UoW, authority re-resolution, durable receipt
+reread, replay/fingerprint conflict, and absence of a third UoW, mutation retry,
+generic retry, recovery write/commit, or uncertain-commit recovery. Direct
+repository duplicate-flush evidence is synthetic out-of-topology constraint
+translation only. Real receipt-add 1062 race evidence becomes mandatory only if
+a future composed runtime writer or changed transaction topology can
+legitimately reach receipt uniqueness without first serializing on the
+aggregate lock; this amendment neither approves nor requires such a topology.
+
+If commit raises after durability may have occurred, the response is the fixed
+500 with no success or replay claim. The service does not reread, recover, or
+claim exactly once. A later exact client retry may resolve from durable receipt
+state, but the failed request itself makes no durability claim.
+
+### Success response
+
+First committed retirement and authorized exact replay both return:
+
+- HTTP `200 OK`;
+- media type `application/json`;
+- the existing `PlayerCharacterSelfProjection` response model;
+- no `Location` header; and
+- no operation ID, replay indicator, receipt, command result, source reference,
+  binding, Run, transaction, or recovery metadata.
+
+For an initial revision of 1, the exact shape is:
+
+```json
+{
+  "player_character_id": {
+    "value": "pc.example"
+  },
+  "contract_version": "structured-player-character/v1",
+  "record_revision": {
+    "value": 2
+  },
+  "lifecycle": "retired"
+}
+```
+
+The route maps `MutationSuccessResult.player_character_id`,
+`contract_version`, `resulting_revision`, and `resulting_lifecycle` to the same
+four public fields. On first success, `record_revision.value` is exactly the
+submitted expected revision plus one and `lifecycle` is `retired`. On replay,
+the complete response has the same status, media type, projection semantics,
+and original resulting revision/lifecycle. Clients use the owned GET for the
+current record after any later mutation.
+
+### Safe public error mapping
+
+Every error body is the existing `ErrorResponse` containing only
+`error.error_code` and `error.message`; there is no `details` member.
+
+| Condition | HTTP | Public code | Exact message | Required preservation |
+| --- | ---: | --- | --- | --- |
+| Invalid, absent, or unmapped principal reaching controller resolution | 404 | `PLAYER_CHARACTER_NOT_FOUND` | `Player character was not found` | Same as missing and non-owned; disclose no controller or authentication fact |
+| Malformed path identifier | 422 | `REQUEST_VALIDATION_FAILED` | `Request validation failed` | No lookup and no submitted-value detail |
+| Missing or non-owned character, invalid stored ownership, or changed recovery authority | 404 | `PLAYER_CHARACTER_NOT_FOUND` | `Player character was not found` | Identical body for all cases; no existence, owner, binding, or receipt disclosure |
+| Malformed/missing/null/wrong-type body; unknown or duplicate member; unsupported contract version; invalid revision; missing, false, malformed, or incorrectly typed confirmation | 422 | `REQUEST_VALIDATION_FAILED` | `Request validation failed` | No field details and no service call |
+| Missing, duplicate, non-ASCII, empty, overlength, alphabet-invalid, or otherwise invalid `Idempotency-Key`; invalid or ambiguous `Content-Type` | 422 | `REQUEST_VALIDATION_FAILED` | `Request validation failed` | No raw value, operation key, or receipt disclosure |
+| Maximum `expected_revision = 9223372036854775807` | 409 | `PLAYER_CHARACTER_REVISION_CONFLICT` | `Player character revision does not permit retirement` | Capacity gate wins before fingerprint, receipt, stale-current, binding, or lifecycle evaluation; no receipt or state change |
+| Ordinary stale expected revision or CAS loss after the pre-receipt gates succeed | 409 | `PLAYER_CHARACTER_REVISION_CONFLICT` | `Player character revision does not permit retirement` | No history, current-row, receipt, or revision change |
+| Current lifecycle is not `active`, including a new operation after retirement with an ordinary non-exhausted applicable revision | 409 | `PLAYER_CHARACTER_LIFECYCLE_CONFLICT` | `Player character cannot be retired` | No receipt or revision change; do not disclose private state beyond the safe conflict |
+| Current active Run binding triggers the existing P4-S1 guard | 409 | `PLAYER_CHARACTER_ACTIVE_BINDING_CONFLICT` | `Player character is bound to an active Run` | Character, revision, receipt, Run, and binding remain unchanged; no compensation |
+| Same character/namespace/operation ID reused by an ordinary valid non-exhausted request whose fingerprint differs, after all pre-receipt gates succeed | 409 | `IDEMPOTENCY_CONFLICT` | `Idempotency key was reused` | Stored result and fingerprint remain private; no mutation or commit |
+| Recognized retirement-policy rejection | The revision, lifecycle, or active-binding 409 mapping above | Corresponding fixed code | Corresponding fixed message | Only `STALE_REVISION`, `REVISION_EXHAUSTED`, `INVALID_TRANSITION`, and `ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED` are public-safe retirement rejections |
+| Stored-receipt integrity failure, impossible/wrong-namespace decision, command/result contradiction, or any other domain/application decision | 500 | `INTERNAL_SERVER_ERROR` | `Internal server error` | Treat as internal failure; never publish raw policy code or internal details |
+| Repository, binding-evidence integrity, persistence, rollback, close, projection, composition, or other ordinary infrastructure failure | 500 | `INTERNAL_SERVER_ERROR` | `Internal server error` | Preserve original error internally; expose no SQL, constraint, path, identifier, or exception text |
+| Commit failure or uncertain durability | 500 | `INTERNAL_SERVER_ERROR` | `Internal server error` | No reread, recovery, success, replay, or exactly-once claim |
+
+Cancellation remains outside ordinary exception translation and has no promised
+HTTP response. Internal exceptions, SQL and constraint details, ownership
+facts, controller/principal identifiers, source references, policy traces,
+receipts, fingerprints, Run IDs, binding evidence, transaction state, stack
+traces, and submitted values are never returned.
+
+The selected mapping uses the existing `error_response`/`ErrorResponse` helper
+from `api.errors` directly from the route's private decision translator. No
+change to `src/deviation_protocol/api/errors.py` or
+`src/deviation_protocol/application/errors.py` is required or authorized.
+
+### P5-S3 OpenAPI contract
+
+The corrected unstaged normal-application candidate operation is exactly:
+
+| OpenAPI property | Required value |
+| --- | --- |
+| Path and method | `POST /v1/player-characters/{player_character_id}/retirement` |
+| `operationId` | `retire_player_character` |
+| Tag | `player-characters` |
+| Summary | `Retire a Player Character` |
+| Path parameter | Required `player_character_id` string, `minLength: 1`, `maxLength: 128`, pattern `^[A-Za-z0-9][A-Za-z0-9_.:-]*$` |
+| Header parameter | One required `Idempotency-Key` string, `minLength: 1`, `maxLength: 128`, pattern `^[A-Za-z0-9][A-Za-z0-9_.:-]*$` |
+| Request body | One required `application/json` body referencing `PlayerCharacterRetirementRequest` |
+| Success | `200` `application/json` referencing `PlayerCharacterSelfProjection`, description `Player Character retired or exactly replayed.` |
+| Errors | Only `404`, `409`, `422`, and `500`, each `application/json` referencing `ErrorResponse` |
+| Security | No invented production security scheme |
+
+The operation description states that controller identity is dependency-derived;
+`Idempotency-Key` is required but is not authorization; `confirm_retirement`
+must be the literal `true`; only an owned, active, unbound character can retire;
+first success and exact replay share one 200 projection; replay returns the
+original retirement result; maximum expected revision deterministically returns
+the revision-conflict envelope before idempotency or lifecycle evaluation;
+active binding is rejected without Run or character mutation; the operation
+does not end a Run or historicalize a binding; the owned GET supplies current
+state; and the development principal is not production authentication or
+Internet-deployment authority.
+
+OpenAPI includes the strict three-field request graph and existing response/error
+schemas. It does not advertise final death, deletion, reactivation, continuity
+return, general update/mutation, binding changes, Run termination, controller
+data, confirmation provenance, receipts, fingerprints, persistence types, or
+internal command/result models. Framework-default validation bodies are not the
+public 422 contract. The normal route inventory gains only this unstaged-candidate POST;
+Demo and public Run inventories gain nothing.
+
+### P5-S3 exclusions
+
+This amendment does not authorize final death; reactivation or continuity
+return; general character updates; binding, unbinding, replacement, switching,
+or transfer; deletion, listing, search, or administration; retirement of an
+actively bound character; ending or terminating a Run; historicalizing a Run
+binding; Run lifecycle redesign; frontend, Web, browser, or Demo activation;
+Provider or narrative integration; production authentication; scenario, world,
+NPC, memory, relationship, combat, content, or broader gameplay work; schema,
+ORM, migration, repository, Unit-of-Work, receipt, CAS, transaction, or
+dependency redesign; generic retry; uncertain-commit recovery; or a P4-S2
+objective.
 
 ## Public scenario discovery
 

@@ -58,6 +58,9 @@ def test_demo_composition_does_not_register_player_character_routes() -> None:
         for path in app.openapi()["paths"]
         if path.startswith("/v1/player-characters")
     } == set()
+    assert "PlayerCharacterRetirementRequest" not in app.openapi()[
+        "components"
+    ]["schemas"]
 
 
 class CountingProvider(DeterministicDemoNarrativeProvider):

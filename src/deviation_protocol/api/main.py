@@ -4,13 +4,14 @@ from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from datetime import datetime, timezone
+import json
 from pathlib import Path as FilePath
 import re
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any, Literal, NoReturn
 
 from fastapi import Depends, FastAPI, Header, Path, Request, Response, status
 from fastapi.exceptions import RequestValidationError
-from pydantic import ValidationError
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 from deviation_protocol.api.dependencies import (
     ApiServices,
@@ -19,7 +20,7 @@ from deviation_protocol.api.dependencies import (
     get_session_service,
     get_turn_orchestrator,
 )
-from deviation_protocol.api.errors import install_exception_handlers
+from deviation_protocol.api.errors import error_response, install_exception_handlers
 from deviation_protocol.api.schemas import (
     ActionRequest,
     ActionResponse,
@@ -34,10 +35,13 @@ from deviation_protocol.application.errors import (
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_operations import (
     CharacterCreationCommand,
+    CharacterMutationCommand,
     CharacterOperationNamespace,
     CharacterOperationProtocolCode,
     CharacterOperationProtocolDecision,
     CreationSuccessResult,
+    MutationCommandResult,
+    MutationSuccessResult,
 )
 from deviation_protocol.application.player_character_projection import (
     PlayerCharacterSelfProjection,
@@ -75,13 +79,22 @@ from deviation_protocol.infrastructure.deepseek_narrative import (
 )
 from deviation_protocol.infrastructure.database import create_engine, create_session_factory
 from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
     AuthoritySourceRef,
     PlayerCharacterId,
+    PlayerCharacterLifecycle,
+    PlayerCharacterMutationKind,
     PlayerCharacterOperationId,
+    PlayerCharacterContractVersion,
+    PlayerCharacterRevision,
+    revalidate_player_character_model,
 )
 from deviation_protocol.domain.run import RunAuthoritySourceRef
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
+    PlayerCharacterPolicyCode,
+    PlayerCharacterPolicyDecision,
+    PlayerConfirmation,
 )
 from deviation_protocol.infrastructure.player_character_authority import (
     ConfiguredControllerBinding,
@@ -150,6 +163,22 @@ _PLAYER_CHARACTER_CREATION_OPENAPI_EXTRA: dict[str, Any] = {
         },
     }
 }
+_PLAYER_CHARACTER_RETIREMENT_OPENAPI_EXTRA: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {
+                    "$ref": "#/components/schemas/PlayerCharacterRetirementRequest",
+                }
+            }
+        },
+    }
+}
+_PUBLIC_RETIREMENT_SOURCE_REFERENCE = AuthoritySourceRef(
+    value="source.public-player-character-retirement"
+)
+_EMPTY_PLAYER_CHARACTER_RETIREMENT_PATH = "/v1/player-characters//retirement"
 
 _PUBLIC_ERROR_DESCRIPTIONS = {
     400: "Domain rule violation",
@@ -159,6 +188,28 @@ _PUBLIC_ERROR_DESCRIPTIONS = {
     500: "Internal server error",
     503: "Narrative service unavailable",
 }
+
+
+class _RejectEmptyPlayerCharacterRetirementIdentifier:
+    """Preserve the API validation envelope for the router's empty-segment gap."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if (
+            scope.get("type") == "http"
+            and scope.get("method") == "POST"
+            and scope.get("path") == _EMPTY_PLAYER_CHARACTER_RETIREMENT_PATH
+        ):
+            response = error_response(
+                422,
+                "REQUEST_VALIDATION_FAILED",
+                "Request validation failed",
+            )
+            await response(scope, receive, send)
+            return
+        await self.app(scope, receive, send)
 
 
 def _public_error_responses(*status_codes: int) -> dict[int, dict[str, Any]]:
@@ -227,7 +278,73 @@ def _parse_player_character_creation_command(
         _request_validation_failure()
 
 
-def _install_player_character_creation_openapi_schema(
+class PlayerCharacterRetirementRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        strict=True,
+        revalidate_instances="always",
+    )
+
+    contract_version: PlayerCharacterContractVersion
+    expected_revision: PlayerCharacterRevision
+    confirm_retirement: Literal[True]
+
+    @field_validator("confirm_retirement", mode="before")
+    @classmethod
+    def require_literal_json_true(cls, value: Any) -> bool:
+        """Reject JSON lookalikes before Pydantic's Literal handling can coerce them."""
+
+        if type(value) is not bool or value is not True:
+            raise ValueError("confirm_retirement must be the literal JSON true")
+        return value
+
+
+def _reject_duplicate_json_members(
+    pairs: list[tuple[str, Any]],
+) -> dict[str, Any]:
+    result: dict[str, Any] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("duplicate JSON member")
+        result[key] = value
+    return result
+
+
+def _parse_player_character_retirement_request(
+    raw_body: bytes,
+) -> PlayerCharacterRetirementRequest:
+    try:
+        json.loads(raw_body, object_pairs_hook=_reject_duplicate_json_members)
+        return PlayerCharacterRetirementRequest.model_validate_json(raw_body)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError, ValueError):
+        _request_validation_failure()
+
+
+def _openapi_schema_values_match(left: Any, right: Any) -> bool:
+    if type(left) is float and type(right) is int:
+        return left == float(right)
+    if type(left) is int and type(right) is float:
+        return float(left) == right
+    if type(left) is float and left.is_integer():
+        left = int(left)
+    if type(right) is float and right.is_integer():
+        right = int(right)
+    if type(left) is not type(right):
+        return False
+    if isinstance(left, dict):
+        return left.keys() == right.keys() and all(
+            _openapi_schema_values_match(left[key], right[key]) for key in left
+        )
+    if isinstance(left, list):
+        return len(left) == len(right) and all(
+            _openapi_schema_values_match(item, right[index])
+            for index, item in enumerate(left)
+        )
+    return left == right
+
+
+def _install_player_character_openapi_schemas(
     app: FastAPI,
 ) -> None:
     default_openapi = app.openapi
@@ -242,20 +359,27 @@ def _install_player_character_creation_openapi_schema(
         published = False
         try:
             base_schema = default_openapi()
-            command_schema = CharacterCreationCommand.model_json_schema(
-                mode="validation",
-                ref_template="#/components/schemas/{model}",
-            )
-            definitions = command_schema.pop("$defs", {})
-            generated_components = {
-                "CharacterCreationCommand": command_schema,
-                **definitions,
-            }
-
-            if not isinstance(base_schema, dict) or not isinstance(
-                definitions,
-                dict,
+            generated_components: dict[str, dict[str, Any]] = {}
+            for name, model in (
+                ("CharacterCreationCommand", CharacterCreationCommand),
+                (
+                    "PlayerCharacterRetirementRequest",
+                    PlayerCharacterRetirementRequest,
+                ),
             ):
+                model_schema = model.model_json_schema(
+                    mode="validation",
+                    ref_template="#/components/schemas/{model}",
+                )
+                definitions = model_schema.pop("$defs", {})
+                if not isinstance(definitions, dict):
+                    raise RuntimeError(
+                        "Player Character OpenAPI schema integrity failure"
+                    )
+                generated_components[name] = model_schema
+                generated_components.update(definitions)
+
+            if not isinstance(base_schema, dict):
                 raise RuntimeError(
                     "Player Character OpenAPI schema integrity failure"
                 )
@@ -278,7 +402,9 @@ def _install_player_character_creation_openapi_schema(
                     "Player Character OpenAPI schema integrity failure"
                 )
             for name, definition in generated_components.items():
-                if name in base_schemas and base_schemas[name] != definition:
+                if name in base_schemas and not _openapi_schema_values_match(
+                    base_schemas[name], definition
+                ):
                     raise RuntimeError(
                         "Player Character OpenAPI component collision"
                     )
@@ -298,8 +424,7 @@ def _install_player_character_creation_openapi_schema(
                     "Player Character OpenAPI schema integrity failure"
                 )
             for name, definition in generated_components.items():
-                if name not in candidate_schemas:
-                    candidate_schemas[name] = deepcopy(definition)
+                candidate_schemas[name] = deepcopy(definition)
 
             for name, definition in generated_components.items():
                 if candidate_schemas.get(name) != definition:
@@ -378,6 +503,84 @@ def _translate_creation_decision(
     ):
         raise IdempotencyConflictError("player-character.create")
     raise RuntimeError("unexpected Player Character creation decision")
+
+
+def _project_retirement_success(
+    result: MutationSuccessResult,
+    *,
+    command: CharacterMutationCommand,
+) -> PlayerCharacterSelfProjection:
+    """Expose only a validated retirement result bound to this request's command."""
+
+    result = revalidate_player_character_model(result, MutationSuccessResult)
+    command = revalidate_player_character_model(command, CharacterMutationCommand)
+    if (
+        command.command_kind is not PlayerCharacterMutationKind.RETIRE
+        or result.command_kind is not command.command_kind
+        or result.command_result is not MutationCommandResult.RETIRED
+        or result.player_character_id != command.target_player_character_id
+        or result.contract_version is not command.contract_version
+        or not command.expected_revision.has_successor
+        or result.resulting_revision.value != command.expected_revision.value + 1
+        or result.resulting_lifecycle is not PlayerCharacterLifecycle.RETIRED
+    ):
+        raise RuntimeError("unexpected Player Character retirement result")
+    return PlayerCharacterSelfProjection(
+        player_character_id=result.player_character_id,
+        contract_version=result.contract_version,
+        record_revision=result.resulting_revision,
+        lifecycle=result.resulting_lifecycle,
+    )
+
+
+def _translate_retirement_decision(
+    decision: CharacterOperationProtocolDecision | PlayerCharacterPolicyDecision,
+) -> Response:
+    if isinstance(decision, CharacterOperationProtocolDecision):
+        if decision.operation_namespace is not CharacterOperationNamespace.MUTATE_V1:
+            raise RuntimeError("unexpected Player Character retirement decision")
+        if decision.code is CharacterOperationProtocolCode.AUTHORIZATION_FAILED:
+            raise PlayerCharacterNotFoundError("player-character.retirement")
+        if decision.code is CharacterOperationProtocolCode.IDEMPOTENCY_CONFLICT:
+            raise IdempotencyConflictError("player-character.retirement")
+        if decision.code in {
+            CharacterOperationProtocolCode.STALE_REVISION,
+            CharacterOperationProtocolCode.REVISION_EXHAUSTED,
+        }:
+            return error_response(
+                409,
+                "PLAYER_CHARACTER_REVISION_CONFLICT",
+                "Player character revision does not permit retirement",
+            )
+        raise RuntimeError("unexpected Player Character retirement decision")
+    if decision.code is PlayerCharacterPolicyCode.STALE_REVISION:
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_REVISION_CONFLICT",
+            "Player character revision does not permit retirement",
+        )
+    if decision.code is PlayerCharacterPolicyCode.REVISION_EXHAUSTED:
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_REVISION_CONFLICT",
+            "Player character revision does not permit retirement",
+        )
+    if decision.code is PlayerCharacterPolicyCode.INVALID_TRANSITION:
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_LIFECYCLE_CONFLICT",
+            "Player character cannot be retired",
+        )
+    if (
+        decision.code
+        is PlayerCharacterPolicyCode.ACTIVE_BINDING_ATOMIC_LIFECYCLE_TRANSITION_REQUIRED
+    ):
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_ACTIVE_BINDING_CONFLICT",
+            "Player character is bound to an active Run",
+        )
+    raise RuntimeError("unexpected Player Character retirement decision")
 
 
 def _player_character_clock() -> datetime:
@@ -513,6 +716,14 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     )
     install_exception_handlers(app)
 
+    # Starlette does not dispatch an empty path parameter to an APIRoute, so the
+    # normal parameter validation handler cannot see this one malformed spelling
+    # of the retirement target. Keep this deliberately exact: it is not a
+    # fallback route, is not part of OpenAPI, and leaves every unrelated 404
+    # untouched. This is pure ASGI middleware so cancellation remains unwrapped.
+    if services is None or services.player_character_service is not None:
+        app.add_middleware(_RejectEmptyPlayerCharacterRetirementIdentifier)
+
     @app.get("/health", tags=["system"])
     async def health() -> dict[str, str]:
         return {"status": "ok", "phase": "3.0"}
@@ -562,6 +773,74 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
                 return _project_creation_success(result)
             _translate_creation_decision(result)
 
+        @app.post(
+            "/v1/player-characters/{player_character_id}/retirement",
+            status_code=status.HTTP_200_OK,
+            response_model=PlayerCharacterSelfProjection,
+            response_description="Player Character retired or exactly replayed.",
+            operation_id="retire_player_character",
+            summary="Retire a Player Character",
+            description=(
+                "Controller identity is derived only from the trusted server-side "
+                "principal. Idempotency-Key is required and is not authorization. "
+                "confirm_retirement must be the literal true. Only an owned, active, "
+                "unbound Player Character with a representable successor may retire. "
+                "First success and exact replay share HTTP 200; replay returns the "
+                "stored original retirement result, while GET supplies current state. "
+                "The maximum expected revision returns the revision conflict before "
+                "fingerprint, receipt, idempotency, binding, or lifecycle evaluation. "
+                "An active binding rejects without changing the Player Character, Run, "
+                "or binding; this route does not end a Run or historicalize a binding. "
+                "No receipt, fingerprint, controller, provenance, Run, persistence, "
+                "transaction, or recovery data is public. The fixed development "
+                "principal is not production authentication."
+            ),
+            tags=["player-characters"],
+            responses=_public_error_responses(404, 409, 422, 500),
+            openapi_extra=_PLAYER_CHARACTER_RETIREMENT_OPENAPI_EXTRA,
+        )
+        async def retire_player_character(
+            http_request: Request,
+            player_character_id: PlayerCharacterPathId,
+            idempotency_key: PlayerCharacterIdempotencyKeyHeader,
+            principal: RequestPrincipal = Depends(get_current_principal),
+            service: PlayerCharacterService = Depends(get_player_character_service),
+        ) -> PlayerCharacterSelfProjection | Response:
+            operation_id = _validate_player_character_creation_transport(
+                http_request,
+                idempotency_key,
+            )
+            raw_body = await http_request.body()
+            request = _parse_player_character_retirement_request(raw_body)
+            target = PlayerCharacterId(value=player_character_id)
+            command = CharacterMutationCommand(
+                contract_version=request.contract_version,
+                command_kind=PlayerCharacterMutationKind.RETIRE,
+                target_player_character_id=target,
+                expected_revision=request.expected_revision,
+                applicable_reference=ApplicableCharacterReference(
+                    player_character_id=target,
+                    contract_version=request.contract_version,
+                    record_revision=request.expected_revision,
+                ),
+                confirmation=PlayerConfirmation(
+                    player_character_id=target,
+                    expected_revision=request.expected_revision,
+                    operation_id=operation_id,
+                    mutation_kind=PlayerCharacterMutationKind.RETIRE,
+                    source_reference=_PUBLIC_RETIREMENT_SOURCE_REFERENCE,
+                ),
+                final_death_evidence=None,
+            )
+            result = await service.mutate(
+                principal,
+                operation_id=operation_id,
+                command=command,
+            )
+            if isinstance(result, MutationSuccessResult):
+                return _project_retirement_success(result, command=command)
+            return _translate_retirement_decision(result)
+
         @app.get(
             "/v1/player-characters/{player_character_id}",
             response_model=PlayerCharacterSelfProjection,
@@ -581,7 +860,7 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
                 raise PlayerCharacterNotFoundError(player_character_id)
             return projection
 
-        _install_player_character_creation_openapi_schema(app)
+        _install_player_character_openapi_schemas(app)
 
     @app.get(
         "/v1/scenarios",

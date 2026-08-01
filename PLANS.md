@@ -65,18 +65,43 @@ documents.
   gameplay activation remain unimplemented or deferred as assigned.
 - P5-S1 owned-read API activation is completed and published at
   `5955c47eac07429107b93ef85da6a055bd2044ef`
-  (`feat(player-character): activate owned-read API`). It remains the only
-  published Player Character API surface.
+  (`feat(player-character): activate owned-read API`).
 - The P5-S2 creation/replay public contract is frozen and published at
   `245caff3903666fcd2dd9a318785f323117deb24`
   (`docs(player-character): define P5-S2 public contract`). Its bounded normal
-  `POST /v1/player-characters` implementation and assigned local verification
-  are complete in the current unstaged working-tree candidate, including
-  creation, exact replay, sanitized failures, normal composition, and Demo
-  non-activation evidence. Documentation is synchronized in that candidate;
-  fresh independent read-only review, separate staging and commit
-  authorization, commit, and publication remain pending. P5-S3 and later work
-  remain deferred.
+  `POST /v1/player-characters` implementation was independently approved,
+  committed, and published at
+  `4ba66d8f277988325795c905fdf6fd9e416d7457`
+  (`feat(player-character): add creation API`). P5-S1 and P5-S2 are the only
+  published Player Character API surfaces.
+- [P5-S3](docs/structured_player_character_p5_s3_implementation_plan.md) has
+  received `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`. Its first
+  independently reviewed local implementation candidate received
+  `CHANGES_REQUIRED`. A first corrected candidate and the later re-corrected
+  candidate each received a further fresh `CHANGES_REQUIRED` review. The third
+  review found no production-code defect but requested stronger SQL-race,
+  durable-state, complete unit/OpenAPI, and documentation-history evidence. A
+  subsequent evidence candidate supplied a MySQL 1062 only by rolling back the
+  original mutation transaction and resuming its stale in-memory operation. A
+  focused reachability investigation returned
+  `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`: the
+  current production service instead serializes legitimate retirement writers
+  at the Player Character `FOR UPDATE` lock before receipt lookup or mutation.
+  The present acceptance-boundary-corrected unstaged candidate therefore uses
+  normal concurrent HTTP requests to prove exact replay or ordinary
+  idempotency conflict after one durable mutation, and treats the existing
+  receipt-add recovery only as bounded fault-injection/out-of-topology defense.
+  Its correction validation completed locally: canonical Offline reported
+  1,814 passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one
+  opt-in Provider skip. Its focused final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`, finding no
+  material scoped defect. The accepted real-MySQL evidence proves aggregate-lock
+  serialization, exact replay or ordinary idempotency conflict, and one durable
+  mutation; fault injection remains bounded defensive recovery evidence, and the
+  unreachable receipt-add race is not a requirement. P5-S3 is independently
+  approved and eligible for exact-scope commit; P5-S4 and all unrelated deferred
+  work have not begun. Publication, push, deployment, release, runtime
+  activation, and Provider work remain deferred.
 - Codex does not push; the user performs every push manually.
 - Phase 3.2b historical implementation baseline:
   `a0fbc7a749d9774785aa78ffe2b48b4dcf9e3dce`
@@ -346,12 +371,25 @@ stages:
      `5955c47eac07429107b93ef85da6a055bd2044ef`; it exposes only the approved
      owned single-resource read and does not complete Phase 5;
    - P5-S2's public creation/replay contract is frozen and published at
-     `245caff3903666fcd2dd9a318785f323117deb24`; its bounded normal POST
-     implementation and assigned local verification are complete in the
-     current unstaged candidate, while independent review, staging, commit,
-     and publication remain pending; and
-   - P5-S3 activation of only independently admitted controller mutations
-     remains deferred.
+     `245caff3903666fcd2dd9a318785f323117deb24`; its bounded normal POST was
+     independently approved, committed, and published at
+     `4ba66d8f277988325795c905fdf6fd9e416d7457`; and
+   - P5-S3's first, first-corrected, and re-corrected local retirement
+     candidates each received `CHANGES_REQUIRED`. The later evidence candidate's
+     receipt-add 1062 depended on a mid-operation rollback-and-resume topology.
+     The focused reachability verdict
+     `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`
+     corrected the present acceptance boundary to normal HTTP serialization at
+     the aggregate lock plus explicitly labelled bounded fault injection. The
+     exact eleven-path correction passed local validation (Offline 1,814/124,
+      MySQL 136, Full 1,937/one live-test skip); its focused final independent
+      review returned `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED`
+      with no material scoped defect. It accepted real-MySQL aggregate-lock
+      serialization, replay/conflict, and one durable mutation, and fault
+      injection only as bounded defensive recovery; the unreachable receipt-add
+      race is not a requirement. P5-S3 is eligible for exact-scope commit;
+      P5-S4 and unrelated deferred work have not begun. It is not published,
+      pushed, deployed, released, Demo-, frontend-, or Run-activated.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -459,19 +497,25 @@ UnitOfWork, SQL, ID issuance, or mutation. Supported startup fails closed when
 required controller bindings are absent; no fake or development resolver or
 fake issuer is installed.
 
-P5-S1's owned GET remains preserved in the current candidate. P5-S2 adds only
-the normal application's POST creation/replay route beside it; controller
+P5-S1's owned GET remains published. P5-S2 adds only the normal application's
+published POST creation/replay route beside it; controller
 identity remains server-derived, and operation identity, durable replay,
 allocation, receipts, ownership, and bounded race recovery remain in the
 existing service and persistence authorities. Demo supplies no Player Character
 service and exposes neither Player Character route or OpenAPI path; no frontend
-method calls the POST. P5-S3, frontend activation, Demo behavior, Provider
-behavior, broader Run Protocol and lifecycle integration, narrative
-integration, scenario and world integration, combat integration, content
-integration, public binding, and player-visible gameplay activation remain
-deferred. The internal Run-owned continuous-story-line binding is implemented
-only through P4-S1. DB-001, schema, migrations, dependencies, persistence
-behavior, and transaction behavior remain unchanged.
+method calls the POST. The P5-S3 unstaged local candidate adds only the normal
+  application retirement route; its focused final independent review returned
+  `STRUCTURED_PLAYER_CHARACTER_P5_S3_FOCUSED_FINAL_REVIEW_APPROVED` with no
+  material scoped defect, accepting the real-MySQL serialization/replay-conflict/
+  one-durable-mutation evidence and fault injection only as bounded defensive
+  recovery. P5-S3 is eligible for exact-scope commit; publication, push,
+  deployment, and release remain deferred. Frontend
+activation, Demo behavior, Provider behavior, broader Run Protocol and
+lifecycle integration, narrative integration, scenario and world integration,
+combat integration, content integration, public binding, and player-visible
+gameplay activation remain deferred. The internal Run-owned continuous-story-
+line binding is implemented only through P4-S1. DB-001, schema, migrations,
+dependencies, persistence behavior, and transaction behavior remain unchanged.
 
 The implementation-order amendment below was reviewed, approved, committed,
 and pushed at `afa9f9c21900eebd4e08d65071a26903e83d4a65`, distinct from the
@@ -588,8 +632,8 @@ The canonical decision is
 ## Deferred
 
 - Full Run Protocol behavior beyond the minimum prerequisite; Phase 3.4 NPC
-  residence; P5-S3 and later structured-character API activation; frontend and
-  Demo activation; Provider,
+  residence; P5-S3 runtime activation and later structured-character API
+  activation; frontend and Demo activation; Provider,
   narrative, scenario, world, NPC, memory, relationship, combat, content, and
   broader public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
@@ -637,6 +681,9 @@ manually.
 - Approved and frozen, partially implemented downstream structured
   player-character implementation plan:
   [`docs/structured_player_character_implementation_plan.md`](docs/structured_player_character_implementation_plan.md).
+- Approved P5-S3 plan and acceptance-boundary-corrected, locally validated,
+  independently approved retirement candidate eligible for exact-scope commit:
+  [`docs/structured_player_character_p5_s3_implementation_plan.md`](docs/structured_player_character_p5_s3_implementation_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:
