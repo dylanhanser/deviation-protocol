@@ -17,11 +17,22 @@ compatibility hooks, and Phase 7 remains planned and unimplemented for
 regression, documentation, and closeout. Neither is a Phase 8 prerequisite,
 marked complete, or absorbed by Phase 8.
 
-At the published baseline, Phase 8 implementation had not begun. A separately
-authorized P8-S1 implementation task implements only eligible-character
-discovery. P8-S2 may begin only after exact-byte P8-S1 independent review, a
-separately authorized commit, user publication, clean published-baseline
-confirmation, and a separate explicit P8-S2 implementation task. P8-S2 through
+P8-S1 eligible-character discovery is implemented, independently accepted,
+committed, and published at
+`95ffe4019e2a69967dfae1fee2a1ecba4a628381`. The dedicated
+[P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md)
+freezes the proposed internal transaction and persistent protocol only. Terminal
+review accepted its persistence-width and MySQL-current-read corrections and
+found one material defect in the catalogue-independent snapshot reconstruction;
+the dedicated candidate now corrects that defect with the verified strict
+JSON-mode entry and complete structural round trip. One narrow independent
+read-only re-review of that correction and its direct regression is pending. It
+is not approved, implemented, staged, committed, or published and grants no
+implementation authority. P8-S2
+may begin only after that exact corrected four-document candidate receives
+`STRUCTURED_PLAYER_CHARACTER_P8_S2_PLAN_REVIEW_APPROVED`, is separately
+committed and user-published unchanged, a clean aligned baseline is confirmed,
+and a separate explicit P8-S2 implementation task is authorized. P8-S2 through
 P8-S6 remain unimplemented and unauthorized, and Phase 8 is not complete.
 
 This document is the dedicated implementation plan for:
@@ -874,6 +885,19 @@ non-enumeration, lifecycle/binding exclusion, detachment, key/value privacy,
 OpenAPI, real-MySQL query, no-write, and Demo non-activation.
 
 ### 20.3 P8-S2 — Atomic internal Run entry
+
+The exact persistent byte contract, decoder selection, internal-ID derivation,
+fingerprint mapping, transaction/replay algorithm, closed future path
+allowlists, and implementation gates are frozen by the dedicated
+[P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md).
+Terminal review accepted that candidate's persistence-width and
+MySQL-current-read corrections and found one material snapshot-reconstruction
+defect. The dedicated plan now corrects that defect with the verified strict
+JSON-mode entry and complete structural round trip; one narrow independent
+read-only re-review of that correction and its direct regression is pending. It
+has no authority until its exact corrected four-document bytes are approved,
+separately committed, user-published, and confirmed as a clean aligned
+baseline. This short cross-reference does not duplicate or pre-approve it.
 
 **Purpose:** supply one application-owned transaction that creates Run/line,
 binds the character, creates Session state, adds participation, and activates

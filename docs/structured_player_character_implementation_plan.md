@@ -76,12 +76,18 @@ passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   retain their allocations and remain unimplemented. Phase 8 — Structured
   Player Character Run Entry and Minimum Playable Loop — is the selected
   planning priority under its dedicated approved and published planning
-  authority at `de4d8c0e35c7864948306d751a00aaf295ff77ff`. A separately
-  authorized P8-S1 task implements eligible-character discovery only; P8-S2
-  through P8-S6 remain unimplemented and unauthorized, and Phase 8 is
-  incomplete. Planning publication alone did not authorize P8-S1, which began
-  through its separate task. Push by Codex, deployment, release,
-  runtime activation, and Provider work remain deferred.**
+  authority at `de4d8c0e35c7864948306d751a00aaf295ff77ff`. P8-S1
+  eligible-character discovery is implemented, committed, and published at
+  `95ffe4019e2a69967dfae1fee2a1ecba4a628381`. The dedicated
+  [P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md)
+  retains terminally accepted persistence-width and MySQL-current-read
+  corrections and now corrects the review's one remaining material
+  snapshot-reconstruction defect with the verified strict JSON-mode entry and
+  complete structural round trip. One narrow independent read-only re-review of
+  that correction and its direct regression is pending. It is not approved,
+  implemented, staged, committed, or published. P8-S2 through P8-S6 remain
+  unimplemented and unauthorized, and Phase 8 is incomplete. Push by Codex,
+  deployment, release, runtime activation, and Provider work remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -3764,19 +3770,27 @@ whole-roadmap closeout remains deferred.
 Phase 8 reuses the completed P5-S1, P5-S2, and P5-S3 capabilities without
 reopening them, and it preserves the current Run and Session authority. Its
 approved planning authority alone authorized no implementation. Phase 8 is
-partially implemented through a separately authorized P8-S1 implementation task,
-which implements
-only eligible-character discovery. P8-S2 may begin only after exact-byte P8-S1
-independent review, a separately authorized commit, user publication, clean
-published-baseline confirmation, and a separate explicit P8-S2 implementation
-task. P8-S2 through P8-S6 remain unimplemented and
-unauthorized. Later modifications
+partially implemented through P8-S1 eligible-character discovery, committed
+and published at `95ffe4019e2a69967dfae1fee2a1ecba4a628381`. The dedicated
+[P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md)
+freezes the proposed internal transaction and persistent protocol only. Terminal
+review accepted its persistence-width and MySQL-current-read corrections and
+found one material defect in the catalogue-independent snapshot reconstruction;
+the dedicated candidate now corrects that defect with the verified strict
+JSON-mode entry and complete structural round trip. One narrow independent
+read-only re-review of that correction and its direct regression is pending. It
+is not approved, implemented, staged, committed, or published and grants no
+implementation authority. P8-S2
+may begin only after that exact corrected four-document candidate receives
+`STRUCTURED_PLAYER_CHARACTER_P8_S2_PLAN_REVIEW_APPROVED`, is separately
+committed and user-published unchanged, a clean aligned baseline is confirmed,
+and a separate explicit P8-S2 implementation task is authorized. P8-S2 through
+P8-S6 remain unimplemented and unauthorized. Later modifications
 to the planning-authority bytes require fresh exact-byte independent review
 before a separately authorized documentation commit; that commit precedes user
-publication and clean published-baseline confirmation. P8-S1 began only through
-a separate explicit implementation task after that sequence. Later
-phases may add the explicitly deferred game, Provider, content, progression,
-profile, and production capabilities.
+publication and clean published-baseline confirmation. Later phases may add the
+explicitly deferred game, Provider, content, progression, profile, and
+production capabilities.
 
 ## 25. File-level implementation inventory
 
@@ -3857,11 +3871,16 @@ accepted implementation. It follows
   and P5-S3 was committed and published at
   `34d063e387cde69500e4dc018ff087e87f3eee74`. Phase 5 is complete at P5-S3;
   no P5-S4 exists or has begun. Phase 6 and Phase 7 remain separately allocated
-  and unimplemented. Phase 8 has approved and published planning authority. A
-  separately authorized P8-S1 task implements eligible-character discovery only;
-  P8-S2 through P8-S6 remain unimplemented and unauthorized, and Phase 8 is not
-  complete. Planning publication alone did not authorize P8-S1, which began
-  through its separate task.
+  and unimplemented. Phase 8 has approved and published planning authority. P8-S1
+  eligible-character discovery is implemented and published at the current
+  baseline. Terminal review accepted the dedicated P8-S2 candidate's
+  persistence-width and MySQL-current-read corrections and found one remaining
+  material snapshot-reconstruction defect. That defect is now corrected with
+  the verified strict JSON-mode entry and complete structural round trip; one
+  narrow independent read-only re-review of that correction and its direct
+  regression is pending. It is not approved, implemented, staged, committed,
+  or published; P8-S3 through P8-S6 remain unimplemented and unauthorized, and
+  Phase 8 is not complete.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
