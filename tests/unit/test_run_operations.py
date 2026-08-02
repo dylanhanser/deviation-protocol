@@ -14,6 +14,8 @@ from deviation_protocol.application.run_operations import (
     CreateRunCommand,
     ReservedBindPlayerCharacterCommand,
     RunOperationFingerprint,
+    RunEntryCreationEvidence,
+    RunEntryPublicOperationKey,
     RunOperationNamespace,
     RunReceiptKey,
     RunReplayDecisionCode,
@@ -28,8 +30,10 @@ from deviation_protocol.application.run_operations import (
     construct_created_run,
     create_run_fingerprint,
     creation_result,
+    derive_run_entry_internal_id,
     evaluate_receipt,
     reject_reserved_bind_player_character,
+    run_entry_creation_fingerprint,
 )
 from pydantic import ValidationError
 from deviation_protocol.domain.player_character import (
@@ -37,6 +41,7 @@ from deviation_protocol.domain.player_character import (
     PlayerCharacterContractVersion,
     PlayerCharacterId,
     PlayerCharacterRevision,
+    ControllerBindingRef,
 )
 from deviation_protocol.domain.run import (
     CanonicalRun,
@@ -53,6 +58,63 @@ from deviation_protocol.domain.run import (
 
 
 RUN_ID = RunId(value="run.123e4567e89b42d3a456426614174000")
+
+
+def test_p8_s2_normative_composite_and_internal_id_vectors() -> None:
+    evidence = RunEntryCreationEvidence.model_validate({
+        "controller_operation": {"controller_binding": {"value": "controller.example"}, "public_operation_key": "entry.example"},
+        "player_character": {"player_character_id": {"value": "pc.example"}, "pre_entry_record_revision": {"value": 1}},
+        "scenario": {"scenario_id": "death_certificate", "content_version": "death-certificate-1.1.0", "default_character_definition_id": "character.death_certificate.investigator"},
+        "trusted_run_source": {"source_reference": {"value": "source.production-run"}},
+    })
+    encoded, fingerprint = run_entry_creation_fingerprint(evidence)
+    assert len(encoded) == 531
+    assert fingerprint.value == "98a071065169ed5ad2f3052816da493dd1cd9cff8838d8f050af9ce3c555ee55"
+    key = RunEntryPublicOperationKey(value="entry.example")
+    controller = ControllerBindingRef(value="controller.example")
+    assert derive_run_entry_internal_id(purpose="run.create/v1", controller_binding=controller, public_operation_key=key) == "a36075084453ebcccb61be1755c270c7e03f177181fdd2871d467684f847ef3a"
+    assert derive_run_entry_internal_id(purpose="run.bind-player-character/v1", controller_binding=controller, public_operation_key=key) == "e2cbe6dfd4475fd62a650ea3f01d7f4d37fb35e5863e4b53c1a07dc35f232277"
+    assert derive_run_entry_internal_id(purpose="run.attach-session/v1", controller_binding=controller, public_operation_key=key) == "a3759a0a0e2d2d67349d37bcb264d76e10507abeb015ebe4cc92d45caff4c62c"
+    assert derive_run_entry_internal_id(purpose="session.create/v1", controller_binding=controller, public_operation_key=key) == "19891ce8ad0511e9c02ec73c7b9e05a619a0b211edbe06bbe72fb599e9e21f9e"
+
+    assert encoded == (
+        b"\x89DP8S2CE\r\n\x1a\n\x01"
+        b'{"controller_operation":{"controller_binding":{"value":"controller.example"},"public_operation_key":"entry.example"},'
+        b'"evidence_schema":"run-entry.creation-evidence/v1",'
+        b'"player_character":{"player_character_id":{"value":"pc.example"},"pre_entry_record_revision":{"value":1}},'
+        b'"scenario":{"content_version":"death-certificate-1.1.0","default_character_definition_id":"character.death_certificate.investigator","scenario_id":"death_certificate"},'
+        b'"trusted_run_source":{"source_reference":{"value":"source.production-run"}}}'
+    )
+
+
+def test_p8_s2_every_evidence_component_changes_the_composite_fingerprint() -> None:
+    payload = {
+        "controller_operation": {"controller_binding": {"value": "controller.example"}, "public_operation_key": "entry.example"},
+        "player_character": {"player_character_id": {"value": "pc.example"}, "pre_entry_record_revision": {"value": 1}},
+        "scenario": {"scenario_id": "death_certificate", "content_version": "death-certificate-1.1.0", "default_character_definition_id": "character.death_certificate.investigator"},
+        "trusted_run_source": {"source_reference": {"value": "source.production-run"}},
+    }
+    baseline = RunEntryCreationEvidence.model_validate(payload)
+    _, expected = run_entry_creation_fingerprint(baseline)
+    changes = (
+        ("controller_operation", "controller_binding", {"value": "controller.other"}),
+        ("controller_operation", "public_operation_key", "entry.other"),
+        ("player_character", "player_character_id", {"value": "pc.other"}),
+        ("player_character", "pre_entry_record_revision", {"value": 2}),
+        ("scenario", "scenario_id", "other_scenario"),
+        ("scenario", "content_version", "death-certificate-1.1.1"),
+        ("scenario", "default_character_definition_id", "character.other"),
+        ("trusted_run_source", "source_reference", {"value": "source.other"}),
+    )
+    for section, field, replacement in changes:
+        changed = {
+            **payload,
+            section: {**payload[section], field: replacement},
+        }
+        _, fingerprint = run_entry_creation_fingerprint(
+            RunEntryCreationEvidence.model_validate(changed)
+        )
+        assert fingerprint != expected
 LINE_ID = ContinuousStoryLineId(value="csl.123e4567e89b42d3a456426614174001")
 SOURCE = RunAuthoritySourceRef(value="source.run")
 PLAYER_CHARACTER_ID = PlayerCharacterId(value="pc.bound")

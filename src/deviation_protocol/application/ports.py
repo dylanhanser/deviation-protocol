@@ -33,6 +33,8 @@ from deviation_protocol.application.player_character_operations import (
     StoredMutationSuccessReceipt,
 )
 from deviation_protocol.application.run_operations import (
+    CreateRunCommand,
+    RunEntryCreationEvidence,
     RunReceiptKey,
     StoredRunSuccessReceipt,
 )
@@ -160,6 +162,16 @@ class GameSessionRepository(ABC):
 
     @abstractmethod
     async def get_latest_snapshot(self, session_id: str) -> PersistedSnapshot | None:
+        raise NotImplementedError
+
+    async def get_latest_snapshot_for_update(
+        self, session_id: str,
+    ) -> PersistedSnapshot | None:
+        """P8 replay requires a genuine current locking read, never a fallback."""
+        raise NotImplementedError
+
+    async def get_initialization_event(self, session_id: str) -> DomainEvent | None:
+        """Return only the immutable sequence-one initialization event."""
         raise NotImplementedError
 
     @abstractmethod
@@ -361,6 +373,10 @@ class RunPlayerCharacterBindingUniquenessConflictError(RuntimeError):
     """Only the active-player-character current-row uniqueness race."""
 
 
+class RunWriteConflictError(RuntimeError):
+    """A known Run row uniqueness or immutable-revision race."""
+
+
 @dataclass(frozen=True, slots=True)
 class RunSessionAttachmentLockEvidence:
     """Complete canonical Run-family evidence read under the Run lock."""
@@ -455,6 +471,28 @@ class RunCreationReceiptRepository(ABC):
         self, receipt: StoredRunSuccessReceipt, *, created_at: datetime
     ) -> None:
         raise NotImplementedError
+
+    async def get_with_evidence(
+        self, key: RunReceiptKey
+    ) -> "StoredRunCreationEvidence | None":
+        """P8 replay must opt into a complete, strictly decoded carrier."""
+        raise NotImplementedError
+
+    async def add_with_evidence(
+        self,
+        receipt: StoredRunSuccessReceipt,
+        evidence: RunEntryCreationEvidence,
+        *,
+        created_at: datetime,
+    ) -> None:
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
+class StoredRunCreationEvidence:
+    receipt: StoredRunSuccessReceipt
+    evidence: CreateRunCommand | RunEntryCreationEvidence
+    evidence_canonical: bytes
 
 
 class RunMutationReceiptRepository(ABC):

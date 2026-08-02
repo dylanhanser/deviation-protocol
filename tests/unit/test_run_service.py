@@ -19,6 +19,7 @@ from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    RunEntryCreationEvidence,
     ReservedBindPlayerCharacterCommand,
     RunOperationNamespace,
     RunReceiptKey,
@@ -27,6 +28,7 @@ from deviation_protocol.application.run_operations import (
     StoredRunSuccessReceipt,
     attach_session_fingerprint,
     attach_session_result,
+    activate_first_session_for_run,
     attach_session_to_run,
     bind_player_character_fingerprint,
     bind_player_character_result,
@@ -34,11 +36,15 @@ from deviation_protocol.application.run_operations import (
     construct_created_run,
     create_run_fingerprint,
     creation_result,
+    run_entry_creation_fingerprint,
 )
 from deviation_protocol.application.run_service import (
     RunService,
     RunServiceDecision,
     RunServiceDecisionCode,
+    stage_run_entry_activation,
+    stage_run_entry_binding,
+    stage_run_entry_creation,
 )
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.player_character import (
@@ -131,6 +137,7 @@ class _Uow:
         self.run_creation_receipts = SimpleNamespace(
             get=AsyncMock(return_value=None),
             add=AsyncMock(),
+            add_with_evidence=AsyncMock(),
         )
         self.run_mutation_receipts = SimpleNamespace(
             get=AsyncMock(return_value=None),
@@ -591,6 +598,160 @@ async def test_attachment_noncanonical_locked_family_rolls_back_without_write() 
     uow.run_mutation_receipts.add.assert_not_awaited()
     uow.commit.assert_not_awaited()
     assert uow.rollback_calls == 1
+
+
+def _p8_entry_family():
+    evidence = RunEntryCreationEvidence.model_validate(
+        {
+            "controller_operation": {
+                "controller_binding": {"value": CONTROLLER_BINDING.value},
+                "public_operation_key": "entry.example",
+            },
+            "player_character": {
+                "player_character_id": {"value": PLAYER_CHARACTER_ID.value},
+                "pre_entry_record_revision": {"value": 1},
+            },
+            "scenario": {
+                "scenario_id": "death_certificate",
+                "content_version": "death-certificate-1.1.0",
+                "default_character_definition_id": (
+                    "character.death_certificate.investigator"
+                ),
+            },
+            "trusted_run_source": {
+                "source_reference": {"value": SOURCE.value}
+            },
+        }
+    )
+    create_id = RunOperationId(value="operation.entry.create")
+    bind_id = RunOperationId(value="operation.entry.bind")
+    attach_id = RunOperationId(value="operation.entry.attach")
+    initial = construct_created_run(
+        CreateRunCommand(source_reference=SOURCE),
+        run_id=RUN_ID,
+        continuous_story_line_id=LINE_ID,
+        operation_id=create_id,
+        occurred_at=NOW,
+    )
+    _, create_fingerprint = run_entry_creation_fingerprint(evidence)
+    create_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            operation_namespace=RunOperationNamespace.CREATE_V1,
+            operation_id=create_id,
+        ),
+        fingerprint=create_fingerprint,
+        command_kind=RunMutationKind.CREATE,
+        result=creation_result(initial),
+    )
+    bind_command = BindPlayerCharacterCommand(
+        run_id=RUN_ID,
+        continuous_story_line_id=LINE_ID,
+        target_player_character_id=PLAYER_CHARACTER_ID,
+        expected_state_version=RunStateVersion(value=1),
+        source_reference=SOURCE,
+    )
+    bound = bind_player_character_to_run(
+        initial,
+        bind_command,
+        applicable_character_reference=CHARACTER_REFERENCE,
+        operation_id=bind_id,
+        occurred_at=NOW,
+    )
+    _, bind_fingerprint = bind_player_character_fingerprint(
+        bind_command, operation_id=bind_id
+    )
+    bind_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            run_id=RUN_ID,
+            operation_namespace=RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+            operation_id=bind_id,
+        ),
+        fingerprint=bind_fingerprint,
+        command_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+        result=bind_player_character_result(bound),
+    )
+    attach_command = AttachSessionCommand(
+        run_id=RUN_ID,
+        continuous_story_line_id=LINE_ID,
+        session_id="session.entry",
+        expected_state_version=RunStateVersion(value=2),
+        source_reference=SOURCE,
+    )
+    active = activate_first_session_for_run(
+        bound,
+        attach_command,
+        operation_id=attach_id,
+        occurred_at=NOW,
+    )
+    _, attach_fingerprint = attach_session_fingerprint(
+        attach_command, operation_id=attach_id
+    )
+    attach_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            run_id=RUN_ID,
+            operation_namespace=RunOperationNamespace.ATTACH_SESSION_V1,
+            operation_id=attach_id,
+        ),
+        fingerprint=attach_fingerprint,
+        command_kind=RunMutationKind.ATTACH_SESSION,
+        result=attach_session_result(active),
+    )
+    return (
+        evidence,
+        initial,
+        create_receipt,
+        bound,
+        bind_receipt,
+        active,
+        attach_receipt,
+    )
+
+
+@pytest.mark.asyncio
+async def test_p8_staging_helpers_use_the_supplied_uow_and_never_commit() -> None:
+    uow = _Uow()
+    evidence, initial, create_receipt, bound, bind_receipt, active, attach_receipt = (
+        _p8_entry_family()
+    )
+
+    await stage_run_entry_creation(
+        uow, initial, create_receipt, evidence, created_at=NOW
+    )
+    assert await stage_run_entry_binding(
+        uow, bound, bind_receipt, created_at=NOW
+    )
+    assert await stage_run_entry_activation(
+        uow, active, attach_receipt, created_at=NOW
+    )
+
+    uow.runs.add_initial.assert_awaited_once_with(initial, created_at=NOW)
+    uow.run_creation_receipts.add_with_evidence.assert_awaited_once_with(
+        create_receipt, evidence, created_at=NOW
+    )
+    assert uow.runs.append_revision.await_count == 2
+    assert uow.runs.compare_and_swap_current.await_count == 2
+    uow.run_participations.add.assert_awaited_once_with(
+        active.trusted_participation_references[0], joined_at=NOW
+    )
+    assert uow.run_mutation_receipts.add.await_count == 2
+    uow.commit.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_p8_staging_cas_loss_stops_before_its_receipt() -> None:
+    uow = _Uow()
+    _, _, _, bound, bind_receipt, active, attach_receipt = _p8_entry_family()
+    uow.runs.compare_and_swap_current.return_value = False
+
+    assert not await stage_run_entry_binding(
+        uow, bound, bind_receipt, created_at=NOW
+    )
+    uow.run_mutation_receipts.add.assert_not_awaited()
+    assert not await stage_run_entry_activation(
+        uow, active, attach_receipt, created_at=NOW
+    )
+    uow.run_mutation_receipts.add.assert_not_awaited()
+    uow.commit.assert_not_awaited()
 
 
 @pytest.mark.asyncio

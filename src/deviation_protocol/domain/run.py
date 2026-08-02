@@ -281,8 +281,21 @@ class CanonicalRun(_StrictFrozenModel):
             or current.resulting_state_version != self.state_version
         ):
             raise ValueError("Run provenance does not bind the canonical state")
-        if self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
-            raise ValueError("current Run implementation permits only pre_first_turn state")
+        # P8-S2 admits one and only one active shape.  The older generic
+        # attachment operation deliberately remains pre-first-turn; later Run
+        # lifecycle transitions are not admitted here.
+        if self.lifecycle_status is RunLifecycleStatus.ACTIVE:
+            if (
+                self.state_version.value != 3
+                or current.mutation_kind is not RunMutationKind.ATTACH_SESSION
+                or len(self.trusted_participation_references) != 1
+                or self.trusted_participation_references[0].joined_state_version.value
+                != 3
+                or self.player_character_binding is None
+            ):
+                raise ValueError("pre_first_turn Run may become active only as the exact P8 entry successor")
+        elif self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
+            raise ValueError("current Run implementation permits no terminal lifecycle state")
         binding = self.player_character_binding
         if binding is not None:
             if (

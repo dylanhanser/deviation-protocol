@@ -507,3 +507,26 @@ def test_canonical_operation_bytes_are_nfc_sorted_and_fail_closed() -> None:
     )
     with pytest.raises(TypeError):
         canonical_run_operation_bytes({"unsupported": object()})
+
+
+def test_p8_s2_active_revision_three_is_the_only_new_active_shape() -> None:
+    binding = active_binding()
+    joined = participation(3, session_id="session.entry")
+    active = canonical_run(
+        state_version=RunStateVersion(value=3),
+        current_kind=RunMutationKind.ATTACH_SESSION,
+        participation=(joined,),
+        binding=binding,
+    ).model_copy(update={"lifecycle_status": RunLifecycleStatus.ACTIVE})
+
+    assert validate_canonical_run(active) == active
+
+    invalid_changes = (
+        {"state_version": RunStateVersion(value=2)},
+        {"player_character_binding": None},
+        {"trusted_participation_references": ()},
+        {"lifecycle_status": RunLifecycleStatus.COMPLETED},
+    )
+    for change in invalid_changes:
+        with pytest.raises((ValidationError, ValueError)):
+            validate_canonical_run(active.model_copy(update=change))

@@ -42,6 +42,7 @@ from deviation_protocol.domain.run import (
 from deviation_protocol.infrastructure.orm_models import (
     Base,
     GameSessionRow,
+    GameSnapshotRow,
     RunCreationReceiptRow,
     RunCurrentRow,
     RunMutationReceiptRow,
@@ -481,6 +482,67 @@ async def _add_session(
                 updated_at=NOW,
             )
         )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_current_snapshot_lock_refreshes_a_stale_identity_map(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    run_scope: _RunScope,
+) -> None:
+    session_id = run_scope.session_id("current-snapshot")
+    async with mysql_session_factory.begin() as session:
+        session.add(
+            GameSessionRow(
+                session_id=session_id,
+                player_id="run-integration-player",
+                scenario_id="run-integration-scenario",
+                scenario_version="v" * 32,
+                phase="AWAITING_ACTION",
+                turn_number=0,
+                state_version=0,
+                random_seed=42,
+                created_at=NOW,
+                updated_at=NOW,
+            )
+        )
+        session.add(
+            GameSnapshotRow(
+                session_id=session_id,
+                state_version=0,
+                state_json={"version": 0},
+                updated_at=NOW,
+            )
+        )
+
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as reader:
+        stale = await reader.sessions.get_latest_snapshot(session_id)
+        assert stale is not None and stale.state_version == 0
+
+        async with mysql_session_factory.begin() as writer:
+            await writer.execute(
+                update(GameSessionRow)
+                .where(GameSessionRow.session_id == session_id)
+                .values(state_version=1)
+            )
+            await writer.execute(
+                update(GameSnapshotRow)
+                .where(GameSnapshotRow.session_id == session_id)
+                .values(state_version=1, state_json={"version": 1})
+            )
+
+        locked_session = await reader.sessions.get_owned_for_update(
+            session_id, "run-integration-player"
+        )
+        current = await reader.sessions.get_latest_snapshot_for_update(
+            session_id
+        )
+
+        assert locked_session is not None
+        assert locked_session.session.state_version == 1
+        assert current is not None
+        assert current.state_version == 1
+        assert current.state == {"version": 1}
 
 
 def _principal() -> RequestPrincipal:

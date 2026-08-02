@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field as dataclass_field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from enum import StrEnum
+import copy
+import json
+import re
 import secrets
 from typing import Annotated, Any, Literal
 from uuid import uuid4
@@ -39,7 +42,8 @@ from deviation_protocol.application.narrative_outcome_policy import (
     NarrativeActionAvailability,
     available_narrative_actions,
 )
-from deviation_protocol.application.ports import PersistedSession, UnitOfWorkFactory
+from deviation_protocol.application.ports import PersistedSession, PersistedSnapshot, UnitOfWork, UnitOfWorkFactory
+from deviation_protocol.application.run_operations import RunEntryCreationEvidence
 from deviation_protocol.application.player_memory import (
     DeclarativePlayerMemoryRuleEngine,
     PlayerMemoryProjection,
@@ -61,6 +65,18 @@ from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.events import DomainEvent
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    validate_applicable_character_reference,
+)
+from deviation_protocol.domain.player_memory import (
+    ScenarioMemoryMilestone,
+    ScenarioMemoryStatus,
+)
+from deviation_protocol.domain.run import (
+    RunSessionParticipationReference,
+    revalidate_run_model,
+)
 from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.narrative import NarrativeFrame, VisibleClock
 from deviation_protocol.domain.policies import ActionInputKind, InputContractPolicy
@@ -76,6 +92,21 @@ MAX_VIEW_RECENT_NARRATIVES = 6
 MAX_VIEW_RECENT_NARRATIVE_CHARACTERS = 12_000
 MAX_VIEW_RECENT_NARRATIVE_UTF8_BYTES = 24_000
 NARRATIVE_REQUEST_RETRY_AFTER_SECONDS = 2
+_RUN_ENTRY_OPAQUE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedRunEntryInitialization:
+    """Detached, pure Session initialization awaiting same-UoW staging."""
+
+    session: GameSession
+    definition: ScenarioDefinition
+    character_definition_id: str
+    creation_request_id: str
+    initial_state: GameState
+    initial_frame: NarrativeFrame
+    initialization_event: DomainEvent
+    created_at: datetime
 
 
 def system_utc_clock() -> datetime:
@@ -488,6 +519,202 @@ class SessionService:
             )
         return PublicScenarioCatalog(scenarios=tuple(scenarios))
 
+    def resolve_run_entry_definition(self, scenario_id: str) -> ScenarioDefinition:
+        definition = self._scenario_definition(scenario_id)
+        if (
+            definition is None
+            or definition.public_client is None
+            or not 1 <= len(definition.content_version) <= 32
+            or definition.content_version != self.catalog.content_version
+        ):
+            raise InvalidScenarioDefinitionError(scenario_id)
+        character = self.catalog.character(
+            definition.public_client.default_character_definition_id
+        )
+        if character is None or "npc" in character.tags:
+            raise InvalidScenarioDefinitionError(scenario_id)
+        return definition
+
+    def prepare_run_entry_initialization(
+        self,
+        principal: RequestPrincipal,
+        *,
+        creation_request_id: str,
+        definition: ScenarioDefinition,
+        character_definition_id: str,
+        created_at: datetime,
+    ) -> PreparedRunEntryInitialization:
+        """Issue and validate the complete detached P8 Session candidate."""
+
+        if type(principal) is not RequestPrincipal:
+            raise TypeError("expected RequestPrincipal")
+        if (
+            type(creation_request_id) is not str
+            or len(creation_request_id) != 64
+            or re.fullmatch(r"[0-9a-f]{64}", creation_request_id) is None
+        ):
+            raise ValueError("Session creation-request identity is invalid")
+        if (
+            type(created_at) is not datetime
+            or created_at.tzinfo is None
+            or created_at.utcoffset() != timedelta(0)
+        ):
+            raise ValueError("Run entry Session timestamp must be exact UTC")
+        if (
+            type(definition) is not ScenarioDefinition
+            or definition.public_client is None
+            or not 1 <= len(definition.content_version) <= 32
+            or definition.content_version != self.catalog.content_version
+        ):
+            raise InvalidScenarioDefinitionError(
+                getattr(definition, "scenario_id", "invalid")
+            )
+        scenario_id = definition.scenario_id
+        if (
+            definition.public_client is None
+            or character_definition_id
+            != definition.public_client.default_character_definition_id
+        ):
+            raise InvalidScenarioDefinitionError(scenario_id)
+        character = self.catalog.character(character_definition_id)
+        if character is None or "npc" in character.tags:
+            raise InvalidScenarioDefinitionError(scenario_id)
+        session_id = self.session_id_generator()
+        if (
+            type(session_id) is not str
+            or not 1 <= len(session_id) <= 64
+            or _RUN_ENTRY_OPAQUE_ID.fullmatch(session_id) is None
+        ):
+            raise ValueError("Session ID generator returned an invalid value")
+        random_seed = self.seed_generator()
+        if (
+            type(random_seed) is not int
+            or not 0 <= random_seed <= 2**63 - 1
+        ):
+            raise ValueError("Session seed generator returned an invalid value")
+        session = GameSession(
+            session_id=session_id,
+            player_id=principal.player_id,
+            scenario_id=definition.scenario_id,
+            scenario_version=definition.content_version,
+            phase="AWAITING_ACTION",
+            turn_number=0,
+            state_version=0,
+            random_seed=random_seed,
+        )
+        state = GameState(
+            content_version=self.catalog.content_version,
+            player=PlayerState.from_definition(principal.player_id, character),
+        )
+        try:
+            started = initialize_scenario_state(
+                state,
+                self.catalog,
+                definition,
+                character_tags=character.tags,
+                story_director=self.story_director,
+            )
+        except ScenarioInitializationError:
+            raise InvalidScenarioDefinitionError(scenario_id) from None
+        state = started.candidate_state
+        state.validate_against(self.catalog)
+        if state.scenario_runtime is None:
+            raise InvalidScenarioDefinitionError(scenario_id)
+        state.scenario_runtime.validate_against(definition)
+        initial_frame = bind_public_decision_frame(
+            started.frame,
+            session_id=session.session_id,
+            state_version=0,
+            scenario_content_version=definition.content_version,
+        )
+        event_id = self.event_id_generator()
+        if (
+            type(event_id) is not str
+            or not 1 <= len(event_id) <= 64
+            or _RUN_ENTRY_OPAQUE_ID.fullmatch(event_id) is None
+        ):
+            raise ValueError("event ID generator returned an invalid value")
+        event = DomainEvent(
+            event_id=event_id,
+            session_id=session.session_id,
+            turn_id="session-created",
+            sequence_no=1,
+            event_type="ScenarioStarted",
+            payload={
+                "scenario_id": definition.scenario_id,
+                "scenario_content_version": definition.content_version,
+            },
+            occurred_at=created_at,
+        )
+        return PreparedRunEntryInitialization(
+            session=session,
+            definition=definition,
+            character_definition_id=character_definition_id,
+            creation_request_id=creation_request_id,
+            initial_state=state,
+            initial_frame=initial_frame,
+            initialization_event=event,
+            created_at=created_at,
+        )
+
+    async def stage_run_entry_initialization(
+        self,
+        uow: UnitOfWork,
+        prepared: PreparedRunEntryInitialization,
+    ) -> GameState:
+        """Stage P8's initial Session family in the caller's UoW; never commit."""
+
+        if type(prepared) is not PreparedRunEntryInitialization:
+            raise TypeError("expected PreparedRunEntryInitialization")
+        session = prepared.session
+        definition = prepared.definition
+        event = prepared.initialization_event
+        if (
+            type(session) is not GameSession
+            or session.session_id != event.session_id
+            or session.scenario_id != definition.scenario_id
+            or session.scenario_version != definition.content_version
+            or session.state_version != 0
+            or session.turn_number != 0
+            or session.phase != "AWAITING_ACTION"
+            or event.sequence_no != 1
+            or event.occurred_at != prepared.created_at
+        ):
+            raise ValueError("prepared Run entry Session evidence is inconsistent")
+        await uow.sessions.add_initial_session(
+            session,
+            character_definition_id=prepared.character_definition_id,
+            creation_client_request_id=prepared.creation_request_id,
+            created_at=prepared.created_at,
+        )
+        sequence_no = await uow.sessions.next_event_sequence_no(session.session_id)
+        if sequence_no != 1:
+            raise ValueError("initial Session event sequence is not one")
+        receipts = await uow.sessions.persist_events((event,), state_version=0)
+        if len(receipts) != 1:
+            raise ValueError("initial Session event did not issue one receipt")
+        state = self.memory_rule_engine.apply(
+            state=prepared.initial_state,
+            definition=definition,
+            session_id=session.session_id,
+            turn_id="session-created",
+            state_version=0,
+            receipts=receipts,
+        )
+        state.validate_against(self.catalog)
+        if state.scenario_runtime is None:
+            raise ValueError("initial Session state lost its scenario runtime")
+        state.scenario_runtime.validate_against(definition)
+        if self.scenario_catalog is None:
+            raise InvalidScenarioDefinitionError(definition.scenario_id)
+        state.validate_player_memory_against(self.scenario_catalog)
+        await uow.sessions.add_initial_snapshot(
+            session,
+            state=state.to_snapshot(),
+            created_at=prepared.created_at,
+        )
+        return state
+
     async def _create_once(
         self,
         principal: RequestPrincipal,
@@ -861,6 +1088,146 @@ class SessionService:
             or runtime.scenario_content_version != session.scenario_version
         ):
             raise SnapshotSessionMismatchError(session.session_id)
+        return state
+
+    def validate_run_entry_replay_initialization(
+        self,
+        persisted: PersistedSession,
+        snapshot: PersistedSnapshot,
+        initialization_event: DomainEvent,
+        evidence: RunEntryCreationEvidence,
+        session_creation_request_id: str,
+        *,
+        participation: RunSessionParticipationReference,
+        applicable_character_reference: ApplicableCharacterReference,
+        transaction_time: datetime,
+    ) -> GameState:
+        """Validate P8 entry evidence without consulting mutable catalogue data."""
+
+        if (
+            type(persisted) is not PersistedSession
+            or type(snapshot) is not PersistedSnapshot
+            or type(initialization_event) is not DomainEvent
+            or type(persisted.session) is not GameSession
+            or type(snapshot.state) is not dict
+            or type(initialization_event.payload) is not dict
+        ):
+            raise SnapshotInvalidError("run-entry")
+        evidence = revalidate_run_model(evidence, RunEntryCreationEvidence)
+        participation = revalidate_run_model(
+            participation, RunSessionParticipationReference
+        )
+        applicable_character_reference = validate_applicable_character_reference(
+            applicable_character_reference
+        )
+        session = persisted.session
+        if (
+            type(session.session_id) is not str
+            or not 1 <= len(session.session_id) <= 64
+            or _RUN_ENTRY_OPAQUE_ID.fullmatch(session.session_id) is None
+            or type(session.player_id) is not str
+            or not 1 <= len(session.player_id) <= 64
+            or _RUN_ENTRY_OPAQUE_ID.fullmatch(session.player_id) is None
+            or type(session.state_version) is not int
+            or not 0 <= session.state_version <= 2**63 - 1
+            or type(session.turn_number) is not int
+            or session.turn_number < 0
+            or type(snapshot.state_version) is not int
+            or snapshot.state_version < 0
+            or type(session_creation_request_id) is not str
+            or re.fullmatch(r"[0-9a-f]{64}", session_creation_request_id) is None
+            or type(transaction_time) is not datetime
+            or transaction_time.tzinfo is None
+            or transaction_time.utcoffset() != timedelta(0)
+        ):
+            raise SnapshotInvalidError(session.session_id)
+        if snapshot.state_version != session.state_version:
+            raise SnapshotStateVersionMismatchError(session.session_id)
+        original_payload = copy.deepcopy(snapshot.state)
+        if original_payload.get("schema_version") != 3:
+            raise SnapshotSchemaVersionMismatchError(session.session_id)
+        try:
+            canonical_json_bytes = json.dumps(
+                original_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+                allow_nan=False,
+            ).encode("utf-8")
+            state = GameState.model_validate_json(canonical_json_bytes, strict=True)
+        except (TypeError, ValueError, ValidationError):
+            raise SnapshotInvalidError(session.session_id) from None
+        if state.to_snapshot() != original_payload:
+            raise SnapshotInvalidError(session.session_id)
+        scenario = evidence.scenario
+        if (
+            type(session.scenario_version) is not str
+            or not 1 <= len(session.scenario_version) <= 32
+            or _RUN_ENTRY_OPAQUE_ID.fullmatch(session.scenario_version) is None
+            or session.scenario_version != scenario.content_version
+            or state.content_version != scenario.content_version
+        ):
+            raise SnapshotContentVersionMismatchError(session.session_id)
+        if (
+            session.session_id != initialization_event.session_id
+            or session.session_id != participation.session_id
+            or persisted.creation_client_request_id != session_creation_request_id
+            or session.scenario_id != scenario.scenario_id
+            or persisted.character_definition_id
+            != scenario.default_character_definition_id
+            or state.player.player_id != session.player_id
+            or applicable_character_reference.player_character_id
+            != evidence.player_character.player_character_id
+            or applicable_character_reference.record_revision
+            != evidence.player_character.pre_entry_record_revision
+            or initialization_event.turn_id != "session-created"
+            or initialization_event.sequence_no != 1
+            or initialization_event.event_type != "ScenarioStarted"
+            or initialization_event.payload != {
+                "scenario_id": scenario.scenario_id,
+                "scenario_content_version": scenario.content_version,
+            }
+            or persisted.created_at != transaction_time
+            or initialization_event.occurred_at != transaction_time
+        ):
+            raise SnapshotSessionMismatchError(session.session_id)
+        runtime = state.scenario_runtime
+        if runtime is None:
+            raise SnapshotSessionMismatchError(session.session_id)
+        if runtime.scenario_content_version != scenario.content_version:
+            raise SnapshotContentVersionMismatchError(session.session_id)
+        if (
+            runtime.scenario_id != scenario.scenario_id
+            or state.player.character_definition_id
+            != scenario.default_character_definition_id
+        ):
+            raise SnapshotSessionMismatchError(session.session_id)
+        records = tuple(
+            item
+            for item in state.player_memory.scenario_records
+            if item.scenario_id == scenario.scenario_id
+        )
+        if len(records) != 1:
+            raise SnapshotSessionMismatchError(session.session_id)
+        record = records[0]
+        if record.scenario_content_version != scenario.content_version:
+            raise SnapshotContentVersionMismatchError(session.session_id)
+        if session.state_version == 0:
+            memory = state.player_memory
+            if (
+                session.turn_number != 0
+                or session.phase != "AWAITING_ACTION"
+                or runtime.ending_status is not EndingStatus.ACTIVE
+                or record.status is not ScenarioMemoryStatus.STARTED
+                or record.ending_id is not None
+                or ScenarioMemoryMilestone.STARTED not in record.milestone_refs
+                or record.last_source_event_id != initialization_event.event_id
+                or record.last_source_sequence_no != 1
+                or memory.last_applied_source_sequence_no != 1
+                or memory.last_applied_source_event_id
+                != initialization_event.event_id
+            ):
+                raise SnapshotSessionMismatchError(session.session_id)
         return state
 
     def _validate_create_replay(

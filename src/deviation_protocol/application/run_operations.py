@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from enum import StrEnum
 import hashlib
+import struct
+from typing import Literal
 
 from pydantic import (
     BaseModel,
@@ -14,7 +16,9 @@ from pydantic import (
 
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
+    ControllerBindingRef,
     PlayerCharacterId,
+    PlayerCharacterRevision,
     validate_applicable_character_reference,
 )
 from deviation_protocol.domain.run import (
@@ -60,6 +64,94 @@ class RunOperationFingerprint(_StrictFrozenModel):
 
 class CreateRunCommand(_StrictFrozenModel):
     source_reference: RunAuthoritySourceRef
+
+
+class RunEntryPublicOperationKey(_StrictFrozenModel):
+    value: str = Field(strict=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+
+
+class _RunEntryControllerOperation(_StrictFrozenModel):
+    controller_binding: ControllerBindingRef
+    public_operation_key: str = Field(strict=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+
+
+class _RunEntryPlayerCharacter(_StrictFrozenModel):
+    player_character_id: PlayerCharacterId
+    pre_entry_record_revision: PlayerCharacterRevision
+
+
+class _RunEntryScenario(_StrictFrozenModel):
+    scenario_id: str = Field(strict=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    content_version: str = Field(strict=True, min_length=1, max_length=32, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    default_character_definition_id: str = Field(strict=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+
+
+class _RunEntrySource(_StrictFrozenModel):
+    source_reference: RunAuthoritySourceRef
+
+
+class RunEntryCreationEvidence(_StrictFrozenModel):
+    """The sole P8-S2 composite creation-evidence logical object."""
+
+    controller_operation: _RunEntryControllerOperation
+    evidence_schema: Literal["run-entry.creation-evidence/v1"] = (
+        "run-entry.creation-evidence/v1"
+    )
+    player_character: _RunEntryPlayerCharacter
+    scenario: _RunEntryScenario
+    trusted_run_source: _RunEntrySource
+
+P8_S2_EVIDENCE_MAGIC = b"\x89DP8S2CE\r\n\x1a\n"
+P8_S2_EVIDENCE_VERSION = 1
+
+
+def run_entry_evidence_bytes(evidence: RunEntryCreationEvidence) -> bytes:
+    evidence = revalidate_run_model(evidence, RunEntryCreationEvidence)
+    payload = canonical_run_operation_bytes(evidence)
+    encoded = P8_S2_EVIDENCE_MAGIC + bytes((P8_S2_EVIDENCE_VERSION,)) + payload
+    if not 14 <= len(encoded) <= 4096:
+        raise ValueError("Run entry creation evidence is outside its byte bound")
+    return encoded
+
+
+def run_entry_creation_fingerprint(
+    evidence: RunEntryCreationEvidence,
+) -> tuple[bytes, RunOperationFingerprint]:
+    encoded = run_entry_evidence_bytes(evidence)
+    return encoded, RunOperationFingerprint(value=hashlib.sha256(encoded).hexdigest())
+
+
+_P8_S2_ID_PREFIX = b"deviation-protocol:p8-s2:internal-id:v1"
+
+
+def derive_run_entry_internal_id(
+    *,
+    purpose: str,
+    controller_binding: ControllerBindingRef,
+    public_operation_key: RunEntryPublicOperationKey,
+) -> str:
+    if purpose not in {
+        "run.create/v1",
+        "run.bind-player-character/v1",
+        "run.attach-session/v1",
+        "session.create/v1",
+    }:
+        raise ValueError("Run entry internal-id purpose is not admitted")
+    if type(controller_binding) is not ControllerBindingRef:
+        raise TypeError("expected ControllerBindingRef")
+    controller_binding = revalidate_run_model(
+        controller_binding, ControllerBindingRef
+    )
+    public_operation_key = revalidate_run_model(public_operation_key, RunEntryPublicOperationKey)
+    components = (
+        purpose.encode("ascii"),
+        controller_binding.value.encode("ascii"),
+        public_operation_key.value.encode("ascii"),
+    )
+    encoded = _P8_S2_ID_PREFIX + b"\0" + b"".join(
+        struct.pack(">H", len(item)) + item for item in components
+    )
+    return hashlib.sha256(encoded).hexdigest()
 
 
 class AttachSessionCommand(_StrictFrozenModel):
@@ -345,6 +437,63 @@ def attach_session_to_run(
         current_mutation_provenance=provenance,
         trusted_participation_references=(*run.trusted_participation_references, participation),
         player_character_binding=run.player_character_binding,
+    )
+
+
+def activate_first_session_for_run(
+    run: CanonicalRun,
+    command: AttachSessionCommand,
+    *,
+    operation_id: RunOperationId,
+    occurred_at: datetime,
+) -> CanonicalRun:
+    """Construct the sole P8-S2 revision-three active entry successor."""
+
+    run = validate_canonical_run(run)
+    command = revalidate_run_model(command, AttachSessionCommand)
+    operation_id = revalidate_run_model(operation_id, RunOperationId)
+    binding = run.player_character_binding
+    if (
+        run.state_version.value != 2
+        or run.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN
+        or binding is None
+        or run.trusted_participation_references
+        or command.run_id != run.run_id
+        or command.continuous_story_line_id != run.continuous_story_line_id
+        or command.expected_state_version != run.state_version
+        or command.source_reference != run.creation_provenance.source_reference
+        or command.source_reference != binding.binding_authority_source_ref
+        or len(command.session_id) > 64
+    ):
+        raise ValueError("P8 entry activation requires exact bound revision two")
+    successor = run.state_version.successor()
+    participation = RunSessionParticipationReference(
+        session_id=command.session_id,
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        joined_state_version=successor,
+        operation_id=operation_id,
+        source_reference=command.source_reference,
+    )
+    provenance = RunMutationProvenance(
+        target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version,
+        resulting_state_version=successor,
+        mutation_kind=RunMutationKind.ATTACH_SESSION,
+        operation_id=operation_id,
+        source_reference=command.source_reference,
+        occurred_at=occurred_at,
+    )
+    return CanonicalRun(
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        lifecycle_status=RunLifecycleStatus.ACTIVE,
+        state_version=successor,
+        creation_provenance=run.creation_provenance,
+        current_mutation_provenance=provenance,
+        trusted_participation_references=(participation,),
+        player_character_binding=binding,
     )
 
 

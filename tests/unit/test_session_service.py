@@ -19,16 +19,36 @@ from deviation_protocol.application.errors import (
     InvalidScenarioDefinitionError,
     SessionNotFoundError,
     SnapshotContentVersionMismatchError,
+    SnapshotInvalidError,
+    SnapshotSchemaVersionMismatchError,
+    SnapshotSessionMismatchError,
+    SnapshotStateVersionMismatchError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.ports import PersistedSession, PersistedSnapshot
 from deviation_protocol.application.session_service import (
+    PreparedRunEntryInitialization,
     SessionCreationResult,
     SessionService,
 )
+from deviation_protocol.application.run_operations import RunEntryCreationEvidence
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.persisted_events import _issue_persisted_event_receipt
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    PlayerCharacterContractVersion,
+    PlayerCharacterId,
+    PlayerCharacterRevision,
+)
+from deviation_protocol.domain.run import (
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+    RunOperationId,
+    RunSessionParticipationReference,
+    RunStateVersion,
+)
 from deviation_protocol.domain.state import DomainRuleViolation, GameState, NpcState
 from deviation_protocol.infrastructure.content_loader import JsonContentCatalogLoader
 from deviation_protocol.infrastructure.scenario_loader import JsonScenarioCatalogLoader
@@ -204,6 +224,63 @@ def service_and_store() -> tuple[SessionService, Store]:
 
 def principal(player_id: str = "player-1") -> RequestPrincipal:
     return RequestPrincipal(player_id=player_id, authentication_scheme="test")
+
+
+def _run_entry_evidence(*, content_version: str) -> RunEntryCreationEvidence:
+    return RunEntryCreationEvidence.model_validate(
+        {
+            "controller_operation": {
+                "controller_binding": {"value": "controller.example"},
+                "public_operation_key": "entry.example",
+            },
+            "player_character": {
+                "player_character_id": {"value": "pc.example"},
+                "pre_entry_record_revision": {"value": 1},
+            },
+            "scenario": {
+                "scenario_id": "death_certificate",
+                "content_version": content_version,
+                "default_character_definition_id": (
+                    "character.death_certificate.investigator"
+                ),
+            },
+            "trusted_run_source": {
+                "source_reference": {"value": "source.production-run"}
+            },
+        }
+    )
+
+
+async def _staged_run_entry(
+    service: SessionService,
+    store: Store,
+) -> tuple[
+    PreparedRunEntryInitialization,
+    PersistedSession,
+    PersistedSnapshot,
+    DomainEvent,
+]:
+    definition = service.resolve_run_entry_definition("death_certificate")
+    prepared = service.prepare_run_entry_initialization(
+        principal(),
+        creation_request_id="a" * 64,
+        definition=definition,
+        character_definition_id=(
+            "character.death_certificate.investigator"
+        ),
+        created_at=NOW,
+    )
+    uow = Uow(store)
+    await service.stage_run_entry_initialization(uow, prepared)
+    assert uow.pending_session is not None
+    assert uow.pending_snapshot is not None
+    assert len(uow.pending_events) == 1
+    return (
+        prepared,
+        uow.pending_session,
+        uow.pending_snapshot,
+        uow.pending_events[0],
+    )
 
 
 @pytest.fixture
@@ -717,3 +794,233 @@ async def test_metadata_does_not_contain_snapshot_or_internal_fields(
         "character_display_name",
     }
     assert not ({"random_seed", "snapshot", "npcs", "trusted_context"} & set(payload))
+
+
+def test_run_entry_definition_enforces_the_exact_32_character_boundary(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, _ = scenario_service_and_store
+    original = service.resolve_run_entry_definition("death_certificate")
+
+    def install_version(value: str) -> None:
+        content = service.catalog.model_copy(update={"content_version": value})
+        definition = original.model_copy(update={"content_version": value})
+        assert service.scenario_catalog is not None
+        service.catalog = content
+        service.scenario_catalog = service.scenario_catalog.model_copy(
+            update={
+                "content_version": value,
+                "content_catalog": content,
+                "scenarios": (definition,),
+            }
+        )
+
+    install_version("v" * 32)
+    assert (
+        service.resolve_run_entry_definition("death_certificate").content_version
+        == "v" * 32
+    )
+
+    install_version("v" * 33)
+    with pytest.raises(InvalidScenarioDefinitionError):
+        service.resolve_run_entry_definition("death_certificate")
+
+
+@pytest.mark.asyncio
+async def test_run_entry_snapshot_uses_strict_json_mode_and_full_round_trip(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    prepared, persisted, snapshot, event = await _staged_run_entry(service, store)
+    payload_before = deepcopy(snapshot.state)
+    evidence = _run_entry_evidence(
+        content_version=prepared.definition.content_version
+    )
+    participation = RunSessionParticipationReference(
+        session_id=prepared.session.session_id,
+        run_id=RunId(value="run.entry"),
+        continuous_story_line_id=ContinuousStoryLineId(value="csl.entry"),
+        joined_state_version=RunStateVersion(value=3),
+        operation_id=RunOperationId(value="operation.attach"),
+        source_reference=RunAuthoritySourceRef(value="source.production-run"),
+    )
+    reference = ApplicableCharacterReference(
+        player_character_id=PlayerCharacterId(value="pc.example"),
+        contract_version=PlayerCharacterContractVersion.V1,
+        record_revision=PlayerCharacterRevision(value=1),
+    )
+
+    with pytest.raises(ValidationError):
+        GameState.model_validate(snapshot.state, strict=True)
+    json_state = GameState.model_validate_json(
+        json.dumps(
+            snapshot.state,
+            ensure_ascii=False,
+            sort_keys=True,
+            separators=(",", ":"),
+        ),
+        strict=True,
+    )
+    assert json_state.to_snapshot() == snapshot.state
+    assert any(
+        isinstance(value, tuple)
+        for value in vars(json_state.scenario_runtime).values()
+    )
+
+    service.catalog = service.catalog.model_copy(
+        update={"content_version": "catalogue-replaced"}
+    )
+    service.scenario_catalog = None
+    validated = service.validate_run_entry_replay_initialization(
+        persisted,
+        snapshot,
+        event,
+        evidence,
+        "a" * 64,
+        participation=participation,
+        applicable_character_reference=reference,
+        transaction_time=NOW,
+    )
+    assert validated.to_snapshot() == payload_before
+    assert snapshot.state == payload_before
+
+
+@pytest.mark.asyncio
+async def test_run_entry_snapshot_strict_and_semantic_negative_matrix(
+    scenario_service_and_store: tuple[SessionService, Store],
+) -> None:
+    service, store = scenario_service_and_store
+    prepared, persisted, snapshot, event = await _staged_run_entry(service, store)
+    evidence = _run_entry_evidence(
+        content_version=prepared.definition.content_version
+    )
+    participation = RunSessionParticipationReference(
+        session_id=prepared.session.session_id,
+        run_id=RunId(value="run.entry"),
+        continuous_story_line_id=ContinuousStoryLineId(value="csl.entry"),
+        joined_state_version=RunStateVersion(value=3),
+        operation_id=RunOperationId(value="operation.attach"),
+        source_reference=RunAuthoritySourceRef(value="source.production-run"),
+    )
+    reference = ApplicableCharacterReference(
+        player_character_id=PlayerCharacterId(value="pc.example"),
+        contract_version=PlayerCharacterContractVersion.V1,
+        record_revision=PlayerCharacterRevision(value=1),
+    )
+
+    def validate(
+        candidate: PersistedSnapshot = snapshot,
+        *,
+        session: PersistedSession = persisted,
+        started: DomainEvent = event,
+        run_participation: RunSessionParticipationReference = participation,
+        character_reference: ApplicableCharacterReference = reference,
+    ) -> GameState:
+        return service.validate_run_entry_replay_initialization(
+            session,
+            candidate,
+            started,
+            evidence,
+            "a" * 64,
+            participation=run_participation,
+            applicable_character_reference=character_reference,
+            transaction_time=NOW,
+        )
+
+    payload = snapshot.state
+    default_supplied = {
+        key: value for key, value in payload.items() if key != "npcs"
+    }
+    normalized_collection = deepcopy(payload)
+    normalized_collection["player_memory"]["scenario_records"][0][
+        "milestone_refs"
+    ] = ["STARTED", "IMPORTANT_FACT_CONFIRMED"]
+    for normalized in (default_supplied, normalized_collection):
+        reconstructed = GameState.model_validate_json(
+            json.dumps(
+                normalized,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ),
+            strict=True,
+        )
+        assert reconstructed.to_snapshot() != normalized
+        with pytest.raises(SnapshotInvalidError):
+            validate(PersistedSnapshot(snapshot.state_version, normalized))
+
+    malformed_payloads = (
+        {**payload, "unknown": "x"},
+        {key: value for key, value in payload.items() if key != "schema_version"},
+        {**payload, "schema_version": True},
+        {**payload, "content_version": 1},
+        {**payload, "npcs": []},
+        {**payload, "scenario_runtime": {**payload["scenario_runtime"], "ending_status": "UNKNOWN"}},
+        {**payload, "player": {**payload["player"], "unknown": "x"}},
+        {**payload, "player": {**payload["player"], "player_id": "bad identifier"}},
+        {
+            **payload,
+            "player_memory": {
+                **payload["player_memory"],
+                "scenario_records": [
+                    {
+                        **payload["player_memory"]["scenario_records"][0],
+                        "milestone_refs": [
+                            *payload["player_memory"]["scenario_records"][0][
+                                "milestone_refs"
+                            ],
+                            *payload["player_memory"]["scenario_records"][0][
+                                "milestone_refs"
+                            ],
+                        ],
+                    }
+                ],
+            },
+        },
+    )
+    for index, malformed in enumerate(malformed_payloads):
+        try:
+            validate(PersistedSnapshot(snapshot.state_version, malformed))
+        except (
+            SnapshotInvalidError,
+            SnapshotSchemaVersionMismatchError,
+            SnapshotContentVersionMismatchError,
+        ):
+            continue
+        pytest.fail(f"malformed snapshot case {index} was accepted")
+
+    semantic_cases = (
+        {"session": replace(persisted.session, state_version=1)},
+        {"session": replace(persisted.session, scenario_id="other")},
+        {"session": replace(persisted.session, scenario_version="other")},
+        {"character_definition_id": "character.other"},
+        {"creation_client_request_id": "b" * 64},
+    )
+    for change in semantic_cases:
+        changed_session = replace(persisted, **change)
+        with pytest.raises(
+            (
+                SnapshotInvalidError,
+                SnapshotSessionMismatchError,
+                SnapshotStateVersionMismatchError,
+                SnapshotContentVersionMismatchError,
+            )
+        ):
+            validate(session=changed_session)
+
+    with pytest.raises(SnapshotSessionMismatchError):
+        validate(
+            run_participation=participation.model_copy(
+                update={"session_id": "session.other"}
+            )
+        )
+    with pytest.raises(SnapshotSessionMismatchError):
+        validate(
+            character_reference=reference.model_copy(
+                update={
+                    "record_revision": PlayerCharacterRevision(value=2)
+                }
+            )
+        )
+    with pytest.raises(SnapshotSessionMismatchError):
+        validate(started=replace(event, sequence_no=2))

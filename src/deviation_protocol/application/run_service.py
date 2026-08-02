@@ -17,6 +17,7 @@ from deviation_protocol.application.ports import (
     RunReceiptUniquenessConflictError,
     RunSessionAttachmentLockEvidence,
     RunSessionParticipationUniquenessConflictError,
+    UnitOfWork,
     UnitOfWorkFactory,
 )
 from deviation_protocol.application.run_operations import (
@@ -24,6 +25,7 @@ from deviation_protocol.application.run_operations import (
     BindPlayerCharacterCommand,
     CreateRunCommand,
     ReservedBindPlayerCharacterCommand,
+    RunEntryCreationEvidence,
     RunOperationNamespace,
     RunReceiptKey,
     RunReplayDecision,
@@ -41,6 +43,7 @@ from deviation_protocol.application.run_operations import (
     creation_result,
     evaluate_receipt,
     reject_reserved_bind_player_character,
+    run_entry_creation_fingerprint,
 )
 from deviation_protocol.domain.player_character import (
     ControllerBindingRef,
@@ -56,6 +59,7 @@ from deviation_protocol.domain.run import (
     RunLifecycleStatus,
     RunMutationKind,
     RunOperationId,
+    RunStateVersion,
     revalidate_run_model,
     validate_canonical_run,
 )
@@ -85,6 +89,142 @@ class RunServiceDecision(BaseModel):
     )
 
     code: RunServiceDecisionCode
+
+
+def _validate_entry_stage_time(run: CanonicalRun, created_at: datetime) -> None:
+    if (
+        type(created_at) is not datetime
+        or created_at.tzinfo is None
+        or created_at.utcoffset() != timedelta(0)
+        or run.current_mutation_provenance.occurred_at != created_at
+    ):
+        raise ValueError("Run entry staging timestamp is inconsistent")
+
+
+async def stage_run_entry_creation(
+    uow: UnitOfWork,
+    run: CanonicalRun,
+    receipt: StoredRunSuccessReceipt,
+    evidence: RunEntryCreationEvidence,
+    *,
+    created_at: datetime,
+) -> None:
+    """Stage revision one and its composite receipt without committing."""
+
+    run = validate_canonical_run(run)
+    receipt = revalidate_run_model(receipt, StoredRunSuccessReceipt)
+    evidence = revalidate_run_model(evidence, RunEntryCreationEvidence)
+    _validate_entry_stage_time(run, created_at)
+    _, fingerprint = run_entry_creation_fingerprint(evidence)
+    if (
+        run.state_version.value != 1
+        or receipt.key.operation_id != run.creation_provenance.operation_id
+        or receipt.fingerprint != fingerprint
+        or receipt.result != creation_result(run)
+        or evidence.trusted_run_source.source_reference
+        != run.creation_provenance.source_reference
+    ):
+        raise ValueError("Run entry creation staging evidence is inconsistent")
+    await uow.runs.add_initial(run, created_at=created_at)
+    await uow.run_creation_receipts.add_with_evidence(
+        receipt, evidence, created_at=created_at
+    )
+
+
+async def stage_run_entry_binding(
+    uow: UnitOfWork,
+    run: CanonicalRun,
+    receipt: StoredRunSuccessReceipt,
+    *,
+    created_at: datetime,
+) -> bool:
+    """Stage revision two, its current-row CAS, and receipt without commit."""
+
+    run = validate_canonical_run(run)
+    receipt = revalidate_run_model(receipt, StoredRunSuccessReceipt)
+    _validate_entry_stage_time(run, created_at)
+    binding = run.player_character_binding
+    if (
+        run.state_version.value != 2
+        or run.current_mutation_provenance.mutation_kind
+        is not RunMutationKind.BIND_PLAYER_CHARACTER
+        or binding is None
+        or receipt.key.run_id != run.run_id
+        or receipt.key.operation_id
+        != run.current_mutation_provenance.operation_id
+        or receipt.result != bind_player_character_result(run)
+    ):
+        raise ValueError("Run entry binding staging evidence is inconsistent")
+    command = BindPlayerCharacterCommand(
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        target_player_character_id=(
+            binding.applicable_character_reference.player_character_id
+        ),
+        expected_state_version=RunStateVersion(value=1),
+        source_reference=run.current_mutation_provenance.source_reference,
+    )
+    _, fingerprint = bind_player_character_fingerprint(
+        command, operation_id=run.current_mutation_provenance.operation_id
+    )
+    if receipt.fingerprint != fingerprint:
+        raise ValueError("Run entry binding receipt fingerprint is inconsistent")
+    await uow.runs.append_revision(run, created_at=created_at)
+    won = await uow.runs.compare_and_swap_current(
+        run, expected_state_version=1, updated_at=created_at
+    )
+    if not won:
+        return False
+    await uow.run_mutation_receipts.add(receipt, created_at=created_at)
+    return True
+
+
+async def stage_run_entry_activation(
+    uow: UnitOfWork,
+    run: CanonicalRun,
+    receipt: StoredRunSuccessReceipt,
+    *,
+    created_at: datetime,
+) -> bool:
+    """Stage the sole P8 revision-three activation without committing."""
+
+    run = validate_canonical_run(run)
+    receipt = revalidate_run_model(receipt, StoredRunSuccessReceipt)
+    _validate_entry_stage_time(run, created_at)
+    if (
+        run.lifecycle_status is not RunLifecycleStatus.ACTIVE
+        or run.state_version.value != 3
+        or run.current_mutation_provenance.mutation_kind
+        is not RunMutationKind.ATTACH_SESSION
+        or len(run.trusted_participation_references) != 1
+        or receipt.key.run_id != run.run_id
+        or receipt.key.operation_id
+        != run.current_mutation_provenance.operation_id
+        or receipt.result != attach_session_result(run)
+    ):
+        raise ValueError("Run entry activation staging evidence is inconsistent")
+    participation = run.trusted_participation_references[0]
+    command = AttachSessionCommand(
+        run_id=run.run_id,
+        continuous_story_line_id=run.continuous_story_line_id,
+        session_id=participation.session_id,
+        expected_state_version=RunStateVersion(value=2),
+        source_reference=run.current_mutation_provenance.source_reference,
+    )
+    _, fingerprint = attach_session_fingerprint(
+        command, operation_id=run.current_mutation_provenance.operation_id
+    )
+    if receipt.fingerprint != fingerprint:
+        raise ValueError("Run entry attachment receipt fingerprint is inconsistent")
+    await uow.runs.append_revision(run, created_at=created_at)
+    await uow.run_participations.add(participation, joined_at=created_at)
+    won = await uow.runs.compare_and_swap_current(
+        run, expected_state_version=2, updated_at=created_at
+    )
+    if not won:
+        return False
+    await uow.run_mutation_receipts.add(receipt, created_at=created_at)
+    return True
 
 
 @dataclass(slots=True)

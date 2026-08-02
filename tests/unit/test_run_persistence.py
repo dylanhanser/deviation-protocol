@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import UTC, datetime
+import json
 
 import pytest
 
@@ -9,6 +10,7 @@ from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    RunEntryCreationEvidence,
     RunOperationNamespace,
     RunReceiptKey,
     StoredRunSuccessReceipt,
@@ -21,6 +23,7 @@ from deviation_protocol.application.run_operations import (
     construct_created_run,
     create_run_fingerprint,
     creation_result,
+    run_entry_evidence_bytes,
 )
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
@@ -54,6 +57,8 @@ from deviation_protocol.infrastructure.run_persistence import (
     attach_operation_evidence_to_storage_bytes,
     binding_operation_evidence_to_storage_bytes,
     creation_operation_evidence_to_storage_bytes,
+    creation_operation_evidence_from_storage,
+    creation_evidence_from_storage,
     fingerprint_to_storage_bytes,
     run_receipt_to_storage_bytes,
     validate_stored_run_record_set,
@@ -64,6 +69,98 @@ RUN_ID = RunId(value="run.persistence")
 LINE_ID = ContinuousStoryLineId(value="csl.persistence")
 SOURCE = RunAuthoritySourceRef(value="source.persistence")
 CREATED_AT = datetime(2026, 7, 29, 10, 0, tzinfo=UTC)
+
+
+def test_p8_composite_family_never_falls_back_to_historical_decoder() -> None:
+    evidence = RunEntryCreationEvidence.model_validate({
+        "controller_operation": {"controller_binding": {"value": "controller.example"}, "public_operation_key": "entry.example"},
+        "player_character": {"player_character_id": {"value": "pc.example"}, "pre_entry_record_revision": {"value": 1}},
+        "scenario": {"scenario_id": "death_certificate", "content_version": "death-certificate-1.1.0", "default_character_definition_id": "character.death_certificate.investigator"},
+        "trusted_run_source": {"source_reference": {"value": "source.production-run"}},
+    })
+    encoded = run_entry_evidence_bytes(evidence)
+    assert creation_evidence_from_storage(encoded) == evidence
+    with pytest.raises(RunStoredRecordIntegrityError):
+        creation_evidence_from_storage(encoded[:12])
+    with pytest.raises(RunStoredRecordIntegrityError):
+        creation_evidence_from_storage(encoded[:12] + b"\x02" + encoded[13:])
+    with pytest.raises(RunStoredRecordIntegrityError):
+        creation_evidence_from_storage(b"\x89not-a-composite")
+
+    historical = CreateRunCommand(source_reference=SOURCE)
+    historical_bytes = creation_operation_evidence_to_storage_bytes(historical)
+    assert creation_evidence_from_storage(historical_bytes) == historical
+    with pytest.raises(RunStoredRecordIntegrityError):
+        creation_operation_evidence_from_storage(encoded)
+
+
+def test_p8_composite_decoder_rejects_the_complete_noncanonical_matrix() -> None:
+    evidence = RunEntryCreationEvidence.model_validate({
+        "controller_operation": {"controller_binding": {"value": "controller.example"}, "public_operation_key": "entry.example"},
+        "player_character": {"player_character_id": {"value": "pc.example"}, "pre_entry_record_revision": {"value": 1}},
+        "scenario": {"scenario_id": "death_certificate", "content_version": "death-certificate-1.1.0", "default_character_definition_id": "character.death_certificate.investigator"},
+        "trusted_run_source": {"source_reference": {"value": "source.production-run"}},
+    })
+    encoded = run_entry_evidence_bytes(evidence)
+    header, payload = encoded[:13], encoded[13:]
+    parsed = json.loads(payload)
+
+    malformed = [
+        b"",
+        b"[]",
+        b"\xff",
+        b'{"evidence_schema":NaN}',
+        b'{"evidence_schema":1.0}',
+        payload + b" ",
+        b" " + payload,
+        json.dumps(parsed, ensure_ascii=True).encode(),
+        json.dumps(
+            dict(reversed(tuple(parsed.items()))),
+            sort_keys=False,
+            separators=(",", ":"),
+        ).encode(),
+        json.dumps(parsed, sort_keys=True, separators=(", ", ": ")).encode(),
+        payload.replace(b'"evidence_schema":', b'"evidence_schema":"duplicate","evidence_schema":', 1),
+        payload.replace(b'"controller_binding":', b'"controller_binding":{"value":"duplicate"},"controller_binding":', 1),
+        payload.replace(b'"value":"controller.example"', b'"value":"controller.example","value":"duplicate"', 1),
+        payload.replace(b"entry.example", b"entry\\u002eexample", 1),
+        payload.replace(b'"value":1', b'"value":01', 1),
+        payload.replace(b'"value":1', b'"value":1e0', 1),
+    ]
+    structural_changes = (
+        {**parsed, "unknown": "x"},
+        {key: value for key, value in parsed.items() if key != "scenario"},
+        {**parsed, "evidence_schema": None},
+        {**parsed, "evidence_schema": True},
+        {**parsed, "controller_operation": []},
+        {**parsed, "controller_operation": {**parsed["controller_operation"], "unknown": "x"}},
+        {**parsed, "player_character": {**parsed["player_character"], "pre_entry_record_revision": {"value": 1.0}}},
+        {**parsed, "player_character": {**parsed["player_character"], "pre_entry_record_revision": {"value": True}}},
+        {**parsed, "scenario": {**parsed["scenario"], "content_version": "x" * 33}},
+        {**parsed, "scenario": {**parsed["scenario"], "scenario_id": "bad identifier"}},
+    )
+    malformed.extend(
+        json.dumps(item, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()
+        for item in structural_changes
+    )
+
+    for index, invalid_payload in enumerate(malformed):
+        try:
+            creation_evidence_from_storage(header + invalid_payload)
+        except RunStoredRecordIntegrityError:
+            continue
+        pytest.fail(f"noncanonical composite case {index} was accepted")
+
+    for invalid in (
+        encoded[:12],
+        encoded[:12] + b"\x02" + encoded[13:],
+        bytes([0x89]) + encoded[1:12].replace(b"D", b"X", 1) + encoded[12:],
+        encoded + b"x" * (4097 - len(encoded)),
+        b"{" + encoded[1:],
+        b"[" + encoded[1:],
+    ):
+        with pytest.raises(RunStoredRecordIntegrityError):
+            creation_evidence_from_storage(invalid)
 JOINED_AT = datetime(2026, 7, 29, 10, 1, tzinfo=UTC)
 BINDING_AT = datetime(2026, 7, 29, 10, 2, tzinfo=UTC)
 AFTER_BINDING_AT = datetime(2026, 7, 29, 10, 3, tzinfo=UTC)

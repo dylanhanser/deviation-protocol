@@ -32,14 +32,18 @@ from deviation_protocol.application.ports import (
     RunSessionAttachmentLockEvidence,
     RunSessionParticipationRepository,
     RunSessionParticipationUniquenessConflictError,
+    StoredRunCreationEvidence,
 )
 from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    RunEntryCreationEvidence,
     RunOperationNamespace,
     RunReceiptKey,
     StoredRunSuccessReceipt,
+    run_entry_creation_fingerprint,
+    run_entry_evidence_bytes,
 )
 from deviation_protocol.application.player_character_operations import (
     CharacterCreationCommand,
@@ -145,6 +149,7 @@ from deviation_protocol.infrastructure.run_persistence import (
     binding_operation_evidence_to_storage_bytes,
     canonical_run_from_revision_storage,
     canonical_run_from_current_storage,
+    creation_evidence_from_storage,
     creation_operation_evidence_to_storage_bytes as run_creation_evidence_bytes,
     creation_receipt_from_storage as run_creation_receipt_from_storage,
     fingerprint_to_storage_bytes as run_fingerprint_to_storage_bytes,
@@ -310,6 +315,41 @@ class SqlAlchemyGameSessionRepository(GameSessionRepository):
         return PersistedSnapshot(
             state_version=row.state_version,
             state=dict(row.state_json),
+        )
+
+    async def get_latest_snapshot_for_update(
+        self, session_id: str,
+    ) -> PersistedSnapshot | None:
+        row = await self._session.scalar(
+            select(GameSnapshotRow)
+            .where(GameSnapshotRow.session_id == session_id)
+            .execution_options(populate_existing=True)
+            .with_for_update()
+        )
+        if row is None:
+            return None
+        return PersistedSnapshot(
+            state_version=row.state_version,
+            state=dict(row.state_json),
+        )
+
+    async def get_initialization_event(self, session_id: str) -> DomainEvent | None:
+        row = await self._session.scalar(
+            select(DomainEventRow).where(
+                DomainEventRow.session_id == session_id,
+                DomainEventRow.sequence_no == 1,
+            )
+        )
+        if row is None:
+            return None
+        return DomainEvent(
+            event_id=row.event_id,
+            session_id=row.session_id,
+            turn_id=row.turn_id,
+            sequence_no=row.sequence_no,
+            event_type=row.event_type,
+            payload=dict(row.payload_json),
+            occurred_at=_as_utc(row.occurred_at),
         )
 
     async def next_event_sequence_no(self, session_id: str) -> int:
@@ -2934,6 +2974,106 @@ class SqlAlchemyRunCreationReceiptRepository(
             )
         await self._validate_complete_run(receipt.result.run_id)
         return receipt
+
+    async def get_with_evidence(
+        self, key: RunReceiptKey
+    ) -> StoredRunCreationEvidence | None:
+        if key.operation_namespace is not RunOperationNamespace.CREATE_V1:
+            raise ValueError("Run creation receipt repository rejects namespace")
+        row = await self._run_scalar(
+            select(RunCreationReceiptRow).where(
+                RunCreationReceiptRow.operation_namespace
+                == key.operation_namespace.value,
+                RunCreationReceiptRow.operation_id == key.operation_id.value,
+            )
+        )
+        if row is None:
+            return None
+        stored = self._run_creation_receipt_record(row)
+        receipt = run_creation_receipt_from_storage(stored)
+        if receipt.key != key:
+            raise RunStoredRecordIntegrityError(
+                "Run creation receipt lookup identity is mismatched"
+            )
+        evidence = creation_evidence_from_storage(
+            stored.operation_evidence_canonical
+        )
+        await self._validate_complete_run(receipt.result.run_id)
+        return StoredRunCreationEvidence(
+            receipt=receipt,
+            evidence=evidence,
+            evidence_canonical=stored.operation_evidence_canonical,
+        )
+
+    async def add_with_evidence(
+        self,
+        receipt: StoredRunSuccessReceipt,
+        evidence: RunEntryCreationEvidence,
+        *,
+        created_at: datetime,
+    ) -> None:
+        """Persist the validated P8 composite in the existing receipt column."""
+        if (
+            receipt.key.operation_namespace
+            is not RunOperationNamespace.CREATE_V1
+            or receipt.command_kind is not RunMutationKind.CREATE
+        ):
+            raise ValueError("Run creation receipt repository rejects command")
+        evidence_bytes, fingerprint = run_entry_creation_fingerprint(evidence)
+        if receipt.fingerprint != fingerprint:
+            raise RunStoredRecordIntegrityError(
+                "P8 receipt fingerprint does not bind composite evidence"
+            )
+        result = receipt.result
+        revision = await self._run_at_revision(
+            result.run_id, result.resulting_state_version.value
+        )
+        stored = StoredRunCreationReceiptRecord(
+            operation_namespace=receipt.key.operation_namespace.value,
+            operation_id=receipt.key.operation_id,
+            fingerprint=run_fingerprint_to_storage_bytes(receipt.fingerprint),
+            command_kind=receipt.command_kind.value,
+            result_schema_version=result.result_schema_version,
+            result_run_id=result.run_id,
+            result_continuous_story_line_id=result.continuous_story_line_id,
+            resulting_lifecycle_status=result.lifecycle_status.value,
+            resulting_state_version=result.resulting_state_version.value,
+            receipt_canonical=run_receipt_to_storage_bytes(receipt),
+            operation_evidence_canonical=evidence_bytes,
+            created_at=created_at,
+        )
+        if (
+            run_creation_receipt_from_storage(stored) != receipt
+            or revision.creation_provenance.source_reference
+            != evidence.trusted_run_source.source_reference
+            or revision.creation_provenance.operation_id
+            != receipt.key.operation_id
+            or revision.creation_provenance.occurred_at != created_at
+        ):
+            raise RunStoredRecordIntegrityError(
+                "P8 Run creation receipt storage mapping is inconsistent"
+            )
+        row = RunCreationReceiptRow(
+            operation_namespace=stored.operation_namespace,
+            operation_id=stored.operation_id.value,
+            fingerprint=stored.fingerprint,
+            command_kind=stored.command_kind,
+            result_schema_version=stored.result_schema_version,
+            result_run_id=stored.result_run_id.value,
+            result_continuous_story_line_id=(
+                stored.result_continuous_story_line_id.value
+            ),
+            resulting_lifecycle_status=stored.resulting_lifecycle_status,
+            resulting_state_version=stored.resulting_state_version,
+            receipt_canonical=stored.receipt_canonical,
+            operation_evidence_canonical=stored.operation_evidence_canonical,
+            created_at=created_at,
+        )
+        await self._flush_run_row(
+            row,
+            conflict_message="Run creation receipt conflict",
+            conflict_type=RunReceiptUniquenessConflictError,
+        )
 
     async def add(
         self,

@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+import hashlib
+import json
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -13,9 +17,30 @@ from sqlalchemy.exc import DBAPIError, IntegrityError, OperationalError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.errors import (
+    SnapshotContentVersionMismatchError,
+    SnapshotSessionMismatchError,
+)
+from deviation_protocol.application.run_entry_service import (
+    RunEntryCommand,
+    RunEntryDecision,
+    RunEntryDecisionCode,
+    RunEntryIntegrityError,
+    RunEntryResult,
+    RunEntryService,
+)
+from deviation_protocol.application.run_operations import RunEntryPublicOperationKey
+from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.application.player_character_operations import (
+    MUTATION_RESULT_SCHEMA_VERSION,
     CharacterCreationCommand,
     CharacterMutationCommand,
+    CharacterOperationNamespace,
+    MutationCommandResult,
+    MutationReceiptKey,
+    MutationSuccessResult,
+    build_mutation_success_receipt,
+    mutation_fingerprint,
 )
 from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
@@ -24,9 +49,17 @@ from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    RunOperationNamespace,
+    RunReceiptKey,
     RunReplayDecision,
     RunReplayDecisionCode,
+    StoredRunSuccessReceipt,
+    activate_first_session_for_run,
     attach_session_fingerprint,
+    attach_session_result,
+    bind_player_character_fingerprint,
+    bind_player_character_result,
+    bind_player_character_to_run,
 )
 from deviation_protocol.application.run_service import (
     RunService,
@@ -51,16 +84,20 @@ from deviation_protocol.domain.player_character_policies import (
     PlayerCharacterPolicyCode,
     PlayerCharacterPolicyDecision,
     PlayerConfirmation,
+    RetirePlayerCharacterPolicy,
     TrustedFinalDeathEvidence,
 )
 from deviation_protocol.domain.run import (
     ContinuousStoryLineId,
     RunAuthoritySourceRef,
     RunId,
+    RunMutationKind,
     RunOperationId,
     RunStateVersion,
 )
 from deviation_protocol.infrastructure.orm_models import (
+    DomainEventRow,
+    GameSnapshotRow,
     GameSessionRow,
     PlayerCharacterControllerBindingRow,
     PlayerCharacterCreationReceiptRow,
@@ -77,12 +114,24 @@ from deviation_protocol.infrastructure.orm_models import (
 from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyGameSessionRepository,
     SqlAlchemyPlayerCharacterRepository,
+    SqlAlchemyRunCreationReceiptRepository,
     SqlAlchemyRunMutationReceiptRepository,
     SqlAlchemyRunRepository,
+    SqlAlchemyRunSessionParticipationRepository,
+)
+from deviation_protocol.infrastructure.scenario_loader import (
+    JsonScenarioCatalogLoader,
 )
 from deviation_protocol.infrastructure.run_persistence import (
     RunRepositoryError,
     RunStoredRecordIntegrityError,
+    attach_operation_evidence_to_storage_bytes,
+    binding_operation_evidence_to_storage_bytes,
+    fingerprint_to_storage_bytes as run_fingerprint_to_storage_bytes,
+    run_receipt_to_storage_bytes,
+)
+from deviation_protocol.infrastructure.player_character_persistence import (
+    PlayerCharacterStoredRecordIntegrityError,
 )
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
 
@@ -94,6 +143,12 @@ CHARACTER_SOURCE = AuthoritySourceRef(
 )
 TIMEOUT = 10.0
 LOCK_PROBE_TIMEOUT = 3.0
+SCENARIO_PACK = (
+    Path(__file__).parents[2]
+    / "config"
+    / "scenarios"
+    / "death_certificate_v1.json"
+)
 
 
 class _Resolver:
@@ -117,8 +172,10 @@ class _Resolver:
 class _Issuer:
     def __init__(self, value: Any) -> None:
         self.value = value
+        self.calls = 0
 
     def issue(self) -> Any:
+        self.calls += 1
         return self.value
 
 
@@ -313,6 +370,42 @@ async def _create_character(
     return _Character(
         principal=principal,
         binding=binding,
+        record=record,
+        resolver=resolver,
+        service=service,
+    )
+
+
+async def _create_additional_owned_character(
+    factory: async_sessionmaker[AsyncSession],
+    scope: _Scope,
+    suffix: str,
+    owner: _Character,
+) -> _Character:
+    player_character_id = scope.character_id(suffix)
+    service, resolver = _character_service(
+        factory,
+        principal=owner.principal,
+        binding=owner.binding,
+        player_character_id=player_character_id,
+    )
+    await service.create(
+        owner.principal,
+        operation_id=PlayerCharacterOperationId(
+            value=f"operation.{scope.token}.create-character-{suffix}"
+        ),
+        command=CharacterCreationCommand(
+            contract_version=PlayerCharacterContractVersion.V1,
+            character_core=CharacterCore(),
+            narration_preferences=NarrationPreferences(),
+        ),
+    )
+    async with SqlAlchemyUnitOfWork(factory) as uow:
+        record = await uow.player_characters.get(player_character_id)
+    assert record is not None
+    return _Character(
+        principal=owner.principal,
+        binding=owner.binding,
         record=record,
         resolver=resolver,
         service=service,
@@ -3713,3 +3806,2107 @@ async def test_mysql_concurrent_bind_constraints_leave_one_complete_binding(
             await _run_family_counts(mysql_session_factory, run_b),
         )
     ) == [(1, 1, 1, 0), (2, 1, 1, 1)]
+
+
+@dataclass(slots=True)
+class _EntryUowCounts:
+    units: int = 0
+    commit_attempts: int = 0
+    successful_commits: int = 0
+    rollback_exits: int = 0
+    closes: int = 0
+
+
+@dataclass(slots=True)
+class _TwoPartyEntryBarrier:
+    labels: list[str] = field(default_factory=list)
+    all_arrived: asyncio.Event = field(default_factory=asyncio.Event)
+    release: asyncio.Event = field(default_factory=asyncio.Event)
+
+    async def arrive(self, label: str) -> None:
+        assert label not in self.labels
+        self.labels.append(label)
+        if len(self.labels) == 2:
+            self.all_arrived.set()
+        await asyncio.wait_for(self.release.wait(), timeout=TIMEOUT)
+
+
+class _CountingEntryUnitOfWork(SqlAlchemyUnitOfWork):
+    def __init__(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        counts: _EntryUowCounts,
+    ) -> None:
+        super().__init__(factory)
+        self._entry_counts = counts
+
+    async def __aenter__(self):
+        self._entry_counts.units += 1
+        return await super().__aenter__()
+
+    async def __aexit__(self, exc_type, exc, traceback) -> None:
+        if exc_type is not None or not self._committed:
+            self._entry_counts.rollback_exits += 1
+        try:
+            await super().__aexit__(exc_type, exc, traceback)
+        finally:
+            self._entry_counts.closes += 1
+
+    async def commit(self) -> None:
+        self._entry_counts.commit_attempts += 1
+        await super().commit()
+        self._entry_counts.successful_commits += 1
+
+
+class _SynchronizedEntryUnitOfWork(_CountingEntryUnitOfWork):
+    def __init__(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        counts: _EntryUowCounts,
+        *,
+        barrier: _TwoPartyEntryBarrier,
+        label: str,
+        point: str,
+    ) -> None:
+        super().__init__(factory, counts)
+        self._barrier = barrier
+        self._label = label
+        self._point = point
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        targets = {
+            "character-lock": (self.player_characters, "get_for_update"),
+            "derived-key": (
+                self.run_creation_receipts,
+                "add_with_evidence",
+            ),
+            "run-identity": (self.runs, "add_initial"),
+            "line-identity": (self.runs, "add_initial"),
+            "session-identity": (self.sessions, "add_initial_session"),
+        }
+        repository, method_name = targets[self._point]
+        original = getattr(repository, method_name)
+
+        async def synchronize_then_call(*args, **kwargs):
+            await self._barrier.arrive(self._label)
+            return await original(*args, **kwargs)
+
+        setattr(repository, method_name, synchronize_then_call)
+        return self
+
+
+class _DuplicateParticipationEntryUnitOfWork(_CountingEntryUnitOfWork):
+    async def __aenter__(self):
+        await super().__aenter__()
+        assert self._session is not None
+        original = SqlAlchemyRunSessionParticipationRepository(
+            self._session
+        )
+        original_add = original.add
+
+        async def add_twice(participation, *, joined_at):
+            await original_add(participation, joined_at=joined_at)
+            await original_add(participation, joined_at=joined_at)
+
+        original.add = add_twice
+        self.run_participations = original
+        return self
+
+
+class _PostCommitUncertaintyEntryUnitOfWork(_CountingEntryUnitOfWork):
+    async def commit(self) -> None:
+        self._entry_counts.commit_attempts += 1
+        await SqlAlchemyUnitOfWork.commit(self)
+        self._entry_counts.successful_commits += 1
+        raise RuntimeError("controlled uncertain commit outcome")
+
+
+class _BoundaryFailureEntryUnitOfWork(_CountingEntryUnitOfWork):
+    def __init__(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        counts: _EntryUowCounts,
+        *,
+        boundary: str,
+        failure_factory: Any,
+    ) -> None:
+        super().__init__(factory, counts)
+        self._failure_boundary = boundary
+        self._failure_factory = failure_factory
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        targets = {
+            "run-1": (self.runs, "add_initial", 1),
+            "creation-receipt": (
+                self.run_creation_receipts,
+                "add_with_evidence",
+                1,
+            ),
+            "run-2": (self.runs, "append_revision", 1),
+            "cas-1": (self.runs, "compare_and_swap_current", 1),
+            "binding-receipt": (self.run_mutation_receipts, "add", 1),
+            "session-row": (self.sessions, "add_initial_session", 1),
+            "session-event": (self.sessions, "persist_events", 1),
+            "session-snapshot": (self.sessions, "add_initial_snapshot", 1),
+            "run-3": (self.runs, "append_revision", 2),
+            "participation": (self.run_participations, "add", 1),
+            "cas-2": (self.runs, "compare_and_swap_current", 2),
+            "attachment-receipt": (self.run_mutation_receipts, "add", 2),
+        }
+        repository, method_name, target_call = targets[self._failure_boundary]
+        original = getattr(repository, method_name)
+        calls = 0
+
+        async def fail_after_boundary(*args, **kwargs):
+            nonlocal calls
+            result = await original(*args, **kwargs)
+            calls += 1
+            if calls == target_call:
+                raise self._failure_factory()
+            return result
+
+        setattr(repository, method_name, fail_after_boundary)
+        return self
+
+
+class _ReplayReceiptBarrierRepository(
+    SqlAlchemyRunCreationReceiptRepository
+):
+    def __init__(
+        self,
+        session: AsyncSession,
+        receipt_read: asyncio.Event,
+        writer_done: asyncio.Event,
+    ) -> None:
+        super().__init__(session)
+        self._receipt_read = receipt_read
+        self._writer_done = writer_done
+
+    async def get_with_evidence(self, key):
+        stored = await super().get_with_evidence(key)
+        self._receipt_read.set()
+        await asyncio.wait_for(self._writer_done.wait(), timeout=TIMEOUT)
+        return stored
+
+
+class _ReplayBarrierUnitOfWork(_CountingEntryUnitOfWork):
+    def __init__(
+        self,
+        factory: async_sessionmaker[AsyncSession],
+        counts: _EntryUowCounts,
+        receipt_read: asyncio.Event,
+        writer_done: asyncio.Event,
+    ) -> None:
+        super().__init__(factory, counts)
+        self._receipt_read = receipt_read
+        self._writer_done = writer_done
+
+    async def __aenter__(self):
+        await super().__aenter__()
+        assert self._session is not None
+        self.run_creation_receipts = _ReplayReceiptBarrierRepository(
+            self._session, self._receipt_read, self._writer_done
+        )
+        return self
+
+
+def _entry_service(
+    factory: async_sessionmaker[AsyncSession],
+    scope: _Scope,
+    character: _Character,
+    *,
+    suffix: str,
+    counts: _EntryUowCounts,
+    content_version: str | None = None,
+    uow_factory_override: Any | None = None,
+    run_id: RunId | None = None,
+    line_id: ContinuousStoryLineId | None = None,
+    session_id: str | None = None,
+) -> RunEntryService:
+    scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    if content_version is not None:
+        content_catalog = scenario_catalog.content_catalog.model_copy(
+            update={"content_version": content_version}
+        )
+        scenario_catalog = scenario_catalog.model_copy(
+            update={
+                "content_version": content_version,
+                "content_catalog": content_catalog,
+                "scenarios": tuple(
+                    definition.model_copy(
+                        update={"content_version": content_version}
+                    )
+                    for definition in scenario_catalog.scenarios
+                ),
+            }
+        )
+    session_id = session_id or scope.session_id(f"entry-{suffix}")
+
+    def uow_factory() -> _CountingEntryUnitOfWork:
+        if uow_factory_override is not None:
+            return uow_factory_override()
+        return _CountingEntryUnitOfWork(factory, counts)
+
+    session_service = SessionService(
+        uow_factory=uow_factory,
+        catalog=scenario_catalog.content_catalog,
+        scenario_catalog=scenario_catalog,
+        clock=lambda: NOW,
+        session_id_generator=lambda: session_id,
+        seed_generator=lambda: 42,
+        event_id_generator=lambda: f"event.{scope.token}-{suffix}",
+    )
+    return RunEntryService(
+        uow_factory=uow_factory,
+        run_id_issuer=_Issuer(run_id or scope.run_id(f"entry-{suffix}")),
+        continuous_story_line_id_issuer=_Issuer(
+            line_id or scope.line_id(f"entry-{suffix}")
+        ),
+        source_reference=RUN_SOURCE,
+        clock=lambda: NOW,
+        controller_binding_resolver=character.resolver,
+        player_character_binding_evidence=character.service,
+        session_service=session_service,
+    )
+
+
+@dataclass(frozen=True, slots=True)
+class _P8DurableFamilyCounts:
+    revisions: int
+    current: int
+    creation_receipts: int
+    mutation_receipts: int
+    participations: int
+    sessions: int
+    events: int
+    snapshots: int
+
+
+async def _p8_durable_family_counts(
+    factory: async_sessionmaker[AsyncSession],
+    *,
+    run_id: str,
+    session_id: str,
+) -> _P8DurableFamilyCounts:
+    async with factory() as fresh:
+        async def count(row_type: Any, predicate: Any) -> int:
+            return int(
+                await fresh.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(row_type)
+                    .where(predicate)
+                )
+                or 0
+            )
+
+        return _P8DurableFamilyCounts(
+            revisions=await count(
+                RunRevisionRow, RunRevisionRow.run_id == run_id
+            ),
+            current=await count(RunCurrentRow, RunCurrentRow.run_id == run_id),
+            creation_receipts=await count(
+                RunCreationReceiptRow,
+                RunCreationReceiptRow.result_run_id == run_id,
+            ),
+            mutation_receipts=await count(
+                RunMutationReceiptRow, RunMutationReceiptRow.run_id == run_id
+            ),
+            participations=await count(
+                RunSessionParticipationRow,
+                RunSessionParticipationRow.run_id == run_id,
+            ),
+            sessions=await count(
+                GameSessionRow, GameSessionRow.session_id == session_id
+            ),
+            events=await count(
+                DomainEventRow, DomainEventRow.session_id == session_id
+            ),
+            snapshots=await count(
+                GameSnapshotRow, GameSnapshotRow.session_id == session_id
+            ),
+        )
+
+
+async def _p8_scope_durable_totals(
+    factory: async_sessionmaker[AsyncSession],
+    scope: _Scope,
+) -> _P8DurableFamilyCounts:
+    async with factory() as fresh:
+        async def count(row_type: Any, predicate: Any) -> int:
+            return int(
+                await fresh.scalar(
+                    sa.select(sa.func.count())
+                    .select_from(row_type)
+                    .where(predicate)
+                )
+                or 0
+            )
+
+        return _P8DurableFamilyCounts(
+            revisions=await count(
+                RunRevisionRow, RunRevisionRow.run_id.in_(scope.run_ids)
+            ),
+            current=await count(
+                RunCurrentRow, RunCurrentRow.run_id.in_(scope.run_ids)
+            ),
+            creation_receipts=await count(
+                RunCreationReceiptRow,
+                RunCreationReceiptRow.result_run_id.in_(scope.run_ids),
+            ),
+            mutation_receipts=await count(
+                RunMutationReceiptRow,
+                RunMutationReceiptRow.run_id.in_(scope.run_ids),
+            ),
+            participations=await count(
+                RunSessionParticipationRow,
+                RunSessionParticipationRow.run_id.in_(scope.run_ids),
+            ),
+            sessions=await count(
+                GameSessionRow,
+                GameSessionRow.session_id.in_(scope.session_ids),
+            ),
+            events=await count(
+                DomainEventRow,
+                DomainEventRow.session_id.in_(scope.session_ids),
+            ),
+            snapshots=await count(
+                GameSnapshotRow,
+                GameSnapshotRow.session_id.in_(scope.session_ids),
+            ),
+        )
+
+
+async def _release_proven_entry_overlap(
+    barrier: _TwoPartyEntryBarrier,
+    first: asyncio.Task[Any],
+    second: asyncio.Task[Any],
+) -> tuple[Any, Any]:
+    try:
+        await asyncio.wait_for(barrier.all_arrived.wait(), timeout=TIMEOUT)
+        assert sorted(barrier.labels) == ["first", "second"]
+        assert not barrier.release.is_set()
+        assert not first.done()
+        assert not second.done()
+        barrier.release.set()
+        return await asyncio.wait_for(
+            asyncio.gather(first, second),
+            timeout=TIMEOUT,
+        )
+    except BaseException:
+        barrier.release.set()
+        for task in (first, second):
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(first, second, return_exceptions=True)
+        raise
+
+
+async def _insert_retired_immutable_revision(
+    factory: async_sessionmaker[AsyncSession],
+    character: _Character,
+    *,
+    suffix: str,
+) -> ApplicableCharacterReference:
+    operation_id, command = _lifecycle_command(
+        character,
+        kind=PlayerCharacterMutationKind.RETIRE,
+        suffix=suffix,
+    )
+    decision = RetirePlayerCharacterPolicy().evaluate(
+        character.record,
+        target=command.target_player_character_id,
+        expected_revision=command.expected_revision,
+        operation_id=operation_id,
+        confirmation=command.confirmation,
+        applicable_reference=command.applicable_reference,
+    )
+    assert decision.code is PlayerCharacterPolicyCode.ACCEPTED
+    assert decision.resulting_record is not None
+    retired = decision.resulting_record
+    _, fingerprint = mutation_fingerprint(
+        command,
+        operation_id=operation_id,
+    )
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=retired.player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=retired.player_character_id,
+            contract_version=retired.contract_version,
+            command_kind=PlayerCharacterMutationKind.RETIRE,
+            command_result=MutationCommandResult.RETIRED,
+            resulting_revision=retired.record_revision,
+            resulting_lifecycle=retired.lifecycle,
+        ),
+    )
+    async with SqlAlchemyUnitOfWork(factory) as uow:
+        await uow.player_characters.append_revision(retired, created_at=NOW)
+        assert await uow.player_characters.compare_and_swap_current(
+            retired,
+            expected_revision=character.record.record_revision.value,
+            created_at=NOW,
+        )
+        await uow.mutation_receipts.add(receipt, created_at=NOW)
+        await uow.commit()
+    return ApplicableCharacterReference(
+        player_character_id=retired.player_character_id,
+        contract_version=retired.contract_version,
+        record_revision=retired.record_revision,
+    )
+
+
+async def _coherently_replace_p8_binding_family(
+    factory: async_sessionmaker[AsyncSession],
+    created: RunEntryResult,
+    target: ApplicableCharacterReference,
+) -> None:
+    async with factory.begin() as session:
+        repository = SqlAlchemyRunRepository(session)
+        initial = await repository._run_at_revision(created.run_id, 1)
+        mutation_rows = (
+            await session.scalars(
+                sa.select(RunMutationReceiptRow)
+                .where(RunMutationReceiptRow.run_id == created.run_id.value)
+                .order_by(RunMutationReceiptRow.resulting_state_version)
+            )
+        ).all()
+        binding_row, attachment_row = mutation_rows
+        binding_operation_id = RunOperationId(value=binding_row.operation_id)
+        attachment_operation_id = RunOperationId(
+            value=attachment_row.operation_id
+        )
+        binding_command = BindPlayerCharacterCommand(
+            run_id=created.run_id,
+            continuous_story_line_id=initial.continuous_story_line_id,
+            target_player_character_id=target.player_character_id,
+            expected_state_version=RunStateVersion(value=1),
+            source_reference=RUN_SOURCE,
+        )
+        rebound = bind_player_character_to_run(
+            initial,
+            binding_command,
+            applicable_character_reference=target,
+            operation_id=binding_operation_id,
+            occurred_at=NOW,
+        )
+        assert attachment_row.participation_session_id is not None
+        reactivated = activate_first_session_for_run(
+            rebound,
+            AttachSessionCommand(
+                run_id=created.run_id,
+                continuous_story_line_id=initial.continuous_story_line_id,
+                session_id=attachment_row.participation_session_id,
+                expected_state_version=RunStateVersion(value=2),
+                source_reference=RUN_SOURCE,
+            ),
+            operation_id=attachment_operation_id,
+            occurred_at=NOW,
+        )
+        _, binding_fingerprint = (
+            bind_player_character_fingerprint(
+                binding_command,
+                operation_id=binding_operation_id,
+            )
+        )
+        binding_receipt = StoredRunSuccessReceipt(
+            key=RunReceiptKey(
+                run_id=created.run_id,
+                operation_namespace=(
+                    RunOperationNamespace.BIND_PLAYER_CHARACTER_V1
+                ),
+                operation_id=binding_operation_id,
+            ),
+            fingerprint=binding_fingerprint,
+            command_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+            result=bind_player_character_result(rebound),
+        )
+        rebound_values = SqlAlchemyRunRepository._run_core_values(rebound)
+        active_values = SqlAlchemyRunRepository._run_core_values(reactivated)
+        await session.execute(
+            sa.update(RunRevisionRow)
+            .where(
+                RunRevisionRow.run_id == created.run_id.value,
+                RunRevisionRow.state_version == 2,
+            )
+            .values(**rebound_values)
+            .execution_options(synchronize_session=False)
+        )
+        await session.execute(
+            sa.update(RunRevisionRow)
+            .where(
+                RunRevisionRow.run_id == created.run_id.value,
+                RunRevisionRow.state_version == 3,
+            )
+            .values(**active_values)
+            .execution_options(synchronize_session=False)
+        )
+        await session.execute(
+            sa.update(RunCurrentRow)
+            .where(RunCurrentRow.run_id == created.run_id.value)
+            .values(
+                **active_values,
+                active_player_character_id=target.player_character_id.value,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        await session.execute(
+            sa.update(RunMutationReceiptRow)
+            .where(
+                RunMutationReceiptRow.run_id == created.run_id.value,
+                RunMutationReceiptRow.operation_namespace
+                == RunOperationNamespace.BIND_PLAYER_CHARACTER_V1.value,
+            )
+            .values(
+                fingerprint=run_fingerprint_to_storage_bytes(
+                    binding_fingerprint
+                ),
+                result_player_character_id=target.player_character_id.value,
+                result_character_contract_version=target.contract_version.value,
+                result_character_record_revision=target.record_revision.value,
+                receipt_canonical=run_receipt_to_storage_bytes(
+                    binding_receipt
+                ),
+                operation_evidence_canonical=(
+                    binding_operation_evidence_to_storage_bytes(
+                        binding_command
+                    )
+                ),
+            )
+            .execution_options(synchronize_session=False)
+        )
+
+
+async def _coherently_replace_p8_participation_session(
+    factory: async_sessionmaker[AsyncSession],
+    created: RunEntryResult,
+    replacement_session_id: str,
+) -> None:
+    async with factory.begin() as session:
+        repository = SqlAlchemyRunRepository(session)
+        bound = await repository._run_at_revision(created.run_id, 2)
+        attachment_row = await session.scalar(
+            sa.select(RunMutationReceiptRow).where(
+                RunMutationReceiptRow.run_id == created.run_id.value,
+                RunMutationReceiptRow.operation_namespace
+                == RunOperationNamespace.ATTACH_SESSION_V1.value,
+            )
+        )
+        assert attachment_row is not None
+        operation_id = RunOperationId(value=attachment_row.operation_id)
+        command = AttachSessionCommand(
+            run_id=created.run_id,
+            continuous_story_line_id=bound.continuous_story_line_id,
+            session_id=replacement_session_id,
+            expected_state_version=RunStateVersion(value=2),
+            source_reference=RUN_SOURCE,
+        )
+        substituted = activate_first_session_for_run(
+            bound,
+            command,
+            operation_id=operation_id,
+            occurred_at=NOW,
+        )
+        _, fingerprint = attach_session_fingerprint(
+            command,
+            operation_id=operation_id,
+        )
+        receipt = StoredRunSuccessReceipt(
+            key=RunReceiptKey(
+                run_id=created.run_id,
+                operation_namespace=RunOperationNamespace.ATTACH_SESSION_V1,
+                operation_id=operation_id,
+            ),
+            fingerprint=fingerprint,
+            command_kind=RunMutationKind.ATTACH_SESSION,
+            result=attach_session_result(substituted),
+        )
+        receipt_values = {
+            column.name: getattr(attachment_row, column.name)
+            for column in RunMutationReceiptRow.__table__.columns
+        }
+        receipt_values.update(
+            {
+                "fingerprint": run_fingerprint_to_storage_bytes(fingerprint),
+                "participation_session_id": replacement_session_id,
+                "receipt_canonical": run_receipt_to_storage_bytes(receipt),
+                "operation_evidence_canonical": (
+                    attach_operation_evidence_to_storage_bytes(command)
+                ),
+            }
+        )
+        await session.delete(attachment_row)
+        await session.flush()
+        changed = await session.execute(
+            sa.update(RunSessionParticipationRow)
+            .where(
+                RunSessionParticipationRow.run_id == created.run_id.value
+            )
+            .values(session_id=replacement_session_id)
+            .execution_options(synchronize_session=False)
+        )
+        assert changed.rowcount == 1
+        session.add(RunMutationReceiptRow(**receipt_values))
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_active_binding_query_returns_zero_then_one_canonical_match(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-active-query"
+    )
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as before:
+        absent = await before.runs.get_active_for_player_character_for_update(
+            character.record.player_character_id
+        )
+    assert absent is None
+
+    counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="active-query",
+        counts=counts,
+    )
+    created = await service.enter(
+        character.principal,
+        command=RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.active-query"
+            ),
+            player_character_id=character.record.player_character_id,
+            expected_record_revision=character.record.record_revision,
+            scenario_id="death_certificate",
+        ),
+    )
+    assert isinstance(created, RunEntryResult)
+
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as after:
+        present = await after.runs.get_active_for_player_character_for_update(
+            character.record.player_character_id
+        )
+    assert present is not None
+    assert present.run_id == created.run_id
+    assert present.player_character_binding is not None
+    assert (
+        present.player_character_binding.applicable_character_reference
+        .player_character_id
+        == character.record.player_character_id
+    )
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=0,
+        closes=1,
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize("corruption", ("lifecycle", "ownership"))
+async def test_mysql_p8_owned_character_query_rejects_corrupt_current_family(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    corruption: str,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, f"p8-owned-{corruption}"
+    )
+    other = await _create_character(
+        mysql_session_factory, binding_scope, f"p8-owned-{corruption}-other"
+    )
+    async with mysql_session_factory.begin() as session:
+        values = (
+            {"lifecycle": PlayerCharacterLifecycle.RETIRED.value}
+            if corruption == "lifecycle"
+            else {"controller_binding": other.binding.value}
+        )
+        changed = await session.execute(
+            sa.update(PlayerCharacterCurrentRow)
+            .where(
+                PlayerCharacterCurrentRow.player_character_id
+                == character.record.player_character_id.value
+            )
+            .values(**values)
+        )
+        assert changed.rowcount == 1
+
+    counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix=f"owned-{corruption}",
+        counts=counts,
+    )
+    with pytest.raises(PlayerCharacterStoredRecordIntegrityError) as raised:
+        await service.enter(
+            character.principal,
+            command=RunEntryCommand(
+                public_operation_key=RunEntryPublicOperationKey(
+                    value=f"entry.{binding_scope.token}.owned-{corruption}"
+                ),
+                player_character_id=character.record.player_character_id,
+                expected_record_revision=character.record.record_revision,
+                scenario_id="death_certificate",
+            ),
+        )
+
+    assert character.record.player_character_id.value not in str(raised.value)
+    assert other.binding.value not in str(raised.value)
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    async with mysql_session_factory() as session:
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunRevisionRow)
+                .where(RunRevisionRow.run_id.in_(binding_scope.run_ids))
+            )
+            == 0
+        )
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(GameSessionRow)
+                .where(GameSessionRow.session_id.in_(binding_scope.session_ids))
+            )
+            == 0
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_active_binding_query_rejects_corrupt_surviving_family(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-corrupt-binding"
+    )
+    creation_counts = _EntryUowCounts()
+    creator = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="cb-win",
+        counts=creation_counts,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.corrupt-binding-winner"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+    created = await creator.enter(character.principal, command=command)
+    assert isinstance(created, RunEntryResult)
+
+    async with mysql_session_factory.begin() as session:
+        changed = await session.execute(
+            sa.update(RunCurrentRow)
+            .where(RunCurrentRow.run_id == created.run_id.value)
+            .values(
+                lifecycle_status="completed",
+                binding_state="historical",
+                inactivated_at=NOW,
+                active_player_character_id=None,
+            )
+        )
+        assert changed.rowcount == 1
+
+    rejection_counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="cb-lose",
+        counts=rejection_counts,
+    )
+    with pytest.raises(RunStoredRecordIntegrityError) as raised:
+        await service.enter(
+            character.principal,
+            command=RunEntryCommand(
+                public_operation_key=RunEntryPublicOperationKey(
+                    value=f"entry.{binding_scope.token}.corrupt-binding-loser"
+                ),
+                player_character_id=character.record.player_character_id,
+                expected_record_revision=character.record.record_revision,
+                scenario_id="death_certificate",
+            ),
+        )
+
+    assert created.run_id.value not in str(raised.value)
+    assert rejection_counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    loser_run_id = next(
+        run_id for run_id in binding_scope.run_ids if run_id != created.run_id.value
+    )
+    loser_session_id = next(
+        session_id
+        for session_id in binding_scope.session_ids
+        if session_id != created.session_id
+    )
+    async with mysql_session_factory() as session:
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunRevisionRow)
+                .where(RunRevisionRow.run_id == loser_run_id)
+            )
+            == 0
+        )
+        assert await session.get(GameSessionRow, loser_session_id) is None
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_entry_enforces_32_character_scenario_version_before_writes(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    accepted_character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-width-32"
+    )
+    accepted_counts = _EntryUowCounts()
+    accepted_service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        accepted_character,
+        suffix="width-32",
+        counts=accepted_counts,
+        content_version="v" * 32,
+    )
+    accepted = await accepted_service.enter(
+        accepted_character.principal,
+        command=RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.width-32"
+            ),
+            player_character_id=accepted_character.record.player_character_id,
+            expected_record_revision=accepted_character.record.record_revision,
+            scenario_id="death_certificate",
+        ),
+    )
+    assert isinstance(accepted, RunEntryResult)
+    async with mysql_session_factory() as session:
+        accepted_row = await session.get(GameSessionRow, accepted.session_id)
+    assert accepted_row is not None
+    assert accepted_row.scenario_version == "v" * 32
+
+    rejected_character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-width-33"
+    )
+    rejected_counts = _EntryUowCounts()
+    rejected_service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        rejected_character,
+        suffix="width-33",
+        counts=rejected_counts,
+        content_version="v" * 33,
+    )
+    rejected = await rejected_service.enter(
+        rejected_character.principal,
+        command=RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.width-33"
+            ),
+            player_character_id=rejected_character.record.player_character_id,
+            expected_record_revision=rejected_character.record.record_revision,
+            scenario_id="death_certificate",
+        ),
+    )
+    assert rejected == RunEntryDecision(
+        code=RunEntryDecisionCode.INVALID_SCENARIO_DEFINITION
+    )
+    assert rejected_counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("substitution", "expected_error"),
+    (
+        ("binding", RunEntryIntegrityError),
+        ("immutable-revision", RunStoredRecordIntegrityError),
+        ("participation", RunEntryIntegrityError),
+        ("session", SnapshotSessionMismatchError),
+        ("initial-event", SnapshotSessionMismatchError),
+    ),
+)
+async def test_mysql_p8_coherent_cross_family_substitutions_fail_closed(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    substitution: str,
+    expected_error: type[Exception],
+) -> None:
+    short = {
+        "binding": "xb",
+        "immutable-revision": "xr",
+        "participation": "xp",
+        "session": "xs",
+        "initial-event": "xe",
+    }[substitution]
+    character = await _create_character(
+        mysql_session_factory, binding_scope, f"p8-{short}"
+    )
+    counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix=short,
+        counts=counts,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.{short}"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+    created = await service.enter(character.principal, command=command)
+    assert isinstance(created, RunEntryResult)
+
+    protected_value: str
+    if substitution == "binding":
+        replacement = await _create_additional_owned_character(
+            mysql_session_factory,
+            binding_scope,
+            f"p8-{short}-alt",
+            character,
+        )
+        target = ApplicableCharacterReference(
+            player_character_id=replacement.record.player_character_id,
+            contract_version=replacement.record.contract_version,
+            record_revision=replacement.record.record_revision,
+        )
+        protected_value = target.player_character_id.value
+        await _coherently_replace_p8_binding_family(
+            mysql_session_factory, created, target
+        )
+    elif substitution == "immutable-revision":
+        target = await _insert_retired_immutable_revision(
+            mysql_session_factory,
+            character,
+            suffix=short,
+        )
+        protected_value = str(target.record_revision.value)
+        await _coherently_replace_p8_binding_family(
+            mysql_session_factory, created, target
+        )
+    elif substitution == "participation":
+        replacement_session_id = await _add_session(
+            mysql_session_factory,
+            binding_scope,
+            suffix=f"p8-{short}-alt",
+            principal=character.principal,
+        )
+        protected_value = replacement_session_id
+        await _coherently_replace_p8_participation_session(
+            mysql_session_factory,
+            created,
+            replacement_session_id,
+        )
+    elif substitution == "session":
+        protected_value = "binding-lock-order-scenario"
+        async with mysql_session_factory.begin() as session:
+            changed = await session.execute(
+                sa.update(GameSessionRow)
+                .where(GameSessionRow.session_id == created.session_id)
+                .values(scenario_id=protected_value)
+            )
+            assert changed.rowcount == 1
+    else:
+        protected_value = "scenario.substituted"
+        async with mysql_session_factory.begin() as session:
+            changed = await session.execute(
+                sa.update(DomainEventRow)
+                .where(DomainEventRow.session_id == created.session_id)
+                .values(
+                    payload_json={
+                        "scenario_id": protected_value,
+                        "scenario_content_version": (
+                            "death-certificate-1.1.0"
+                        ),
+                    }
+                )
+            )
+            assert changed.rowcount == 1
+
+    with pytest.raises(expected_error) as raised:
+        await service.enter(character.principal, command=command)
+
+    assert protected_value not in str(raised.value)
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+    async with mysql_session_factory() as fresh:
+        durable_counts = (
+            await fresh.scalar(
+                sa.select(sa.func.count()).select_from(RunRevisionRow).where(
+                    RunRevisionRow.run_id == created.run_id.value
+                )
+            ),
+            await fresh.scalar(
+                sa.select(sa.func.count()).select_from(RunCurrentRow).where(
+                    RunCurrentRow.run_id == created.run_id.value
+                )
+            ),
+            await fresh.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunCreationReceiptRow)
+                .where(
+                    RunCreationReceiptRow.result_run_id
+                    == created.run_id.value
+                )
+            ),
+            await fresh.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunMutationReceiptRow)
+                .where(RunMutationReceiptRow.run_id == created.run_id.value)
+            ),
+            await fresh.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunSessionParticipationRow)
+                .where(
+                    RunSessionParticipationRow.run_id == created.run_id.value
+                )
+            ),
+        )
+    assert durable_counts == (3, 1, 1, 2, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "boundary",
+    (
+        "run-1",
+        "creation-receipt",
+        "run-2",
+        "cas-1",
+        "binding-receipt",
+        "session-row",
+        "session-event",
+        "session-snapshot",
+        "run-3",
+        "participation",
+        "cas-2",
+        "attachment-receipt",
+    ),
+)
+async def test_mysql_p8_failure_after_each_write_boundary_rolls_back_everything(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    boundary: str,
+) -> None:
+    short_suffix = f"pf-{boundary[:4]}"
+    character = await _create_character(
+        mysql_session_factory, binding_scope, short_suffix
+    )
+    counts = _EntryUowCounts()
+
+    def failing_uow() -> _BoundaryFailureEntryUnitOfWork:
+        return _BoundaryFailureEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            boundary=boundary,
+            failure_factory=lambda: RuntimeError(f"failure after {boundary}"),
+        )
+
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix=short_suffix,
+        counts=counts,
+        uow_factory_override=failing_uow,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.{boundary}"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+
+    with pytest.raises(RuntimeError, match=f"failure after {boundary}"):
+        await service.enter(character.principal, command=command)
+
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    run_id = next(iter(binding_scope.run_ids))
+    session_id = next(iter(binding_scope.session_ids))
+    async with mysql_session_factory() as session:
+        counts_after = (
+            await session.scalar(
+                sa.select(sa.func.count()).select_from(RunRevisionRow).where(
+                    RunRevisionRow.run_id == run_id
+                )
+            ),
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunCreationReceiptRow)
+                .where(RunCreationReceiptRow.result_run_id == run_id)
+            ),
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunMutationReceiptRow)
+                .where(RunMutationReceiptRow.run_id == run_id)
+            ),
+            await session.scalar(
+                sa.select(sa.func.count())
+                .select_from(RunSessionParticipationRow)
+                .where(RunSessionParticipationRow.run_id == run_id)
+            ),
+            await session.scalar(
+                sa.select(sa.func.count()).select_from(GameSessionRow).where(
+                    GameSessionRow.session_id == session_id
+                )
+            ),
+        )
+    assert counts_after == (0, 0, 0, 0, 0)
+
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as following:
+        locked = await following.player_characters.get_for_update(
+            character.record.player_character_id
+        )
+    assert locked == character.record
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_cancellation_rolls_back_and_releases_all_locks(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-cancel"
+    )
+    counts = _EntryUowCounts()
+
+    def cancelling_uow() -> _BoundaryFailureEntryUnitOfWork:
+        return _BoundaryFailureEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            boundary="session-snapshot",
+            failure_factory=asyncio.CancelledError,
+        )
+
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="cancel",
+        counts=counts,
+        uow_factory_override=cancelling_uow,
+    )
+    with pytest.raises(asyncio.CancelledError):
+        await service.enter(
+            character.principal,
+            command=RunEntryCommand(
+                public_operation_key=RunEntryPublicOperationKey(
+                    value=f"entry.{binding_scope.token}.cancel"
+                ),
+                player_character_id=character.record.player_character_id,
+                expected_record_revision=character.record.record_revision,
+                scenario_id="death_certificate",
+            ),
+        )
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    async with SqlAlchemyUnitOfWork(mysql_session_factory) as following:
+        locked = await asyncio.wait_for(
+            following.player_characters.get_for_update(
+                character.record.player_character_id
+            ),
+            timeout=TIMEOUT,
+        )
+    assert locked == character.record
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_entry_is_atomic_and_exact_replay_is_read_only(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-entry"
+    )
+    counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="atomic",
+        counts=counts,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.atomic"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+
+    created = await service.enter(character.principal, command=command)
+    assert isinstance(created, RunEntryResult)
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=0,
+        closes=1,
+    )
+
+    async with mysql_session_factory() as session:
+        run_counts_list: list[int] = []
+        for table in (
+            RunRevisionRow,
+            RunCurrentRow,
+            RunMutationReceiptRow,
+            RunSessionParticipationRow,
+        ):
+            run_counts_list.append(
+                int(
+                    await session.scalar(
+                        sa.select(sa.func.count()).select_from(table).where(
+                            table.run_id == created.run_id.value
+                        )
+                    )
+                    or 0
+                )
+            )
+        run_counts = tuple(run_counts_list)
+        creation_row = await session.scalar(
+            sa.select(RunCreationReceiptRow).where(
+                RunCreationReceiptRow.result_run_id == created.run_id.value
+            )
+        )
+        session_row = await session.get(GameSessionRow, created.session_id)
+        snapshot_row = await session.get(GameSnapshotRow, created.session_id)
+        event_rows = (
+            await session.scalars(
+                sa.select(DomainEventRow).where(
+                    DomainEventRow.session_id == created.session_id
+                )
+            )
+        ).all()
+    assert run_counts == (3, 1, 2, 1)
+    assert creation_row is not None
+    assert 14 <= len(creation_row.operation_evidence_canonical) <= 4096
+    assert creation_row.operation_evidence_canonical.startswith(
+        b"\x89DP8S2CE\r\n\x1a\n\x01"
+    )
+    assert creation_row.fingerprint == hashlib.sha256(
+        creation_row.operation_evidence_canonical
+    ).digest()
+    assert session_row is not None
+    assert session_row.scenario_version == "death-certificate-1.1.0"
+    assert snapshot_row is not None and snapshot_row.state_version == 0
+    assert snapshot_row.state_json["schema_version"] == 3
+    assert snapshot_row.state_json["player_memory"]["scenario_records"]
+    assert len(event_rows) == 1
+    assert event_rows[0].sequence_no == 1
+
+    replayed = await service.enter(character.principal, command=command)
+    assert replayed == created
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+
+    async with mysql_session_factory() as session:
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count()).select_from(RunRevisionRow).where(
+                    RunRevisionRow.run_id == created.run_id.value
+                )
+            )
+            == 3
+        )
+        assert (
+            await session.scalar(
+                sa.select(sa.func.count()).select_from(DomainEventRow).where(
+                    DomainEventRow.session_id == created.session_id
+                )
+            )
+            == 1
+        )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "tamper",
+    (
+        "controller",
+        "public-key",
+        "player-character",
+        "character-revision",
+        "scenario",
+        "content-version",
+        "default-character",
+        "source",
+        "raw-fingerprint",
+        "canonical-fingerprint",
+        "canonical-result",
+        "canonical-key",
+    ),
+)
+async def test_mysql_p8_creation_evidence_and_receipt_tamper_fail_closed(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    tamper: str,
+) -> None:
+    short_suffix = f"pt-{tamper[:3]}"
+    character = await _create_character(
+        mysql_session_factory, binding_scope, short_suffix
+    )
+    counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix=short_suffix,
+        counts=counts,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.{tamper}"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+    created = await service.enter(character.principal, command=command)
+    assert isinstance(created, RunEntryResult)
+
+    async with mysql_session_factory.begin() as session:
+        row = await session.scalar(
+            sa.select(RunCreationReceiptRow).where(
+                RunCreationReceiptRow.result_run_id == created.run_id.value
+            )
+        )
+        assert row is not None
+        if tamper in {
+            "controller",
+            "public-key",
+            "player-character",
+            "character-revision",
+            "scenario",
+            "content-version",
+            "default-character",
+            "source",
+        }:
+            payload = json.loads(row.operation_evidence_canonical[13:])
+            if tamper == "controller":
+                payload["controller_operation"]["controller_binding"][
+                    "value"
+                ] = "controller.tampered"
+            elif tamper == "public-key":
+                payload["controller_operation"][
+                    "public_operation_key"
+                ] = "entry.tampered"
+            elif tamper == "player-character":
+                payload["player_character"]["player_character_id"][
+                    "value"
+                ] = "pc.tampered"
+            elif tamper == "character-revision":
+                payload["player_character"][
+                    "pre_entry_record_revision"
+                ]["value"] = 2
+            elif tamper == "scenario":
+                payload["scenario"]["scenario_id"] = "scenario.tampered"
+            elif tamper == "content-version":
+                payload["scenario"]["content_version"] = "version.tampered"
+            elif tamper == "default-character":
+                payload["scenario"][
+                    "default_character_definition_id"
+                ] = "character.tampered"
+            else:
+                payload["trusted_run_source"]["source_reference"][
+                    "value"
+                ] = "source.tampered"
+            row.operation_evidence_canonical = (
+                b"\x89DP8S2CE\r\n\x1a\n\x01"
+                + json.dumps(
+                    payload,
+                    ensure_ascii=False,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                ).encode("utf-8")
+            )
+        elif tamper == "raw-fingerprint":
+            row.fingerprint = b"\x00" * 32
+        else:
+            receipt_payload = json.loads(row.receipt_canonical)
+            if tamper == "canonical-fingerprint":
+                receipt_payload["fingerprint"]["value"] = "0" * 64
+            elif tamper == "canonical-result":
+                receipt_payload["result"]["run_id"]["value"] = "run.tampered"
+            else:
+                receipt_payload["key"]["operation_id"][
+                    "value"
+                ] = "operation.tampered"
+            row.receipt_canonical = json.dumps(
+                receipt_payload,
+                ensure_ascii=False,
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+
+    with pytest.raises(RunStoredRecordIntegrityError):
+        await service.enter(character.principal, command=command)
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize("tamper", (False, True))
+async def test_mysql_p8_replay_uses_current_session_and_snapshot_reads(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    tamper: bool,
+) -> None:
+    suffix = "p8-current-bad" if tamper else "p8-current-good"
+    character = await _create_character(
+        mysql_session_factory, binding_scope, suffix
+    )
+    creation_counts = _EntryUowCounts()
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="current-bad" if tamper else "current-good",
+        counts=creation_counts,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.current-{tamper}"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+    created = await service.enter(character.principal, command=command)
+    assert isinstance(created, RunEntryResult)
+
+    receipt_read = asyncio.Event()
+    writer_done = asyncio.Event()
+    replay_counts = _EntryUowCounts()
+
+    def replay_uow() -> _ReplayBarrierUnitOfWork:
+        return _ReplayBarrierUnitOfWork(
+            mysql_session_factory,
+            replay_counts,
+            receipt_read,
+            writer_done,
+        )
+
+    service.uow_factory = replay_uow
+
+    async def advance_current_state() -> None:
+        await asyncio.wait_for(receipt_read.wait(), timeout=TIMEOUT)
+        try:
+            async with mysql_session_factory.begin() as writer:
+                snapshot = await writer.get(GameSnapshotRow, created.session_id)
+                assert snapshot is not None
+                payload = deepcopy(snapshot.state_json)
+                if tamper:
+                    payload["content_version"] = "tampered-content"
+                await writer.execute(
+                    sa.update(GameSessionRow)
+                    .where(GameSessionRow.session_id == created.session_id)
+                    .values(state_version=1)
+                )
+                await writer.execute(
+                    sa.update(GameSnapshotRow)
+                    .where(GameSnapshotRow.session_id == created.session_id)
+                    .values(state_version=1, state_json=payload)
+                )
+        finally:
+            writer_done.set()
+
+    replay_task = asyncio.create_task(
+        service.enter(character.principal, command=command)
+    )
+    writer_task = asyncio.create_task(advance_current_state())
+    if tamper:
+        with pytest.raises(SnapshotContentVersionMismatchError):
+            await asyncio.wait_for(
+                asyncio.gather(replay_task, writer_task), timeout=TIMEOUT
+            )
+    else:
+        replayed, _ = await asyncio.wait_for(
+            asyncio.gather(replay_task, writer_task), timeout=TIMEOUT
+        )
+        assert replayed == created
+
+    assert replay_counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    async with mysql_session_factory() as session:
+        session_row = await session.get(GameSessionRow, created.session_id)
+        snapshot_row = await session.get(GameSnapshotRow, created.session_id)
+    assert session_row is not None and session_row.state_version == 1
+    assert snapshot_row is not None and snapshot_row.state_version == 1
+    assert snapshot_row.state_json["content_version"] == (
+        "tampered-content" if tamper else "death-certificate-1.1.0"
+    )
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_same_character_same_key_has_one_commit_and_one_replay(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-entry-race"
+    )
+    counts = _EntryUowCounts()
+    barrier = _TwoPartyEntryBarrier()
+    labels = iter(("first", "second"))
+
+    def synchronized_uow() -> _SynchronizedEntryUnitOfWork:
+        return _SynchronizedEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            barrier=barrier,
+            label=next(labels),
+            point="character-lock",
+        )
+
+    first_service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="race-a",
+        counts=counts,
+        uow_factory_override=synchronized_uow,
+    )
+    second_service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="race-b",
+        counts=counts,
+        uow_factory_override=synchronized_uow,
+    )
+    command = RunEntryCommand(
+        public_operation_key=RunEntryPublicOperationKey(
+            value=f"entry.{binding_scope.token}.race"
+        ),
+        player_character_id=character.record.player_character_id,
+        expected_record_revision=character.record.record_revision,
+        scenario_id="death_certificate",
+    )
+
+    first_task = asyncio.create_task(
+        first_service.enter(character.principal, command=command)
+    )
+    second_task = asyncio.create_task(
+        second_service.enter(character.principal, command=command)
+    )
+    first, second = await _release_proven_entry_overlap(
+        barrier, first_task, second_task
+    )
+
+    assert isinstance(first, RunEntryResult)
+    assert second == first
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+    winning_counts = await _p8_durable_family_counts(
+        mysql_session_factory,
+        run_id=first.run_id.value,
+        session_id=first.session_id,
+    )
+    assert winning_counts == _P8DurableFamilyCounts(3, 1, 1, 2, 1, 1, 1, 1)
+    losing_run_id = next(
+        value for value in binding_scope.run_ids if value != first.run_id.value
+    )
+    losing_session_id = next(
+        value for value in binding_scope.session_ids if value != first.session_id
+    )
+    assert await _p8_durable_family_counts(
+        mysql_session_factory,
+        run_id=losing_run_id,
+        session_id=losing_session_id,
+    ) == _P8DurableFamilyCounts(0, 0, 0, 0, 0, 0, 0, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_same_character_different_keys_has_one_durable_winner(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-entry-different-key"
+    )
+    counts = _EntryUowCounts()
+    barrier = _TwoPartyEntryBarrier()
+    labels = iter(("first", "second"))
+
+    def synchronized_uow() -> _SynchronizedEntryUnitOfWork:
+        return _SynchronizedEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            barrier=barrier,
+            label=next(labels),
+            point="character-lock",
+        )
+
+    services = tuple(
+        _entry_service(
+            mysql_session_factory,
+            binding_scope,
+            character,
+            suffix=f"different-{suffix}",
+            counts=counts,
+            uow_factory_override=synchronized_uow,
+        )
+        for suffix in ("a", "b")
+    )
+    commands = tuple(
+        RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.different-{suffix}"
+            ),
+            player_character_id=character.record.player_character_id,
+            expected_record_revision=character.record.record_revision,
+            scenario_id="death_certificate",
+        )
+        for suffix in ("a", "b")
+    )
+
+    tasks = tuple(
+        asyncio.create_task(
+            service.enter(character.principal, command=command)
+        )
+        for service, command in zip(services, commands, strict=True)
+    )
+    results = await _release_proven_entry_overlap(
+        barrier, tasks[0], tasks[1]
+    )
+
+    assert sum(isinstance(item, RunEntryResult) for item in results) == 1
+    assert [
+        item
+        for item in results
+        if isinstance(item, RunEntryDecision)
+    ] == [
+        RunEntryDecision(
+            code=RunEntryDecisionCode.PLAYER_CHARACTER_NOT_ELIGIBLE
+        )
+    ]
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+    winner = next(item for item in results if isinstance(item, RunEntryResult))
+    assert await _p8_durable_family_counts(
+        mysql_session_factory,
+        run_id=winner.run_id.value,
+        session_id=winner.session_id,
+    ) == _P8DurableFamilyCounts(3, 1, 1, 2, 1, 1, 1, 1)
+    losing_run_id = next(
+        value for value in binding_scope.run_ids if value != winner.run_id.value
+    )
+    losing_session_id = next(
+        value for value in binding_scope.session_ids if value != winner.session_id
+    )
+    assert await _p8_durable_family_counts(
+        mysql_session_factory,
+        run_id=losing_run_id,
+        session_id=losing_session_id,
+    ) == _P8DurableFamilyCounts(0, 0, 0, 0, 0, 0, 0, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_same_derived_key_non_equivalent_race_has_one_family(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    first_character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-key-a"
+    )
+    second_character = await _create_additional_owned_character(
+        mysql_session_factory,
+        binding_scope,
+        "p8-key-b",
+        first_character,
+    )
+    counts = _EntryUowCounts()
+    barrier = _TwoPartyEntryBarrier()
+    labels = iter(("first", "second"))
+
+    def synchronized_uow() -> _SynchronizedEntryUnitOfWork:
+        return _SynchronizedEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            barrier=barrier,
+            label=next(labels),
+            point="character-lock",
+        )
+
+    services = tuple(
+        _entry_service(
+            mysql_session_factory,
+            binding_scope,
+            character,
+            suffix=f"key-{suffix}",
+            counts=counts,
+            uow_factory_override=synchronized_uow,
+        )
+        for character, suffix in (
+            (first_character, "a"),
+            (second_character, "b"),
+        )
+    )
+    commands = tuple(
+        RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.same-derived-key"
+            ),
+            player_character_id=character.record.player_character_id,
+            expected_record_revision=character.record.record_revision,
+            scenario_id="death_certificate",
+        )
+        for character in (first_character, second_character)
+    )
+    tasks = tuple(
+        asyncio.create_task(
+            service.enter(first_character.principal, command=command)
+        )
+        for service, command in zip(services, commands, strict=True)
+    )
+
+    results = await _release_proven_entry_overlap(
+        barrier, tasks[0], tasks[1]
+    )
+
+    assert sum(isinstance(item, RunEntryResult) for item in results) == 1
+    assert [
+        item for item in results if isinstance(item, RunEntryDecision)
+    ] == [
+        RunEntryDecision(code=RunEntryDecisionCode.IDEMPOTENCY_CONFLICT)
+    ]
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+    assert await _p8_scope_durable_totals(
+        mysql_session_factory, binding_scope
+    ) == _P8DurableFamilyCounts(3, 1, 1, 2, 1, 1, 1, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("identity", "barrier_point"),
+    (
+        ("run", "run-identity"),
+        ("line", "line-identity"),
+        ("session", "session-identity"),
+    ),
+)
+async def test_mysql_p8_identity_uniqueness_races_rollback_losing_family(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    identity: str,
+    barrier_point: str,
+) -> None:
+    first_character = await _create_character(
+        mysql_session_factory, binding_scope, f"p8-{identity}-a"
+    )
+    second_character = await _create_character(
+        mysql_session_factory, binding_scope, f"p8-{identity}-b"
+    )
+    shared_run = (
+        binding_scope.run_id("entry-shared-run")
+        if identity == "run"
+        else None
+    )
+    shared_line = (
+        binding_scope.line_id("entry-shared-line")
+        if identity == "line"
+        else None
+    )
+    shared_session = (
+        binding_scope.session_id("entry-shared-session")
+        if identity == "session"
+        else None
+    )
+    counts = _EntryUowCounts()
+    barrier = _TwoPartyEntryBarrier()
+    labels = iter(("first", "second"))
+
+    def synchronized_uow() -> _SynchronizedEntryUnitOfWork:
+        return _SynchronizedEntryUnitOfWork(
+            mysql_session_factory,
+            counts,
+            barrier=barrier,
+            label=next(labels),
+            point=barrier_point,
+        )
+
+    services = tuple(
+        _entry_service(
+            mysql_session_factory,
+            binding_scope,
+            character,
+            suffix=f"{identity}-{suffix}",
+            counts=counts,
+            uow_factory_override=synchronized_uow,
+            run_id=shared_run,
+            line_id=shared_line,
+            session_id=shared_session,
+        )
+        for character, suffix in (
+            (first_character, "a"),
+            (second_character, "b"),
+        )
+    )
+    commands = tuple(
+        RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.{identity}-{suffix}"
+            ),
+            player_character_id=character.record.player_character_id,
+            expected_record_revision=character.record.record_revision,
+            scenario_id="death_certificate",
+        )
+        for character, suffix in (
+            (first_character, "a"),
+            (second_character, "b"),
+        )
+    )
+    tasks = tuple(
+        asyncio.create_task(
+            service.enter(character.principal, command=command)
+        )
+        for service, command, character in zip(
+            services,
+            commands,
+            (first_character, second_character),
+            strict=True,
+        )
+    )
+
+    results = await _release_proven_entry_overlap(
+        barrier, tasks[0], tasks[1]
+    )
+
+    assert sum(isinstance(item, RunEntryResult) for item in results) == 1
+    assert [
+        item for item in results if isinstance(item, RunEntryDecision)
+    ] == [RunEntryDecision(code=RunEntryDecisionCode.RUN_ENTRY_CONFLICT)]
+    assert counts == _EntryUowCounts(
+        units=2,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=2,
+    )
+    assert await _p8_scope_durable_totals(
+        mysql_session_factory, binding_scope
+    ) == _P8DurableFamilyCounts(3, 1, 1, 2, 1, 1, 1, 1)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_participation_uniqueness_loss_rolls_back_all_writes(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-participation-unique"
+    )
+    counts = _EntryUowCounts()
+
+    def duplicate_participation_uow() -> (
+        _DuplicateParticipationEntryUnitOfWork
+    ):
+        return _DuplicateParticipationEntryUnitOfWork(
+            mysql_session_factory, counts
+        )
+
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="part-unique",
+        counts=counts,
+        uow_factory_override=duplicate_participation_uow,
+    )
+    result = await service.enter(
+        character.principal,
+        command=RunEntryCommand(
+            public_operation_key=RunEntryPublicOperationKey(
+                value=f"entry.{binding_scope.token}.part-unique"
+            ),
+            player_character_id=character.record.player_character_id,
+            expected_record_revision=character.record.record_revision,
+            scenario_id="death_certificate",
+        ),
+    )
+
+    assert result == RunEntryDecision(
+        code=RunEntryDecisionCode.RUN_ENTRY_CONFLICT
+    )
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=0,
+        successful_commits=0,
+        rollback_exits=1,
+        closes=1,
+    )
+    assert await _p8_scope_durable_totals(
+        mysql_session_factory, binding_scope
+    ) == _P8DurableFamilyCounts(0, 0, 0, 0, 0, 0, 0, 0)
+
+
+@pytest.mark.integration
+@pytest.mark.asyncio
+async def test_mysql_p8_uncertain_commit_has_no_recovery_or_second_attempt(
+    mysql_session_factory: async_sessionmaker[AsyncSession],
+    binding_scope: _Scope,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    character = await _create_character(
+        mysql_session_factory, binding_scope, "p8-uncertain"
+    )
+    counts = _EntryUowCounts()
+    policy_calls: list[str] = []
+    original_resolve = SessionService.resolve_run_entry_definition
+
+    def counted_resolve(
+        session_service: SessionService, scenario_id: str
+    ):
+        policy_calls.append(scenario_id)
+        return original_resolve(session_service, scenario_id)
+
+    monkeypatch.setattr(
+        SessionService,
+        "resolve_run_entry_definition",
+        counted_resolve,
+    )
+
+    def uncertain_uow() -> _PostCommitUncertaintyEntryUnitOfWork:
+        return _PostCommitUncertaintyEntryUnitOfWork(
+            mysql_session_factory, counts
+        )
+
+    service = _entry_service(
+        mysql_session_factory,
+        binding_scope,
+        character,
+        suffix="uncertain",
+        counts=counts,
+        uow_factory_override=uncertain_uow,
+    )
+    with pytest.raises(
+        RuntimeError, match="controlled uncertain commit outcome"
+    ):
+        await service.enter(
+            character.principal,
+            command=RunEntryCommand(
+                public_operation_key=RunEntryPublicOperationKey(
+                    value=f"entry.{binding_scope.token}.uncertain"
+                ),
+                player_character_id=character.record.player_character_id,
+                expected_record_revision=(
+                    character.record.record_revision
+                ),
+                scenario_id="death_certificate",
+            ),
+        )
+
+    assert policy_calls == ["death_certificate"]
+    assert service.run_id_issuer.calls == 1
+    assert service.continuous_story_line_id_issuer.calls == 1
+    assert counts == _EntryUowCounts(
+        units=1,
+        commit_attempts=1,
+        successful_commits=1,
+        rollback_exits=1,
+        closes=1,
+    )
+    assert await _p8_scope_durable_totals(
+        mysql_session_factory, binding_scope
+    ) == _P8DurableFamilyCounts(3, 1, 1, 2, 1, 1, 1, 1)

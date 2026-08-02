@@ -14,6 +14,9 @@ from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    P8_S2_EVIDENCE_MAGIC,
+    P8_S2_EVIDENCE_VERSION,
+    RunEntryCreationEvidence,
     RunOperationFingerprint,
     RunOperationNamespace,
     StoredRunSuccessReceipt,
@@ -22,8 +25,11 @@ from deviation_protocol.application.run_operations import (
     bind_player_character_fingerprint,
     bind_player_character_result,
     create_run_fingerprint,
+    run_entry_creation_fingerprint,
+    run_entry_evidence_bytes,
     creation_result,
 )
+from deviation_protocol.application.ports import RunWriteConflictError
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
     CanonicalPlayerCharacter,
@@ -60,7 +66,7 @@ class RunRepositoryError(RuntimeError):
     """A minimum Run-core database operation failed."""
 
 
-class RunRepositoryConflictError(RunRepositoryError):
+class RunRepositoryConflictError(RunRepositoryError, RunWriteConflictError):
     """A known immutable or unique Run constraint rejected a write."""
 
 
@@ -294,6 +300,41 @@ def creation_operation_evidence_from_storage(value: bytes) -> CreateRunCommand:
     if creation_operation_evidence_to_storage_bytes(command) != value:
         raise _fail("Run creation operation evidence is non-canonical")
     return command
+
+
+def run_entry_creation_evidence_from_storage(value: bytes) -> RunEntryCreationEvidence:
+    """Decode only the reserved P8 composite family; never fall back."""
+    if type(value) is not bytes or not 14 <= len(value) <= 4096:
+        raise _fail("Run entry creation evidence is outside its byte bounds")
+    if not value.startswith(P8_S2_EVIDENCE_MAGIC):
+        raise _fail("Run entry creation evidence has invalid family magic")
+    if value[12] != P8_S2_EVIDENCE_VERSION:
+        raise _fail("Run entry creation evidence has an unsupported version")
+    payload = value[13:]
+    _strict_object(payload)
+    try:
+        evidence = RunEntryCreationEvidence.model_validate_json(
+            payload, strict=True
+        )
+        evidence = revalidate_run_model(evidence, RunEntryCreationEvidence)
+    except (TypeError, ValueError) as exc:
+        raise _fail("Run entry creation evidence is invalid") from exc
+    if run_entry_evidence_bytes(evidence) != value:
+        raise _fail("Run entry creation evidence is non-canonical")
+    return evidence
+
+
+def creation_evidence_from_storage(
+    value: bytes,
+) -> CreateRunCommand | RunEntryCreationEvidence:
+    """Select the historical or composite family from its non-overlapping byte."""
+    if type(value) is not bytes or not value:
+        raise _fail("Run creation evidence is empty or invalid")
+    if value[0] == 0x89:
+        return run_entry_creation_evidence_from_storage(value)
+    if value[0] == 0x7B:
+        return creation_operation_evidence_from_storage(value)
+    raise _fail("Run creation evidence has no admitted family")
 
 
 def attach_operation_evidence_to_storage_bytes(command: AttachSessionCommand) -> bytes:
@@ -580,10 +621,13 @@ def creation_receipt_from_storage(
         "operation_evidence_canonical",
     )
     receipt = _receipt_from_storage(stored.receipt_canonical)
-    command = creation_operation_evidence_from_storage(
+    command = creation_evidence_from_storage(
         stored.operation_evidence_canonical
     )
-    _, fingerprint = create_run_fingerprint(command)
+    if isinstance(command, RunEntryCreationEvidence):
+        _, fingerprint = run_entry_creation_fingerprint(command)
+    else:
+        _, fingerprint = create_run_fingerprint(command)
     result = receipt.result
     if (
         receipt.key.operation_namespace is not RunOperationNamespace.CREATE_V1
@@ -916,7 +960,7 @@ def validate_stored_run_record_set(
             )
 
     creation = creation_receipt_from_storage(creation_receipt)
-    creation_command = creation_operation_evidence_from_storage(
+    creation_command = creation_evidence_from_storage(
         creation_receipt.operation_evidence_canonical
     )
     initial = history[0]
@@ -924,7 +968,11 @@ def validate_stored_run_record_set(
         creation.result != creation_result(initial)
         or creation.key.operation_id
         != initial.creation_provenance.operation_id
-        or creation_command.source_reference
+        or (
+            creation_command.trusted_run_source.source_reference
+            if isinstance(creation_command, RunEntryCreationEvidence)
+            else creation_command.source_reference
+        )
         != initial.creation_provenance.source_reference
         or creation_receipt.created_at
         != initial.creation_provenance.occurred_at

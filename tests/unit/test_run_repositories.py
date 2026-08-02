@@ -13,6 +13,7 @@ from sqlalchemy.dialects import mysql
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from deviation_protocol.application.ports import (
+    GameSessionRepository,
     RunCreationReceiptRepository,
     RunMutationReceiptRepository,
     RunRepository,
@@ -24,6 +25,7 @@ from deviation_protocol.application.run_operations import (
     AttachSessionCommand,
     BindPlayerCharacterCommand,
     CreateRunCommand,
+    RunEntryCreationEvidence,
     RunOperationNamespace,
     RunReceiptKey,
     attach_session_fingerprint,
@@ -35,6 +37,8 @@ from deviation_protocol.application.run_operations import (
     construct_created_run,
     create_run_fingerprint,
     creation_result,
+    run_entry_creation_fingerprint,
+    run_entry_evidence_bytes,
 )
 from deviation_protocol.domain.player_character import (
     ApplicableCharacterReference,
@@ -71,6 +75,7 @@ from deviation_protocol.infrastructure.player_character_persistence import (
     PlayerCharacterStoredRecordIntegrityError,
 )
 from deviation_protocol.infrastructure.repositories import (
+    SqlAlchemyGameSessionRepository,
     SqlAlchemyPlayerCharacterRepository,
     SqlAlchemyRunCreationReceiptRepository,
     SqlAlchemyRunMutationReceiptRepository,
@@ -455,6 +460,92 @@ def test_run_repository_adapters_match_exact_port_signatures(
         assert inspect.signature(getattr(adapter, method_name)) == (
             inspect.signature(getattr(port, method_name))
         )
+
+
+@pytest.mark.asyncio
+async def test_current_snapshot_port_fails_closed_and_sql_is_a_current_locking_read() -> None:
+    with pytest.raises(NotImplementedError):
+        await GameSessionRepository.get_latest_snapshot_for_update(
+            object(), "session.entry"
+        )
+
+    row = SimpleNamespace(state_version=7, state_json={"schema_version": 3})
+    session = _SessionProbe()
+    session.scalar_results.append(row)
+    result = await SqlAlchemyGameSessionRepository(
+        session
+    ).get_latest_snapshot_for_update("session.entry")
+
+    assert result is not None
+    assert result.state_version == 7
+    statement = session.scalar_statements[0]
+    compiled = str(
+        statement.compile(
+            dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}
+        )
+    )
+    assert "game_snapshots.session_id = 'session.entry'" in compiled
+    assert "FOR UPDATE" in compiled
+    assert statement.get_execution_options()["populate_existing"] is True
+
+
+@pytest.mark.asyncio
+async def test_composite_creation_receipt_is_written_and_reloaded_exactly() -> None:
+    created = _created()
+    evidence = RunEntryCreationEvidence.model_validate(
+        {
+            "controller_operation": {
+                "controller_binding": {"value": "controller.example"},
+                "public_operation_key": "entry.example",
+            },
+            "player_character": {
+                "player_character_id": {"value": "pc.example"},
+                "pre_entry_record_revision": {"value": 1},
+            },
+            "scenario": {
+                "scenario_id": "death_certificate",
+                "content_version": "death-certificate-1.1.0",
+                "default_character_definition_id": (
+                    "character.death_certificate.investigator"
+                ),
+            },
+            "trusted_run_source": {
+                "source_reference": {"value": SOURCE.value}
+            },
+        }
+    )
+    _, fingerprint = run_entry_creation_fingerprint(evidence)
+    receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            operation_namespace=RunOperationNamespace.CREATE_V1,
+            operation_id=created.creation_provenance.operation_id,
+        ),
+        fingerprint=fingerprint,
+        command_kind=RunMutationKind.CREATE,
+        result=creation_result(created),
+    )
+    write_session = _SessionProbe()
+    repository = SqlAlchemyRunCreationReceiptRepository(write_session)
+    repository._run_at_revision = AsyncMock(return_value=created)  # type: ignore[method-assign]
+    repository._validate_complete_run = AsyncMock(return_value=created)  # type: ignore[method-assign]
+    await repository.add_with_evidence(receipt, evidence, created_at=NOW)
+
+    row = write_session.added[0]
+    assert row.operation_evidence_canonical == run_entry_evidence_bytes(evidence)
+    assert len(row.operation_evidence_canonical) <= 4096
+    assert write_session.flush_calls == [(row,)]
+
+    read_session = _SessionProbe()
+    read_session.scalar_results.append(row)
+    reader = SqlAlchemyRunCreationReceiptRepository(read_session)
+    reader._run_at_revision = AsyncMock(return_value=created)  # type: ignore[method-assign]
+    reader._validate_complete_run = AsyncMock(return_value=created)  # type: ignore[method-assign]
+    stored = await reader.get_with_evidence(receipt.key)
+
+    assert stored is not None
+    assert stored.receipt == receipt
+    assert stored.evidence == evidence
+    assert stored.evidence_canonical == run_entry_evidence_bytes(evidence)
 
 
 @pytest.mark.asyncio
