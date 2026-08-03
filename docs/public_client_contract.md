@@ -863,8 +863,8 @@ objective.
 
 ## Phase 8 Player Character discovery and Run entry
 
-Status: **The corrected local P8-S3 public-entry candidate exists;
-documentation synchronization awaits focused independent read-only re-review.**
+Status: **P8-S3 normal public Run entry is implemented, independently approved,
+committed, published, and complete; Demo and Web activation remain deferred.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -888,9 +888,9 @@ and all five corrections are complete. The subsequent independent read-only
 re-review found no remaining actionable runtime, API, strict-transport,
 OpenAPI, MySQL, privacy, architecture, or test-discrimination defect but
 formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
-synchronization finding. This documentation-only correction awaits a focused
-independent read-only re-review, so the P8-S3 implementation candidate is not
-independently approved and remains unstaged, uncommitted, and unpublished.
+synchronization finding. The complete 15-path candidate then received focused
+independent read-only approval and was committed and published at
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
 P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
 status closure have not started. Phase 8 and the overall project remain
 incomplete. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase
@@ -944,8 +944,8 @@ or recovery.
 
 ### Run-entry request
 
-The local P8-S3 candidate implements one normal-application mutation. Demo
-parity remains deferred to P8-S4:
+The published P8-S3 implementation provides one normal-application mutation.
+Demo parity remains deferred to P8-S4:
 
 ```http
 POST /v1/runs

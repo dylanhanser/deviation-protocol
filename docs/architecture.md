@@ -556,9 +556,9 @@ its local implementation candidate returned `CHANGES_REQUIRED` with five
 bounded findings, and all five corrections are complete. A subsequent
 independent read-only re-review found no remaining actionable technical defect
 but formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
-synchronization finding. This seven-owner documentation correction awaits its
-own focused independent read-only re-review, so the implementation candidate is
-not independently approved and remains unstaged, uncommitted, and unpublished.
+synchronization finding. The complete 15-path candidate then received focused
+independent read-only approval and was committed and published at
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
 P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
 status closure have not started. Phase 8 and the overall project remain
 incomplete.
@@ -566,7 +566,7 @@ Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
 
-The local P8-S3 candidate registers exactly one normal-composition
+The published P8-S3 implementation registers exactly one normal-composition
 `POST /v1/runs` operation. Normal composition constructs one lazy
 `RunEntryService` from the exact existing `RunService` issuers, source, clock,
 controller resolver, Player Character evidence reader, shared SQLAlchemy UoW
