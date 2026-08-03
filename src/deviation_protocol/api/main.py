@@ -17,6 +17,7 @@ from deviation_protocol.api.dependencies import (
     ApiServices,
     get_current_principal,
     get_player_character_service,
+    get_run_entry_service,
     get_session_service,
     get_turn_orchestrator,
 )
@@ -27,9 +28,12 @@ from deviation_protocol.api.schemas import (
     CreateSessionRequest,
     ErrorResponse,
     NarrativeRequestStatusResponse,
+    RunEntryRequest,
+    RunEntryResponse,
 )
 from deviation_protocol.application.errors import (
     IdempotencyConflictError,
+    InvalidScenarioDefinitionError,
     PlayerCharacterNotFoundError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
@@ -57,6 +61,16 @@ from deviation_protocol.application.ports import (
 )
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
 from deviation_protocol.application.run_service import RunService
+from deviation_protocol.application.run_entry_service import (
+    RunEntryCommand,
+    RunEntryDecision,
+    RunEntryDecisionCode,
+    RunEntryResult,
+    RunEntryService,
+)
+from deviation_protocol.application.run_operations import (
+    RunEntryPublicOperationKey,
+)
 from deviation_protocol.application.session_service import (
     PlayerVisibleStateProjection,
     PlayerSessionView,
@@ -90,7 +104,7 @@ from deviation_protocol.domain.player_character import (
     PlayerCharacterRevision,
     revalidate_player_character_model,
 )
-from deviation_protocol.domain.run import RunAuthoritySourceRef
+from deviation_protocol.domain.run import RunAuthoritySourceRef, revalidate_run_model
 from deviation_protocol.domain.player_character_policies import (
     CreatePlayerCharacterPolicy,
     PlayerCharacterPolicyCode,
@@ -172,6 +186,16 @@ _PLAYER_CHARACTER_RETIREMENT_OPENAPI_EXTRA: dict[str, Any] = {
                 "schema": {
                     "$ref": "#/components/schemas/PlayerCharacterRetirementRequest",
                 }
+            }
+        },
+    }
+}
+_RUN_ENTRY_OPENAPI_EXTRA: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/RunEntryRequest"}
             }
         },
     }
@@ -276,6 +300,28 @@ def _parse_player_character_creation_command(
     try:
         return CharacterCreationCommand.model_validate_json(raw_body)
     except ValidationError:
+        _request_validation_failure()
+
+
+def _validate_run_entry_transport(
+    request: Request,
+    idempotency_key: str,
+) -> RunEntryPublicOperationKey:
+    operation_id = _validate_player_character_creation_transport(
+        request,
+        idempotency_key,
+    )
+    try:
+        return RunEntryPublicOperationKey(value=operation_id.value)
+    except ValueError:
+        _request_validation_failure()
+
+
+def _parse_run_entry_request(raw_body: bytes) -> RunEntryRequest:
+    try:
+        json.loads(raw_body, object_pairs_hook=_reject_duplicate_json_members)
+        return RunEntryRequest.model_validate_json(raw_body)
+    except (json.JSONDecodeError, UnicodeDecodeError, ValidationError, ValueError):
         _request_validation_failure()
 
 
@@ -446,6 +492,10 @@ def _install_player_character_openapi_schemas(
                                 "Player Character OpenAPI reference integrity "
                                 "failure"
                             )
+                        if value == "#/components/schemas/RunEntryRequest":
+                            # The independently conditional Run-entry installer
+                            # resolves this component in the outer atomic schema.
+                            continue
                         target: Any = candidate_schema
                         for encoded_part in value[2:].split("/"):
                             part = encoded_part.replace("~1", "/").replace(
@@ -464,6 +514,105 @@ def _install_player_character_openapi_schemas(
                                 raise RuntimeError(
                                     "Player Character OpenAPI reference integrity "
                                     "failure"
+                                )
+                elif isinstance(current, list):
+                    pending.extend(current)
+
+            app.openapi_schema = candidate_schema
+            installed_schema = candidate_schema
+            published = True
+            return candidate_schema
+        finally:
+            if not published:
+                app.openapi_schema = original_openapi_schema
+
+    app.openapi = _openapi
+
+
+def _install_run_entry_openapi_schema(app: FastAPI) -> None:
+    default_openapi = app.openapi
+    installed_schema: dict[str, Any] | None = None
+
+    def _openapi() -> dict[str, Any]:
+        nonlocal installed_schema
+        if installed_schema is not None:
+            return installed_schema
+
+        original_openapi_schema = app.openapi_schema
+        published = False
+        try:
+            base_schema = default_openapi()
+            model_schema = RunEntryRequest.model_json_schema(
+                mode="validation",
+                ref_template="#/components/schemas/{model}",
+            )
+            definitions = model_schema.pop("$defs", {})
+            if not isinstance(base_schema, dict) or not isinstance(
+                definitions, dict
+            ):
+                raise RuntimeError("Run entry OpenAPI schema integrity failure")
+            generated_components = {
+                "RunEntryRequest": model_schema,
+                **definitions,
+            }
+            base_components = base_schema.get("components", {})
+            base_schemas = (
+                base_components.get("schemas", {})
+                if isinstance(base_components, dict)
+                else None
+            )
+            if not isinstance(base_schemas, dict):
+                raise RuntimeError("Run entry OpenAPI schema integrity failure")
+            for name, definition in generated_components.items():
+                if not isinstance(name, str) or not isinstance(definition, dict):
+                    raise RuntimeError(
+                        "Run entry OpenAPI schema integrity failure"
+                    )
+                if name in base_schemas and not _openapi_schema_values_match(
+                    base_schemas[name], definition
+                ):
+                    raise RuntimeError("Run entry OpenAPI component collision")
+
+            candidate_schema = deepcopy(base_schema)
+            candidate_components = candidate_schema.setdefault("components", {})
+            candidate_schemas = (
+                candidate_components.setdefault("schemas", {})
+                if isinstance(candidate_components, dict)
+                else None
+            )
+            if not isinstance(candidate_schemas, dict):
+                raise RuntimeError("Run entry OpenAPI schema integrity failure")
+            for name, definition in generated_components.items():
+                candidate_schemas[name] = deepcopy(definition)
+
+            pending: list[Any] = [candidate_schema]
+            while pending:
+                current = pending.pop()
+                if isinstance(current, dict):
+                    for key, value in current.items():
+                        if key != "$ref":
+                            pending.append(value)
+                            continue
+                        if not isinstance(value, str) or not value.startswith("#/"):
+                            raise RuntimeError(
+                                "Run entry OpenAPI reference integrity failure"
+                            )
+                        target: Any = candidate_schema
+                        for encoded_part in value[2:].split("/"):
+                            part = encoded_part.replace("~1", "/").replace(
+                                "~0", "~"
+                            )
+                            if isinstance(target, dict) and part in target:
+                                target = target[part]
+                            elif (
+                                isinstance(target, list)
+                                and part.isdigit()
+                                and int(part) < len(target)
+                            ):
+                                target = target[int(part)]
+                            else:
+                                raise RuntimeError(
+                                    "Run entry OpenAPI reference integrity failure"
                                 )
                 elif isinstance(current, list):
                     pending.extend(current)
@@ -584,6 +733,67 @@ def _translate_retirement_decision(
     raise RuntimeError("unexpected Player Character retirement decision")
 
 
+def _project_run_entry_success(
+    result: RunEntryResult,
+    *,
+    command: RunEntryCommand,
+) -> RunEntryResponse:
+    result = revalidate_run_model(result, RunEntryResult)
+    command = revalidate_run_model(command, RunEntryCommand)
+    character = result.player_character
+    if (
+        result.scenario_id != command.scenario_id
+        or character.player_character_id != command.player_character_id
+        or character.record_revision != command.expected_record_revision
+        or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE
+    ):
+        raise RuntimeError("unexpected Run entry result")
+    return RunEntryResponse(
+        run_id=result.run_id.value,
+        session_id=result.session_id,
+        scenario_id=result.scenario_id,
+        player_character=PlayerCharacterSelfProjection(
+            player_character_id=PlayerCharacterId(
+                value=character.player_character_id.value
+            ),
+            contract_version=character.contract_version,
+            record_revision=PlayerCharacterRevision(
+                value=character.record_revision.value
+            ),
+            lifecycle=character.lifecycle,
+        ),
+    )
+
+
+def _translate_run_entry_decision(decision: RunEntryDecision) -> Response:
+    decision = revalidate_run_model(decision, RunEntryDecision)
+    if decision.code is RunEntryDecisionCode.AUTHORIZATION_FAILED:
+        raise PlayerCharacterNotFoundError("run-entry")
+    if decision.code is RunEntryDecisionCode.IDEMPOTENCY_CONFLICT:
+        raise IdempotencyConflictError("run-entry")
+    if decision.code is RunEntryDecisionCode.PLAYER_CHARACTER_STALE:
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_STALE",
+            "Player character revision is stale",
+        )
+    if decision.code is RunEntryDecisionCode.PLAYER_CHARACTER_NOT_ELIGIBLE:
+        return error_response(
+            409,
+            "PLAYER_CHARACTER_NOT_ELIGIBLE",
+            "Player character is not eligible for Run entry",
+        )
+    if decision.code is RunEntryDecisionCode.INVALID_SCENARIO_DEFINITION:
+        raise InvalidScenarioDefinitionError("run-entry")
+    if decision.code is RunEntryDecisionCode.RUN_ENTRY_CONFLICT:
+        return error_response(
+            409,
+            "RUN_ENTRY_CONFLICT",
+            "Run entry conflicts with current state",
+        )
+    raise RuntimeError("unexpected Run entry decision")
+
+
 def _player_character_clock() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -626,6 +836,27 @@ def build_run_service(
         player_character_binding_evidence=(
             player_character_binding_evidence
         ),
+    )
+
+
+def build_run_entry_service(
+    *,
+    run_service: RunService,
+    session_service: SessionService,
+) -> RunEntryService:
+    return RunEntryService(
+        uow_factory=run_service.uow_factory,
+        run_id_issuer=run_service.run_id_issuer,
+        continuous_story_line_id_issuer=(
+            run_service.continuous_story_line_id_issuer
+        ),
+        source_reference=run_service.source_reference,
+        clock=run_service.clock,
+        controller_binding_resolver=run_service.controller_binding_resolver,
+        player_character_binding_evidence=(
+            run_service.player_character_binding_evidence
+        ),
+        session_service=session_service,
     )
 
 
@@ -677,18 +908,24 @@ def build_default_services(
         uow_factory=uow_factory,
         controller_binding_resolver=controller_binding_resolver,
     )
+    session_service = SessionService(
+        uow_factory=uow_factory,
+        catalog=catalog,
+        scenario_catalog=scenario_catalog,
+    )
+    run_service = build_run_service(
+        uow_factory=uow_factory,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_binding_evidence=player_character_service,
+    )
     return ApiServices(
-        session_service=SessionService(
-            uow_factory=uow_factory,
-            catalog=catalog,
-            scenario_catalog=scenario_catalog,
-        ),
+        session_service=session_service,
         turn_orchestrator=orchestrator,
         player_character_service=player_character_service,
-        run_service=build_run_service(
-            uow_factory=uow_factory,
-            controller_binding_resolver=controller_binding_resolver,
-            player_character_binding_evidence=player_character_service,
+        run_service=run_service,
+        run_entry_service=build_run_entry_service(
+            run_service=run_service,
+            session_service=session_service,
         ),
         engine=engine,
         narrative_provider=provider,
@@ -886,6 +1123,60 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
             return projection
 
         _install_player_character_openapi_schemas(app)
+
+    if services is None or services.run_entry_service is not None:
+
+        @app.post(
+            "/v1/runs",
+            status_code=status.HTTP_200_OK,
+            response_model=RunEntryResponse,
+            response_description="Run entered or exactly replayed.",
+            operation_id="enter_run",
+            summary="Enter a Run",
+            description=(
+                "Controller authority is derived only by the trusted server. "
+                "Idempotency-Key is required but is not authority. First success "
+                "and exact replay share HTTP 200. The server rechecks ownership "
+                "and eligibility and issues the Run, continuous-story-line, and "
+                "Session identities. This response is a stable entry projection, "
+                "not the current View; clients read the returned Session View next. "
+                "P8-S3 does not activate Demo entry, production authentication, or "
+                "Internet deployment."
+            ),
+            tags=["runs"],
+            responses=_public_error_responses(404, 409, 422, 500),
+            openapi_extra=_RUN_ENTRY_OPENAPI_EXTRA,
+        )
+        async def enter_run(
+            http_request: Request,
+            idempotency_key: PlayerCharacterIdempotencyKeyHeader,
+            principal: RequestPrincipal = Depends(get_current_principal),
+            service: RunEntryService = Depends(get_run_entry_service),
+        ) -> RunEntryResponse | Response:
+            public_operation_key = _validate_run_entry_transport(
+                http_request,
+                idempotency_key,
+            )
+            raw_body = await http_request.body()
+            request = _parse_run_entry_request(raw_body)
+            command = RunEntryCommand(
+                public_operation_key=public_operation_key,
+                player_character_id=PlayerCharacterId(
+                    value=request.player_character_id
+                ),
+                expected_record_revision=PlayerCharacterRevision(
+                    value=request.expected_record_revision
+                ),
+                scenario_id=request.scenario_id,
+            )
+            result = await service.enter(principal, command=command)
+            if type(result) is RunEntryResult:
+                return _project_run_entry_success(result, command=command)
+            if type(result) is RunEntryDecision:
+                return _translate_run_entry_decision(result)
+            raise RuntimeError("unexpected Run entry service result")
+
+        _install_run_entry_openapi_schema(app)
 
     @app.get(
         "/v1/scenarios",

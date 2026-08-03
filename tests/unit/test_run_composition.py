@@ -7,8 +7,15 @@ import uuid
 
 from pydantic import ValidationError
 import pytest
+from fastapi import Request
 
 from deviation_protocol.api import main
+from deviation_protocol.api.dependencies import (
+    ApiServices,
+    get_run_entry_service,
+)
+from deviation_protocol.api.demo_composition import build_demo_runtime
+from deviation_protocol.application.run_entry_service import RunEntryService
 from deviation_protocol.application.run_operations import (
     ReservedBindPlayerCharacterCommand,
     RunReplayDecisionCode,
@@ -234,7 +241,9 @@ def test_default_composition_reuses_one_lazy_mysql_uow_graph(
     )
 
     service = services.run_service
+    entry_service = services.run_entry_service
     assert type(service) is RunService
+    assert type(entry_service) is RunEntryService
     assert service is services.run_service
     assert (
         service.uow_factory
@@ -247,6 +256,29 @@ def test_default_composition_reuses_one_lazy_mysql_uow_graph(
         is services.player_character_service
     )
     assert (
+        entry_service.uow_factory
+        is service.uow_factory
+        is services.player_character_service.uow_factory
+        is services.session_service.uow_factory
+        is services.turn_orchestrator.uow_factory
+    )
+    assert entry_service.run_id_issuer is service.run_id_issuer
+    assert (
+        entry_service.continuous_story_line_id_issuer
+        is service.continuous_story_line_id_issuer
+    )
+    assert entry_service.source_reference is service.source_reference
+    assert entry_service.clock is service.clock
+    assert (
+        entry_service.controller_binding_resolver
+        is service.controller_binding_resolver
+    )
+    assert (
+        entry_service.player_character_binding_evidence
+        is service.player_character_binding_evidence
+    )
+    assert entry_service.session_service is services.session_service
+    assert (
         service.controller_binding_resolver
         is services.player_character_service.controller_binding_resolver
     )
@@ -256,6 +288,76 @@ def test_default_composition_reuses_one_lazy_mysql_uow_graph(
     assert constructed_with == []
     assert service.uow_factory() is uow
     assert constructed_with == [session_factory]
+
+
+def test_run_entry_builder_is_lazy_and_reuses_the_exact_run_and_session_graph() -> None:
+    uow_calls = 0
+
+    def forbidden_uow() -> Any:
+        nonlocal uow_calls
+        uow_calls += 1
+        raise AssertionError("composition must not construct a UoW")
+
+    run_service = main.build_run_service(
+        uow_factory=forbidden_uow,
+        controller_binding_resolver=object(),  # type: ignore[arg-type]
+        player_character_binding_evidence=object(),  # type: ignore[arg-type]
+    )
+    session_service = object()
+
+    entry_service = main.build_run_entry_service(
+        run_service=run_service,
+        session_service=session_service,  # type: ignore[arg-type]
+    )
+
+    assert type(entry_service) is RunEntryService
+    assert entry_service.uow_factory is forbidden_uow
+    assert entry_service.run_id_issuer is run_service.run_id_issuer
+    assert (
+        entry_service.continuous_story_line_id_issuer
+        is run_service.continuous_story_line_id_issuer
+    )
+    assert entry_service.source_reference is run_service.source_reference
+    assert entry_service.clock is run_service.clock
+    assert (
+        entry_service.controller_binding_resolver
+        is run_service.controller_binding_resolver
+    )
+    assert (
+        entry_service.player_character_binding_evidence
+        is run_service.player_character_binding_evidence
+    )
+    assert entry_service.session_service is session_service
+    assert uow_calls == 0
+
+
+def test_run_entry_dependency_fails_closed_without_fallback() -> None:
+    services = ApiServices(
+        session_service=object(),  # type: ignore[arg-type]
+        turn_orchestrator=object(),  # type: ignore[arg-type]
+    )
+    app = main.create_app(services=services)
+    app.state.api_services = services
+    request = Request({"type": "http", "app": app})
+
+    with pytest.raises(
+        RuntimeError,
+        match="^Run entry service is not configured$",
+    ):
+        get_run_entry_service(request)
+
+
+def test_demo_composition_remains_independent_of_run_entry() -> None:
+    runtime = build_demo_runtime()
+    app = main.create_app(services=runtime.services)
+
+    assert runtime.services.run_entry_service is None
+    assert "/v1/runs" not in {
+        route.path for route in app.routes
+    }
+    assert "RunEntryRequest" not in app.openapi().get("components", {}).get(
+        "schemas", {}
+    )
 
 
 def test_default_database_configuration_is_lazy_and_fails_closed(
@@ -326,6 +428,7 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
             frozenset({"GET"}),
         ),
         ("/v1/player-characters", frozenset({"POST"})),
+        ("/v1/runs", frozenset({"POST"})),
         (
             "/v1/player-characters/{player_character_id}/retirement",
             frozenset({"POST"}),

@@ -11,6 +11,9 @@ from deviation_protocol.application.session_service import (
     PublicNarrativeRequestStatus,
     NarrativeRequestClientAction,
 )
+from deviation_protocol.application.player_character_projection import (
+    PlayerCharacterSelfProjection,
+)
 from deviation_protocol.domain.actions import (
     MAX_ACTION_DESCRIPTION_LENGTH,
     MAX_ACTION_DIALOGUE_LENGTH,
@@ -38,6 +41,36 @@ SafeId128 = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
     ),
 ]
+
+
+class RunEntryRequest(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        strict=True,
+        revalidate_instances="always",
+    )
+
+    player_character_id: SafeId128
+    expected_record_revision: Annotated[
+        int,
+        Field(strict=True, ge=1, le=2**63 - 1),
+    ]
+    scenario_id: SafeId128
+
+
+class RunEntryResponse(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        strict=True,
+        revalidate_instances="always",
+    )
+
+    run_id: SafeId128
+    session_id: SafeId64
+    scenario_id: SafeId128
+    player_character: PlayerCharacterSelfProjection
 
 
 class StrictApiModel(BaseModel):

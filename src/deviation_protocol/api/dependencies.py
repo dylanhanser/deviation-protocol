@@ -11,6 +11,7 @@ from deviation_protocol.application.player_character_service import (
     PlayerCharacterService,
 )
 from deviation_protocol.application.ports import TurnOrchestrator
+from deviation_protocol.application.run_entry_service import RunEntryService
 from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.application.narrative_models import NarrativeProvider
@@ -22,6 +23,7 @@ class ApiServices:
     turn_orchestrator: TurnOrchestrator
     player_character_service: PlayerCharacterService | None = None
     run_service: RunService | None = None
+    run_entry_service: RunEntryService | None = None
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
 
@@ -54,4 +56,11 @@ def get_player_character_service(request: Request) -> PlayerCharacterService:
     service = get_api_services(request).player_character_service
     if service is None:
         raise RuntimeError("Player Character service is not configured")
+    return service
+
+
+def get_run_entry_service(request: Request) -> RunEntryService:
+    service = get_api_services(request).run_entry_service
+    if service is None:
+        raise RuntimeError("Run entry service is not configured")
     return service

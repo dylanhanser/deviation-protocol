@@ -861,10 +861,10 @@ ORM, migration, repository, Unit-of-Work, receipt, CAS, transaction, or
 dependency redesign; generic retry; uncertain-commit recovery; or a P4-S2
 objective.
 
-## Planned Phase 8 Player Character discovery and Run entry
+## Phase 8 Player Character discovery and Run entry
 
-Status: **Partially implemented through published P8-S2 atomic internal Run
-entry; P8-S3 normal public activation is the next plan candidate.**
+Status: **The corrected local P8-S3 public-entry candidate exists;
+documentation synchronization awaits focused independent read-only re-review.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -878,14 +878,24 @@ P8-G0 is complete and published. P8-S1 eligible-character discovery is
 implemented, accepted, committed, and published. P8-S2 atomic internal Run
 entry is implemented, accepted, committed, and published at
 `70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation and F1/F2/F3
-evidence are closed and are not reopened. The review-ready
-[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
-is next, but it is not independently reviewed, approved, implemented, staged,
-committed, or published and does not authorize the `POST /v1/runs` route.
+evidence are closed and are not reopened. The
+[P8-S3 implementation plan](structured_player_character_p8_s3_implementation_plan.md)
+was independently approved and committed/published at
+`e17172ad0a9febe4ec9e3a96e7be8204c9722d29`. Its exact normal public-entry
+implementation candidate introduced `POST /v1/runs`. Its first independent
+implementation review returned `CHANGES_REQUIRED` with five bounded findings,
+and all five corrections are complete. The subsequent independent read-only
+re-review found no remaining actionable runtime, API, strict-transport,
+OpenAPI, MySQL, privacy, architecture, or test-discrimination defect but
+formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
+synchronization finding. This documentation-only correction awaits a focused
+independent read-only re-review, so the P8-S3 implementation candidate is not
+independently approved and remains unstaged, uncommitted, and unpublished.
 P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure remain unimplemented. Phase 5 remains complete at P5-S3; no
-P5-S4 exists. Existing Phase 6 and Phase 7 allocations remain planned and
-unimplemented, and neither is a Phase 8 prerequisite.
+status closure have not started. Phase 8 and the overall project remain
+incomplete. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase
+6 and Phase 7 allocations remain planned and unimplemented, and neither is a
+Phase 8 prerequisite.
 
 ### Eligible-character collection
 
@@ -934,8 +944,8 @@ or recovery.
 
 ### Run-entry request
 
-P8-S3 plans one normal-application mutation. Demo parity remains deferred to
-P8-S4:
+The local P8-S3 candidate implements one normal-application mutation. Demo
+parity remains deferred to P8-S4:
 
 ```http
 POST /v1/runs

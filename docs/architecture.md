@@ -536,7 +536,7 @@ scenario integration, combat integration, and broader public gameplay
 activation remain deferred. P4-S1 alone is complete; no broader Phase 4
 completion is implied.
 
-## Planned Phase 8 Run-entry and playable-loop boundary
+## Phase 8 Run-entry and playable-loop boundary
 
 Phase 8 is explicitly allocated to Structured Player Character Run Entry and
 the Minimum Playable Loop. Its approved and published planning authority is
@@ -549,15 +549,34 @@ accepted, committed, and published at
 `70815b181624e5475d2d978bef0db1ed3b22324e`
 (`feat(player-character): add durable run-entry initialization`); its
 implementation and F1/F2/F3 evidence are closed and are not reopened. The
-review-ready
-[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
-is the canonical next slice, but it is not independently reviewed, approved,
-implemented, staged, committed, or published and grants no implementation
-authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
-evidence/final status closure remain unimplemented. Phase 8 remains incomplete.
+[P8-S3 implementation plan](structured_player_character_p8_s3_implementation_plan.md)
+was independently approved and committed/published at
+`e17172ad0a9febe4ec9e3a96e7be8204c9722d29`. The first independent review of
+its local implementation candidate returned `CHANGES_REQUIRED` with five
+bounded findings, and all five corrections are complete. A subsequent
+independent read-only re-review found no remaining actionable technical defect
+but formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
+synchronization finding. This seven-owner documentation correction awaits its
+own focused independent read-only re-review, so the implementation candidate is
+not independently approved and remains unstaged, uncommitted, and unpublished.
+P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
+status closure have not started. Phase 8 and the overall project remain
+incomplete.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
+
+The local P8-S3 candidate registers exactly one normal-composition
+`POST /v1/runs` operation. Normal composition constructs one lazy
+`RunEntryService` from the exact existing `RunService` issuers, source, clock,
+controller resolver, Player Character evidence reader, shared SQLAlchemy UoW
+factory, and already-built `SessionService`. The API adapter owns no UoW,
+repository call, commit, replay lookup, retry, or post-result persistence; it
+forwards the trusted principal and one strict command to the existing entry
+coordinator at most once. Demo composition remains independent, has no entry
+service, and exposes no `/v1/runs` route. Real-MySQL production-ASGI evidence
+passed through the canonical 19-action terminal journey with a scripted
+no-network Provider; no live Provider was called.
 
 The planned architecture reuses the current MySQL/`AsyncSession` Unit of Work,
 Player Character aggregate and detached projection, Run revision/current/

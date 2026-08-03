@@ -848,7 +848,7 @@ or changed transaction topology can legitimately reach that unique boundary
 without first serializing on the aggregate lock. No such topology is approved
 or required by this contract.
 
-### Phase 8 Run-entry and minimum playable-loop planning status
+### Phase 8 Run-entry and minimum playable-loop status
 
 Phase 5 ended with published P5-S3. No P5-S4 exists. The separately allocated
 Phase 8 approved and published planning authority is the
@@ -863,12 +863,25 @@ published-baseline confirmation. P8-G0 is complete and published. P8-S1
 eligible-character discovery is implemented, accepted, committed, and
 published. P8-S2 atomic internal Run entry is implemented, accepted, committed,
 and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation
-and F1/F2/F3 evidence are closed and are not reopened. The review-ready
-[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
-is the canonical next slice, but it is not independently reviewed, approved,
-implemented, staged, committed, or published and grants no implementation
-authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
-evidence/final status closure remain unimplemented.
+and F1/F2/F3 evidence are closed and are not reopened. The
+[P8-S3 implementation plan](structured_player_character_p8_s3_implementation_plan.md)
+was independently approved and committed/published at
+`e17172ad0a9febe4ec9e3a96e7be8204c9722d29`. Its corrected local implementation
+candidate contains normal public Run entry that reuses the exact
+trusted Player Character ownership/eligibility evidence, returns only the
+detached four-field character projection, and leaves the active revision-one
+character unchanged through the terminal Session journey. Independent
+technical evidence did not constitute approval: the implementation candidate's
+first independent review returned
+`CHANGES_REQUIRED` with five bounded findings, and all five corrections are
+complete. The subsequent independent read-only re-review found no remaining
+actionable technical defect but formally returned `CHANGES_REQUIRED` solely for
+one Medium documentation-synchronization finding. This seven-owner
+documentation correction awaits a focused independent read-only re-review, so
+the P8-S3 implementation candidate is not independently approved and remains
+unstaged, uncommitted, and unpublished. P8-S4 Demo parity, P8-S5 Web connection,
+and P8-S6 cross-surface evidence/final status closure have not started. Phase 8
+and the overall project remain incomplete.
 
 The planned Phase 8 character-side boundary is narrow:
 
@@ -1080,9 +1093,14 @@ public Run, frontend, Web, and administration were not activated by Phase 5.
 Phase 8 now has the approved and published planning authority described above.
 P8-G0 and P8-S1 are complete and published. P8-S2 atomic internal Run entry is
 implemented, accepted, committed, and published at
-`70815b181624e5475d2d978bef0db1ed3b22324e`; it remains closed. P8-S3 normal
-API/composition activation is only the review-ready, unapproved candidate linked
-above, while P8-S4 through P8-S6 remain unimplemented and Phase 8 is incomplete.
+`70815b181624e5475d2d978bef0db1ed3b22324e`; it remains closed. The P8-S3
+normal API/composition implementation candidate linked above contains the
+completed five bounded corrections. Its subsequent independent re-review
+returned `CHANGES_REQUIRED` solely for the Medium documentation-synchronization
+finding; this documentation-only correction still awaits focused independent
+read-only re-review and is not an approval. The candidate remains unstaged,
+uncommitted, and unpublished. P8-S4 through P8-S6 have not started, and Phase 8
+and the overall project remain incomplete.
 Demo parity remains P8-S4, Web connection remains P8-S5, and cross-surface
 evidence/final status closure remains P8-S6. Phase 6 and Phase 7 remain
 allocated and unimplemented. The approved final

@@ -10,9 +10,18 @@ one narrow Session-backed activation path below. Its planning bytes were
 published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`, so P8-G0 is complete.
 P8-S1 discovery and P8-S2 atomic internal admission are implemented and
 published; P8-S2 is closed at `70815b181624e5475d2d978bef0db1ed3b22324e`.
-P8-S3 normal public activation is only a review-ready, unapproved plan
-candidate. This status does not mark Phase 3.3, Phase 6, Phase 7, or Phase 8
-complete.**
+The P8-S3 plan is approved and published at
+`e17172ad0a9febe4ec9e3a96e7be8204c9722d29`, and its local candidate introduced
+normal public `POST /v1/runs` activation. The first independent implementation
+review returned `CHANGES_REQUIRED` with five bounded findings, and all five
+corrections are complete. A subsequent independent read-only re-review found no
+remaining actionable technical defect but formally returned `CHANGES_REQUIRED`
+solely for one Medium documentation-synchronization finding. This seven-owner
+documentation correction awaits focused independent read-only re-review; the
+P8-S3 implementation candidate is not independently approved and remains
+unstaged, uncommitted, and unpublished. P8-S4, P8-S5, and P8-S6 have not
+started. Phase 8 and the overall project remain incomplete; this status does
+not mark Phase 3.3, Phase 6, or Phase 7 complete.**
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -94,9 +103,10 @@ The reserved character-binding seam was populated by the completed separately
 authorized P4-S1 work. That internal completion does not activate a public
 binding route or the `active` lifecycle transition.
 
-## Planned Phase 8 Session-backed minimum admission
+## Phase 8 Session-backed minimum admission
 
-Status: **Partially implemented through published P8-S2 atomic internal Run entry; P8-S3 plan candidate is next**
+Status: **Implemented through a corrected local P8-S3 normal-entry candidate;
+documentation synchronization awaits focused independent read-only re-review**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -111,12 +121,21 @@ P8-G0 is complete and published. P8-S1 eligible-character discovery is
 implemented, accepted, committed, and published. P8-S2 atomic internal Run
 entry is implemented, accepted, committed, and published at
 `70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation and F1/F2/F3
-evidence are closed, and P8-S2 is not being reopened. The review-ready
-[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
-is the canonical next slice, but it is not independently reviewed, approved,
-implemented, staged, committed, or published and grants no implementation
-authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
-evidence/final status closure remain unimplemented.
+evidence are closed, and P8-S2 is not being reopened. The
+[P8-S3 implementation plan](structured_player_character_p8_s3_implementation_plan.md)
+was independently approved and committed/published at
+`e17172ad0a9febe4ec9e3a96e7be8204c9722d29`. Its local candidate now reaches
+the existing atomic admission authority through normal production composition
+and public `POST /v1/runs`, with real-MySQL replay/no-write decisions and the
+canonical Session terminal journey verified. The API owns no transaction and
+the Run remains active and immutably bound after scenario settlement.
+Its five bounded first-review corrections are complete. The subsequent
+independent read-only re-review found only the Medium documentation-
+synchronization finding described above and returned `CHANGES_REQUIRED`. The
+current documentation-only correction awaits focused independent read-only
+re-review; it is not an approval. Nothing is staged, committed, or published,
+and P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
+evidence/final status closure have not started.
 
 ### Narrow authority amendment
 

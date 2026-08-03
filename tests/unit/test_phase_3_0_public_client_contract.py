@@ -9,6 +9,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
+from deviation_protocol.api import main
 from deviation_protocol.application.action_gateway import ActionGateway, ActionRoute
 from deviation_protocol.application.session_service import PlayerSessionView
 from deviation_protocol.application.narrative_outcome_policy import (
@@ -605,6 +606,152 @@ def test_openapi_exposes_public_contract_without_internal_models() -> None:
         "PersistedEventReceipt",
         "MemoryRuleDefinition",
     }.isdisjoint(model_names)
+
+
+def test_run_entry_openapi_is_the_exact_public_allowlisted_contract() -> None:
+    schema = main.create_app().openapi()
+    operation = schema["paths"]["/v1/runs"]["post"]
+
+    assert operation["operationId"] == "enter_run"
+    assert operation["tags"] == ["runs"]
+    assert operation["summary"] == "Enter a Run"
+    assert operation["description"] == (
+        "Controller authority is derived only by the trusted server. "
+        "Idempotency-Key is required but is not authority. First success and "
+        "exact replay share HTTP 200. The server rechecks ownership and "
+        "eligibility and issues the Run, continuous-story-line, and Session "
+        "identities. This response is a stable entry projection, not the current "
+        "View; clients read the returned Session View next. P8-S3 does not "
+        "activate Demo entry, production authentication, or Internet deployment."
+    )
+    assert operation["parameters"] == [
+        {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": True,
+            "schema": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 128,
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+                "title": "Idempotency-Key",
+            },
+        }
+    ]
+    assert operation["requestBody"] == {
+        "required": True,
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/RunEntryRequest"}
+            }
+        },
+    }
+    assert set(operation["responses"]) == {"200", "404", "409", "422", "500"}
+    assert operation["responses"]["200"] == {
+        "description": "Run entered or exactly replayed.",
+        "content": {
+            "application/json": {
+                "schema": {"$ref": "#/components/schemas/RunEntryResponse"}
+            }
+        },
+    }
+    for status_code in ("404", "409", "422", "500"):
+        assert operation["responses"][status_code]["content"]["application/json"][
+            "schema"
+        ] == {"$ref": "#/components/schemas/ErrorResponse"}
+
+    components = schema["components"]["schemas"]
+    request = components["RunEntryRequest"]
+    assert request["additionalProperties"] is False
+    assert request["type"] == "object"
+    assert request["required"] == [
+        "player_character_id",
+        "expected_record_revision",
+        "scenario_id",
+    ]
+    assert set(request["properties"]) == {
+        "player_character_id",
+        "expected_record_revision",
+        "scenario_id",
+    }
+    for field_name in ("player_character_id", "scenario_id"):
+        assert request["properties"][field_name] == {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+            "title": " ".join(
+                part.capitalize() for part in field_name.split("_")
+            ),
+            "type": "string",
+        }
+    assert request["properties"]["expected_record_revision"] == {
+        "maximum": 9223372036854775807,
+        "minimum": 1,
+        "title": "Expected Record Revision",
+        "type": "integer",
+    }
+
+    response = components["RunEntryResponse"]
+    assert response["additionalProperties"] is False
+    assert response["type"] == "object"
+    assert response["required"] == [
+        "run_id",
+        "session_id",
+        "scenario_id",
+        "player_character",
+    ]
+    assert set(response["properties"]) == {
+        "run_id",
+        "session_id",
+        "scenario_id",
+        "player_character",
+    }
+    assert response["properties"]["player_character"] == {
+        "$ref": "#/components/schemas/PlayerCharacterSelfProjection"
+    }
+
+    pending: list[Any] = [schema]
+    while pending:
+        current = pending.pop()
+        if isinstance(current, dict):
+            for key, value in current.items():
+                if key != "$ref":
+                    pending.append(value)
+                    continue
+                target: Any = schema
+                assert isinstance(value, str) and value.startswith("#/")
+                for part in value[2:].split("/"):
+                    target = target[part.replace("~1", "/").replace("~0", "~")]
+        elif isinstance(current, list):
+            pending.extend(current)
+
+    internal_names = {
+        "RunEntryCommand",
+        "RunEntryResult",
+        "RunEntryDecision",
+        "CanonicalRun",
+        "ApplicableCharacterReference",
+        "StoredRunSuccessReceipt",
+        "RunEntryCreationEvidence",
+        "ControllerBindingRef",
+        "NarrativeJob",
+        "NarrativeRequest",
+    }
+    assert internal_names.isdisjoint(components)
+    action_responses = schema["paths"][
+        "/v1/sessions/{session_id}/actions"
+    ]["post"]["responses"]
+    assert action_responses["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ActionResponse"
+    }
+    assert action_responses["202"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/ActionResponse"
+    }
+    assert schema["paths"][
+        "/v1/sessions/{session_id}/requests/{client_request_id}"
+    ]["get"]["responses"]["200"]["content"]["application/json"]["schema"] == {
+        "$ref": "#/components/schemas/NarrativeRequestStatusResponse"
+    }
 
 
 def test_production_python_has_no_scenario_id_specific_branch() -> None:

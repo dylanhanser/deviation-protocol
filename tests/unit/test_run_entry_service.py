@@ -5,11 +5,15 @@ from copy import deepcopy
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
+from typing import get_type_hints
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from fastapi.routing import APIRoute
 from pydantic import ValidationError
 
+from deviation_protocol.api import dependencies as api_dependencies
+from deviation_protocol.api import main as api_main
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.player_character_service import (
     PlayerCharacterBindingEligibilityEvidence,
@@ -863,15 +867,41 @@ async def test_commit_failure_or_cancellation_has_one_attempt_and_no_success(
     assert uow.rollback_calls == uow.close_calls == 1
 
 
-def test_p8_s2_exposes_no_api_route_or_later_lifecycle_behavior() -> None:
-    repository_root = Path(__file__).parents[2]
-    api_source = (
-        repository_root / "src" / "deviation_protocol" / "api" / "main.py"
-    ).read_text(encoding="utf-8")
+def test_p8_s3_exposes_the_canonical_run_entry_service_at_the_public_route() -> None:
+    events: list[str] = []
+    service, _, _, _ = _service(_Factory(_Uow(events)), events)
+    services = api_dependencies.ApiServices(
+        session_service=service.session_service,
+        turn_orchestrator=object(),  # type: ignore[arg-type]
+        run_entry_service=service,
+    )
+    request = SimpleNamespace(
+        app=SimpleNamespace(state=SimpleNamespace(api_services=services))
+    )
+    app = api_main.create_app(services=services)
+    route = next(
+        route
+        for route in app.routes
+        if isinstance(route, APIRoute) and route.path == "/v1/runs"
+    )
     result_fields = set(RunEntryResult.model_fields)
 
-    assert "RunEntryService" not in api_source
-    assert 'post("/v1/runs"' not in api_source
+    assert not hasattr(api_dependencies, "RunEntryCoordinator")
+    assert not hasattr(api_main, "RunEntryCoordinator")
+    assert get_type_hints(api_dependencies.ApiServices)["run_entry_service"] == (
+        RunEntryService | None
+    )
+    assert (
+        get_type_hints(api_dependencies.get_run_entry_service)["return"]
+        is RunEntryService
+    )
+    assert api_dependencies.get_run_entry_service(request) is service
+    assert get_type_hints(route.endpoint)["service"] is RunEntryService
+    assert api_dependencies.get_run_entry_service in {
+        dependency.call for dependency in route.dependant.dependencies
+    }
+    assert route.methods == {"POST"}
+    assert route.operation_id == "enter_run"
     assert result_fields == {
         "run_id",
         "session_id",
