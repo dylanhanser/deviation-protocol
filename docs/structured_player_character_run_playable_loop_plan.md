@@ -19,21 +19,18 @@ marked complete, or absorbed by Phase 8.
 
 P8-S1 eligible-character discovery is implemented, independently accepted,
 committed, and published at
-`95ffe4019e2a69967dfae1fee2a1ecba4a628381`. The dedicated
-[P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md)
-freezes the proposed internal transaction and persistent protocol only. Terminal
-review accepted its persistence-width and MySQL-current-read corrections and
-found one material defect in the catalogue-independent snapshot reconstruction;
-the dedicated candidate now corrects that defect with the verified strict
-JSON-mode entry and complete structural round trip. One narrow independent
-read-only re-review of that correction and its direct regression is pending. It
-is not approved, implemented, staged, committed, or published and grants no
-implementation authority. P8-S2
-may begin only after that exact corrected four-document candidate receives
-`STRUCTURED_PLAYER_CHARACTER_P8_S2_PLAN_REVIEW_APPROVED`, is separately
-committed and user-published unchanged, a clean aligned baseline is confirmed,
-and a separate explicit P8-S2 implementation task is authorized. P8-S2 through
-P8-S6 remain unimplemented and unauthorized, and Phase 8 is not complete.
+`95ffe4019e2a69967dfae1fee2a1ecba4a628381`. P8-S2 atomic internal Run entry
+is implemented, accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`
+(`feat(player-character): add durable run-entry initialization`); its
+implementation and F1/F2/F3 evidence are closed, and P8-S2 is not being
+reopened. The review-ready
+[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
+is the canonical next slice, but it is not independently reviewed, approved,
+implemented, staged, committed, or published and grants no implementation
+authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
+evidence/final status closure remain unimplemented, and Phase 8 is not
+complete.
 
 This document is the dedicated implementation plan for:
 
@@ -72,9 +69,9 @@ candidate bytes and SHA-256 identities. It cannot rely on the published
 approval. Its exact changed bytes require a fresh independent read-only review
 before a separately authorized documentation commit; that authorized commit
 precedes user publication and clean published-baseline confirmation. Only then
-may the synchronized authority support a separate explicit P8-S1 implementation
-task. This later correction workflow does not reopen or become part of the
-completed original P8-G0 approval and publication gate.
+may the synchronized authority support the next applicable Phase 8 task. This
+later correction workflow does not reopen or become part of the completed
+original P8-G0 approval and publication gate.
 
 ## 2. Verified planning baseline
 
@@ -130,8 +127,8 @@ Authority remains divided by subject:
 | --- | --- | --- |
 | [Final Narrative Experience](final_narrative_experience.md) | Approved product authority | Persistent character and Run identity; model/server separation; minimum reading-first direction |
 | [Structured Player Character Contract](structured_player_character_contract.md) | Approved and frozen, partially implemented | Character identity, lifecycle, ownership, applicable reference, binding cardinality, privacy |
-| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus Phase 8 exception partially implemented through P8-S1 | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
-| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus Phase 8 additions partially implemented through P8-S1 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
+| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus Phase 8 exception partially implemented through P8-S2 | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
+| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus discovery implemented at P8-S1, internal admission implemented at P8-S2, and public admission planned for P8-S3 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
 | [Minimum Run Core Plan](minimum_run_core_implementation_plan.md) | Completed historical implementation authority | Run schema, repositories, UoW, identities, participation, receipts, transaction precedent |
 | [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, and synchronized with the approved and published Phase 8 planning authority | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
 | [Architecture](architecture.md) and committed source | Current implemented fact | Composition, Session lifecycle, Demo isolation, persistence and dependency direction |
@@ -201,10 +198,9 @@ Phase 8 reuses unchanged:
 No existing Session is inferred to belong to a Run. Only new Phase 8 admission
 creates participation.
 
-## 6. Current missing connection
+## 6. Current remaining connection
 
-The repository currently has all of these pieces separately but no trusted
-operation joining them:
+Published P8-S2 now supplies the trusted internal operation joining:
 
 ```text
 owned active Player Character
@@ -215,12 +211,14 @@ owned active Player Character
   -> existing public action loop
 ```
 
-The public owned-read surface requires a previously known opaque ID and cannot
-discover reusable characters. The public Session-create route creates an
-unbound legacy Session. Run creation, character binding, and participation are
-internal. The Run aggregate admits only `pre_first_turn` in current domain
-validation. Demo composition has no Player Character or Run repositories or
-services, and Web has no Player Character or Run-entry methods.
+P8-S1 already discovers reusable eligible characters. P8-S2's internal
+`RunEntryService` now creates Run revisions 1/2/3, binds the character, creates
+the Session, adds participation, and activates the Run in one UoW. The current
+missing connection is public and compositional: no normal `POST /v1/runs`
+adapter or normal entry-service dependency exists. The public legacy
+Session-create route remains unbound. Demo composition still has no Player
+Character or Run repositories/services, and Web has no Player Character or
+Run-entry methods.
 
 Those are the only connections Phase 8 fills.
 
@@ -359,7 +357,8 @@ continues to support a known ID.
 
 ### 10.2 Run entry
 
-Phase 8 adds exactly one normal-application mutation:
+P8-S3 plans exactly one normal-application mutation; P8-S4 separately owns Demo
+parity:
 
 ```http
 POST /v1/runs
@@ -491,10 +490,9 @@ scenario selection, and line continuation remain future Run-owned work.
 
 ## 13. Transaction, lock, and concurrency model
 
-One new application service, provisionally named `RunEntryService`, is the
-single transaction owner. File and symbol naming may change during an
-implementation slice only if dependency direction and this ownership remain
-exact.
+Published P8-S2 implements `RunEntryService` as the single transaction owner.
+P8-S3 reuses that exact service and may not rename, replace, duplicate, or
+reopen its ownership.
 
 The new-operation order is:
 
@@ -556,9 +554,9 @@ server default character-definition ID, and trusted source. Bind and attach
 receipts retain their existing exact Run/line/character/Session/version
 fingerprints.
 
-The accepted `P8-REV-001` correction makes that composite fingerprint durable,
-not merely an in-memory admission check. P8-S2 must introduce a strict Phase 8
-composite creation-evidence model and a backward-compatible creation-evidence
+The accepted `P8-REV-001` correction made that composite fingerprint durable,
+not merely an in-memory admission check. P8-S2 introduced the strict Phase 8
+composite creation-evidence model and backward-compatible creation-evidence
 codec. The complete composite evidence is written through the existing
 `run_creation_receipts.operation_evidence_canonical` carrier and decoded from
 that same carrier after repository reload. The Run creation-receipt repository
@@ -766,12 +764,12 @@ behavior. An implementer must not create a convenience migration.
 | Slice | Canonical purpose | Prerequisite | Completion state |
 | --- | --- | --- | --- |
 | P8-G0 | Freeze this seven-document plan and exact public/Run authority amendments | Clean published P5-S3 baseline | Planning approval and publication satisfied at `de4d8c0e35c7864948306d751a00aaf295ff77ff`; any later correction requires exact-byte independent review, a separately authorized documentation commit, user publication, and clean-baseline confirmation |
-| P8-S1 | Add bounded owned active-unbound character discovery | Approved/published P8-G0 | Accepted discovery contract and implementation; no Run entry yet |
-| P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Accepted application/domain/MySQL behavior; no public route yet |
-| P8-S3 | Activate normal-app Run-entry API and composition | Accepted P8-S2 | Accepted normal public/OpenAPI route; Demo/Web not yet connected |
-| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Accepted local deterministic backend route journey |
-| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Accepted create-or-reuse through terminal View browser journey |
-| P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Independently reviewed complete implementation and truthful documentation |
+| P8-S1 | Add bounded owned active-unbound character discovery | Approved/published P8-G0 | Implemented, accepted, committed, and published at `95ffe4019e2a69967dfae1fee2a1ecba4a628381` |
+| P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Implemented, accepted, committed, and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; closed with no public route |
+| P8-S3 | Activate normal-app Run-entry API and composition | Accepted/published P8-S2 | Review-ready implementation-plan candidate only; not reviewed, approved, implemented, staged, committed, or published |
+| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Unimplemented; Demo parity remains deferred here |
+| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Unimplemented; Web connection remains deferred here |
+| P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Unimplemented; cross-surface evidence and final status closure remain deferred here |
 
 Each slice is separately authorized, leaves an unstaged reviewable candidate,
 receives a fresh independent review, and has a separately authorized local
@@ -838,9 +836,8 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`
 correction is a new candidate whose exact bytes require a fresh independent
 review before a separately authorized documentation commit. That authorized
 commit precedes user publication and clean published-baseline confirmation;
-only then may the synchronized authority support a separate explicit P8-S1
-implementation task. This later workflow is not part of the completed original
-P8-G0 gate.
+only then may the synchronized authority support the next applicable Phase 8
+task. This later workflow is not part of the completed original P8-G0 gate.
 
 **Exclusions:** every code, test, migration, dependency, generated, Provider,
 deployment, staging, commit, and push action.
@@ -887,17 +884,13 @@ OpenAPI, real-MySQL query, no-write, and Demo non-activation.
 ### 20.3 P8-S2 — Atomic internal Run entry
 
 The exact persistent byte contract, decoder selection, internal-ID derivation,
-fingerprint mapping, transaction/replay algorithm, closed future path
-allowlists, and implementation gates are frozen by the dedicated
-[P8-S2 implementation-plan candidate](structured_player_character_p8_s2_implementation_plan.md).
-Terminal review accepted that candidate's persistence-width and
-MySQL-current-read corrections and found one material snapshot-reconstruction
-defect. The dedicated plan now corrects that defect with the verified strict
-JSON-mode entry and complete structural round trip; one narrow independent
-read-only re-review of that correction and its direct regression is pending. It
-has no authority until its exact corrected four-document bytes are approved,
-separately committed, user-published, and confirmed as a clean aligned
-baseline. This short cross-reference does not duplicate or pre-approve it.
+fingerprint mapping, transaction/replay algorithm, closed path allowlists, and
+implementation gates remain frozen in the historical
+[P8-S2 implementation plan](structured_player_character_p8_s2_implementation_plan.md).
+P8-S2 is implemented, accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation and F1/F2/F3
+evidence are closed. P8-S3 reuses that completed service and does not edit,
+review, correct, or expand P8-S2 or its frozen plan.
 
 **Purpose:** supply one application-owned transaction that creates Run/line,
 binds the character, creates Session state, adds participation, and activates
@@ -986,6 +979,14 @@ prove all of the following:
    failure point and no second store, retry, or compensation.
 
 ### 20.4 P8-S3 — Normal API and composition activation
+
+The standalone
+[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
+freezes the exact route, DTO, decision mapping, composition graph, path
+responsibilities, discriminating evidence, and workflow gates. It is
+review-ready only and is not independently reviewed, approved, implemented,
+staged, committed, or published. Its creation grants no implementation
+authority.
 
 **Purpose:** expose only the approved normal-app `POST /v1/runs` operation and
 compose its service lazily.

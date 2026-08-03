@@ -863,8 +863,8 @@ objective.
 
 ## Planned Phase 8 Player Character discovery and Run entry
 
-Status: **Partially implemented through separately authorized P8-S1
-eligible-character discovery — Run admission and later slices unimplemented.**
+Status: **Partially implemented through published P8-S2 atomic internal Run
+entry; P8-S3 normal public activation is the next plan candidate.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -874,14 +874,18 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 Later modifications to those canonical planning bytes require fresh exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
-A separately authorized P8-S1 implementation task implements only the
-eligible-character-discovery contract. P8-S2 may begin only after exact-byte
-P8-S1 independent review, a separately authorized commit, user publication,
-clean published-baseline confirmation, and a separate explicit P8-S2
-implementation task. P8-S2 through P8-S6 remain unimplemented and
-unauthorized. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase 6 and
-Phase 7 allocations remain planned and unimplemented, and neither is a Phase 8
-prerequisite.
+P8-G0 is complete and published. P8-S1 eligible-character discovery is
+implemented, accepted, committed, and published. P8-S2 atomic internal Run
+entry is implemented, accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation and F1/F2/F3
+evidence are closed and are not reopened. The review-ready
+[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
+is next, but it is not independently reviewed, approved, implemented, staged,
+committed, or published and does not authorize the `POST /v1/runs` route.
+P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
+status closure remain unimplemented. Phase 5 remains complete at P5-S3; no
+P5-S4 exists. Existing Phase 6 and Phase 7 allocations remain planned and
+unimplemented, and neither is a Phase 8 prerequisite.
 
 ### Eligible-character collection
 
@@ -930,7 +934,8 @@ or recovery.
 
 ### Run-entry request
 
-Phase 8 plans one normal/Demo mutation:
+P8-S3 plans one normal-application mutation. Demo parity remains deferred to
+P8-S4:
 
 ```http
 POST /v1/runs
@@ -1025,7 +1030,7 @@ retry.
 
 ### OpenAPI boundary
 
-Phase 8 OpenAPI must describe exactly:
+P8-S3 OpenAPI must describe exactly:
 
 - the eligible collection's 200, 404, 422, and 500 responses;
 - the Run-entry operation's required `Idempotency-Key`, exact strict body,

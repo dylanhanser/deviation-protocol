@@ -859,12 +859,16 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 It does not implement behavior. Later modifications to its canonical planning
 bytes require fresh exact-byte independent review before a separately authorized
 documentation commit; that commit precedes user publication and clean
-published-baseline confirmation. A separately authorized P8-S1 implementation
-task implements only eligible-character discovery. P8-S2 may begin only after
-exact-byte P8-S1 independent review, a separately authorized commit, user
-publication, clean published-baseline confirmation, and a separate explicit
-P8-S2 implementation task. P8-S2 through P8-S6 remain unimplemented and
-unauthorized.
+published-baseline confirmation. P8-G0 is complete and published. P8-S1
+eligible-character discovery is implemented, accepted, committed, and
+published. P8-S2 atomic internal Run entry is implemented, accepted, committed,
+and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation
+and F1/F2/F3 evidence are closed and are not reopened. The review-ready
+[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
+is the canonical next slice, but it is not independently reviewed, approved,
+implemented, staged, committed, or published and grants no implementation
+authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
+evidence/final status closure remain unimplemented.
 
 The planned Phase 8 character-side boundary is narrow:
 
@@ -1073,11 +1077,14 @@ canonical counts above, final independent review passed, and the result was
 committed and published as `34d063e387cde69500e4dc018ff087e87f3eee74`.
 Phase 5 is complete at P5-S3, no P5-S4 exists, and P5-S3 remains closed. Demo,
 public Run, frontend, Web, and administration were not activated by Phase 5.
-Phase 8 now has the approved and published planning authority described above;
-a separately authorized P8-S1 task implements eligible-character discovery only,
-while P8-S2 through P8-S6 remain unimplemented and unauthorized and Phase 8 is
-incomplete. Phase 6 and Phase 7 remain allocated and unimplemented. Planning
-approval and publication alone did not authorize P8-S1, which began through its
-separate task. The approved final
+Phase 8 now has the approved and published planning authority described above.
+P8-G0 and P8-S1 are complete and published. P8-S2 atomic internal Run entry is
+implemented, accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`; it remains closed. P8-S3 normal
+API/composition activation is only the review-ready, unapproved candidate linked
+above, while P8-S4 through P8-S6 remain unimplemented and Phase 8 is incomplete.
+Demo parity remains P8-S4, Web connection remains P8-S5, and cross-surface
+evidence/final status closure remains P8-S6. Phase 6 and Phase 7 remain
+allocated and unimplemented. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

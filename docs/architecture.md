@@ -542,12 +542,19 @@ Phase 8 is explicitly allocated to Structured Player Character Run Entry and
 the Minimum Playable Loop. Its approved and published planning authority is
 [`structured_player_character_run_playable_loop_plan.md`](structured_player_character_run_playable_loop_plan.md).
 The approved planning bytes were committed and published at
-`de4d8c0e35c7864948306d751a00aaf295ff77ff`. Phase 8 remains incomplete. A
-separately authorized P8-S1 implementation task implements only
-eligible-character discovery. P8-S2 may begin only after exact-byte P8-S1
-independent review, a separately authorized commit, user publication, clean
-published-baseline confirmation, and a separate explicit P8-S2 implementation
-task. P8-S2 through P8-S6 remain unimplemented and unauthorized.
+`de4d8c0e35c7864948306d751a00aaf295ff77ff`, so P8-G0 is complete and
+published. P8-S1 eligible-character discovery is implemented, accepted,
+committed, and published. P8-S2 atomic internal Run entry is implemented,
+accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`
+(`feat(player-character): add durable run-entry initialization`); its
+implementation and F1/F2/F3 evidence are closed and are not reopened. The
+review-ready
+[P8-S3 implementation-plan candidate](structured_player_character_p8_s3_implementation_plan.md)
+is the canonical next slice, but it is not independently reviewed, approved,
+implemented, staged, committed, or published and grants no implementation
+authority. P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
+evidence/final status closure remain unimplemented. Phase 8 remains incomplete.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.

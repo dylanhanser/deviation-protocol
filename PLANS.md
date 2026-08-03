@@ -134,7 +134,7 @@ documents.
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
 | Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
-| Phase 8 | **Partially implemented through P8-S1 eligible-character discovery; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
+| Phase 8 | **Partially implemented through published P8-S2 atomic Run entry; P8-S3 plan candidate pending review; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -408,17 +408,18 @@ stages:
      entry/binding, existing gameplay, deterministic Demo, and minimal Web
      backbone described in the
      [dedicated Phase 8 plan](docs/structured_player_character_run_playable_loop_plan.md).
-   - Phase 8 is the current planning priority and remains incomplete. P8-S1
-     eligible-character discovery is implemented and published at the current
-     baseline. Terminal review accepted the P8-S2 persistence-width and
-     MySQL-current-read corrections but found one material defect in the
-     catalogue-independent snapshot reconstruction. The candidate now uses the
-     verified strict JSON-mode entry with complete snapshot round-trip equality;
-     one narrow independent read-only re-review of only that correction and its
-     direct regression is pending. It is not approved, implemented, staged,
-     committed, or published; P8-S3 through P8-S6 remain unimplemented and
-     unauthorized. Phase 8 neither implements nor completes Phase 6 or Phase 7,
-     and future features remain addable through later phases.
+   - Phase 8 is the current planning priority and remains incomplete. P8-G0 is
+     complete and published, and P8-S1 eligible-character discovery is complete
+     and published. P8-S2 atomic internal Run entry is implemented, accepted,
+     committed, and published at
+     `70815b181624e5475d2d978bef0db1ed3b22324e`; its implementation and F1/F2/F3
+     evidence are closed and are not reopened. The dedicated
+     [P8-S3 implementation-plan candidate](docs/structured_player_character_p8_s3_implementation_plan.md)
+     is the next planned slice and is review-ready only: it is not independently
+     reviewed, approved, implemented, staged, committed, or published. P8-S4
+     Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
+     status closure remain unimplemented. Phase 8 neither implements nor
+     completes Phase 6 or Phase 7.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -661,7 +662,7 @@ The canonical decision is
 
 ## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
 
-Status: **Partially implemented through separately authorized P8-S1 eligible-character discovery — incomplete.**
+Status: **Partially implemented through published P8-S2 atomic internal Run entry; P8-S3 plan candidate is next — incomplete.**
 
 Phase 8 is explicitly allocated to the next selected product priority: create
 or reuse an owned Structured Player Character, discover/select an eligible one,
@@ -684,23 +685,21 @@ committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`.
 Planning publication does not authorize implementation. Later modifications to
 the canonical planning bytes require fresh exact-byte independent review before
 a separately authorized documentation commit; that commit precedes user
-publication and clean published-baseline confirmation. P8-S1 eligible-character
-discovery is implemented, committed, and published at
-`95ffe4019e2a69967dfae1fee2a1ecba4a628381`. The dedicated
-[P8-S2 implementation-plan candidate](docs/structured_player_character_p8_s2_implementation_plan.md)
-now freezes the proposed internal transaction and persistent protocol. Terminal
-review accepted its persistence-width and MySQL-current-read corrections and
-found one material defect in the catalogue-independent snapshot reconstruction;
-the dedicated candidate now corrects that defect with the verified strict
-JSON-mode entry and complete structural round trip. One narrow independent
-read-only re-review of that correction and its direct regression is pending. It
-is not approved, implemented, staged, committed, or published and grants no
-implementation authority. P8-S2
-may begin only after that exact corrected four-document candidate receives
-`STRUCTURED_PLAYER_CHARACTER_P8_S2_PLAN_REVIEW_APPROVED`, is separately
-committed and user-published unchanged, a clean aligned baseline is confirmed,
-and a separate explicit P8-S2 implementation task is authorized. P8-S2 through
-P8-S6 remain unimplemented and unauthorized, and Phase 8 is not complete.
+publication and clean published-baseline confirmation. P8-G0 is complete and
+published. P8-S1 eligible-character discovery is implemented, independently
+accepted, committed, and published at
+`95ffe4019e2a69967dfae1fee2a1ecba4a628381`. P8-S2 atomic internal Run entry is
+implemented, accepted, committed, and published at
+`70815b181624e5475d2d978bef0db1ed3b22324e`
+(`feat(player-character): add durable run-entry initialization`); its
+implementation and F1/F2/F3 evidence are closed, and P8-S2 is not being
+reopened. The dedicated
+[P8-S3 implementation-plan candidate](docs/structured_player_character_p8_s3_implementation_plan.md)
+is the canonical next slice. It is review-ready only and is not independently
+reviewed, approved, implemented, staged, committed, or published; its creation
+does not authorize implementation. P8-S4 Demo parity, P8-S5 Web connection,
+and P8-S6 cross-surface evidence and final status closure remain unimplemented.
+Phase 8 is not complete.
 
 ## Deferred
 
@@ -760,6 +759,9 @@ manually.
 - Approved and published Phase 8 Structured Player Character Run entry and
   minimum playable-loop planning authority:
   [`docs/structured_player_character_run_playable_loop_plan.md`](docs/structured_player_character_run_playable_loop_plan.md).
+- Review-ready, unapproved P8-S3 normal API/composition implementation-plan
+  candidate:
+  [`docs/structured_player_character_p8_s3_implementation_plan.md`](docs/structured_player_character_p8_s3_implementation_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:
