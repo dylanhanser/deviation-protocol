@@ -7,7 +7,23 @@ planning candidate received independent approval with
 `STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
 committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`
 (`docs(player-character): approve phase 8 playable-loop plan`). This plan does
-not authorize implementation.**
+not authorize implementation. The current worktree bytes are an unapproved,
+uncommitted, and unpublished candidate amendment limited to the P8-S4 test-path
+budget.**
+
+The sole future success verdict for an independent read-only review of the exact
+amended parent-plan bytes is:
+
+```text
+STRUCTURED_PLAYER_CHARACTER_P8_S4_PARENT_TEST_BUDGET_AMENDMENT_INDEPENDENT_REVIEW_APPROVED
+```
+
+That verdict binds only the exact amended bytes and reviewer-reported SHA-256.
+It does not authorize a commit, push, publication, correction of the existing
+P8-S4 implementation-plan candidate, P8-S4 implementation, P8-S5, or P8-S6.
+After approval, the amendment still requires separate commit authorization,
+user publication, and confirmation of a new clean aligned baseline before the
+P8-S4 candidate may change. No approval or publication is claimed here.
 
 Phase 5 is complete at the published P5-S3 baseline
 `34d063e387cde69500e4dc018ff087e87f3eee74`
@@ -53,16 +69,17 @@ It records an approved planning boundary only. It creates no runtime capability,
 test, migration, frontend behavior, Demo behavior, Provider behavior,
 deployment, or production activation.
 
-The sole operative successful verdict for an independent review of the exact
-complete seven-document planning candidate is:
+The historical successful verdict for the independent review of the exact
+published seven-document planning candidate was:
 
 ```text
 STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED
 ```
 
 The historical `P8-REV-002` correction made this exact reachable review verdict
-the only operative token; no alias or older alternative is accepted. Generic
-`APPROVED`, P5-S1/P5-S2/P5-S3, Phase 6, Phase 7, implementation-review,
+the only operative token for that published candidate. It is not operative for
+the current amendment; the amendment token above is its sole success verdict.
+Generic `APPROVED`, P5-S1/P5-S2/P5-S3, Phase 6, Phase 7, implementation-review,
 historical, blocked, and differently named tokens cannot satisfy the gate.
 Review binds the exact complete candidate bytes and the SHA-256 inventory
 recorded after the candidate is frozen. Any byte change invalidates that
@@ -818,9 +835,10 @@ unchanged documents mechanically. Each slice edits only owners whose current
 authority, status, evidence, or next-action wording actually needs
 synchronization. Before that slice's independent review, every applicable
 owner must be truthful under the canonical documentation-synchronization
-checklist. The separately frozen production- and test-path budgets remain
-unchanged. This documentation allowance admits no production, test, migration,
-generated, dependency, or configuration path. Required synchronization is part
+checklist. The documentation allowance does not alter the separately stated
+production- and test-path budgets. This documentation allowance admits no
+production, test, migration, generated, dependency, or configuration path.
+Required synchronization is part
 of that slice's candidate, independent review, and commit boundary; a slice
 must not enter review or commit with known documentation drift. P8-S6 retains
 its final cross-surface evidence and closure responsibility.
@@ -1108,20 +1126,20 @@ and no live Provider was called.
 **Purpose:** make the planned backend journey executable locally without MySQL
 or external Provider I/O.
 
-**Production path budget: at most three:**
+**Mandatory production path budget: exactly three:**
 
 - `src/deviation_protocol/infrastructure/demo_persistence.py`;
 - `src/deviation_protocol/infrastructure/demo_generators.py`;
 - `src/deviation_protocol/api/demo_composition.py`.
 
-**Test path budget: at most five:**
+**Mandatory test/support path budget: exactly six:**
 
 - `tests/unit/test_demo_persistence.py`;
 - `tests/unit/test_demo_composition.py`;
+- `tests/unit/test_run_composition.py`;
+- `tests/unit/test_player_character_api.py`;
 - `tests/e2e/test_demo_cross_process_replay.py`;
-- `tests/e2e/support/demo_replay_child.py`; and
-- `tests/unit/test_demo_scripts.py`, only if launcher/smoke expectations need a
-  narrow route-inventory update.
+- `tests/e2e/support/demo_replay_child.py`.
 
 The accepted `P8-FRESH-003` correction authorizes the executable child because
 `test_demo_cross_process_replay.py` launches that exact path. The child
@@ -1130,14 +1148,49 @@ generator-category trace, validates the complete `DemoStoreSnapshot` field
 manifest, and builds the schema-complete private snapshot representation. P8-S4
 adds Player Character and Run-entry persistence families and deterministic
 identities to that topology, so the cross-process evidence would be incomplete
-if the executed reconstruction owner remained inspection-only. The five-path
-maximum adds no unrelated Demo test or support path and changes no P8-S4
-production scope.
+if the executed reconstruction owner remained inspection-only.
 
-**Documentation path budget: at most seven:** limited to the common exact seven
-Phase 8 owners above. Edit only applicable owners, and make all applicable
-authority/status/evidence/next-action wording truthful before P8-S4 independent
-review.
+The two additional existing unit-test owners are mandatory because P8-S4 adds
+no new public route or schema. It composes the already-existing Player Character
+and Run-entry services into Demo mode, and current `create_app()` registration
+exposes their existing routes and schemas whenever those service slots are
+populated. Therefore
+`test_demo_composition_remains_independent_of_run_entry` in
+`tests/unit/test_run_composition.py` and
+`test_demo_composition_gets_no_player_character_route_or_schema` in
+`tests/unit/test_player_character_api.py` cannot retain their older Demo-
+exclusion expectations. P8-S4 must replace only those obsolete assertions with
+expectations consistent with Demo composition ownership. Broad rewrites of
+either file are unauthorized, and unrelated normal-composition assertions must
+remain unchanged. This is required P8-S4 test maintenance, not P8-S5 Web work or
+P8-S6 cross-surface closure, and it does not claim the corrections are already
+implemented.
+
+**Conditional test/support path budget: at most one:**
+
+- `tests/unit/test_demo_scripts.py`, only if the later implementation preflight
+  proves that its launcher or smoke assertions enumerate the exact affected
+  route inventory.
+
+Current inspection finds no exact affected route-inventory assertion in that
+file, so the objective predicate remains inactive. If later evidence activates
+it, only the narrow expected route inventory may change.
+
+**Implementation-and-test totals:** exactly nine mandatory paths: three
+production plus six test/support. If the sole conditional predicate activates,
+the maxima become at most seven test/support paths and at most ten
+implementation-and-test paths. A required production or mandatory test/support
+path outside these inventories stops P8-S4 for plan reassessment.
+
+**Other implementation path budgets:** zero migration paths, zero configuration
+paths, zero dependency paths, and zero generated paths.
+
+**Later post-publication documentation-sync path budget: exactly seven and
+separate from implementation/test:** the common exact seven Phase 8 owners
+above. All seven are inspected and synchronized after P8-S4 publication; they
+are not counted in either the nine mandatory implementation/test paths or the
+conditional maximum of ten. This does not authorize documentation sync before
+the separately reviewed implementation is committed and user-published.
 
 **Transaction/persistence:** one process-local atomic store publication; exact
 rollback and lock semantics matching application contracts. No database,
@@ -1306,11 +1359,21 @@ git diff --check
 ### P8-S4
 
 ```powershell
-.\.venv\Scripts\python.exe -m pytest <Demo persistence/composition/e2e paths>
+.\.venv\Scripts\python.exe -m pytest `
+  tests/unit/test_demo_persistence.py `
+  tests/unit/test_demo_composition.py `
+  tests/unit/test_run_composition.py `
+  tests/unit/test_player_character_api.py `
+  tests/e2e/test_demo_cross_process_replay.py
 .\.venv\Scripts\python.exe -m compileall -q src tests alembic
 .\scripts\verify.ps1 -Mode Offline
 git diff --check
 ```
+
+The cross-process selection executes the mandatory
+`tests/e2e/support/demo_replay_child.py` support path. Add
+`tests/unit/test_demo_scripts.py` to the focused selection only if its objective
+conditional predicate above activates.
 
 ### P8-S5
 
