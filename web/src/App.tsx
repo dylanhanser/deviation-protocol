@@ -4,12 +4,18 @@ import { publicApiClient, type PublicApiClient } from "./api/client";
 import { ApiClientError, formatApiClientError } from "./api/errors";
 import {
   actionRequestSchema,
+  idempotencyKeySchema,
+  minimalPlayerCharacterCreationRequestSchema,
+  runEntryRequestSchema,
   sessionPathIdSchema,
   type ActionRequest,
+  type MinimalPlayerCharacterCreationRequest,
   type PlayerSessionView,
+  type PlayerCharacterSelfProjection,
   type PublicActionAffordance,
   type PublicPlayableActionType,
   type PublicScenarioDescription,
+  type RunEntryRequest,
 } from "./api/schemas";
 import {
   clearSessionRecoveryRecord,
@@ -28,10 +34,35 @@ type PollWait = (milliseconds: number, signal: AbortSignal) => Promise<void>;
 
 interface AppProps {
   client?: PublicApiClient;
-  requestIdFactory?: () => string;
+  idempotencyKeyFactory?: () => string;
   actionIdentityFactory?: () => ActionIdentity;
   pollWait?: PollWait;
 }
+
+interface DiscoveryError {
+  message: string;
+  retryable: boolean;
+}
+
+interface MutationAttemptBase {
+  generation: number;
+  idempotencyKey: string;
+  uncertaintyTainted: boolean;
+  inFlight: boolean;
+}
+
+interface PlayerCharacterCreateAttempt extends MutationAttemptBase {
+  kind: "player-character-create";
+  exactFrozenBody: Readonly<MinimalPlayerCharacterCreationRequest>;
+}
+
+interface RunEntryAttempt extends MutationAttemptBase {
+  kind: "run-entry";
+  exactFrozenBody: Readonly<RunEntryRequest>;
+  entrySuccessAwaitingStorage: boolean;
+}
+
+type MutationAttempt = PlayerCharacterCreateAttempt | RunEntryAttempt;
 
 type ViewStaleKind =
   | "transport-uncertain"
@@ -66,6 +97,7 @@ interface RecoveryStorageFailureState {
 
 type ForegroundOperationKind =
   | "creating"
+  | "entering"
   | "reading"
   | "recovering"
   | "submitting"
@@ -107,6 +139,42 @@ const RECOVERY_STORAGE_FAILURE_MESSAGE =
   "本标签页 sessionStorage 无法安全访问或更新。Session、View 与行动控件已锁定；客户端不会 POST、重放行动或生成新的恢复身份。";
 const DETERMINISTIC_DEMO_WARNING =
   "Deterministic Demo  local only  temporary data  not a production Provider";
+const MUTATION_UNCERTAIN_MESSAGE =
+  "服务器是否已持久化本次操作仍不确定。客户端不会自动重试；只能用完全相同的请求内容手动重试。";
+const RUN_DISCOVERY_LIMIT_MESSAGE =
+  "如果 Run 已在服务器提交但 Session ID 尚未保存，此 Web 客户端无法发现或恢复该 Run。";
+const DOCUMENTED_MUTATION_ERRORS: Readonly<
+  Record<string, { status: number; message: string }>
+> = {
+  PLAYER_CHARACTER_NOT_FOUND: {
+    status: 404,
+    message: "Player character was not found",
+  },
+  IDEMPOTENCY_CONFLICT: {
+    status: 409,
+    message: "Idempotency key was reused",
+  },
+  PLAYER_CHARACTER_STALE: {
+    status: 409,
+    message: "Player character revision is stale",
+  },
+  PLAYER_CHARACTER_NOT_ELIGIBLE: {
+    status: 409,
+    message: "Player character is not eligible for Run entry",
+  },
+  RUN_ENTRY_CONFLICT: {
+    status: 409,
+    message: "Run entry conflicts with current state",
+  },
+  REQUEST_VALIDATION_FAILED: {
+    status: 422,
+    message: "Request validation failed",
+  },
+  INVALID_SCENARIO_DEFINITION: {
+    status: 422,
+    message: "Scenario definition is not available",
+  },
+};
 
 function newOpaqueId(): string {
   return globalThis.crypto.randomUUID();
@@ -145,6 +213,15 @@ function isTransportUncertain(error: unknown): boolean {
     error instanceof ApiClientError &&
     ["network", "aborted", "invalid-response"].includes(error.kind)
   );
+}
+
+function discoveryErrorFor(error: unknown): DiscoveryError {
+  return {
+    message: formatApiClientError(error),
+    retryable:
+      error instanceof ApiClientError &&
+      (error.kind === "network" || error.kind === "api"),
+  };
 }
 
 function isDescriptionActionType(
@@ -514,16 +591,30 @@ function ActionPanel({
 
 export default function App({
   client = publicApiClient,
-  requestIdFactory = newOpaqueId,
+  idempotencyKeyFactory = newOpaqueId,
   actionIdentityFactory = newActionIdentity,
   pollWait = waitForPollingDelay,
 }: AppProps) {
   const [scenarios, setScenarios] = useState<PublicScenarioDescription[] | null>(
     null,
   );
-  const [scenarioError, setScenarioError] = useState<string | null>(null);
+  const [scenarioError, setScenarioError] = useState<DiscoveryError | null>(null);
   const [selectedScenarioId, setSelectedScenarioId] = useState("");
-  const [selectedRoleId, setSelectedRoleId] = useState("");
+  const [scenarioRefreshAttempt, setScenarioRefreshAttempt] = useState(0);
+  const [eligibleCharacters, setEligibleCharacters] = useState<
+    PlayerCharacterSelfProjection[] | null
+  >(null);
+  const [eligibleTruncated, setEligibleTruncated] = useState(false);
+  const [eligibleError, setEligibleError] = useState<DiscoveryError | null>(null);
+  const [selectedPlayerCharacterId, setSelectedPlayerCharacterId] = useState("");
+  const [createdPlayerCharacter, setCreatedPlayerCharacter] =
+    useState<PlayerCharacterSelfProjection | null>(null);
+  const [eligibleRefreshAttempt, setEligibleRefreshAttempt] = useState(0);
+  const [mutationAttempt, setMutationAttempt] =
+    useState<MutationAttempt | null>(null);
+  const [requiredCatalogRefresh, setRequiredCatalogRefresh] = useState<
+    "eligible" | "scenario" | null
+  >(null);
   const [initialRecoveryRead] = useState(() => readSessionRecoveryRecord());
   const initialRecoveryRecord = initialRecoveryRead.ok
     ? initialRecoveryRead.value
@@ -551,11 +642,36 @@ export default function App({
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const foregroundOperationRef = useRef<ForegroundOperation | null>(null);
   const operationGenerationRef = useRef(0);
+  const mutationAttemptRef = useRef<MutationAttempt | null>(null);
+  const mutationGenerationRef = useRef(0);
   const loadedSessionRef = useRef<LoadedSession | null>(null);
   const recoveryRecordRef = useRef<SessionRecoveryRecord | null>(
     initialRecoveryRecord,
   );
   const previousClientRef = useRef(client);
+
+  const replaceMutationAttempt = useCallback(
+    (next: MutationAttempt | null) => {
+      mutationAttemptRef.current = next;
+      setMutationAttempt(next);
+    },
+    [],
+  );
+
+  const updateMutationAttempt = useCallback(
+    (
+      generation: number,
+      update: (current: MutationAttempt) => MutationAttempt,
+    ): boolean => {
+      const current = mutationAttemptRef.current;
+      if (current === null || current.generation !== generation) {
+        return false;
+      }
+      replaceMutationAttempt(update(current));
+      return true;
+    },
+    [replaceMutationAttempt],
+  );
 
   const invalidateForegroundOperation = useCallback(() => {
     operationGenerationRef.current += 1;
@@ -641,10 +757,7 @@ export default function App({
         }
         setScenarios(catalog.scenarios);
         const firstScenario = catalog.scenarios[0];
-        if (firstScenario !== undefined) {
-          setSelectedScenarioId(firstScenario.scenario_id);
-          setSelectedRoleId(firstScenario.default_character_definition_id);
-        }
+        setSelectedScenarioId(firstScenario?.scenario_id ?? "");
       })
       .catch((error: unknown) => {
         if (
@@ -653,25 +766,72 @@ export default function App({
         ) {
           return;
         }
-        setScenarioError(formatApiClientError(error));
+        setScenarioError(discoveryErrorFor(error));
       });
     return () => {
       active = false;
       controller.abort();
     };
-  }, [client]);
+  }, [client, scenarioRefreshAttempt]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    void client
+      .listEligiblePlayerCharacters(controller.signal)
+      .then((collection) => {
+        if (!active) {
+          return;
+        }
+        setEligibleCharacters(collection.eligible_player_characters);
+        setEligibleTruncated(collection.truncated);
+        setCreatedPlayerCharacter(null);
+        setSelectedPlayerCharacterId(
+          collection.eligible_player_characters[0]?.player_character_id.value ??
+            "",
+        );
+      })
+      .catch((error: unknown) => {
+        if (
+          !active ||
+          (error instanceof ApiClientError && error.kind === "aborted")
+        ) {
+          return;
+        }
+        setEligibleError(discoveryErrorFor(error));
+      });
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [client, eligibleRefreshAttempt]);
 
   useEffect(() => {
     if (previousClientRef.current !== client) {
+      const attempt = mutationAttemptRef.current;
+      if (attempt?.inFlight === true) {
+        replaceMutationAttempt({
+          ...attempt,
+          uncertaintyTainted: true,
+          inFlight: false,
+        });
+      }
       invalidateForegroundOperation();
       loadedSessionRef.current = null;
       setLoadedSession(null);
       setCreatedSessionWithoutView(null);
       setOperationError(null);
       setRecoveryInterruption(null);
+      setScenarios(null);
+      setScenarioError(null);
+      setEligibleCharacters(null);
+      setEligibleTruncated(false);
+      setEligibleError(null);
+      setCreatedPlayerCharacter(null);
+      setSelectedPlayerCharacterId("");
       previousClientRef.current = client;
     }
-  }, [client, invalidateForegroundOperation]);
+  }, [client, invalidateForegroundOperation, replaceMutationAttempt]);
 
   useEffect(() => {
     return () => {
@@ -823,23 +983,36 @@ export default function App({
   const selectedScenario = scenarios?.find(
     (scenario) => scenario.scenario_id === selectedScenarioId,
   );
+  const selectedPlayerCharacter =
+    createdPlayerCharacter?.player_character_id.value ===
+    selectedPlayerCharacterId
+      ? createdPlayerCharacter
+      : eligibleCharacters?.find(
+          (character) =>
+            character.player_character_id.value === selectedPlayerCharacterId,
+        );
 
   function handleScenarioChange(scenarioId: string) {
     setSelectedScenarioId(scenarioId);
-    const scenario = scenarios?.find((item) => item.scenario_id === scenarioId);
-    setSelectedRoleId(scenario?.default_character_definition_id ?? "");
   }
 
   function commitLoadedSession(
+    sessionId: string,
+    view: PlayerSessionView,
+  ) {
+    const next = { sessionId, view, stale: null };
+    loadedSessionRef.current = next;
+    setLoadedSession(next);
+  }
+
+  function persistAndCommitLoadedSession(
     sessionId: string,
     view: PlayerSessionView,
   ): boolean {
     if (!persistRecoveryRecord(sessionId)) {
       return false;
     }
-    const next = { sessionId, view, stale: null };
-    loadedSessionRef.current = next;
-    setLoadedSession(next);
+    commitLoadedSession(sessionId, view);
     return true;
   }
 
@@ -925,69 +1098,359 @@ export default function App({
     if (current === null || current.sessionId !== sessionId) {
       return;
     }
-    commitLoadedSession(sessionId, restoredView);
+    persistAndCommitLoadedSession(sessionId, restoredView);
   }
 
-  async function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  function clearMutationAttempt(generation: number): boolean {
+    const current = mutationAttemptRef.current;
+    if (current === null || current.generation !== generation) {
+      return false;
+    }
+    replaceMutationAttempt(null);
+    return true;
+  }
+
+  function isDocumentedApiResult(
+    error: unknown,
+    status: number,
+    codes: readonly string[],
+  ): error is ApiClientError {
+    return (
+      error instanceof ApiClientError &&
+      error.kind === "api" &&
+      error.status === status &&
+      error.errorCode !== undefined &&
+      codes.includes(error.errorCode) &&
+      DOCUMENTED_MUTATION_ERRORS[error.errorCode]?.status === status &&
+      DOCUMENTED_MUTATION_ERRORS[error.errorCode]?.message === error.message
+    );
+  }
+
+  function retainUncertainMutation(
+    generation: number,
+    error: unknown,
+  ) {
+    updateMutationAttempt(generation, (current) => ({
+      ...current,
+      uncertaintyTainted: true,
+      inFlight: false,
+    }));
+    setOperationError(
+      `${formatApiClientError(error)} ${MUTATION_UNCERTAIN_MESSAGE}`,
+    );
+  }
+
+  function classifyMutationFailure(
+    attempt: MutationAttempt,
+    error: unknown,
+  ) {
+    const current = mutationAttemptRef.current;
+    if (current === null || current.generation !== attempt.generation) {
+      return;
+    }
+
+    const documented404 = isDocumentedApiResult(
+      error,
+      404,
+      ["PLAYER_CHARACTER_NOT_FOUND"],
+    );
     if (
-      foregroundOperationRef.current !== null ||
-      recoveryInterruption !== null ||
-      recoveryStorageFailure !== null ||
-      selectedScenario === undefined ||
-      selectedRoleId === ""
+      documented404 &&
+      (current.uncertaintyTainted ||
+        (current.kind === "run-entry" &&
+          current.entrySuccessAwaitingStorage))
     ) {
+      retainUncertainMutation(attempt.generation, error);
       return;
     }
-    const operation = beginForegroundOperation("creating", {
-      clearSession: true,
-    });
-    if (operation === null) {
+
+    if (attempt.kind === "player-character-create") {
+      if (
+        documented404 ||
+        isDocumentedApiResult(error, 409, ["IDEMPOTENCY_CONFLICT"]) ||
+        isDocumentedApiResult(error, 422, ["REQUEST_VALIDATION_FAILED"])
+      ) {
+        clearMutationAttempt(attempt.generation);
+        setOperationError(formatApiClientError(error));
+        return;
+      }
+      retainUncertainMutation(attempt.generation, error);
       return;
     }
-    let createdSessionId: string | null = null;
+
+    if (documented404) {
+      clearMutationAttempt(attempt.generation);
+      setSelectedPlayerCharacterId("");
+      setCreatedPlayerCharacter(null);
+      setRequiredCatalogRefresh("eligible");
+      setOperationError(formatApiClientError(error));
+      return;
+    }
+    if (isDocumentedApiResult(error, 409, ["IDEMPOTENCY_CONFLICT"])) {
+      clearMutationAttempt(attempt.generation);
+      setOperationError(formatApiClientError(error));
+      return;
+    }
+    if (
+      isDocumentedApiResult(error, 409, [
+        "PLAYER_CHARACTER_STALE",
+        "PLAYER_CHARACTER_NOT_ELIGIBLE",
+        "RUN_ENTRY_CONFLICT",
+      ])
+    ) {
+      clearMutationAttempt(attempt.generation);
+      setSelectedPlayerCharacterId("");
+      setCreatedPlayerCharacter(null);
+      setRequiredCatalogRefresh("eligible");
+      setOperationError(formatApiClientError(error));
+      return;
+    }
+    if (
+      isDocumentedApiResult(error, 422, [
+        "REQUEST_VALIDATION_FAILED",
+        "INVALID_SCENARIO_DEFINITION",
+      ])
+    ) {
+      clearMutationAttempt(attempt.generation);
+      if (error.errorCode === "INVALID_SCENARIO_DEFINITION") {
+        setSelectedScenarioId("");
+        setRequiredCatalogRefresh("scenario");
+      } else {
+        setSelectedPlayerCharacterId("");
+        setCreatedPlayerCharacter(null);
+        setRequiredCatalogRefresh("eligible");
+      }
+      setOperationError(formatApiClientError(error));
+      return;
+    }
+    retainUncertainMutation(attempt.generation, error);
+  }
+
+  async function executeMutationAttempt(
+    attempt: MutationAttempt,
+    operation: ForegroundOperation,
+  ) {
     try {
-      const created = await client.createSession(
-        {
-          client_request_id: requestIdFactory(),
-          character_definition_id: selectedRoleId,
-          scenario_id: selectedScenario.scenario_id,
-        },
+      if (attempt.kind === "player-character-create") {
+        const created = await client.createPlayerCharacter(
+          attempt.exactFrozenBody,
+          attempt.idempotencyKey,
+          operation.controller.signal,
+        );
+        if (!isCurrentOperation(operation)) {
+          return;
+        }
+        if (!clearMutationAttempt(attempt.generation)) {
+          return;
+        }
+        setCreatedPlayerCharacter(created);
+        setSelectedPlayerCharacterId(created.player_character_id.value);
+        setRequiredCatalogRefresh(null);
+        setOperationError(null);
+        return;
+      }
+
+      const entered = await client.enterRun(
+        attempt.exactFrozenBody,
+        attempt.idempotencyKey,
         operation.controller.signal,
       );
       if (!isCurrentOperation(operation)) {
         return;
       }
-      createdSessionId = created.session_id;
-      if (!persistRecoveryRecord(created.session_id)) {
+      if (!persistRecoveryRecord(entered.session_id)) {
+        updateMutationAttempt(attempt.generation, (current) => ({
+          ...current,
+          ...(current.kind === "run-entry"
+            ? { entrySuccessAwaitingStorage: true }
+            : {}),
+          inFlight: false,
+        }));
         return;
       }
-      setManualSessionId(created.session_id);
-      const restoredView = await client.getSessionView(
-        created.session_id,
-        operation.controller.signal,
-      );
-      if (!isCurrentOperation(operation)) {
+      if (!clearMutationAttempt(attempt.generation)) {
         return;
       }
-      commitLoadedSession(created.session_id, restoredView);
+      setManualSessionId(entered.session_id);
+      setCreatedSessionWithoutView(null);
+      try {
+        const restoredView = await client.getSessionView(
+          entered.session_id,
+          operation.controller.signal,
+        );
+        if (!isCurrentOperation(operation)) {
+          return;
+        }
+        commitLoadedSession(entered.session_id, restoredView);
+      } catch (error: unknown) {
+        if (!isCurrentOperation(operation)) {
+          return;
+        }
+        setCreatedSessionWithoutView(entered.session_id);
+        setOperationError(
+          `Run 已进入且 Session ID 已保存；权威 View 读取失败：${formatApiClientError(error)}`,
+        );
+      }
     } catch (error: unknown) {
       if (!isCurrentOperation(operation)) {
         return;
       }
-      if (createdSessionId !== null) {
-        setCreatedSessionWithoutView(createdSessionId);
-      }
-      setOperationError(formatApiClientError(error));
+      classifyMutationFailure(attempt, error);
     } finally {
       finishForegroundOperation(operation);
     }
+  }
+
+  function installAndSendMutation(
+    attempt: MutationAttempt,
+    operationKind: "creating" | "entering",
+  ) {
+    replaceMutationAttempt(attempt);
+    const operation = beginForegroundOperation(operationKind, {
+      clearSession: false,
+    });
+    if (operation === null) {
+      clearMutationAttempt(attempt.generation);
+      return;
+    }
+    void executeMutationAttempt(attempt, operation);
+  }
+
+  function buildMutationIdentity(): string | null {
+    try {
+      const parsed = idempotencyKeySchema.safeParse(idempotencyKeyFactory());
+      if (!parsed.success) {
+        setOperationError("无法构造有效的操作身份；请求未发送。");
+        return null;
+      }
+      return parsed.data;
+    } catch {
+      setOperationError("无法构造有效的操作身份；请求未发送。");
+      return null;
+    }
+  }
+
+  function handlePlayerCharacterCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (
+      foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null ||
+      recoveryRecordRef.current !== null ||
+      recoveryInterruption !== null ||
+      recoveryStorageFailure !== null ||
+      eligibleCharacters?.length !== 0 ||
+      createdPlayerCharacter !== null
+    ) {
+      return;
+    }
+    const idempotencyKey = buildMutationIdentity();
+    if (idempotencyKey === null) {
+      return;
+    }
+    const parsedBody = minimalPlayerCharacterCreationRequestSchema.safeParse({
+      contract_version: "structured-player-character/v1",
+      character_core: {},
+      narration_preferences: {},
+    });
+    if (!parsedBody.success) {
+      setOperationError("无法构造最小 Player Character 请求；请求未发送。");
+      return;
+    }
+    const exactFrozenBody = Object.freeze({
+      ...parsedBody.data,
+      character_core: Object.freeze({}),
+      narration_preferences: Object.freeze({}),
+    });
+    const generation = mutationGenerationRef.current + 1;
+    mutationGenerationRef.current = generation;
+    installAndSendMutation(
+      {
+        kind: "player-character-create",
+        generation,
+        idempotencyKey,
+        exactFrozenBody,
+        uncertaintyTainted: false,
+        inFlight: true,
+      },
+      "creating",
+    );
+  }
+
+  function handleRunEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (
+      foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null ||
+      recoveryRecordRef.current !== null ||
+      recoveryInterruption !== null ||
+      recoveryStorageFailure !== null ||
+      requiredCatalogRefresh !== null ||
+      selectedScenario === undefined ||
+      selectedPlayerCharacter === undefined
+    ) {
+      return;
+    }
+    const idempotencyKey = buildMutationIdentity();
+    if (idempotencyKey === null) {
+      return;
+    }
+    const parsedBody = runEntryRequestSchema.safeParse({
+      player_character_id:
+        selectedPlayerCharacter.player_character_id.value,
+      expected_record_revision:
+        selectedPlayerCharacter.record_revision.value,
+      scenario_id: selectedScenario.scenario_id,
+    });
+    if (!parsedBody.success) {
+      setOperationError("无法构造有效的 Run-entry 请求；请求未发送。");
+      return;
+    }
+    const exactFrozenBody = Object.freeze(parsedBody.data);
+    const generation = mutationGenerationRef.current + 1;
+    mutationGenerationRef.current = generation;
+    installAndSendMutation(
+      {
+        kind: "run-entry",
+        generation,
+        idempotencyKey,
+        exactFrozenBody,
+        uncertaintyTainted: false,
+        inFlight: true,
+        entrySuccessAwaitingStorage: false,
+      },
+      "entering",
+    );
+  }
+
+  function handleMutationRetry() {
+    const current = mutationAttemptRef.current;
+    if (
+      current === null ||
+      current.inFlight ||
+      foregroundOperationRef.current !== null ||
+      recoveryInterruption !== null ||
+      recoveryStorageFailure !== null
+    ) {
+      return;
+    }
+    const next = { ...current, inFlight: true };
+    replaceMutationAttempt(next);
+    const operation = beginForegroundOperation(
+      next.kind === "player-character-create" ? "creating" : "entering",
+      { clearSession: false },
+    );
+    if (operation === null) {
+      replaceMutationAttempt(current);
+      return;
+    }
+    void executeMutationAttempt(next, operation);
   }
 
   async function handleManualRead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
       foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null ||
       recoveryInterruption !== null ||
       recoveryStorageFailure !== null
     ) {
@@ -1018,7 +1481,7 @@ export default function App({
       if (!isCurrentOperation(operation)) {
         return;
       }
-      commitLoadedSession(parsedSessionId.data, restoredView);
+      persistAndCommitLoadedSession(parsedSessionId.data, restoredView);
     } catch (error: unknown) {
       if (!isCurrentOperation(operation)) {
         return;
@@ -1027,6 +1490,74 @@ export default function App({
     } finally {
       finishForegroundOperation(operation);
     }
+  }
+
+  async function handleEnteredSessionViewRetry() {
+    const sessionId = createdSessionWithoutView;
+    if (
+      sessionId === null ||
+      foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null ||
+      recoveryStorageFailure !== null
+    ) {
+      return;
+    }
+    const operation = beginForegroundOperation("reading", {
+      clearSession: false,
+    });
+    if (operation === null) {
+      return;
+    }
+    try {
+      const restoredView = await client.getSessionView(
+        sessionId,
+        operation.controller.signal,
+      );
+      if (!isCurrentOperation(operation)) {
+        return;
+      }
+      commitLoadedSession(sessionId, restoredView);
+      setCreatedSessionWithoutView(null);
+      setOperationError(null);
+    } catch (error: unknown) {
+      if (!isCurrentOperation(operation)) {
+        return;
+      }
+      setOperationError(
+        `权威 View 读取失败：${formatApiClientError(error)}`,
+      );
+    } finally {
+      finishForegroundOperation(operation);
+    }
+  }
+
+  function handleScenarioRefresh() {
+    if (
+      foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null
+    ) {
+      return;
+    }
+    setRequiredCatalogRefresh(null);
+    setScenarios(null);
+    setScenarioError(null);
+    setScenarioRefreshAttempt((attempt) => attempt + 1);
+  }
+
+  function handleEligibleRefresh() {
+    if (
+      foregroundOperationRef.current !== null ||
+      mutationAttemptRef.current !== null
+    ) {
+      return;
+    }
+    setRequiredCatalogRefresh(null);
+    setEligibleCharacters(null);
+    setEligibleTruncated(false);
+    setEligibleError(null);
+    setCreatedPlayerCharacter(null);
+    setSelectedPlayerCharacterId("");
+    setEligibleRefreshAttempt((attempt) => attempt + 1);
   }
 
   async function handleExplicitViewRefresh() {
@@ -1209,26 +1740,30 @@ export default function App({
     recoveryStorageFailure !== null
       ? "sessionStorage 处于安全锁定状态；不能创建、读取或提交行动。"
       : foregroundOperation === "creating"
-      ? "正在创建 Session 并读取完整权威 View。"
-      : foregroundOperation === "reading"
-        ? "正在读取完整权威 View。"
-        : foregroundOperation === "recovering"
-          ? "正在恢复本标签页已验证的 Session；行动保持锁定。"
-          : foregroundOperation === "submitting"
-            ? "正在提交行动；不会自动重发。"
-            : foregroundOperation === "pending"
-              ? "正在按 retry 指示检查同一 confirmed-202 request。"
-              : foregroundOperation === "refreshing"
-                ? "正在重新读取完整权威 View。"
-                : recoveryInterruption !== null
-                  ? "自动恢复已暂停；行动保持锁定，只能手动重试安全 GET。"
-                  : loadedSession?.stale !== null && loadedSession !== null
-                    ? "当前 View 可能 stale；行动保持禁用，等待显式刷新。"
-                    : loadedSession?.view.scenario_status === "ENDED"
-                      ? "副本已结束；没有可执行行动。"
-                      : loadedSession !== null
-                        ? "空闲：当前 View 已确认，可以选择公开行动。"
-                        : "空闲：可以创建 Session 或手动读取已有 Session。";
+        ? "正在创建最小 Player Character；不会自动重发。"
+        : foregroundOperation === "entering"
+          ? "正在进入 Run；成功后先保存 Session ID，再读取权威 View。"
+          : foregroundOperation === "reading"
+            ? "正在读取完整权威 View。"
+            : foregroundOperation === "recovering"
+              ? "正在恢复本标签页已验证的 Session；行动保持锁定。"
+              : foregroundOperation === "submitting"
+                ? "正在提交行动；不会自动重发。"
+                : foregroundOperation === "pending"
+                  ? "正在按 retry 指示检查同一 confirmed-202 request。"
+                  : foregroundOperation === "refreshing"
+                    ? "正在重新读取完整权威 View。"
+                    : recoveryInterruption !== null
+                      ? "自动恢复已暂停；行动保持锁定，只能手动重试安全 GET。"
+                      : mutationAttempt !== null
+                        ? "一个操作结果尚未解决；只能手动重试完全相同的操作。"
+                        : loadedSession?.stale !== null && loadedSession !== null
+                          ? "当前 View 可能 stale；行动保持禁用，等待显式刷新。"
+                          : loadedSession?.view.scenario_status === "ENDED"
+                            ? "副本已结束；没有可执行行动。"
+                            : loadedSession !== null
+                              ? "空闲：当前 View 已确认，可以选择公开行动。"
+                              : "空闲：可以选择 Player Character 与副本进入 Run，或手动读取已有 Session。";
 
   const actionDisabledReason =
     recoveryStorageFailure !== null
@@ -1240,6 +1775,13 @@ export default function App({
         : null;
   const isDeterministicDemo =
     import.meta.env.VITE_APP_MODE === "deterministic-demo";
+  const prePlayControlsDisabled =
+    foregroundOperation !== null ||
+    mutationAttempt !== null ||
+    recoveryInterruption !== null ||
+    recoveryStorageFailure !== null ||
+    recoveryRecord !== null ||
+    requiredCatalogRefresh !== null;
 
   return (
     <main>
@@ -1257,79 +1799,170 @@ export default function App({
       </p>
 
       <section className="panel" aria-labelledby="scenario-heading">
-        <h2 id="scenario-heading">选择副本与角色</h2>
+        <h2 id="scenario-heading">选择公开副本</h2>
         {scenarios === null && scenarioError === null ? (
           <p role="status" aria-live="polite">
             正在加载公开副本…
           </p>
         ) : null}
-        {scenarioError !== null ? <p role="alert">{scenarioError}</p> : null}
+        {scenarioError !== null ? (
+          <div role="alert">
+            <p>{scenarioError.message}</p>
+            {scenarioError.retryable ? (
+              <button type="button" onClick={handleScenarioRefresh}>
+                重试公开副本 GET
+              </button>
+            ) : (
+              <p>公开副本响应不符合合同，选择保持锁定。</p>
+            )}
+          </div>
+        ) : null}
         {scenarios?.length === 0 ? <p>当前没有可公开游玩的副本。</p> : null}
         {scenarios !== null && scenarios.length > 0 ? (
-          <form onSubmit={handleCreate}>
-            <fieldset
-              disabled={
-                foregroundOperation !== null ||
-                recoveryInterruption !== null ||
-                recoveryStorageFailure !== null
+          <fieldset disabled={prePlayControlsDisabled}>
+            <legend className="sr-only">选择公开副本</legend>
+            <label htmlFor="scenario">副本</label>
+            <select
+              id="scenario"
+              value={selectedScenarioId}
+              onChange={(event) => handleScenarioChange(event.target.value)}
+            >
+              {scenarios.map((scenario) => (
+                <option key={scenario.scenario_id} value={scenario.scenario_id}>
+                  {scenario.title}
+                </option>
+              ))}
+            </select>
+
+            {selectedScenario === undefined ? null : (
+              <div className="scenario-copy">
+                <h3>{selectedScenario.title}</h3>
+                <p>{selectedScenario.hook}</p>
+                <p>内容版本：{selectedScenario.content_version}</p>
+              </div>
+            )}
+          </fieldset>
+        ) : null}
+        {requiredCatalogRefresh === "scenario" ? (
+          <button type="button" onClick={handleScenarioRefresh}>
+            刷新公开副本后重新选择
+          </button>
+        ) : null}
+      </section>
+
+      <section className="panel" aria-labelledby="character-heading">
+        <h2 id="character-heading">选择 Player Character</h2>
+        {eligibleCharacters === null && eligibleError === null ? (
+          <p role="status" aria-live="polite">
+            正在加载可进入 Run 的 Player Character…
+          </p>
+        ) : null}
+        {eligibleError !== null ? (
+          <div role="alert">
+            <p>{eligibleError.message}</p>
+            {eligibleError.retryable ? (
+              <button type="button" onClick={handleEligibleRefresh}>
+                重试 eligible Player Character GET
+              </button>
+            ) : (
+              <p>Player Character 响应不符合合同，选择保持锁定。</p>
+            )}
+          </div>
+        ) : null}
+        {eligibleTruncated ? (
+          <p className="supporting-copy">
+            仅显示服务器按顺序返回的前 32 个可选 Player Character；没有总数或分页。
+          </p>
+        ) : null}
+        {eligibleCharacters !== null && eligibleCharacters.length > 0 ? (
+          <fieldset disabled={prePlayControlsDisabled}>
+            <legend className="sr-only">选择 eligible Player Character</legend>
+            <label htmlFor="player-character">Player Character</label>
+            <select
+              id="player-character"
+              value={selectedPlayerCharacterId}
+              onChange={(event) =>
+                setSelectedPlayerCharacterId(event.target.value)
               }
             >
-              <legend className="sr-only">创建 Session</legend>
-              <label htmlFor="scenario">副本</label>
-              <select
-                id="scenario"
-                value={selectedScenarioId}
-                onChange={(event) => handleScenarioChange(event.target.value)}
-              >
-                {scenarios.map((scenario) => (
-                  <option key={scenario.scenario_id} value={scenario.scenario_id}>
-                    {scenario.title}
-                  </option>
-                ))}
-              </select>
-
-              {selectedScenario === undefined ? null : (
-                <div className="scenario-copy">
-                  <h3>{selectedScenario.title}</h3>
-                  <p>{selectedScenario.hook}</p>
-                  <p>内容版本：{selectedScenario.content_version}</p>
-                </div>
-              )}
-
-              <label htmlFor="role">角色</label>
-              <select
-                id="role"
-                value={selectedRoleId}
-                onChange={(event) => setSelectedRoleId(event.target.value)}
-              >
-                {selectedScenario?.playable_characters.map((role) => (
-                  <option
-                    key={role.character_definition_id}
-                    value={role.character_definition_id}
-                  >
-                    {role.display_name} — {role.description}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="submit"
-                disabled={
-                  foregroundOperation !== null ||
-                  recoveryInterruption !== null ||
-                  recoveryStorageFailure !== null ||
-                  selectedScenario === undefined ||
-                  selectedRoleId === ""
-                }
-              >
+              {eligibleCharacters.map((character) => (
+                <option
+                  key={character.player_character_id.value}
+                  value={character.player_character_id.value}
+                >
+                  {character.player_character_id.value} · {character.contract_version} · revision {character.record_revision.value} · {character.lifecycle}
+                </option>
+              ))}
+            </select>
+          </fieldset>
+        ) : null}
+        {eligibleCharacters?.length === 0 &&
+        createdPlayerCharacter === null &&
+        scenarios !== null &&
+        scenarios.length > 0 &&
+        scenarioError === null ? (
+          <form onSubmit={handlePlayerCharacterCreate}>
+            <fieldset disabled={prePlayControlsDisabled}>
+              <legend className="sr-only">创建最小 Player Character</legend>
+              <p>服务器当前没有返回可进入 Run 的 Player Character。</p>
+              <button type="submit">
                 {foregroundOperation === "creating"
-                  ? "正在创建…"
-                  : "创建 Session"}
+                  ? "正在创建 Player Character…"
+                  : "创建最小 Player Character"}
               </button>
             </fieldset>
           </form>
         ) : null}
+        {createdPlayerCharacter === null ? null : (
+          <p className="supporting-copy">
+            已选择服务器返回的创建结果 {createdPlayerCharacter.player_character_id.value}（revision {createdPlayerCharacter.record_revision.value}，{createdPlayerCharacter.lifecycle}）。Run entry 将再次由服务器校验；这不是后续当前 eligibility 保证。
+          </p>
+        )}
+        {requiredCatalogRefresh === "eligible" ? (
+          <button type="button" onClick={handleEligibleRefresh}>
+            刷新 eligible Player Character 后重新选择
+          </button>
+        ) : null}
+        {selectedPlayerCharacter === undefined ||
+        selectedScenario === undefined ? null : (
+          <form onSubmit={handleRunEntry}>
+            <fieldset disabled={prePlayControlsDisabled}>
+              <legend className="sr-only">进入 Run</legend>
+              <button type="submit">
+                {foregroundOperation === "entering" ? "正在进入 Run…" : "进入 Run"}
+              </button>
+            </fieldset>
+          </form>
+        )}
       </section>
+
+      {mutationAttempt === null ? null : (
+        <section className="stale-warning" role="alert" aria-labelledby="mutation-retry-heading">
+          <h2 id="mutation-retry-heading">操作结果尚未解决</h2>
+          <p>
+            {mutationAttempt.kind === "run-entry" &&
+            mutationAttempt.entrySuccessAwaitingStorage
+              ? "Run entry 已成功，但 Session ID 尚未安全保存。清除存储锁定后，只能用完全相同的操作进行 replay。"
+              : MUTATION_UNCERTAIN_MESSAGE}
+          </p>
+          {mutationAttempt.kind === "run-entry" ? (
+            <p>{RUN_DISCOVERY_LIMIT_MESSAGE}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleMutationRetry}
+            disabled={
+              mutationAttempt.inFlight ||
+              foregroundOperation !== null ||
+              recoveryStorageFailure !== null
+            }
+          >
+            {mutationAttempt.inFlight
+              ? "相同操作正在发送…"
+              : "手动重试完全相同的操作"}
+          </button>
+        </section>
+      )}
 
       <section className="panel" aria-labelledby="restore-heading">
         <h2 id="restore-heading">手动读取已有 Session</h2>
@@ -1337,6 +1970,7 @@ export default function App({
           <fieldset
             disabled={
               foregroundOperation !== null ||
+              mutationAttempt !== null ||
               recoveryInterruption !== null ||
               recoveryStorageFailure !== null
             }
@@ -1354,6 +1988,7 @@ export default function App({
               type="submit"
               disabled={
                 foregroundOperation !== null ||
+                mutationAttempt !== null ||
                 recoveryInterruption !== null ||
                 recoveryStorageFailure !== null ||
                 manualSessionId.trim() === ""
@@ -1374,9 +2009,14 @@ export default function App({
           </p>
         ) : null}
         {createdSessionWithoutView !== null ? (
-          <p role="status" className="session-confirmation">
-            已创建 Session：{createdSessionWithoutView}，但 PlayerSessionView 未加载。
-          </p>
+          <div role="status" className="session-confirmation">
+            <p>
+              已进入 Run 并保存 Session：{createdSessionWithoutView}，但 PlayerSessionView 未加载。
+            </p>
+            <button type="button" onClick={() => void handleEnteredSessionViewRetry()}>
+              重试读取权威 View
+            </button>
+          </div>
         ) : null}
         {operationError !== null ? <p role="alert">{operationError}</p> : null}
         {recoveryStorageFailure === null &&

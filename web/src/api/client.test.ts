@@ -6,16 +6,26 @@ import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
 import {
   actionRequestSchema,
   actionResponseSchema,
+  eligiblePlayerCharacterCollectionSchema,
+  minimalPlayerCharacterCreationRequestSchema,
   narrativeRequestStatusResponseSchema,
+  playerCharacterSelfProjectionSchema,
   playerSessionViewSchema,
+  runEntryRequestSchema,
+  runEntryResponseSchema,
 } from "./schemas";
 import {
   activeViewFixture,
   committedActionResponseFixture,
+  eligiblePlayerCharactersFixture,
   endedViewFixture,
   errorFixture,
   freeActionViewFixture,
+  minimalPlayerCharacterCreationFixture,
   pendingActionResponseFixture,
+  playerCharacterFixture,
+  runEntryRequestFixture,
+  runEntryResponseFixture,
   scenarioCatalogFixture,
   sessionCreationFixture,
   synchronousActionResponseFixture,
@@ -514,6 +524,349 @@ describe("public API response contracts", () => {
     ],
   ] as const)("continues to reject an invalid affordance %s", (_label, makeView) => {
     expect(playerSessionViewSchema.safeParse(makeView()).success).toBe(false);
+  });
+
+  it("validates the bounded Player Character and Run-entry schema matrix", () => {
+    expect(
+      minimalPlayerCharacterCreationRequestSchema.parse(
+        minimalPlayerCharacterCreationFixture,
+      ),
+    ).toEqual(minimalPlayerCharacterCreationFixture);
+    expect(
+      playerCharacterSelfProjectionSchema.parse({
+        ...playerCharacterFixture,
+        harmless_future_field: "discarded",
+      }),
+    ).toEqual(playerCharacterFixture);
+    expect(
+      eligiblePlayerCharacterCollectionSchema.parse(
+        eligiblePlayerCharactersFixture,
+      ),
+    ).toEqual(eligiblePlayerCharactersFixture);
+    expect(runEntryRequestSchema.parse(runEntryRequestFixture)).toEqual(
+      runEntryRequestFixture,
+    );
+    expect(runEntryResponseSchema.parse(runEntryResponseFixture)).toEqual(
+      runEntryResponseFixture,
+    );
+
+    expect(
+      minimalPlayerCharacterCreationRequestSchema.safeParse({
+        ...minimalPlayerCharacterCreationFixture,
+        lifecycle: "active",
+      }).success,
+    ).toBe(false);
+    expect(
+      runEntryRequestSchema.safeParse({
+        ...runEntryRequestFixture,
+        expected_record_revision: Number.MAX_SAFE_INTEGER + 1,
+      }).success,
+    ).toBe(false);
+    expect(
+      eligiblePlayerCharacterCollectionSchema.safeParse({
+        eligible_player_characters: Array.from({ length: 33 }, (_, index) => ({
+          ...playerCharacterFixture,
+          player_character_id: { value: `pc.${String(index).padStart(2, "0")}` },
+        })),
+        truncated: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      eligiblePlayerCharacterCollectionSchema.safeParse({
+        eligible_player_characters: [
+          { ...playerCharacterFixture, player_character_id: { value: "pc.b" } },
+          { ...playerCharacterFixture, player_character_id: { value: "pc.a" } },
+        ],
+        truncated: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      eligiblePlayerCharacterCollectionSchema.safeParse({
+        eligible_player_characters: [
+          { ...playerCharacterFixture, lifecycle: "retired" },
+        ],
+        truncated: false,
+      }).success,
+    ).toBe(false);
+    expect(
+      eligiblePlayerCharacterCollectionSchema.safeParse({
+        eligible_player_characters: [playerCharacterFixture],
+        truncated: true,
+      }).success,
+    ).toBe(false);
+    expect(
+      playerCharacterSelfProjectionSchema.safeParse({
+        ...playerCharacterFixture,
+        record_revision: { value: Number.MAX_SAFE_INTEGER + 1 },
+      }).success,
+    ).toBe(false);
+  });
+
+  it("rejects invalid mutation construction before fetch and exposes no raw value", async () => {
+    const fetchImplementation = vi.fn();
+    const api = new PublicApiClient({
+      baseUrl: `${apiOrigin}/`,
+      fetchImplementation,
+    });
+    expect(() =>
+      api.createPlayerCharacter(
+        minimalPlayerCharacterCreationFixture,
+        "invalid key with spaces",
+      ),
+    ).toThrow();
+    await expect(
+      api.enterRun(
+        { ...runEntryRequestFixture, expected_record_revision: 0 },
+        "Entry.Invalid-1",
+      ),
+    ).rejects.toThrow();
+    expect(fetchImplementation).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["revision", { ...playerCharacterFixture, record_revision: { value: 2 } }],
+    ["lifecycle", { ...playerCharacterFixture, lifecycle: "retired" }],
+  ] as const)("rejects an incompatible creation-success %s", async (_label, body) => {
+    server.use(
+      http.post(`${apiOrigin}/v1/player-characters`, () =>
+        HttpResponse.json(body),
+      ),
+    );
+    await expect(
+      client().createPlayerCharacter(
+        minimalPlayerCharacterCreationFixture,
+        "Create.Incompatible-1",
+      ),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+    });
+  });
+
+  it("sends each new operation once with its exact method, URL, headers and body", async () => {
+    const requests: Array<{
+      method: string;
+      url: string;
+      accept: string | null;
+      contentType: string | null;
+      key: string | null;
+      body: unknown;
+    }> = [];
+    server.use(
+      http.post(`${apiOrigin}/v1/player-characters`, async ({ request }) => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          accept: request.headers.get("accept"),
+          contentType: request.headers.get("content-type"),
+          key: request.headers.get("idempotency-key"),
+          body: await request.json(),
+        });
+        return HttpResponse.json(playerCharacterFixture);
+      }),
+      http.get(
+        `${apiOrigin}/v1/player-characters/eligible-for-run-entry`,
+        ({ request }) => {
+          requests.push({
+            method: request.method,
+            url: request.url,
+            accept: request.headers.get("accept"),
+            contentType: request.headers.get("content-type"),
+            key: request.headers.get("idempotency-key"),
+            body: null,
+          });
+          return HttpResponse.json(eligiblePlayerCharactersFixture);
+        },
+      ),
+      http.post(`${apiOrigin}/v1/runs`, async ({ request }) => {
+        requests.push({
+          method: request.method,
+          url: request.url,
+          accept: request.headers.get("accept"),
+          contentType: request.headers.get("content-type"),
+          key: request.headers.get("idempotency-key"),
+          body: await request.json(),
+        });
+        return HttpResponse.json(runEntryResponseFixture);
+      }),
+    );
+
+    const api = client();
+    await expect(
+      api.createPlayerCharacter(
+        minimalPlayerCharacterCreationFixture,
+        "Create.Web-1",
+      ),
+    ).resolves.toEqual(playerCharacterFixture);
+    await expect(api.listEligiblePlayerCharacters()).resolves.toEqual(
+      eligiblePlayerCharactersFixture,
+    );
+    await expect(
+      api.enterRun(runEntryRequestFixture, "Entry.Web-1"),
+    ).resolves.toEqual(runEntryResponseFixture);
+
+    expect(requests).toEqual([
+      {
+        method: "POST",
+        url: `${apiOrigin}/v1/player-characters`,
+        accept: "application/json",
+        contentType: "application/json",
+        key: "Create.Web-1",
+        body: minimalPlayerCharacterCreationFixture,
+      },
+      {
+        method: "GET",
+        url: `${apiOrigin}/v1/player-characters/eligible-for-run-entry`,
+        accept: "application/json",
+        contentType: null,
+        key: null,
+        body: null,
+      },
+      {
+        method: "POST",
+        url: `${apiOrigin}/v1/runs`,
+        accept: "application/json",
+        contentType: "application/json",
+        key: "Entry.Web-1",
+        body: runEntryRequestFixture,
+      },
+    ]);
+  });
+
+  it.each([
+    ["scenario", { ...runEntryResponseFixture, scenario_id: "scenario.other" }],
+    [
+      "character",
+      {
+        ...runEntryResponseFixture,
+        player_character: {
+          ...playerCharacterFixture,
+          player_character_id: { value: "pc.other" },
+        },
+      },
+    ],
+    [
+      "revision",
+      {
+        ...runEntryResponseFixture,
+        player_character: {
+          ...playerCharacterFixture,
+          record_revision: { value: 2 },
+        },
+      },
+    ],
+  ] as const)("rejects a Run-entry %s identity mismatch", async (_label, body) => {
+    server.use(
+      http.post(`${apiOrigin}/v1/runs`, () => HttpResponse.json(body)),
+    );
+    await expect(
+      client().enterRun(runEntryRequestFixture, "Entry.Identity-1"),
+    ).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+    });
+  });
+
+  it.each([
+    [
+      "creation",
+      () =>
+        client().createPlayerCharacter(
+          minimalPlayerCharacterCreationFixture,
+          "Create.Malformed-1",
+        ),
+      `${apiOrigin}/v1/player-characters`,
+    ],
+    [
+      "eligible collection",
+      () => client().listEligiblePlayerCharacters(),
+      `${apiOrigin}/v1/player-characters/eligible-for-run-entry`,
+    ],
+    [
+      "Run entry",
+      () => client().enterRun(runEntryRequestFixture, "Entry.Malformed-1"),
+      `${apiOrigin}/v1/runs`,
+    ],
+  ] as const)("rejects a malformed successful %s response without retry", async (_label, call, url) => {
+    let fetchCount = 0;
+    server.use(
+      http.all(url, () => {
+        fetchCount += 1;
+        return HttpResponse.json({ unexpected: "shape" });
+      }),
+    );
+    await expect(call()).rejects.toMatchObject({
+      kind: "invalid-response",
+      status: 200,
+      reason: "CONTRACT_MISMATCH",
+    });
+    expect(fetchCount).toBe(1);
+  });
+
+  it.each([
+    [404, "PLAYER_CHARACTER_NOT_FOUND"],
+    [409, "IDEMPOTENCY_CONFLICT"],
+    [422, "REQUEST_VALIDATION_FAILED"],
+    [500, "INTERNAL_SERVER_ERROR"],
+  ] as const)("maps sanitized Run-entry HTTP %i errors without retry", async (status, code) => {
+    let fetchCount = 0;
+    server.use(
+      http.post(`${apiOrigin}/v1/runs`, () => {
+        fetchCount += 1;
+        return HttpResponse.json(errorFixture(code, `safe ${status}`), { status });
+      }),
+    );
+    await expect(
+      client().enterRun(runEntryRequestFixture, "Entry.Error-1"),
+    ).rejects.toMatchObject({ kind: "api", status, errorCode: code });
+    expect(fetchCount).toBe(1);
+  });
+
+  it("maps a Run-entry response-read failure as network uncertainty without retry", async () => {
+    const response = HttpResponse.json(runEntryResponseFixture);
+    const responseText = vi
+      .spyOn(response, "text")
+      .mockRejectedValue(new TypeError("response stream lost"));
+    const fetchImplementation = vi.fn(async () => response);
+    const api = new PublicApiClient({
+      baseUrl: `${apiOrigin}/`,
+      fetchImplementation,
+    });
+
+    await expect(
+      api.enterRun(runEntryRequestFixture, "Entry.Response-Lost-1"),
+    ).rejects.toMatchObject({ kind: "network" });
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
+    expect(responseText).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts one Run-entry fetch without retrying", async () => {
+    const controller = new AbortController();
+    const fetchImplementation = vi.fn(
+      async (_input: RequestInfo | URL, init?: RequestInit) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener(
+            "abort",
+            () => reject(new DOMException("aborted", "AbortError")),
+            { once: true },
+          );
+        }),
+    );
+    const api = new PublicApiClient({
+      baseUrl: `${apiOrigin}/`,
+      fetchImplementation,
+    });
+    const pending = api.enterRun(
+      runEntryRequestFixture,
+      "Entry.Abort-1",
+      controller.signal,
+    );
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ kind: "aborted" });
+    expect(fetchImplementation).toHaveBeenCalledTimes(1);
   });
 
   it("sends the exact session creation method, URL, headers and JSON body", async () => {

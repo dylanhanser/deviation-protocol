@@ -1,10 +1,46 @@
 import type {
   ActionResponse,
+  EligiblePlayerCharacterCollection,
+  MinimalPlayerCharacterCreationRequest,
   PlayerMemoryProjection,
+  PlayerCharacterSelfProjection,
   PlayerSessionView,
   PublicScenarioCatalog,
+  RunEntryRequest,
+  RunEntryResponse,
   SessionCreationResult,
 } from "../api/schemas";
+
+export const minimalPlayerCharacterCreationFixture: MinimalPlayerCharacterCreationRequest = {
+  contract_version: "structured-player-character/v1",
+  character_core: {},
+  narration_preferences: {},
+};
+
+export const playerCharacterFixture: PlayerCharacterSelfProjection = {
+  player_character_id: { value: "pc.public-alpha" },
+  contract_version: "structured-player-character/v1",
+  record_revision: { value: 1 },
+  lifecycle: "active",
+};
+
+export const eligiblePlayerCharactersFixture: EligiblePlayerCharacterCollection = {
+  eligible_player_characters: [playerCharacterFixture],
+  truncated: false,
+};
+
+export const runEntryRequestFixture: RunEntryRequest = {
+  player_character_id: playerCharacterFixture.player_character_id.value,
+  expected_record_revision: playerCharacterFixture.record_revision.value,
+  scenario_id: "scenario.public-alpha",
+};
+
+export const runEntryResponseFixture: RunEntryResponse = {
+  run_id: "run.public-alpha",
+  session_id: "session-public-1",
+  scenario_id: runEntryRequestFixture.scenario_id,
+  player_character: playerCharacterFixture,
+};
 
 export const scenarioCatalogFixture: PublicScenarioCatalog = {
   scenarios: [

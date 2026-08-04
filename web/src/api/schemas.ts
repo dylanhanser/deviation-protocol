@@ -3,6 +3,7 @@ import { z } from "zod";
 const safeIdPattern = /^[A-Za-z0-9][A-Za-z0-9_.:-]*$/;
 const safeId64Schema = z.string().min(1).max(64).regex(safeIdPattern);
 const safeId128Schema = z.string().min(1).max(128).regex(safeIdPattern);
+const positiveSafeIntegerSchema = z.number().int().positive().safe();
 const plainStringSchema = z.string();
 const nonNegativeIntegerSchema = z.number().int().nonnegative();
 const dateTimeSchema = z.iso.datetime({ offset: true });
@@ -62,6 +63,97 @@ export const publicScenarioDescriptionSchema = z
 
 export const publicScenarioCatalogSchema = z.object({
   scenarios: z.array(publicScenarioDescriptionSchema).max(32),
+});
+
+export const idempotencyKeySchema = safeId128Schema;
+
+export const minimalPlayerCharacterCreationRequestSchema = z
+  .object({
+    contract_version: z.literal("structured-player-character/v1"),
+    character_core: z.object({}).strict(),
+    narration_preferences: z.object({}).strict(),
+  })
+  .strict();
+
+export const playerCharacterSelfProjectionSchema = z.object({
+  player_character_id: z.object({ value: safeId128Schema }),
+  contract_version: z.literal("structured-player-character/v1"),
+  record_revision: z.object({ value: positiveSafeIntegerSchema }),
+  lifecycle: z.enum(["active", "retired", "deceased"]),
+});
+
+export const playerCharacterCreationResultSchema =
+  playerCharacterSelfProjectionSchema.superRefine((projection, context) => {
+    if (projection.record_revision.value !== 1) {
+      context.addIssue({
+        code: "custom",
+        path: ["record_revision", "value"],
+        message: "creation result revision must be 1",
+      });
+    }
+    if (projection.lifecycle !== "active") {
+      context.addIssue({
+        code: "custom",
+        path: ["lifecycle"],
+        message: "creation result lifecycle must be active",
+      });
+    }
+  });
+
+export const eligiblePlayerCharacterCollectionSchema = z
+  .object({
+    eligible_player_characters: z
+      .array(playerCharacterSelfProjectionSchema)
+      .max(32),
+    truncated: z.boolean(),
+  })
+  .superRefine((collection, context) => {
+    if (
+      collection.truncated &&
+      collection.eligible_player_characters.length !== 32
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["truncated"],
+        message: "truncated eligible collection must contain 32 items",
+      });
+    }
+    collection.eligible_player_characters.forEach((projection, index) => {
+      if (projection.lifecycle !== "active") {
+        context.addIssue({
+          code: "custom",
+          path: ["eligible_player_characters", index, "lifecycle"],
+          message: "eligible Player Character lifecycle must be active",
+        });
+      }
+      const previous = collection.eligible_player_characters[index - 1];
+      if (
+        previous !== undefined &&
+        previous.player_character_id.value >=
+          projection.player_character_id.value
+      ) {
+        context.addIssue({
+          code: "custom",
+          path: ["eligible_player_characters", index, "player_character_id"],
+          message: "eligible Player Characters must use authoritative ID order",
+        });
+      }
+    });
+  });
+
+export const runEntryRequestSchema = z
+  .object({
+    player_character_id: safeId128Schema,
+    expected_record_revision: positiveSafeIntegerSchema,
+    scenario_id: safeId128Schema,
+  })
+  .strict();
+
+export const runEntryResponseSchema = z.object({
+  run_id: safeId128Schema,
+  session_id: safeId64Schema,
+  scenario_id: safeId128Schema,
+  player_character: playerCharacterSelfProjectionSchema,
 });
 
 export const createSessionRequestSchema = z
@@ -981,6 +1073,17 @@ export type PublicScenarioDescription = z.infer<
   typeof publicScenarioDescriptionSchema
 >;
 export type PublicScenarioCatalog = z.infer<typeof publicScenarioCatalogSchema>;
+export type MinimalPlayerCharacterCreationRequest = z.infer<
+  typeof minimalPlayerCharacterCreationRequestSchema
+>;
+export type PlayerCharacterSelfProjection = z.infer<
+  typeof playerCharacterSelfProjectionSchema
+>;
+export type EligiblePlayerCharacterCollection = z.infer<
+  typeof eligiblePlayerCharacterCollectionSchema
+>;
+export type RunEntryRequest = z.infer<typeof runEntryRequestSchema>;
+export type RunEntryResponse = z.infer<typeof runEntryResponseSchema>;
 export type CreateSessionRequest = z.infer<typeof createSessionRequestSchema>;
 export type ActionRequest = z.infer<typeof actionRequestSchema>;
 export type ActionResponse = z.infer<typeof actionResponseSchema>;

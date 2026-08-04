@@ -6,7 +6,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
-import type { PlayerSessionView } from "./api/schemas";
+import type {
+  EligiblePlayerCharacterCollection,
+  PlayerSessionView,
+} from "./api/schemas";
 import {
   SESSION_RECOVERY_STORAGE_KEY,
   readSessionRecoveryRecord,
@@ -15,9 +18,14 @@ import {
 import {
   activeViewFixture,
   committedActionResponseFixture,
+  eligiblePlayerCharactersFixture,
   endedViewFixture,
   errorFixture,
   freeActionViewFixture,
+  minimalPlayerCharacterCreationFixture,
+  playerCharacterFixture,
+  runEntryRequestFixture,
+  runEntryResponseFixture,
   scenarioCatalogFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
@@ -31,8 +39,25 @@ function scenarioHandler() {
   );
 }
 
+function eligibleHandler(
+  collection: EligiblePlayerCharacterCollection = eligiblePlayerCharactersFixture,
+) {
+  return http.get(
+    `${apiOrigin}/v1/player-characters/eligible-for-run-entry`,
+    () => HttpResponse.json(collection),
+  );
+}
+
 function postGuards(onPost: () => void) {
   return [
+    http.post(`${apiOrigin}/v1/player-characters`, () => {
+      onPost();
+      return HttpResponse.json({}, { status: 500 });
+    }),
+    http.post(`${apiOrigin}/v1/runs`, () => {
+      onPost();
+      return HttpResponse.json({}, { status: 500 });
+    }),
     http.post(`${apiOrigin}/v1/sessions`, () => {
       onPost();
       return HttpResponse.json({}, { status: 500 });
@@ -55,18 +80,22 @@ function renderRecoveryApp(
   options: {
     client?: PublicApiClient;
     pollWait?: (milliseconds: number, signal: AbortSignal) => Promise<void>;
-    requestIdFactory?: () => string;
+    idempotencyKeyFactory?: () => string;
     actionIdentityFactory?: () => {
       turnId: string;
       clientRequestId: string;
     };
     strictMode?: boolean;
+    eligiblePlayerCharacters?: EligiblePlayerCharacterCollection;
   } = {},
 ) {
+  server.use(eligibleHandler(options.eligiblePlayerCharacters));
   const app = (
     <App
       client={options.client ?? testClient}
-      requestIdFactory={options.requestIdFactory ?? (() => "unused-create-id")}
+      idempotencyKeyFactory={
+        options.idempotencyKeyFactory ?? (() => "unused-mutation-id")
+      }
       actionIdentityFactory={
         options.actionIdentityFactory ?? deterministicActionIdentityFactory
       }
@@ -199,7 +228,7 @@ describe("same-tab Session reload recovery", () => {
     let oldStatusReads = 0;
     let oldViewReads = 0;
     let posts = 0;
-    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
     const actionIdentityFactory = vi.fn(deterministicActionIdentityFactory);
     server.use(
       scenarioHandler(),
@@ -222,11 +251,11 @@ describe("same-tab Session reload recovery", () => {
     try {
       // Independent Storage objects model only the observable storage boundary;
       // they do not simulate browser-process shutdown, restart, or tab restore.
-      renderRecoveryApp({ requestIdFactory, actionIdentityFactory });
+      renderRecoveryApp({ idempotencyKeyFactory, actionIdentityFactory });
 
       await waitFor(() =>
         expect(
-          screen.getByRole("button", { name: "创建 Session" }),
+          screen.getByRole("button", { name: "进入 Run" }),
         ).toBeEnabled(),
       );
       expect(priorStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).not.toBeNull();
@@ -234,7 +263,7 @@ describe("same-tab Session reload recovery", () => {
       expect(oldStatusReads).toBe(0);
       expect(oldViewReads).toBe(0);
       expect(posts).toBe(0);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
       expect(actionIdentityFactory).not.toHaveBeenCalled();
       expect(screen.queryByText("当前 Session：old-session")).not.toBeInTheDocument();
       expect(screen.queryByText(/confirmed-202 request/)).not.toBeInTheDocument();
@@ -366,7 +395,7 @@ describe("same-tab Session reload recovery", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
     expect(
-      await screen.findByRole("button", { name: "创建 Session" }),
+      await screen.findByRole("button", { name: "进入 Run" }),
     ).toBeDisabled();
     expect(posts).toBe(0);
 
@@ -444,7 +473,7 @@ describe("same-tab Session reload recovery", () => {
     let statusReads = 0;
     let viewReads = 0;
     let posts = 0;
-    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
     const actionIdentityFactory = vi.fn(deterministicActionIdentityFactory);
     server.use(
       scenarioHandler(),
@@ -475,7 +504,7 @@ describe("same-tab Session reload recovery", () => {
       }),
     );
     const user = userEvent.setup();
-    renderRecoveryApp({ requestIdFactory, actionIdentityFactory });
+    renderRecoveryApp({ idempotencyKeyFactory, actionIdentityFactory });
     await statusStarted.promise;
 
     const clear = screen.getByRole("button", {
@@ -487,7 +516,7 @@ describe("same-tab Session reload recovery", () => {
 
     await waitFor(() => expect(statusSignal?.aborted).toBe(true));
     expect(storedRecoveryRecord()).toBeNull();
-    expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
     expect(
       screen.queryByRole("heading", { name: "当前可执行行动" }),
     ).not.toBeInTheDocument();
@@ -497,7 +526,7 @@ describe("same-tab Session reload recovery", () => {
     expect(statusReads).toBe(1);
     expect(viewReads).toBe(0);
     expect(posts).toBe(0);
-    expect(requestIdFactory).not.toHaveBeenCalled();
+    expect(idempotencyKeyFactory).not.toHaveBeenCalled();
     expect(actionIdentityFactory).not.toHaveBeenCalled();
   });
 
@@ -515,7 +544,7 @@ describe("same-tab Session reload recovery", () => {
         void parameters;
       },
     );
-    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
     const actionIdentityFactory = vi.fn(deterministicActionIdentityFactory);
     server.use(
       scenarioHandler(),
@@ -561,7 +590,7 @@ describe("same-tab Session reload recovery", () => {
 
     renderRecoveryApp({
       pollWait,
-      requestIdFactory,
+      idempotencyKeyFactory,
       actionIdentityFactory,
     });
 
@@ -573,7 +602,7 @@ describe("same-tab Session reload recovery", () => {
     ]);
     expect(pollWait).toHaveBeenCalledTimes(1);
     expect(pollWait.mock.calls[0]?.[0]).toBe(4_000);
-    expect(requestIdFactory).not.toHaveBeenCalled();
+    expect(idempotencyKeyFactory).not.toHaveBeenCalled();
     expect(actionIdentityFactory).not.toHaveBeenCalled();
     expect(posts).toBe(0);
     expect(storedRecoveryRecord()).toEqual({
@@ -737,7 +766,7 @@ describe("same-tab Session reload recovery", () => {
       expect(
         screen.queryByRole("heading", { name: "当前可执行行动" }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.getByRole("button", { name: "读取 PlayerSessionView" }),
       ).toBeDisabled();
@@ -796,7 +825,7 @@ describe("same-tab Session reload recovery", () => {
       expect(
         globalThis.sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY),
       ).toBeNull();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
       expect(screen.getByLabelText("Session ID")).toBeEnabled();
       expect(
         screen.getByRole("button", { name: "读取 PlayerSessionView" }),
@@ -835,7 +864,7 @@ describe("same-tab Session reload recovery", () => {
     );
 
     renderRecoveryApp();
-    expect(await screen.findByRole("button", { name: "创建 Session" })).toBeEnabled();
+    expect(await screen.findByRole("button", { name: "进入 Run" })).toBeEnabled();
 
     expect(sessionGets).toBe(0);
     expect(posts).toBe(0);
@@ -871,7 +900,7 @@ describe("same-tab Session reload recovery", () => {
         await screen.findByRole("heading", { name: "sessionStorage 安全锁定" }),
       ).toBeVisible();
       expect(screen.getByText(/失败边界：access/)).toBeVisible();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.getByRole("button", { name: "读取 PlayerSessionView" }),
       ).toBeDisabled();
@@ -903,7 +932,7 @@ describe("same-tab Session reload recovery", () => {
         await screen.findByRole("heading", { name: "sessionStorage 安全锁定" }),
       ).toBeVisible();
       expect(screen.getByText(/失败边界：get/)).toBeVisible();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.queryByRole("heading", { name: "当前可执行行动" }),
       ).not.toBeInTheDocument();
@@ -984,7 +1013,7 @@ describe("same-tab Session reload recovery", () => {
       ).toBeVisible();
       expect(screen.getByText(/失败边界：remove/)).toBeVisible();
       expect(storage.getItem(SESSION_RECOVERY_STORAGE_KEY)).not.toBeNull();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.queryByRole("heading", { name: "当前可执行行动" }),
       ).not.toBeInTheDocument();
@@ -1054,7 +1083,7 @@ describe("same-tab Session reload recovery", () => {
       expect(
         screen.queryByRole("button", { name: "手动重试安全 GET" }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
       expect(viewReads).toBe(0);
       expect(posts).toBe(0);
       expect(statusReads).toBe(1);
@@ -1064,7 +1093,7 @@ describe("same-tab Session reload recovery", () => {
 
       rendered.unmount();
       renderRecoveryApp();
-      await screen.findByRole("button", { name: "创建 Session" });
+      await screen.findByRole("button", { name: "进入 Run" });
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(0);
       expect(posts).toBe(0);
@@ -1124,7 +1153,7 @@ describe("same-tab Session reload recovery", () => {
       ).toBeVisible();
       expect(screen.getByText(/失败边界：remove/)).toBeVisible();
       expect(storage.getItem(SESSION_RECOVERY_STORAGE_KEY)).not.toBeNull();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.queryByRole("button", { name: "手动重试安全 GET" }),
       ).not.toBeInTheDocument();
@@ -1243,10 +1272,12 @@ describe("same-tab Session reload recovery", () => {
     const newRead = deferred<PlayerSessionView>();
     const oldClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => oldRead.promise,
     } as unknown as PublicApiClient;
     const newClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => newRead.promise,
     } as unknown as PublicApiClient;
     seedRecoveryRecord("session-public-1");
@@ -1258,7 +1289,7 @@ describe("same-tab Session reload recovery", () => {
     rendered.rerender(
       <App
         client={newClient}
-        requestIdFactory={() => "unused-create-id"}
+        idempotencyKeyFactory={() => "unused-mutation-id"}
         actionIdentityFactory={deterministicActionIdentityFactory}
       />,
     );
@@ -1274,5 +1305,480 @@ describe("same-tab Session reload recovery", () => {
       version: 1,
       session_id: "session-public-1",
     });
+  });
+});
+
+describe("Player Character and Run-entry mutation recovery", () => {
+  it("retains and manually retries the exact creation key/body after response uncertainty", async () => {
+    const keys: Array<string | null> = [];
+    const bodies: unknown[] = [];
+    let creationPosts = 0;
+    let runPosts = 0;
+    const idempotencyKeyFactory = vi.fn(() => "Create.Recovery-1");
+    server.use(
+      scenarioHandler(),
+      http.post(`${apiOrigin}/v1/player-characters`, async ({ request }) => {
+        creationPosts += 1;
+        keys.push(request.headers.get("idempotency-key"));
+        bodies.push(await request.json());
+        return creationPosts === 1
+          ? HttpResponse.error()
+          : HttpResponse.json(playerCharacterFixture);
+      }),
+      http.post(`${apiOrigin}/v1/runs`, () => {
+        runPosts += 1;
+        return HttpResponse.json(runEntryResponseFixture);
+      }),
+    );
+    const user = userEvent.setup();
+    renderRecoveryApp({
+      eligiblePlayerCharacters: {
+        eligible_player_characters: [],
+        truncated: false,
+      },
+      idempotencyKeyFactory,
+    });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "创建最小 Player Character",
+      }),
+    );
+    expect(
+      await screen.findByRole("heading", { name: "操作结果尚未解决" }),
+    ).toBeVisible();
+    expect(creationPosts).toBe(1);
+    await act(async () => Promise.resolve());
+    expect(creationPosts).toBe(1);
+    expect(screen.getByLabelText("副本")).toBeDisabled();
+    expect(screen.getByLabelText("Session ID")).toBeDisabled();
+    expect(document.body).not.toHaveTextContent("Create.Recovery-1");
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    );
+    expect(await screen.findByText(/已选择服务器返回的创建结果/)).toBeVisible();
+    expect(keys).toEqual(["Create.Recovery-1", "Create.Recovery-1"]);
+    expect(bodies).toEqual([
+      minimalPlayerCharacterCreationFixture,
+      minimalPlayerCharacterCreationFixture,
+    ]);
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(1);
+    expect(runPosts).toBe(0);
+    expect(storedRecoveryRecord()).toBeNull();
+  });
+
+  it("retains a tainted Run-entry pair across a later non-enumerating 404 and resolves only by exact replay", async () => {
+    const keys: Array<string | null> = [];
+    const bodies: unknown[] = [];
+    let entryPosts = 0;
+    const idempotencyKeyFactory = vi.fn(() => "Entry.Tainted-404");
+    server.use(
+      scenarioHandler(),
+      http.post(`${apiOrigin}/v1/runs`, async ({ request }) => {
+        entryPosts += 1;
+        keys.push(request.headers.get("idempotency-key"));
+        bodies.push(await request.json());
+        if (entryPosts === 1) {
+          return HttpResponse.error();
+        }
+        if (entryPosts === 2) {
+          return HttpResponse.json(
+            errorFixture(
+              "PLAYER_CHARACTER_NOT_FOUND",
+              "Player character was not found",
+            ),
+            { status: 404 },
+          );
+        }
+        return HttpResponse.json(runEntryResponseFixture);
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => HttpResponse.json(activeViewFixture),
+      ),
+    );
+    const user = userEvent.setup();
+    renderRecoveryApp({ idempotencyKeyFactory });
+
+    await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+    const retry = await screen.findByRole("button", {
+      name: "手动重试完全相同的操作",
+    });
+    expect(entryPosts).toBe(1);
+    expect(screen.getByLabelText("Player Character")).toBeDisabled();
+    await user.click(retry);
+    expect(
+      screen.getByText(/HTTP 404 · PLAYER_CHARACTER_NOT_FOUND/),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    ).toBeEnabled();
+    expect(
+      screen.queryByRole("button", {
+        name: "刷新 eligible Player Character 后重新选择",
+      }),
+    ).not.toBeInTheDocument();
+
+    await user.click(
+      screen.getByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    );
+    expect(await screen.findByText("当前 Session：session-public-1")).toBeVisible();
+    expect(keys).toEqual([
+      "Entry.Tainted-404",
+      "Entry.Tainted-404",
+      "Entry.Tainted-404",
+    ]);
+    expect(bodies).toEqual([
+      runEntryRequestFixture,
+      runEntryRequestFixture,
+      runEntryRequestFixture,
+    ]);
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(1);
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
+  });
+
+  it.each(["safe-500", "malformed-success", "mismatched-public-error"] as const)(
+    "retains a Run-entry pair after %s with no automatic POST retry",
+    async (outcome) => {
+      let entryPosts = 0;
+      server.use(
+        scenarioHandler(),
+        http.post(`${apiOrigin}/v1/runs`, () => {
+          entryPosts += 1;
+          if (outcome === "safe-500") {
+            return HttpResponse.json(
+              errorFixture("INTERNAL_SERVER_ERROR", "Internal server error"),
+              { status: 500 },
+            );
+          }
+          if (outcome === "mismatched-public-error") {
+            return HttpResponse.json(
+              errorFixture(
+                "PLAYER_CHARACTER_NOT_FOUND",
+                "Unrecognized public message",
+              ),
+              { status: 404 },
+            );
+          }
+          return HttpResponse.json({ malformed: true });
+        }),
+      );
+      const user = userEvent.setup();
+      renderRecoveryApp({
+        idempotencyKeyFactory: () => `Entry.${outcome}`,
+      });
+
+      await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+      expect(
+        await screen.findByRole("button", {
+          name: "手动重试完全相同的操作",
+        }),
+      ).toBeEnabled();
+      await act(async () => Promise.resolve());
+      expect(entryPosts).toBe(1);
+      expect(storedRecoveryRecord()).toBeNull();
+    },
+  );
+
+  it("loses a pending Run-entry pair on reload before response handling and never submits a replacement", async () => {
+    const entryGate = deferred<void>();
+    let entryPosts = 0;
+    server.use(
+      scenarioHandler(),
+      http.post(`${apiOrigin}/v1/runs`, async () => {
+        entryPosts += 1;
+        await entryGate.promise;
+        return HttpResponse.json(runEntryResponseFixture);
+      }),
+    );
+    const user = userEvent.setup();
+    const rendered = renderRecoveryApp({
+      idempotencyKeyFactory: () => "Entry.Before-Storage",
+    });
+    await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+    await waitFor(() => expect(entryPosts).toBe(1));
+    expect(storedRecoveryRecord()).toBeNull();
+
+    rendered.unmount();
+    renderRecoveryApp({
+      idempotencyKeyFactory: () => "Entry.Replacement-Must-Not-Run",
+    });
+    expect(await screen.findByRole("button", { name: "进入 Run" })).toBeEnabled();
+    entryGate.resolve();
+    await act(async () => Promise.resolve());
+    expect(entryPosts).toBe(1);
+    expect(storedRecoveryRecord()).toBeNull();
+    expect(
+      screen.queryByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("reloads after Session storage by View GET only and never duplicates Run entry", async () => {
+    const firstViewGate = deferred<void>();
+    let entryPosts = 0;
+    let viewReads = 0;
+    server.use(
+      scenarioHandler(),
+      http.post(`${apiOrigin}/v1/runs`, () => {
+        entryPosts += 1;
+        return HttpResponse.json(runEntryResponseFixture);
+      }),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        async () => {
+          viewReads += 1;
+          if (viewReads === 1) {
+            await firstViewGate.promise;
+          }
+          return HttpResponse.json(activeViewFixture);
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    const rendered = renderRecoveryApp({
+      idempotencyKeyFactory: () => "Entry.After-Storage",
+    });
+    await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+    await waitFor(() => expect(viewReads).toBe(1));
+    expect(storedRecoveryRecord()).toEqual({
+      version: 1,
+      session_id: "session-public-1",
+    });
+
+    rendered.unmount();
+    firstViewGate.resolve();
+    renderRecoveryApp({
+      idempotencyKeyFactory: () => "Entry.Must-Not-Replay",
+    });
+    expect(await screen.findByText("当前 Session：session-public-1")).toBeVisible();
+    expect(entryPosts).toBe(1);
+    expect(viewReads).toBe(2);
+  });
+
+  it("retains the exact successful Run-entry pair when Session storage fails and replays it after safe clear", async () => {
+    const storage = new FaultInjectingStorage();
+    storage.failSet = true;
+    const restoreStorage = installSessionStorage(storage);
+    const keys: Array<string | null> = [];
+    const bodies: unknown[] = [];
+    let entryPosts = 0;
+    try {
+      server.use(
+        scenarioHandler(),
+        http.post(`${apiOrigin}/v1/runs`, async ({ request }) => {
+          entryPosts += 1;
+          keys.push(request.headers.get("idempotency-key"));
+          bodies.push(await request.json());
+          return HttpResponse.json(runEntryResponseFixture);
+        }),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/view`,
+          () => HttpResponse.json(activeViewFixture),
+        ),
+      );
+      const user = userEvent.setup();
+      renderRecoveryApp({
+        idempotencyKeyFactory: () => "Entry.Storage-Failure",
+      });
+      await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+      expect(
+        await screen.findByRole("heading", {
+          name: "sessionStorage 安全锁定",
+        }),
+      ).toBeVisible();
+      expect(entryPosts).toBe(1);
+
+      storage.failSet = false;
+      await user.click(
+        screen.getByRole("button", { name: "重试安全清除恢复记录" }),
+      );
+      await user.click(
+        await screen.findByRole("button", {
+          name: "手动重试完全相同的操作",
+        }),
+      );
+      expect(await screen.findByText("当前 Session：session-public-1")).toBeVisible();
+      expect(keys).toEqual([
+        "Entry.Storage-Failure",
+        "Entry.Storage-Failure",
+      ]);
+      expect(bodies).toEqual([runEntryRequestFixture, runEntryRequestFixture]);
+      expect(entryPosts).toBe(2);
+    } finally {
+      restoreStorage();
+    }
+  });
+
+  it("rejects a deliberately late creation success after client replacement without corrupting newer selection or retry evidence", async () => {
+    const obsoleteCharacter = {
+      ...playerCharacterFixture,
+      player_character_id: { value: "pc.obsolete-creation" },
+    };
+    const lateCreation = deferred<typeof obsoleteCharacter>();
+    const oldCreationKeys: string[] = [];
+    const oldCreationBodies: unknown[] = [];
+    const oldIdempotencyKeyFactory = vi.fn(
+      () => "Create.Late-Old-Client",
+    );
+    const newIdempotencyKeyFactory = vi.fn(
+      () => "Create.New-Client-Must-Not-Run",
+    );
+    let oldCreationCalls = 0;
+    let oldCreationDeliveryCompleted = false;
+    let newCreationCalls = 0;
+    let newRunCalls = 0;
+    const oldClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => ({
+        eligible_player_characters: [],
+        truncated: false,
+      }),
+      createPlayerCharacter: async (body: unknown, idempotencyKey: string) => {
+        oldCreationCalls += 1;
+        oldCreationBodies.push(body);
+        oldCreationKeys.push(idempotencyKey);
+        const created = await lateCreation.promise;
+        oldCreationDeliveryCompleted = true;
+        return created;
+      },
+    } as unknown as PublicApiClient;
+    const newClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () =>
+        eligiblePlayerCharactersFixture,
+      createPlayerCharacter: async () => {
+        newCreationCalls += 1;
+        return playerCharacterFixture;
+      },
+      enterRun: async () => {
+        newRunCalls += 1;
+        return runEntryResponseFixture;
+      },
+    } as unknown as PublicApiClient;
+    const user = userEvent.setup();
+    const rendered = renderRecoveryApp({
+      client: oldClient,
+      idempotencyKeyFactory: oldIdempotencyKeyFactory,
+    });
+
+    await user.click(
+      await screen.findByRole("button", {
+        name: "创建最小 Player Character",
+      }),
+    );
+    await waitFor(() => expect(oldCreationCalls).toBe(1));
+    expect(storedRecoveryRecord()).toBeNull();
+
+    rendered.rerender(
+      <App
+        client={newClient}
+        idempotencyKeyFactory={newIdempotencyKeyFactory}
+        actionIdentityFactory={deterministicActionIdentityFactory}
+      />,
+    );
+    expect(await screen.findByLabelText("Player Character")).toHaveValue(
+      playerCharacterFixture.player_character_id.value,
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    ).toBeEnabled();
+
+    await act(async () => {
+      lateCreation.resolve(obsoleteCharacter);
+      await lateCreation.promise;
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(oldCreationDeliveryCompleted).toBe(true));
+
+    expect(screen.getByLabelText("Player Character")).toHaveValue(
+      playerCharacterFixture.player_character_id.value,
+    );
+    expect(document.body).not.toHaveTextContent(
+      obsoleteCharacter.player_character_id.value,
+    );
+    expect(
+      screen.getByRole("heading", { name: "操作结果尚未解决" }),
+    ).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: "手动重试完全相同的操作" }),
+    ).toBeEnabled();
+    expect(oldCreationKeys).toEqual(["Create.Late-Old-Client"]);
+    expect(oldCreationBodies).toEqual([minimalPlayerCharacterCreationFixture]);
+    expect(oldIdempotencyKeyFactory).toHaveBeenCalledTimes(1);
+    expect(newIdempotencyKeyFactory).not.toHaveBeenCalled();
+    expect(newCreationCalls).toBe(0);
+    expect(newRunCalls).toBe(0);
+    expect(storedRecoveryRecord()).toBeNull();
+    expect(globalThis.sessionStorage.length).toBe(0);
+    expect(document.body).not.toHaveTextContent("Create.Late-Old-Client");
+    expect(globalThis.location.search).toBe("");
+    expect(globalThis.location.hash).toBe("");
+  });
+
+  it("isolates a late Run-entry completion after client replacement from Session storage and newer UI state", async () => {
+    const lateEntry = deferred<typeof runEntryResponseFixture>();
+    let oldEntryCalls = 0;
+    let newEntryCalls = 0;
+    const oldClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
+      enterRun: async () => {
+        oldEntryCalls += 1;
+        return lateEntry.promise;
+      },
+    } as unknown as PublicApiClient;
+    const newClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
+      enterRun: async () => {
+        newEntryCalls += 1;
+        return runEntryResponseFixture;
+      },
+      getSessionView: async () => activeViewFixture,
+    } as unknown as PublicApiClient;
+    const user = userEvent.setup();
+    const rendered = renderRecoveryApp({
+      client: oldClient,
+      idempotencyKeyFactory: () => "Entry.Late-Old-Client",
+    });
+    await user.click(await screen.findByRole("button", { name: "进入 Run" }));
+    await waitFor(() => expect(oldEntryCalls).toBe(1));
+
+    rendered.rerender(
+      <App
+        client={newClient}
+        idempotencyKeyFactory={() => "Entry.New-Client"}
+        actionIdentityFactory={deterministicActionIdentityFactory}
+      />,
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "手动重试完全相同的操作",
+      }),
+    ).toBeEnabled();
+    lateEntry.resolve(runEntryResponseFixture);
+    await act(async () => Promise.resolve());
+
+    expect(storedRecoveryRecord()).toBeNull();
+    expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
+    expect(newEntryCalls).toBe(0);
+    expect(document.body).not.toHaveTextContent("Entry.Late-Old-Client");
+    expect(globalThis.location.search).toBe("");
+    expect(globalThis.location.hash).toBe("");
   });
 });

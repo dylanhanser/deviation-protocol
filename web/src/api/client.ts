@@ -10,19 +10,30 @@ import {
   actionRequestSchema,
   actionResponseSchema,
   createSessionRequestSchema,
+  eligiblePlayerCharacterCollectionSchema,
   errorResponseSchema,
+  idempotencyKeySchema,
+  minimalPlayerCharacterCreationRequestSchema,
   narrativeRequestStatusResponseSchema,
+  playerCharacterCreationResultSchema,
   playerSessionViewSchema,
   publicScenarioCatalogSchema,
   requestPathIdSchema,
+  runEntryRequestSchema,
+  runEntryResponseSchema,
   sessionPathIdSchema,
   sessionCreationResultSchema,
   type ActionRequest,
   type ActionResponse,
   type CreateSessionRequest,
+  type EligiblePlayerCharacterCollection,
+  type MinimalPlayerCharacterCreationRequest,
   type NarrativeRequestStatusResponse,
   type PlayerSessionView,
+  type PlayerCharacterSelfProjection,
   type PublicScenarioCatalog,
+  type RunEntryRequest,
+  type RunEntryResponse,
   type SessionCreationResult,
 } from "./schemas";
 
@@ -106,6 +117,74 @@ export class PublicApiClient {
       200,
       publicScenarioCatalogSchema,
     );
+  }
+
+  createPlayerCharacter(
+    request: MinimalPlayerCharacterCreationRequest,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<PlayerCharacterSelfProjection> {
+    const body = minimalPlayerCharacterCreationRequestSchema.parse(request);
+    const validatedKey = idempotencyKeySchema.parse(idempotencyKey);
+    return this.request(
+      "v1/player-characters",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": validatedKey,
+        },
+        body: JSON.stringify(body),
+        ...(signal === undefined ? {} : { signal }),
+      },
+      200,
+      playerCharacterCreationResultSchema,
+    );
+  }
+
+  listEligiblePlayerCharacters(
+    signal?: AbortSignal,
+  ): Promise<EligiblePlayerCharacterCollection> {
+    return this.request(
+      "v1/player-characters/eligible-for-run-entry",
+      { method: "GET", ...(signal === undefined ? {} : { signal }) },
+      200,
+      eligiblePlayerCharacterCollectionSchema,
+    );
+  }
+
+  async enterRun(
+    request: RunEntryRequest,
+    idempotencyKey: string,
+    signal?: AbortSignal,
+  ): Promise<RunEntryResponse> {
+    const body = runEntryRequestSchema.parse(request);
+    const validatedKey = idempotencyKeySchema.parse(idempotencyKey);
+    const response = await this.request(
+      "v1/runs",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": validatedKey,
+        },
+        body: JSON.stringify(body),
+        ...(signal === undefined ? {} : { signal }),
+      },
+      200,
+      runEntryResponseSchema,
+    );
+    if (
+      response.scenario_id !== body.scenario_id ||
+      response.player_character.player_character_id.value !==
+        body.player_character_id ||
+      response.player_character.record_revision.value !==
+        body.expected_record_revision ||
+      response.player_character.lifecycle !== "active"
+    ) {
+      throw responseError(200, "CONTRACT_MISMATCH");
+    }
+    return response;
   }
 
   createSession(

@@ -16,6 +16,7 @@ import {
   type PublicActionSubmissionResult,
 } from "./api/client";
 import type {
+  EligiblePlayerCharacterCollection,
   NarrativeRequestStatusResponse,
   PlayerSessionView,
 } from "./api/schemas";
@@ -23,10 +24,14 @@ import { readSessionRecoveryRecord } from "./sessionRecovery";
 import {
   activeViewFixture,
   committedActionResponseFixture,
+  eligiblePlayerCharactersFixture,
   endedViewFixture,
   errorFixture,
   freeActionViewFixture,
+  minimalPlayerCharacterCreationFixture,
   pendingActionResponseFixture,
+  playerCharacterFixture,
+  runEntryResponseFixture,
   scenarioCatalogFixture,
   synchronousActionResponseFixture,
 } from "./test/fixtures";
@@ -83,6 +88,15 @@ function scenarioHandler() {
   );
 }
 
+function eligibleHandler(
+  collection: EligiblePlayerCharacterCollection = eligiblePlayerCharactersFixture,
+) {
+  return http.get(
+    `${apiOrigin}/v1/player-characters/eligible-for-run-entry`,
+    () => HttpResponse.json(collection),
+  );
+}
+
 function deterministicActionIdentityFactory() {
   let next = 0;
   return () => {
@@ -102,14 +116,16 @@ function renderActionApp(
       turnId: string;
       clientRequestId: string;
     };
-    requestIdFactory?: () => string;
+    idempotencyKeyFactory?: () => string;
+    eligiblePlayerCharacters?: EligiblePlayerCharacterCollection;
   } = {},
 ) {
+  server.use(eligibleHandler(options.eligiblePlayerCharacters));
   return render(
     <App
       client={options.client ?? testClient}
-      requestIdFactory={
-        options.requestIdFactory ?? (() => "opaque-create-request")
+      idempotencyKeyFactory={
+        options.idempotencyKeyFactory ?? (() => "opaque-mutation-request")
       }
       actionIdentityFactory={
         options.actionIdentityFactory ?? deterministicActionIdentityFactory()
@@ -554,10 +570,10 @@ function assertRenderedScenarioCatalogPresentation(
   container: HTMLElement,
 ): void {
   const scenarioCopy = container.querySelector(".scenario-copy");
-  const roleSelect = container.querySelector("#role");
+  const scenarioSelect = container.querySelector("#scenario");
   if (
     !(scenarioCopy instanceof HTMLElement) ||
-    !(roleSelect instanceof HTMLSelectElement)
+    !(scenarioSelect instanceof HTMLSelectElement)
   ) {
     throw new Error("the public scenario catalog was not rendered");
   }
@@ -570,36 +586,8 @@ function assertRenderedScenarioCatalogPresentation(
       "你还活着，但系统已经签发了你的死亡证明。必须在处置规程完成前证明记录错了。",
     ),
   ).toBeVisible();
-  expect(roleSelect.value).toBe(
-    "character.death_certificate.investigator",
-  );
-  expect(
-    Array.from(roleSelect.options, (option) => ({
-      value: option.value,
-      presentation: option.textContent,
-    })),
-  ).toEqual([
-    {
-      value: "character.death_certificate.investigator",
-      presentation: "调查者 — 以开放方式调查现场、记录与目击者。",
-    },
-    {
-      value: "character.profession.clinical",
-      presentation: "临床背景调查者 — 擅长识别生命体征与临床矛盾。",
-    },
-    {
-      value: "character.profession.documents",
-      presentation: "文书调查者 — 擅长核验文书权威与证据链。",
-    },
-    {
-      value: "character.profession.response",
-      presentation: "现场响应调查者 — 擅长现场响应、脱险与降级冲突。",
-    },
-    {
-      value: "character.profession.systems",
-      presentation: "系统分析调查者 — 擅长追查系统顺序与自动规程。",
-    },
-  ]);
+  expect(scenarioSelect.value).toBe("death_certificate");
+  expect(container.querySelector("#role")).toBeNull();
 }
 
 function readRenderedCanonicalPresentation(container: HTMLElement) {
@@ -680,17 +668,12 @@ describe("action_affordances and synchronous lifecycle", () => {
       http.get(`${apiOrigin}/v1/scenarios`, () =>
         HttpResponse.json(canonicalScenarioCatalog),
       ),
-      http.post(`${apiOrigin}/v1/sessions`, () => {
-        const initial = canonicalView(0);
-        return HttpResponse.json(
-          {
-            ...initial.metadata,
-            scenario_id: "death_certificate",
-            narrative_frame: initial.narrative_frame,
-          },
-          { status: 201 },
-        );
-      }),
+      http.post(`${apiOrigin}/v1/runs`, () =>
+        HttpResponse.json({
+          ...runEntryResponseFixture,
+          scenario_id: "death_certificate",
+        }),
+      ),
       http.get(
         `${apiOrigin}/v1/sessions/session-public-1/view`,
         () => {
@@ -732,7 +715,7 @@ describe("action_affordances and synchronous lifecycle", () => {
     const user = userEvent.setup();
     const rendered = renderActionApp();
     await screen.findByLabelText("副本");
-    await user.click(screen.getByRole("button", { name: "创建 Session" }));
+    await user.click(screen.getByRole("button", { name: "进入 Run" }));
     await waitFor(() => expect(viewVersions).toEqual([0]));
     await user.click(
       screen.getByRole("button", {
@@ -835,29 +818,49 @@ describe("action_affordances and synchronous lifecycle", () => {
     const submittedBodies: Array<Record<string, unknown>> = [];
     const viewVersions: number[] = [];
     const servedViews: PlayerSessionView[] = [];
+    const requestStatusCallSequence: Array<{
+      requestId: string;
+      status: "PENDING" | "COMMITTED";
+    }> = [];
+    const confirmed202Sequence: string[] = [];
+    const pollWait = vi.fn(
+      async (...parameters: [number, AbortSignal]) => {
+        void parameters;
+      },
+    );
     let currentVersion = 0;
     let creationBody: unknown;
+    let entryBody: unknown;
+    let actionPostCount = 0;
+    let requestStatusReads = 0;
+    let legacySessionCreates = 0;
 
     server.use(
       http.get(`${apiOrigin}/v1/scenarios`, () =>
         HttpResponse.json(canonicalScenarioCatalog),
       ),
-      http.post(`${apiOrigin}/v1/sessions`, async ({ request }) => {
+      http.post(`${apiOrigin}/v1/player-characters`, async ({ request }) => {
         creationBody = await request.json();
-        const initial = canonicalView(0);
-        return HttpResponse.json(
-          {
-            ...initial.metadata,
-            scenario_id: "death_certificate",
-            narrative_frame: initial.narrative_frame,
-          },
-          { status: 201 },
-        );
+        return HttpResponse.json(playerCharacterFixture);
+      }),
+      http.post(`${apiOrigin}/v1/runs`, async ({ request }) => {
+        entryBody = await request.json();
+        return HttpResponse.json({
+          ...runEntryResponseFixture,
+          scenario_id: "death_certificate",
+        });
+      }),
+      http.post(`${apiOrigin}/v1/sessions`, () => {
+        legacySessionCreates += 1;
+        return HttpResponse.json({}, { status: 500 });
       }),
       http.get(
         `${apiOrigin}/v1/sessions/session-public-1/view`,
         () => {
           const view = canonicalView(currentVersion);
+          if (currentVersion === 2) {
+            confirmed202Sequence.push("view:2");
+          }
           viewVersions.push(view.metadata.state_version);
           servedViews.push(view);
           return HttpResponse.json(view);
@@ -866,6 +869,7 @@ describe("action_affordances and synchronous lifecycle", () => {
       http.post(
         `${apiOrigin}/v1/sessions/session-public-1/actions`,
         async ({ request }) => {
+          actionPostCount += 1;
           const body = (await request.json()) as Record<string, unknown>;
           const expected = expectedActions[currentVersion]!;
           const displayed = canonicalView(currentVersion).action_affordances;
@@ -900,6 +904,13 @@ describe("action_affordances and synchronous lifecycle", () => {
           submittedBodies.push(body);
           currentVersion += 1;
           const clientRequestId = body.client_request_id as string;
+          if (currentVersion === 2) {
+            confirmed202Sequence.push("action:2");
+            return HttpResponse.json(
+              pendingActionResponseFixture(clientRequestId),
+              { status: 202 },
+            );
+          }
           const providerBacked = [2, 10, 11, 13].includes(currentVersion);
           return HttpResponse.json(
             providerBacked
@@ -910,26 +921,75 @@ describe("action_affordances and synchronous lifecycle", () => {
               : synchronousActionResponseFixture(
                   clientRequestId,
                   currentVersion,
-                ),
+            ),
           );
+        },
+      ),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/:requestId`,
+        ({ params }) => {
+          requestStatusReads += 1;
+          const requestId = String(params.requestId);
+          expect(requestId).toBe("opaque-request-2");
+          expect(storedRecoveryRecord()).toEqual({
+            version: 1,
+            session_id: "session-public-1",
+            client_request_id: "opaque-request-2",
+          });
+          if (requestStatusReads === 1) {
+            requestStatusCallSequence.push({ requestId, status: "PENDING" });
+            confirmed202Sequence.push("status:PENDING");
+            return HttpResponse.json({
+              session_id: "session-public-1",
+              client_request_id: requestId,
+              status: "PENDING",
+              client_action: "POLL_SAME_REQUEST",
+              error_code: null,
+              retry_after_seconds: 2,
+              response: null,
+            });
+          }
+          requestStatusCallSequence.push({ requestId, status: "COMMITTED" });
+          confirmed202Sequence.push("status:COMMITTED");
+          return HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: requestId,
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: committedActionResponseFixture(requestId, 2),
+          });
         },
       ),
     );
 
+    const mutationKeys = ["Create.Canonical-1", "Entry.Canonical-1"];
+    const idempotencyKeyFactory = vi.fn(() => mutationKeys.shift()!);
     const user = userEvent.setup();
-    const rendered = renderActionApp();
+    const rendered = renderActionApp({
+      eligiblePlayerCharacters: {
+        eligible_player_characters: [],
+        truncated: false,
+      },
+      idempotencyKeyFactory,
+      pollWait,
+    });
     expect(await screen.findByLabelText("副本")).toHaveValue(
       "death_certificate",
-    );
-    expect(screen.getByLabelText("角色")).toHaveValue(
-      "character.death_certificate.investigator",
     );
     assertRenderedScenarioCatalogPresentation(rendered.container);
     expect(
       rendered.container.querySelector(".demo-warning")?.textContent,
     ).toBe(exactDemoWarning);
 
-    await user.click(screen.getByRole("button", { name: "创建 Session" }));
+    await user.click(
+      await screen.findByRole("button", {
+        name: "创建最小 Player Character",
+      }),
+    );
+    expect(await screen.findByText(/已选择服务器返回的创建结果/)).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "进入 Run" }));
     await waitFor(() => expect(viewVersions).toEqual([0]));
     await waitFor(() =>
       assertRenderedCanonicalPresentation(rendered.container, 0),
@@ -938,11 +998,14 @@ describe("action_affordances and synchronous lifecycle", () => {
     for (const choice of canonicalChoiceSets[0]!) {
       expect(screen.getByRole("button", { name: choice.label })).toBeVisible();
     }
-    expect(creationBody).toEqual({
-      client_request_id: "opaque-create-request",
-      character_definition_id: "character.death_certificate.investigator",
+    expect(creationBody).toEqual(minimalPlayerCharacterCreationFixture);
+    expect(entryBody).toEqual({
+      player_character_id: playerCharacterFixture.player_character_id.value,
+      expected_record_revision: playerCharacterFixture.record_revision.value,
       scenario_id: "death_certificate",
     });
+    expect(idempotencyKeyFactory).toHaveBeenCalledTimes(2);
+    expect(legacySessionCreates).toBe(0);
 
     async function submitAndAwaitView(
       actionNumber: number,
@@ -1069,6 +1132,24 @@ describe("action_affordances and synchronous lifecycle", () => {
         ...expected,
       })),
     );
+    expect(actionPostCount).toBe(19);
+    expect(
+      submittedBodies.filter(
+        (body) => body.client_request_id === "opaque-request-2",
+      ),
+    ).toHaveLength(1);
+    expect(requestStatusCallSequence).toEqual([
+      { requestId: "opaque-request-2", status: "PENDING" },
+      { requestId: "opaque-request-2", status: "COMMITTED" },
+    ]);
+    expect(confirmed202Sequence).toEqual([
+      "action:2",
+      "status:PENDING",
+      "status:COMMITTED",
+      "view:2",
+    ]);
+    expect(pollWait).toHaveBeenCalledTimes(1);
+    expect(pollWait.mock.calls[0]?.[0]).toBe(2_000);
     expect(viewVersions).toEqual(
       Array.from({ length: 20 }, (_, version) => version),
     );
@@ -1708,7 +1789,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       let viewReads = 0;
       const statusGate = deferred<void>();
       const statusStarted = deferred<void>();
-      const requestIdFactory = vi.fn(() => "must-not-be-created");
+      const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
       const actionIdentityFactory = vi.fn(() => ({
         turnId: "opaque-turn-1",
         clientRequestId: "opaque-request-1",
@@ -1758,7 +1839,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       const user = userEvent.setup();
       const rendered = renderActionApp({
         actionIdentityFactory,
-        requestIdFactory,
+        idempotencyKeyFactory,
       });
       await loadSession(user);
 
@@ -1785,22 +1866,22 @@ describe("HTTP 202 request-status lifecycle", () => {
       expect(
         screen.queryByRole("button", { name: "手动重试安全 GET" }),
       ).not.toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
       expect(actionPosts).toBe(1);
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
       expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
 
       rendered.unmount();
-      renderActionApp({ actionIdentityFactory, requestIdFactory });
-      await screen.findByRole("button", { name: "创建 Session" });
+      renderActionApp({ actionIdentityFactory, idempotencyKeyFactory });
+      await screen.findByRole("button", { name: "进入 Run" });
       await act(async () => Promise.resolve());
       expect(actionPosts).toBe(1);
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
       expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
     },
   );
 
@@ -1809,7 +1890,7 @@ describe("HTTP 202 request-status lifecycle", () => {
     let statusReads = 0;
     let viewReads = 0;
     let failRemove = false;
-    const requestIdFactory = vi.fn(() => "must-not-be-created");
+    const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
     const actionIdentityFactory = vi.fn(() => ({
       turnId: "opaque-turn-1",
       clientRequestId: "opaque-request-1",
@@ -1866,7 +1947,7 @@ describe("HTTP 202 request-status lifecycle", () => {
     );
     try {
       const user = userEvent.setup();
-      renderActionApp({ actionIdentityFactory, requestIdFactory });
+      renderActionApp({ actionIdentityFactory, idempotencyKeyFactory });
       await loadSession(user);
 
       await user.click(screen.getByRole("button", { name: "提交继续" }));
@@ -1882,7 +1963,7 @@ describe("HTTP 202 request-status lifecycle", () => {
         session_id: "session-public-1",
         client_request_id: "opaque-request-1",
       });
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeDisabled();
       expect(
         screen.queryByRole("heading", { name: "当前可执行行动" }),
       ).not.toBeInTheDocument();
@@ -1897,7 +1978,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
       expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
 
       failRemove = false;
       await user.click(
@@ -1907,7 +1988,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       );
 
       expect(storedRecoveryRecord()).toBeNull();
-      expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
       expect(
         screen.queryByRole("heading", { name: "sessionStorage 安全锁定" }),
       ).not.toBeInTheDocument();
@@ -1915,7 +1996,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
       expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
     } finally {
       removeItemSpy.mockRestore();
     }
@@ -2051,7 +2132,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       let actionPosts = 0;
       let statusReads = 0;
       let viewReads = 0;
-      const requestIdFactory = vi.fn(() => "must-not-be-created");
+      const idempotencyKeyFactory = vi.fn(() => "must-not-be-created");
       const actionIdentityFactory = vi.fn(() => ({
         turnId: "opaque-turn-1",
         clientRequestId: "opaque-request-1",
@@ -2101,7 +2182,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       const user = userEvent.setup();
       const rendered = renderActionApp({
         actionIdentityFactory,
-        requestIdFactory,
+        idempotencyKeyFactory,
       });
       await loadSession(user);
 
@@ -2122,14 +2203,14 @@ describe("HTTP 202 request-status lifecycle", () => {
       });
 
       rendered.unmount();
-      renderActionApp({ actionIdentityFactory, requestIdFactory });
+      renderActionApp({ actionIdentityFactory, idempotencyKeyFactory });
       await screen.findByText("当前 Session：session-public-1");
       expect(screen.getByText("权威 View：当前")).toBeVisible();
       expect(actionPosts).toBe(1);
       expect(statusReads).toBe(2);
       expect(viewReads).toBe(2);
       expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-      expect(requestIdFactory).not.toHaveBeenCalled();
+      expect(idempotencyKeyFactory).not.toHaveBeenCalled();
       expect(storedRecoveryRecord()).toEqual({
         version: 1,
         session_id: "session-public-1",
@@ -2405,6 +2486,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     }));
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         viewReads += 1;
         return freeActionViewFixture(viewReads);
@@ -2452,7 +2534,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     expect(statusReads).toBe(0);
     expect(viewReads).toBe(1);
     expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
-    expect(screen.getByRole("button", { name: "创建 Session" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
   });
 
   it("explicitly clears during retry wait and prevents another status poll", async () => {
@@ -2477,6 +2559,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     };
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         viewReads += 1;
         return freeActionViewFixture(viewReads);
@@ -2533,6 +2616,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     }));
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async (_sessionId: string, signal?: AbortSignal) => {
         viewReads += 1;
         if (viewReads === 1) {
@@ -2611,7 +2695,7 @@ describe("foreground lock, operation identity and cancellation", () => {
       .getByRole("button", { name: "读取 PlayerSessionView" })
       .closest("form");
     const createForm = screen
-      .getByRole("button", { name: "创建 Session" })
+      .getByRole("button", { name: "进入 Run" })
       .closest("form");
     expect(manualForm).not.toBeNull();
     expect(createForm).not.toBeNull();
@@ -2640,10 +2724,12 @@ describe("foreground lock, operation identity and cancellation", () => {
       const newRead = deferred<PlayerSessionView>();
       const oldClient = {
         listScenarios: async () => scenarioCatalogFixture,
+        listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
         getSessionView: async () => oldRead.promise,
       } as unknown as PublicApiClient;
       const newClient = {
         listScenarios: async () => scenarioCatalogFixture,
+        listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
         getSessionView: async () => newRead.promise,
       } as unknown as PublicApiClient;
       const user = userEvent.setup();
@@ -2659,13 +2745,15 @@ describe("foreground lock, operation identity and cancellation", () => {
       rendered.rerender(
         <App
           client={newClient}
-          requestIdFactory={() => "opaque-create-request"}
+          idempotencyKeyFactory={() => "opaque-mutation-request"}
           actionIdentityFactory={deterministicActionIdentityFactory()}
         />,
       );
       await waitFor(() =>
         expect(
-          screen.getByText("空闲：可以创建 Session 或手动读取已有 Session。"),
+          screen.getByText(
+            "空闲：可以选择 Player Character 与副本进入 Run，或手动读取已有 Session。",
+          ),
         ).toBeVisible(),
       );
       const input = screen.getByLabelText("Session ID");
