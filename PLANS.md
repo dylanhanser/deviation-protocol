@@ -133,7 +133,7 @@ documents.
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
 | Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
-| Phase 8 | **Partially implemented through completed, independently approved, committed, and published P8-S5; P8-S6 has not started; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
+| Phase 8 | **P8-S6 executable evidence collected; documentation implementation candidate pending independent review, commit, publication, and aligned-ref confirmation; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -442,9 +442,18 @@ stages:
      The exact eight-path Web implementation was committed and published at
      `2ce56a757beed8a3989d38453da3b6d80342ca05`
      (`feat(web): connect player characters to playable run flow`). P8-S5 is
-     complete. P8-S6 cross-surface evidence/final status closure has not
-     started. Phase 8 neither implements nor completes Phase 6 or Phase 7, and
-     Phase 8 and the overall project remain incomplete.
+     complete. The frozen P8-S6 implementation plan was approved and published
+     at `4edf2e3341e60632765b85796e8554797c645692`. Fresh P8-S6 executable
+     evidence E01-E14 and commands C01-C21 passed without a production, test,
+     fixture, migration, dependency, configuration, deployment, generated-file,
+     or public-contract change. These current seven-owner worktree bytes are the
+     unapproved, unstaged, uncommitted, and unpublished P8-S6 implementation
+     candidate. Phase 8 completion remains conditional on the candidate's
+     post-edit gates, fresh independent review, separately authorized closure
+     commit, manual user publication, and clean aligned-ref confirmation. Phase
+     8 neither implements nor completes Phase 6 or Phase 7, and Phase 8, the
+     Structured Player Character programme, and the overall project remain
+     incomplete.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -689,7 +698,9 @@ The canonical decision is
 
 ## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
 
-Status: **Partially implemented through completed, independently approved, committed, and published P8-S5; P8-S6 has not started — incomplete.**
+Status: **P8-S6 executable evidence collected; documentation implementation
+candidate pending independent review, commit, publication, and aligned-ref
+confirmation — Phase 8 incomplete.**
 
 Phase 8 is explicitly allocated to the next selected product priority: create
 or reuse an owned Structured Player Character, discover/select an eligible one,
@@ -767,10 +778,20 @@ and scenario discovery to Run entry, same-tab Session recovery storage, the
 authoritative Session View, and the existing action/status/recovery/terminal
 loop. It consumes the existing public Player Character and Run-entry contracts
 and does not use the legacy Session-create route for that primary journey;
-the legacy route remains available. P8-S5 is complete. P8-S6 cross-surface
-evidence/final status closure has not started, and Phase 8 and the overall
-project remain incomplete. P8-S4 used no real Provider or non-loopback network
-dependency and did not claim real-MySQL verification.
+the legacy route remains available. P8-S5 is complete. The approved and
+published frozen P8-S6 plan at
+`4edf2e3341e60632765b85796e8554797c645692` has now been executed through its
+fresh executable evidence boundary: E01-E14 and C01-C21 passed, including the
+accepted real-MySQL, deterministic guarded Demo, Web, Offline, MySQL, Full,
+compile, Alembic, build, and loopback-smoke evidence. These documentation bytes
+remain only an unapproved, unstaged, uncommitted, and unpublished implementation
+candidate. P8-S6 and Phase 8 become complete only after the exact candidate
+passes its remaining local gates, receives fresh independent approval, is
+separately authorized and committed, is manually published by the user, and is
+confirmed at a clean aligned baseline. Phase 6, Phase 7, the Structured Player
+Character programme, and the overall project remain incomplete. P8-S4 used no
+real Provider or non-loopback network dependency and did not claim real-MySQL
+verification.
 
 ## Deferred
 

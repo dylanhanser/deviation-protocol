@@ -865,7 +865,9 @@ objective.
 
 Status: **P8-S5 consumption of the existing Player Character, Run-entry, and
 Session gameplay contracts is implemented, independently approved, committed,
-published, and complete; P8-S6 final evidence/status closure has not started.**
+published, and complete. P8-S6 fresh contract evidence has passed; its
+documentation implementation candidate remains unapproved, uncommitted,
+unpublished, and Phase 8-incomplete.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -909,8 +911,19 @@ implementation, and its corrected implementation received
 The exact eight-path Web implementation was committed and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 consumes the existing
 contracts without changing any public DTO, error, privacy, recovery, route, or
-OpenAPI authority. P8-S6 cross-surface evidence/final status closure has not
-started. Phase 8 and the overall project remain incomplete. Phase 5 remains
+OpenAPI authority. The frozen P8-S6 implementation plan was approved and
+published at `4edf2e3341e60632765b85796e8554797c645692`. Fresh focused API,
+OpenAPI, public-client, rendered-Web, deterministic Demo, real-MySQL, Offline,
+MySQL, and Full evidence passed without changing those contracts. It proves the
+existing primary path from eligible discovery or minimal creation through
+`POST /v1/runs`, persisted same-tab Session recovery, authoritative View,
+action/request-status recovery, and terminal rendering; the legacy
+`POST /v1/sessions` operation remains available but unused by that primary
+journey. Error, non-enumeration, response-identity, strict action/status DTO,
+uncertain-POST no-auto-retry, GET-only confirmed-202 recovery, and privacy
+semantics remain unchanged. These current documentation bytes are only the
+unapproved, unstaged, uncommitted, and unpublished P8-S6 implementation
+candidate. Phase 8 and the overall project remain incomplete. Phase 5 remains
 complete at P5-S3; no P5-S4 exists. Existing Phase 6 and Phase 7 allocations
 remain planned and unimplemented, and neither is a Phase 8 prerequisite.
 

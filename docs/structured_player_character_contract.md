@@ -901,8 +901,15 @@ The exact eight-path Web implementation was committed and published at
 Web journey consumes the existing detached eligible projection and submits its
 exact Player Character identity and revision to existing Run-entry authority.
 It adds no character lifecycle, binding, ownership, DTO, or persistence
-authority. P8-S6 cross-surface evidence/final status closure has not started.
-Phase 8 and the overall project remain incomplete.
+authority. The frozen P8-S6 implementation plan was approved and published at
+`4edf2e3341e60632765b85796e8554797c645692`. Fresh focused and real-MySQL
+evidence confirms that eligible discovery remains bounded, ordered, owned,
+active-only, unbound-only, detached, non-enumerating, and read-only; Run entry
+continues to bind the exact immutable applicable reference and rejects stale,
+foreign, missing, already-bound, and conflicting authority without adding a
+character-side mutation. These current documentation bytes are the unapproved,
+unstaged, uncommitted, and unpublished P8-S6 implementation candidate. Phase
+8 and the overall project remain incomplete.
 
 The implemented Phase 8 character-side boundary remains narrow and unchanged
 by P8-S5:
@@ -1131,8 +1138,13 @@ The frozen P8-S5 plan was independently approved and published at
 `dceecaf0d7a33ccde07f519f83997489acd5fc86`; its corrected implementation was
 independently approved, committed, and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
-cross-surface evidence/final status closure has not started, and Phase 8 and the
-overall project remain incomplete. Phase 6 and Phase 7 remain allocated and
-unimplemented. The approved final
+executable evidence E01-E14 and C01-C21 has now passed without changing the
+Structured Player Character contract, production code, tests, fixtures,
+migrations, dependencies, configuration, deployment, or generated authority.
+The resulting documentation implementation candidate remains pending its
+post-edit gates, fresh independent review, separate commit authorization,
+manual user publication, and aligned-ref confirmation. P8-S6 and Phase 8 are
+therefore incomplete, and the overall project remains incomplete. Phase 6 and
+Phase 7 remain allocated and unimplemented. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

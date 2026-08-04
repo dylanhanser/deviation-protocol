@@ -106,8 +106,12 @@ passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   implementation, and its corrected implementation received
   `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
   The exact eight-path Web implementation was committed and published at
-  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
-  cross-surface evidence/final status closure has not started. Phase 8 and the
+  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. The frozen
+  P8-S6 implementation plan was approved and published at
+  `4edf2e3341e60632765b85796e8554797c645692`; its fresh executable evidence
+  passes through C21 and these current seven-owner documentation bytes are its
+  unapproved, unstaged, uncommitted, and unpublished implementation candidate.
+  Phase 8, Phase 6, Phase 7, the Structured Player Character programme, and the
   overall project remain incomplete. Push by Codex, deployment, release, later
   runtime activation, and Provider work remain deferred.**
 
@@ -3839,10 +3843,13 @@ was committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`,
 and completes the bounded primary Web connection to Player Character discovery
 or minimal creation, Run entry, same-tab Session recovery, authoritative View,
 and the existing action/status/recovery/terminal loop. P8-S5 is complete.
-P8-S6 cross-surface evidence/final status closure has not started. Phase 8 and
-the overall project remain incomplete. P8-S6 remains gated on independent
-review, separate commit authorization, user publication, and clean-baseline
-confirmation for this P8-S5 post-publication documentation synchronization.
+P8-S6 fresh cross-surface executable evidence E01-E14 and commands C01-C21 now
+pass under the approved frozen plan published at
+`4edf2e3341e60632765b85796e8554797c645692`. The resulting documentation
+implementation candidate remains gated on its post-edit checks, fresh
+independent review, separate commit authorization, user publication, and clean
+aligned-baseline confirmation. Phase 8 and the overall project remain
+incomplete.
 Later modifications
 to the planning-authority bytes require fresh exact-byte independent review
 before a separately authorized documentation commit; that commit precedes user
@@ -3947,8 +3954,11 @@ accepted implementation. It follows
   `187d41ba3035c8d717c2fb2578a805402255d979`. P8-S5 minimum Web connection is
   complete under its approved, frozen plan; the corrected implementation was
   independently approved, committed, and published at
-  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S6 has not started, and
-  Phase 8 and the overall project remain incomplete.
+  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S6 executable evidence has
+  now passed through C21 and the seven eligible documentation owners form an
+  unapproved, unstaged, uncommitted, and unpublished implementation candidate.
+  Phase 8 and the overall project remain incomplete pending the remaining
+  plan-defined gates.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -4356,6 +4366,18 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-08-04: The frozen P8-S6 implementation plan was independently approved,
+  committed, and published at `4edf2e3341e60632765b85796e8554797c645692`.
+  Fresh P8-S6 evidence through C21 passed across focused Player Character, Run,
+  public-entry, real-MySQL vertical, deterministic guarded Demo, Web,
+  loopback-smoke, compile, Alembic, isolated Offline, designated MySQL, and Full
+  verification. The exact evidence is owned by the Phase 8 plan. No production,
+  test, fixture, migration, dependency, lockfile, configuration, deployment, or
+  generated-authority path changed. These seven documentation-owner bytes are
+  only the implementation candidate: independent review, separate commit
+  authorization, manual publication, aligned-ref confirmation, and Phase 8
+  completion remain pending. Phase 6, Phase 7, this programme, and the overall
+  project remain incomplete.
 - 2026-08-04: The dedicated P8-S5 implementation plan was independently
   approved, committed, and published at
   `dceecaf0d7a33ccde07f519f83997489acd5fc86` and remained frozen. Its exact
@@ -4369,9 +4391,10 @@ deployment, or work outside a separately authorized phase.
   committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`
   (`feat(web): connect player characters to playable run flow`) with exactly
   three production and five test paths and no documentation path. P8-S5 is
-  complete. This seven-owner post-publication synchronization is documentation
-  only; P8-S6 has not started, and Phase 8 and the overall project remain
-  incomplete.
+  complete. Its seven-owner documentation-only post-publication synchronization
+  was subsequently committed and published at
+  `acb16774e980a48e7a3d3066f764029be6708398`; at that historical point P8-S6
+  had not started, and Phase 8 and the overall project remained incomplete.
 - 2026-08-04: The dedicated P8-S4 implementation plan was independently
   approved, committed, and user-published at
   `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The resulting exact nine-path

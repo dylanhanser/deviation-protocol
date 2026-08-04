@@ -571,9 +571,14 @@ was independently approved and committed/published at
 implementation, and its corrected implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
 The exact eight-path Web implementation was committed and published at
-`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
-cross-surface evidence/final status closure has not started. Phase 8 and the
-overall project remain incomplete.
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. The frozen
+P8-S6 implementation plan was approved and published at
+`4edf2e3341e60632765b85796e8554797c645692`. Its fresh executable evidence now
+passes through C21; these current documentation bytes remain an unapproved,
+unstaged, uncommitted, and unpublished implementation candidate. Phase 8, Phase
+6, Phase 7, the Structured Player Character programme, and the overall project
+remain incomplete pending the plan-defined review, commit, publication, and
+aligned-ref gates.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
@@ -691,6 +696,20 @@ not rewound. Fresh-process evidence executes scenario discovery, Player
 Character create/discovery, Run entry, authoritative View, and the canonical
 19-action ending in separate OS processes and compares deterministic public and
 generator traces without non-loopback network or real Provider access.
+
+Fresh P8-S6 cross-surface evidence preserves that separation. The normal
+production ASGI path passed the designated MySQL 8 public entry-to-terminal
+playthrough and canonical MySQL/Full gates through the existing
+SQLAlchemy/`AsyncSession`/`asyncmy` composition. The independent Demo path passed
+its process-local persistence/composition and two-process fresh/replay evidence
+through `DeterministicDemoNarrativeProvider` behind
+`CanonicalDemoProviderGuard`, with exactly four completed Provider calls for
+the canonical journey. The Web evidence passed the create-or-reuse, Run-entry,
+stored-Session-before-View, action/request-status/View/recovery, and terminal
+rendering lifecycle. No live Provider, production service, unrelated database,
+or other external runtime service was contacted. This evidence changes no
+composition, transaction, persistence, public-contract, migration, or Provider
+authority; it supports only the pending P8-S6 documentation candidate.
 
 ## Phase 3.2b local Demo Web boundary
 

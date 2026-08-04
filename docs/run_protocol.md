@@ -30,9 +30,13 @@ committed/published at `dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained
 frozen during implementation, and its corrected implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
 The exact eight-path Web implementation was committed and published at
-`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6 has not
-started. Phase 8 and the overall project remain incomplete; this status does
-not mark Phase 3.3, Phase 6, or Phase 7 complete.**
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. The frozen
+P8-S6 implementation plan was approved and published at
+`4edf2e3341e60632765b85796e8554797c645692`; its executable evidence has passed
+through C21, and these current documentation bytes are its unapproved,
+unstaged, uncommitted, and unpublished implementation candidate. Phase 8 and
+the overall project remain incomplete; this status does not mark Phase 3.3,
+Phase 6, or Phase 7 complete.**
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -117,7 +121,9 @@ binding route or the `active` lifecycle transition.
 ## Phase 8 Session-backed minimum admission
 
 Status: **Implemented through completed, independently approved, committed, and
-published P8-S5 minimum Web connection; Phase 8 remains incomplete**
+published P8-S5 minimum Web connection; P8-S6 executable evidence collected
+and documentation implementation candidate pending independent review; Phase 8
+remains incomplete**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -158,7 +164,18 @@ implementation, and its corrected implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
 The exact eight-path Web implementation was committed and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
-cross-surface evidence/final status closure has not started.
+fresh evidence now confirms the unchanged Session-backed Run protocol. The
+designated MySQL 8 production-ASGI journey entered one active, immutably bound
+Run and played all 19 authoritative actions to Session settlement; replay
+produced no extra Provider call or durable write, and the Run remained active
+and bound at state version 3 after the terminal `ENDED`/`RESOLVED` View. The
+deterministic Demo journey separately completed the same canonical action,
+request-status, authoritative-View, and terminal sequence with exactly four
+completed guarded Provider calls. Focused Web evidence confirmed Session ID
+storage before the first View GET, a single action POST, confirmed-202 GET-only
+status polling, authoritative View refresh, and no automatic replay. These
+results support only the pending P8-S6 documentation candidate; they do not
+approve, commit, publish, or close it, and they do not make Phase 8 complete.
 
 ### Narrow authority amendment
 

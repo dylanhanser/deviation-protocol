@@ -23,15 +23,19 @@ implementation plan was independently approved, committed, and published at
 implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`,
 was committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`,
-and completes P8-S5. These current worktree bytes are the separate P8-S5
-post-publication documentation synchronization candidate; they are unstaged,
-uncommitted, unpublished, and do not authorize P8-S6.**
+and completes P8-S5. Its post-publication documentation synchronization was
+committed and published at `acb16774e980a48e7a3d3066f764029be6708398`. The
+frozen P8-S6 implementation plan was then approved and published at
+`4edf2e3341e60632765b85796e8554797c645692`. Fresh P8-S6 executable evidence
+E01-E14 and commands C01-C21 now pass. These current seven-owner worktree bytes
+are the P8-S6 implementation candidate; they are unapproved, unstaged,
+uncommitted, unpublished, and do not complete P8-S6 or Phase 8.**
 
 The parent-amendment verdict above is historical and binds only the published
 amendment bytes. The original planning verdict, parent-amendment verdict,
-P8-S4 verdicts, P8-S5 plan verdict, and P8-S5 implementation verdict cannot
-approve this post-publication synchronization candidate, a later documentation
-commit, or P8-S6.
+P8-S4 verdicts, P8-S5 plan verdict, P8-S5 implementation verdict, and P8-S6
+plan verdict cannot approve this implementation candidate or a later
+documentation commit. Fresh independent implementation review remains required.
 
 Phase 5 is complete at the published P5-S3 baseline
 `34d063e387cde69500e4dc018ff087e87f3eee74`
@@ -79,11 +83,15 @@ implementation, and its corrected implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
 The exact eight-path Web implementation was committed and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
-cross-surface evidence/final status closure has not started, and Phase 8 and
-the overall project remain incomplete. P8-S6 may begin only after this P8-S5
-post-publication synchronization is independently reviewed, committed under
-separate authorization, user-published, and confirmed as a clean aligned
-baseline.
+began only after the P8-S5 post-publication synchronization was independently
+reviewed, committed, user-published at
+`acb16774e980a48e7a3d3066f764029be6708398`, and confirmed as the clean aligned
+baseline for the separately approved frozen plan at
+`4edf2e3341e60632765b85796e8554797c645692`. Its fresh executable evidence now
+passes through C21 and its seven-owner documentation implementation candidate
+is pending post-edit verification and independent review. P8-S6, Phase 8, the
+Structured Player Character programme, and the overall project remain
+incomplete.
 
 This document is the dedicated implementation plan for:
 
@@ -842,8 +850,8 @@ behavior. An implementer must not create a convenience migration.
 | P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Implemented, accepted, committed, and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; closed with no public route |
 | P8-S3 | Activate normal-app Run-entry API and composition | Accepted/published P8-S2 | Complete: focused independent read-only approval, then committed and published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1` with exactly 3 production, 5 test, and 7 documentation paths |
 | P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Complete: independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; post-publication synchronization committed and published at `60938260b3e63fffbe849a9a6de8863b7f429897` |
-| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Complete: corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; separate post-publication synchronization is the current unstaged candidate |
-| P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Unimplemented; cross-surface evidence and final status closure remain deferred here |
+| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Complete: corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; post-publication synchronization committed and published at `acb16774e980a48e7a3d3066f764029be6708398` |
+| P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Fresh executable evidence E01-E14 and C01-C21 passed; seven-owner documentation implementation candidate pending post-edit gates and independent review; uncommitted, unpublished, and incomplete |
 
 Each slice is separately authorized, leaves an unstaged reviewable candidate,
 receives a fresh independent review, and has a separately authorized local
@@ -1159,8 +1167,10 @@ independent read-only approval and was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 then
 received the exact approval and publication recorded in section 20.5. P8-S5
 then received the exact approval and publication recorded in section 20.6.
-P8-S6 has not started, Phase 8 and the overall project remain incomplete, and
-no live Provider was called.
+P8-S6 has now collected the fresh executable evidence recorded in section
+20.7, but its documentation implementation candidate remains unapproved,
+uncommitted, unpublished, and incomplete. Phase 8 and the overall project
+remain incomplete, and no live Provider was called.
 
 ### 20.5 P8-S4 — Deterministic Demo parity
 
@@ -1349,7 +1359,11 @@ and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`
 documentation or unauthorized path. The accepted provider-backed action path
 traverses `202`, request-status `PENDING`, request-status `COMMITTED`, and the
 authoritative View, then preserves the established terminal behavior. P8-S5 is
-complete. This separate documentation candidate does not start P8-S6.
+complete. Its separate post-publication documentation candidate was later
+independently reviewed, committed, and published at
+`acb16774e980a48e7a3d3066f764029be6708398`; that publication satisfied the
+prerequisite for separately authorized P8-S6 but did not itself execute or
+approve P8-S6.
 
 ### 20.7 P8-S6 — Evidence and status closure
 
@@ -1368,10 +1382,57 @@ its owning slice and receives a regression test there.
 **Documentation path budget: at most the seven P8-G0 paths.** No completed
 P5-S1/P5-S2/P5-S3 plan is edited.
 
-**Completion:** canonical documentation checklist, exact evidence record,
-Guardrail impact assessment, complete changed-path/hash inventory, fresh
-independent implementation review, separate commit authorization, and manual
-user push. No deployment or release claim.
+**Fresh implementation-candidate evidence:** the approved frozen P8-S6 plan at
+`4edf2e3341e60632765b85796e8554797c645692` was executed from its required clean
+aligned baseline. C01-C21 produced these actual results in the frozen order:
+
+| Command | Actual result |
+| --- | --- |
+| C01 | 262 focused P8-S1 unit/API/composition tests passed |
+| C02 | 27 designated real-MySQL Player Character API tests passed |
+| C03 | 183 Run domain/operation/service/persistence/repository tests passed |
+| C04 | 76 designated real-MySQL Run and binding tests passed |
+| C05 | 50 public Run-entry API tests passed |
+| C06 | 13 normal Run-composition tests passed |
+| C07 | 104 API and public-client-contract tests passed |
+| C08 | Both designated real-MySQL public entry-to-terminal playthrough tests passed |
+| C09 | 451 Demo persistence/composition, shared-owner, and cross-process replay tests passed |
+| C10 | 207 focused Web tests passed and one mode-gated presentation probe skipped; C15 executed that probe |
+| C11 | 225 full Web tests passed and the same single mode-gated probe skipped |
+| C12 | TypeScript project typecheck passed |
+| C13 | ESLint passed with zero warnings |
+| C14 | Production Web build passed with 100 modules transformed |
+| C15 | Loopback Demo startup/proxy/schema, exact rendered warning, dotenv isolation, owned build, and scenario-catalog validation passed; the gated warning probe and validator each passed |
+| C16 | `compileall` passed for `src`, `tests`, and `alembic` |
+| C17 | Alembic reported the single head `20260729_0005` |
+| C18 | Alembic reported one linear history from base through `20260729_0005` |
+| C19 | Isolated Offline verification passed: 1,978 tests passed, 182 expected database/live-only tests skipped; doctor, compile, package, Alembic, and diff checks passed |
+| C20 | Designated MySQL verification passed: 194 tests passed with no skip; compile, package, Alembic, and diff checks passed |
+| C21 | Full verification passed: 2,159 tests passed and only the explicitly opt-in live Provider test skipped; compile, package, Alembic, and diff checks passed |
+
+Together these results satisfy executable evidence E01-E14: bounded private
+eligible discovery; atomic Session-backed Run admission; exact public entry;
+the real-MySQL entry-to-terminal journey; the guarded deterministic Demo journey
+with exactly four completed calls; primary Web create/discover/enter/View and
+complete rendered gameplay; GET-only recovery and no automatic action replay;
+cross-surface lifecycle alignment; Web static/build validation; loopback smoke;
+compile/Alembic validation; the distinct Offline/MySQL/Full relationship; and
+the prohibited-network boundary. No live Provider, production service,
+unrelated database, Git remote, or other external runtime service was contacted.
+No production, test, fixture, migration, dependency, lockfile, configuration,
+deployment, or generated-authority path changed.
+
+These seven documentation-owner worktree bytes are only the P8-S6
+implementation candidate. E15-E16, C22-C25, and the required post-edit
+C19-C21 reruns are adjudicated by the final implementation handoff after these
+bytes exist; this paragraph does not pre-claim their result. Independent review,
+separate commit authorization, local commit, manual user publication, clean
+aligned-ref confirmation, and Phase 8 completion remain pending.
+
+**Completion condition:** canonical documentation checklist, exact evidence
+record, Guardrail impact assessment, complete changed-path/hash inventory,
+fresh independent implementation review, separate commit authorization, manual
+user push, and clean aligned-ref confirmation. No deployment or release claim.
 
 ### 20.8 Per-slice authority and gate summary
 
@@ -1384,8 +1445,8 @@ The following requirements apply together with the detailed budgets above:
 | P8-S2 | No public route; implement only trusted composite admission and the narrow Run activation authority | Existing tables; one entry-owned UoW/commit; repositories only flush | No API/composition activation, Demo/Web, terminal Run transition, later Session, Provider, schema, or migration | Focused domain/service plus real-MySQL atomicity, replay, concurrency, rollback, reconstruction, Alembic-parity, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S2 implementation review and separately authorized P8-S2 commit before P8-S3 |
 | P8-S3 | Implement only normal-app `POST /v1/runs`, exact DTO/errors/OpenAPI, and lazy composition | API/composition own no transaction; entry service remains sole UoW/commit owner; no schema or migration | No public Run read/list/bind/attach/terminal/admin, Demo/Web, Provider, deployment, or auth redesign | Focused API/OpenAPI/composition plus one real-MySQL public `POST /v1/runs`-to-terminal playthrough through every canonical action/request-status/View step and persisted Run/Session/gameplay state, cancellation, privacy, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S3 implementation review and separately authorized P8-S3 commit before P8-S4 |
 | P8-S4 | Add deterministic Demo parity for the already frozen Player Character discovery/create and Run-entry routes | One process-local atomic publication with rollback/lock parity; no database or migration | No normal-composition change, Web work, external I/O, credentials, Provider, or persistence guarantee after process exit | Completed focused Demo repository/composition/e2e determinism, executable-child complete generator/snapshot reconstruction, complete backend journey, `compileall`, Offline, and diff checks | Implementation published at `187d41ba3035c8d717c2fb2578a805402255d979`; post-publication synchronization published at `60938260b3e63fffbe849a9a6de8863b7f429897` before P8-S5 |
-| P8-S5 | Consume only the frozen create/discovery/entry contracts and existing Session gameplay protocol | Existing same-tab Session `sessionStorage` record plus unresolved key/body pairs in current component/process memory only; no durable pending-operation state | No server behavior, client lifecycle authority, optimistic binding, profile/search/admin UI, redesign, automatic retry, or reload/cross-context pending-operation recovery guarantee | Completed focused runtime-schema/client/rendered-loop/recovery tests prove pre-POST key creation, exact manual same-key/body retry, no automatic/replacement retry, history-sensitive 404 retention after an uncertainty-tainted send, precise clear/retain outcomes, honest pre-Session-storage reload limitation, plus typecheck, lint, build, Demo-backed playthrough, and diff checks | Corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; synchronize every applicable owner within the seven-document maximum, then independently review, separately commit, user-publish, and confirm this documentation candidate before P8-S6 |
-| P8-S6 | Synchronize implemented facts and close only Phase 8 | No expected production/test mutation; documentation/status only unless work returns to an owning slice | No late feature, duplicate production playthrough, defect fix without regression ownership, deployment, release, Provider, or Phase 6/7 completion | Re-run P8-S3's accepted MySQL entry-to-terminal test and applicable focused/Offline/MySQL/Full/Alembic/Web/Demo evidence; canonical documentation synchronization | Fresh independent complete-Phase-8 review, then separate completion-commit authorization; user push only |
+| P8-S5 | Consume only the frozen create/discovery/entry contracts and existing Session gameplay protocol | Existing same-tab Session `sessionStorage` record plus unresolved key/body pairs in current component/process memory only; no durable pending-operation state | No server behavior, client lifecycle authority, optimistic binding, profile/search/admin UI, redesign, automatic retry, or reload/cross-context pending-operation recovery guarantee | Completed focused runtime-schema/client/rendered-loop/recovery tests prove pre-POST key creation, exact manual same-key/body retry, no automatic/replacement retry, history-sensitive 404 retention after an uncertainty-tainted send, precise clear/retain outcomes, honest pre-Session-storage reload limitation, plus typecheck, lint, build, Demo-backed playthrough, and diff checks | Corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; seven-owner post-publication synchronization committed and published at `acb16774e980a48e7a3d3066f764029be6708398` before P8-S6 |
+| P8-S6 | Synchronize implemented facts and close only Phase 8 | No production/test mutation; documentation/status candidate only | No late feature, duplicate production playthrough, defect fix without regression ownership, deployment, release, Provider, or Phase 6/7 completion | Fresh P8-S3-owned MySQL entry-to-terminal plus focused/Offline/MySQL/Full/Alembic/Web/Demo evidence passed through C21; seven-owner documentation candidate records the actual results | Candidate remains unapproved, unstaged, uncommitted, unpublished, and Phase 8-incomplete; next is fresh independent review, then separate completion-commit authorization and user push only |
 
 ## 21. Acceptance and evidence matrix
 
@@ -1504,10 +1565,13 @@ The published P8-G0 sequence was:
    followed the narrower published slice plan's explicit implementation review,
    commit, user-publication, and post-publication synchronization sequence
    before P8-S5. P8-S5 likewise follows implementation review, commit, and user
-   publication first, then this separate at-most-seven-owner post-publication
-   synchronization review/commit/publication before P8-S6; and
-9. after P8-S6, obtain one fresh independent review of the complete Phase 8
-   implementation and synchronized documentation before any completion commit.
+   publication first, then a separate at-most-seven-owner post-publication
+   synchronization review/commit/publication. That synchronization was committed
+   and published at `acb16774e980a48e7a3d3066f764029be6708398` before P8-S6;
+   and
+9. after P8-S6 evidence and documentation-candidate preparation, obtain one
+   fresh independent review of the complete Phase 8 implementation and
+   synchronized documentation before any completion commit.
 
 Any post-publication correction repeats steps 1 through 6 for its exact
 corrected bytes before it may be relied upon to begin P8-S1. This plan
