@@ -24,6 +24,10 @@ class DemoStringSequence:
         self._next_value = 1
 
     def __call__(self) -> str:
+        if self._next_value >= 10**self._width:
+            raise RuntimeError(
+                "Demo string sequence exhausted its fixed-width boundary"
+            )
         value = f"{self._prefix}{self._next_value:0{self._width}d}"
         self._next_value += 1
         return value
@@ -44,6 +48,9 @@ class DemoSeedSequence:
 @dataclass(frozen=True, slots=True)
 class DemoGenerators:
     clock: Callable[[], datetime]
+    player_character_id: Callable[[], str]
+    run_id: Callable[[], str]
+    continuous_story_line_id: Callable[[], str]
     session_id: Callable[[], str]
     event_id: Callable[[], str]
     job_id: Callable[[], str]
@@ -55,6 +62,9 @@ class DemoGenerators:
 def new_demo_generators() -> DemoGenerators:
     return DemoGenerators(
         clock=DemoLogicalClock(),
+        player_character_id=DemoStringSequence("pc.demo-", width=8),
+        run_id=DemoStringSequence("run.demo-", width=8),
+        continuous_story_line_id=DemoStringSequence("csl.demo-", width=8),
         session_id=DemoStringSequence("demo-session-", width=8),
         event_id=DemoStringSequence("demo-event-", width=8),
         job_id=DemoStringSequence("demo-job-", width=8),

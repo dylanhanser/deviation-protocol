@@ -58,6 +58,21 @@ from deviation_protocol.infrastructure.demo_persistence import (  # noqa: E402
     DemoProcessStore,
     DemoStoreSnapshot,
 )
+from deviation_protocol.infrastructure.player_character_persistence import (  # noqa: E402
+    StoredControllerBindingRecord,
+    StoredCreationReceiptRecord,
+    StoredCurrentPlayerCharacterRecord,
+    StoredMutationReceiptRecord,
+    StoredPlayerCharacterIdAllocationRecord,
+    StoredPlayerCharacterRevisionRecord,
+)
+from deviation_protocol.infrastructure.run_persistence import (  # noqa: E402
+    StoredCurrentRunRecord,
+    StoredRunCreationReceiptRecord,
+    StoredRunMutationReceiptRecord,
+    StoredRunRevisionRecord,
+    StoredRunSessionParticipationRecord,
+)
 
 
 PROTOCOL = "deviation-demo-generator-trace"
@@ -65,6 +80,9 @@ PROTOCOL_VERSION = 1
 TRACE_CATEGORIES = frozenset(
     {
         "CLOCK",
+        "PLAYER_CHARACTER_ID",
+        "RUN_ID",
+        "CONTINUOUS_STORY_LINE_ID",
         "SESSION_ID",
         "EVENT_ID",
         "JOB_ID",
@@ -87,6 +105,175 @@ EXPECTED_DATACLASS_FIELDS = {
         "narrative_jobs",
         "events",
         "provider_progress",
+        "controller_bindings",
+        "player_character_id_allocations",
+        "player_character_revisions",
+        "player_character_current",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
+        "run_revisions",
+        "run_current",
+        "run_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
+    ),
+    StoredControllerBindingRecord: ("controller_binding", "created_at"),
+    StoredPlayerCharacterIdAllocationRecord: (
+        "player_character_id",
+        "created_at",
+    ),
+    StoredPlayerCharacterRevisionRecord: (
+        "player_character_id",
+        "record_revision",
+        "contract_version",
+        "controller_binding",
+        "lifecycle",
+        "prior_revision",
+        "mutation_kind",
+        "authority_class",
+        "source_reference",
+        "record_canonical",
+        "created_at",
+    ),
+    StoredCurrentPlayerCharacterRecord: (
+        "player_character_id",
+        "contract_version",
+        "record_revision",
+        "controller_binding",
+        "lifecycle",
+        "record_canonical",
+        "created_at",
+        "updated_at",
+    ),
+    StoredCreationReceiptRecord: (
+        "controller_binding",
+        "operation_namespace",
+        "operation_id",
+        "fingerprint",
+        "command_kind",
+        "result_schema_version",
+        "result_player_character_id",
+        "result_contract_version",
+        "resulting_revision",
+        "resulting_lifecycle",
+        "result_record_fingerprint",
+        "receipt_canonical",
+        "operation_evidence_canonical",
+        "created_at",
+    ),
+    StoredMutationReceiptRecord: (
+        "player_character_id",
+        "operation_namespace",
+        "operation_id",
+        "fingerprint",
+        "command_kind",
+        "result_schema_version",
+        "expected_revision",
+        "result_player_character_id",
+        "result_contract_version",
+        "result_command_kind",
+        "command_result",
+        "resulting_revision",
+        "resulting_lifecycle",
+        "before_record_fingerprint",
+        "after_record_fingerprint",
+        "receipt_canonical",
+        "operation_evidence_canonical",
+        "created_at",
+    ),
+    StoredRunRevisionRecord: (
+        "run_id",
+        "continuous_story_line_id",
+        "lifecycle_status",
+        "state_version",
+        "creation_operation_id",
+        "creation_source_reference",
+        "creation_occurred_at",
+        "prior_state_version",
+        "mutation_kind",
+        "operation_id",
+        "source_reference",
+        "occurred_at",
+        "binding_player_character_id",
+        "binding_contract_version",
+        "binding_record_revision",
+        "binding_state",
+        "binding_operation_id",
+        "binding_authority_source_ref",
+        "bound_at",
+        "inactivated_at",
+        "active_player_character_id",
+        "created_at",
+    ),
+    StoredCurrentRunRecord: (
+        "run_id",
+        "continuous_story_line_id",
+        "lifecycle_status",
+        "state_version",
+        "creation_operation_id",
+        "creation_source_reference",
+        "creation_occurred_at",
+        "prior_state_version",
+        "mutation_kind",
+        "operation_id",
+        "source_reference",
+        "occurred_at",
+        "binding_player_character_id",
+        "binding_contract_version",
+        "binding_record_revision",
+        "binding_state",
+        "binding_operation_id",
+        "binding_authority_source_ref",
+        "bound_at",
+        "inactivated_at",
+        "active_player_character_id",
+        "created_at",
+        "updated_at",
+    ),
+    StoredRunSessionParticipationRecord: (
+        "session_id",
+        "run_id",
+        "continuous_story_line_id",
+        "joined_state_version",
+        "operation_id",
+        "source_reference",
+        "joined_at",
+    ),
+    StoredRunCreationReceiptRecord: (
+        "operation_namespace",
+        "operation_id",
+        "fingerprint",
+        "command_kind",
+        "result_schema_version",
+        "result_run_id",
+        "result_continuous_story_line_id",
+        "resulting_lifecycle_status",
+        "resulting_state_version",
+        "receipt_canonical",
+        "operation_evidence_canonical",
+        "created_at",
+    ),
+    StoredRunMutationReceiptRecord: (
+        "run_id",
+        "operation_namespace",
+        "operation_id",
+        "fingerprint",
+        "command_kind",
+        "result_schema_version",
+        "expected_state_version",
+        "result_run_id",
+        "result_continuous_story_line_id",
+        "resulting_lifecycle_status",
+        "resulting_state_version",
+        "participation_session_id",
+        "participation_operation_id",
+        "participation_source_reference",
+        "result_player_character_id",
+        "result_character_contract_version",
+        "result_character_record_revision",
+        "receipt_canonical",
+        "operation_evidence_canonical",
+        "created_at",
     ),
     PersistedSession: (
         "session",
@@ -244,6 +431,17 @@ EXPECTED_PRIVATE_COMPONENTS = frozenset(
         "narrative_jobs",
         "events",
         "provider_progress",
+        "controller_bindings",
+        "player_character_id_allocations",
+        "player_character_revisions",
+        "player_character_current",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
+        "run_revisions",
+        "run_current",
+        "run_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
     }
 )
 
@@ -252,58 +450,124 @@ EXPECTED_PRIVATE_COMPONENTS = frozenset(
 # expectation; exact replay never enters the caller-equivalence path.
 EXPECTED_RAW_PRIVATE_COMPONENT_DIGESTS: dict[str, dict[str, str]] = {
     "same": {
-        "creation_keys": "bb370ff83905a3b6f9312c956d3ae857efbe0f1ba124f10231a80a625af2d5e5",
-        "events": "5200048c35d51196ca1c16a553aa8c6a807e8e2762d68a875b629b291716daad",
-        "narrative_jobs": "0179ba851e2686529c956e299568231a65c48f4b8a66ff47ec1a62d7e91f71fb",
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
+        "creation_keys": "f4031b48f17f191525aa31cee2ff7c872e46590f4894ae42c3bca94cf64342bf",
+        "events": "b5fffb46cb68f3db6f997635c521473e5955a3c88407a1021817d678fe901545",
+        "narrative_jobs": "aa287c34318afc51e25d6dab08ce300ce5c72d0ee79c3e5ae0aab1eebae5aca2",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "4811eea4b120806f062cef07fc5e9eed256b9311109f4c158275d0e8c9c271d2",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "de6b3950427d1023c19aeaa744fb9a5826a23be4d9123d35cf88bc0394bada37",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "e0b409303318a225a2e57d6a26b187e30e3e45bc5a15ce8889005256c05bff4f",
     },
     "browser-a": {
-        "creation_keys": "e2cfb189f10a3196171dad1df767c45ef9a40c9453e59bc357e53023497aa457",
-        "events": "93baa5b4e123c7e75cc370a69865d6dfdca2f484e59ce872be78499875a4da46",
-        "narrative_jobs": "b1de1b59543dd0063eb073de85bbc2f2c4c37b9cedb21a64207b13d7d4958329",
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
+        "creation_keys": "f4031b48f17f191525aa31cee2ff7c872e46590f4894ae42c3bca94cf64342bf",
+        "events": "e7f4e9bbaf6b5603b5c8fb7c1ae9dd01f4b6c0243c60487235d9f9a239171de0",
+        "narrative_jobs": "53603023f147bd3dbc13b873563337d601e9920d601562b366c89fe5c3945e8c",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "b49564f653f53f59eca795a4c9c07c734a4056ebd14c06431d02cf9645a6aaaf",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "de6b3950427d1023c19aeaa744fb9a5826a23be4d9123d35cf88bc0394bada37",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "4f82491e6bd8ee038b443d42d71c8a47ad1abd40a75fcaf08ca591c9936c7fbf",
     },
     "browser-b": {
-        "creation_keys": "bb695a129b1f8ec1cb78d3213ed8e9ecd5b91ee50e5998cee40eaf65befcfcca",
-        "events": "10a5d2706c8cea247b4f620174f2468c9d94319b7ee1c1b968110a4701875cbd",
-        "narrative_jobs": "cedfb18eee569233475f7b343242b109d273995c9ad74f57cc70521dec8f5951",
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
+        "creation_keys": "f4031b48f17f191525aa31cee2ff7c872e46590f4894ae42c3bca94cf64342bf",
+        "events": "9c72bbe9202d662909d7a11c3fc32a3e783e8dc784d866d45bb7ded9ae264ba3",
+        "narrative_jobs": "7fff5f77e375791846c3d49c0cc0f7e976357424bfffa55fe27e5790848a5748",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "376ba41b4c0da297d52b2a24a5c3f7eabe49923aab44bd1e92fe1038aa9097aa",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "de6b3950427d1023c19aeaa744fb9a5826a23be4d9123d35cf88bc0394bada37",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "57fc18776c23492067db55c6f323f7c9eb838778989de17b56d601c1f460d8c5",
     },
 }
 EXPECTED_CALLER_EQUIVALENCE_COMPONENT_DIGESTS: dict[str, dict[str, str]] = {
     "same": {
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
         "creation_keys": "232e0faa4a17ece078877b8994eb6ee4142fd8dbea0ccef67a8c76881e4d6731",
-        "events": "b08bf4435471d04c3c2e2f957e4400a1a9943171f2ee654a39e80862f2cba02b",
-        "narrative_jobs": "801f71ecc515142043f4d6d34b6330261f4d876cf171c2939e2258344362c75c",
+        "events": "cedbcbf3f9ccab541ee4435c3e697dda3a2443ea0e6b00bca6691eb3504919a9",
+        "narrative_jobs": "299fc04940713ed7b0f1a5132a61683c0845767246bd52473ffd1f5c42408417",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "68f667eb9fe514dbda5115634b69319c84f52cfdcc5a8ad4b52f8ff9b1473a69",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "f076abd23cc7c8936b5b5a8ab54b926b2faac2084998134a024f2aa2be73389e",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "b17ce2605138c933e18fa8f2f93975705823f9bc31e8ccbc3ae1004a92db29bc",
     },
     "browser-a": {
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
         "creation_keys": "232e0faa4a17ece078877b8994eb6ee4142fd8dbea0ccef67a8c76881e4d6731",
-        "events": "9c09354d8cc81f814f5916d4036de7815474a2ebe331428c701966439c8e3608",
-        "narrative_jobs": "674db47f9240399adb970118c583d0830f367868d05523d1ff1219c062d2d685",
+        "events": "a8b601d7d8483f838a8b974f8525d6e9a0d3afe4f2f124b8a31df2521b4f0474",
+        "narrative_jobs": "2ab9ce3e2d7f2b7271042e4591360d6a396447d989a74a93cce737a27d0cb6a6",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "68f667eb9fe514dbda5115634b69319c84f52cfdcc5a8ad4b52f8ff9b1473a69",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "f076abd23cc7c8936b5b5a8ab54b926b2faac2084998134a024f2aa2be73389e",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "b61a6f64b2ff3f730c4e108e2795d8a9a43080c52da9bc49f4a7055635aee35c",
     },
     "browser-b": {
+        "controller_bindings": "80031bb5a03194c1c71d487b4107133e8ebe8cc2ee5e26a262459d00a757b471",
         "creation_keys": "232e0faa4a17ece078877b8994eb6ee4142fd8dbea0ccef67a8c76881e4d6731",
-        "events": "8a17f0f6595ff096b2f0b85a9fadecbe982a402c310f66eee54e1b65ea6bb820",
-        "narrative_jobs": "9119e1fd9988024f550c9aab05a4f48b83fc935b02d96ad28369d91f3b265bb8",
+        "events": "bf0b04b18db04741216566fc827b0bc8b98419f96ec2c04e22889a4f70a9f4f2",
+        "narrative_jobs": "2d3d9b89c8711a103f0b0b110f40bae05cb9e93559d21e57041fe9ec296a645a",
+        "player_character_creation_receipts": "e16f5bf7877322e67f04bdc9896178a86cdaf426b9fbdf012a7ee03aaeee6f35",
+        "player_character_current": "07696f0c0712c57b83d1c5b660d256b5ff829aaffd102a91b2768ffdef394cc9",
+        "player_character_id_allocations": "1f81cfeebb6ef32000ee47d9603db3531c540763266f778056bba4bd35724cd4",
+        "player_character_mutation_receipts": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "player_character_revisions": "8ed83b778e4d97f4a19ec07f546ad4e72694b03c2f2cfed32e91039b0ad8916c",
         "provider_progress": "fbead410a3aa326273c452a3d40e4280a8894c84be5306e1147e9a75c55f0327",
-        "sessions": "68f667eb9fe514dbda5115634b69319c84f52cfdcc5a8ad4b52f8ff9b1473a69",
+        "run_creation_receipts": "8ecb9d85ec962b5064d22f842c9dc0afdbbcf9424b1a3fa5cd0d76c0f6c9e038",
+        "run_current": "5646c9544cbb68c34b31f0b68d3fef5ab6dba6f91df4b98c56516d3d6a35f097",
+        "run_mutation_receipts": "71ebd9a2e40c1392b4396b5812fb6d76d600948252bdfbb914ba8cc2ac8c8442",
+        "run_participations": "fc53403234547a0fb54a30afb02b0ff10b97e7b01e41cb0b6a2c72c212e19742",
+        "run_revisions": "0f8ac851105a91a36ecab90752205accedd21d020733e952b5a4614c5be37717",
+        "sessions": "f076abd23cc7c8936b5b5a8ab54b926b2faac2084998134a024f2aa2be73389e",
         "snapshots": "3d8e17bc41f3e33a5cf2fe83ed4848098c0342c47c17556788373ecc4c85117d",
         "turn_requests": "03d9acc99066a7c56c69cea1bf5d5893310aad8de07be51e6f89e8fee348e4b4",
     },
@@ -434,6 +698,15 @@ def _traced_generators(trace: TraceWriter) -> DemoGenerators:
     underlying = new_demo_generators()
     return DemoGenerators(
         clock=_traced("CLOCK", underlying.clock, trace, encode=lambda value: value.isoformat()),
+        player_character_id=_traced(
+            "PLAYER_CHARACTER_ID", underlying.player_character_id, trace
+        ),
+        run_id=_traced("RUN_ID", underlying.run_id, trace),
+        continuous_story_line_id=_traced(
+            "CONTINUOUS_STORY_LINE_ID",
+            underlying.continuous_story_line_id,
+            trace,
+        ),
         session_id=_traced("SESSION_ID", underlying.session_id, trace),
         event_id=_traced("EVENT_ID", underlying.event_id, trace),
         job_id=_traced("JOB_ID", underlying.job_id, trace),
@@ -530,6 +803,8 @@ def _canonical_private_value(value: Any) -> Any:
         return value.astimezone(timezone.utc).isoformat()
     if isinstance(value, Enum):
         return _canonical_private_value(value.value)
+    if isinstance(value, bytes):
+        return {"bytes_hex": value.hex()}
     if isinstance(value, BaseModel):
         return _schema_complete_pydantic_value(value)
     if is_dataclass(value) and not isinstance(value, type):
@@ -719,6 +994,120 @@ def _complete_raw_private_representation(runtime: Any) -> dict[str, Any]:
             {"session_id": session_id, "completed_calls": completed_calls}
             for session_id, completed_calls in sorted(
                 snapshot.provider_progress.items()
+            )
+        ],
+        "controller_bindings": [
+            {
+                "store_controller_binding": controller_binding,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for controller_binding, stored in sorted(
+                snapshot.controller_bindings.items()
+            )
+        ],
+        "player_character_id_allocations": [
+            {
+                "store_player_character_id": player_character_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for player_character_id, stored in sorted(
+                snapshot.player_character_id_allocations.items()
+            )
+        ],
+        "player_character_revisions": [
+            {
+                "store_player_character_id": player_character_id,
+                "store_record_revision": record_revision,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (player_character_id, record_revision), stored in sorted(
+                snapshot.player_character_revisions.items()
+            )
+        ],
+        "player_character_current": [
+            {
+                "store_player_character_id": player_character_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for player_character_id, stored in sorted(
+                snapshot.player_character_current.items()
+            )
+        ],
+        "player_character_creation_receipts": [
+            {
+                "store_controller_binding": controller_binding,
+                "store_operation_namespace": operation_namespace,
+                "store_operation_id": operation_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (
+                controller_binding,
+                operation_namespace,
+                operation_id,
+            ), stored in sorted(
+                snapshot.player_character_creation_receipts.items()
+            )
+        ],
+        "player_character_mutation_receipts": [
+            {
+                "store_player_character_id": player_character_id,
+                "store_operation_namespace": operation_namespace,
+                "store_operation_id": operation_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (
+                player_character_id,
+                operation_namespace,
+                operation_id,
+            ), stored in sorted(
+                snapshot.player_character_mutation_receipts.items()
+            )
+        ],
+        "run_revisions": [
+            {
+                "store_run_id": run_id,
+                "store_state_version": state_version,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (run_id, state_version), stored in sorted(
+                snapshot.run_revisions.items()
+            )
+        ],
+        "run_current": [
+            {
+                "store_run_id": run_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for run_id, stored in sorted(snapshot.run_current.items())
+        ],
+        "run_participations": [
+            {
+                "store_session_id": session_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for session_id, stored in sorted(
+                snapshot.run_participations.items()
+            )
+        ],
+        "run_creation_receipts": [
+            {
+                "store_operation_namespace": operation_namespace,
+                "store_operation_id": operation_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (operation_namespace, operation_id), stored in sorted(
+                snapshot.run_creation_receipts.items()
+            )
+        ],
+        "run_mutation_receipts": [
+            {
+                "store_run_id": run_id,
+                "store_operation_namespace": operation_namespace,
+                "store_operation_id": operation_id,
+                "value": _schema_complete_dataclass_value(stored),
+            }
+            for (run_id, operation_namespace, operation_id), stored in sorted(
+                snapshot.run_mutation_receipts.items()
             )
         ],
     }
@@ -923,24 +1312,92 @@ def _assert_independent_private_source_representation(
         or persisted["value"]["character_definition_id"]
         != "character.death_certificate.investigator"
         or persisted["value"]["creation_client_request_id"]
-        != f"opaque-{identity_family}-create"
+        != "cec599f82a5d9e0c60fe5d0cdddaeb33e83ac721009a3800e2d99373cf10b3b9"
         or persisted["value"]["created_at"]
-        != "2000-01-01T00:00:00+00:00"
+        != "2000-01-01T00:00:01+00:00"
         or persisted["value"]["updated_at"]
-        != "2000-01-01T00:00:50+00:00"
+        != "2000-01-01T00:00:51+00:00"
     ):
         raise RuntimeError("private source Session representation differs")
 
     if representation["creation_keys"] != [
         {
             "player_id": "demo-player",
-            "creation_client_request_id": f"opaque-{identity_family}-create",
+            "creation_client_request_id": (
+                "cec599f82a5d9e0c60fe5d0cdddaeb33"
+                "e83ac721009a3800e2d99373cf10b3b9"
+            ),
             "session_id": "demo-session-00000001",
         }
     ] or representation["provider_progress"] != [
         {"session_id": "demo-session-00000001", "completed_calls": 4}
     ]:
         raise RuntimeError("private source authority index differs")
+
+    character_components = (
+        representation["controller_bindings"],
+        representation["player_character_id_allocations"],
+        representation["player_character_revisions"],
+        representation["player_character_current"],
+        representation["player_character_creation_receipts"],
+    )
+    if (
+        any(len(component) != 1 for component in character_components)
+        or representation["player_character_mutation_receipts"] != []
+        or representation["controller_bindings"][0][
+            "store_controller_binding"
+        ]
+        != "binding.demo-player"
+        or representation["player_character_id_allocations"][0][
+            "store_player_character_id"
+        ]
+        != "pc.demo-00000001"
+        or representation["player_character_revisions"][0][
+            "store_record_revision"
+        ]
+        != 1
+        or representation["player_character_current"][0]["value"][
+            "lifecycle"
+        ]
+        != "active"
+        or representation["player_character_creation_receipts"][0][
+            "store_operation_id"
+        ]
+        != "Create.Cross-Process-1"
+    ):
+        raise RuntimeError("private source Player Character authority differs")
+
+    run_components = (
+        representation["run_current"],
+        representation["run_participations"],
+        representation["run_creation_receipts"],
+    )
+    run_current = representation["run_current"][0]["value"]
+    if (
+        len(representation["run_revisions"]) != 3
+        or any(len(component) != 1 for component in run_components)
+        or len(representation["run_mutation_receipts"]) != 2
+        or [
+            item["store_state_version"]
+            for item in representation["run_revisions"]
+        ]
+        != [1, 2, 3]
+        or representation["run_current"][0]["store_run_id"]
+        != "run.demo-00000001"
+        or run_current["continuous_story_line_id"]["value"]
+        != "csl.demo-00000001"
+        or run_current["lifecycle_status"] != "active"
+        or run_current["state_version"] != 3
+        or run_current["active_player_character_id"]
+        != "pc.demo-00000001"
+        or representation["run_participations"][0]["store_session_id"]
+        != "demo-session-00000001"
+        or representation["run_creation_receipts"][0]["value"][
+            "operation_id"
+        ]["value"]
+        != "2656a006164478467f59b139701dcf319bb25efb674dad74af0ef5fc7b82a63d"
+    ):
+        raise RuntimeError("private source Run authority differs")
 
     if len(representation["snapshots"]) != 1:
         raise RuntimeError("private source snapshot count differs")
@@ -986,8 +1443,8 @@ def _assert_independent_private_source_representation(
 
     jobs = representation["narrative_jobs"]
     job_action_ordinals = (2, 10, 11, 13, 19)
-    expected_created_seconds = (2, 18, 25, 37, 51)
-    expected_updated_seconds = (9, 24, 34, 44, 51)
+    expected_created_seconds = (3, 19, 26, 38, 52)
+    expected_updated_seconds = (10, 25, 35, 45, 52)
     if len(jobs) != 5:
         raise RuntimeError("private source job count differs")
     for ordinal, (persisted_job, action_ordinal) in enumerate(
@@ -1200,8 +1657,10 @@ def _assert_final_private_state(
             action_event_counts.append(0)
             previous_turn_id = event.turn_id
         action_event_counts[-1] += 1
-    expected_event_times = [datetime(2000, 1, 1, tzinfo=timezone.utc)]
-    next_clock_offset = 1
+    expected_event_times = [
+        datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=1)
+    ]
+    next_clock_offset = 2
     for action_number, event_count in enumerate(
         (1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 4, 2, 2, 1, 1, 1, 1, 1, 1),
         start=1,
@@ -1240,7 +1699,7 @@ def _assert_final_private_state(
         (
             tuple(event.occurred_at for event in snapshot.events)
             == tuple(expected_event_times)
-            and next_clock_offset == 52,
+            and next_clock_offset == 53,
             "DEMO_CHILD_FINAL_EVENT_TIMES",
         ),
         (len(jobs) == 5, "DEMO_CHILD_FINAL_JOB_COUNT"),
@@ -1284,17 +1743,41 @@ def _assert_final_private_state(
             "DEMO_CHILD_FINAL_JOB_IDS",
         ),
         (
-            tuple(job.created_at.second for job in jobs) == (2, 18, 25, 37, 51)
+            tuple(job.created_at.second for job in jobs) == (3, 19, 26, 38, 52)
             and tuple(job.updated_at.second for job in jobs)
-            == (9, 24, 34, 44, 51),
+            == (10, 25, 35, 45, 52),
             "DEMO_CHILD_FINAL_JOB_TIMES",
         ),
         (
             next(iter(snapshot.sessions.values())).created_at
-            == datetime(2000, 1, 1, tzinfo=timezone.utc)
+            == datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=1)
             and next(iter(snapshot.sessions.values())).updated_at
-            == datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=50),
+            == datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=51),
             "DEMO_CHILD_FINAL_SESSION_TIMES",
+        ),
+        (
+            len(snapshot.controller_bindings) == 1
+            and len(snapshot.player_character_id_allocations) == 1
+            and len(snapshot.player_character_revisions) == 1
+            and len(snapshot.player_character_current) == 1
+            and len(snapshot.player_character_creation_receipts) == 1
+            and not snapshot.player_character_mutation_receipts,
+            "DEMO_CHILD_FINAL_PLAYER_CHARACTER_AUTHORITY",
+        ),
+        (
+            len(snapshot.run_revisions) == 3
+            and len(snapshot.run_current) == 1
+            and len(snapshot.run_participations) == 1
+            and len(snapshot.run_creation_receipts) == 1
+            and len(snapshot.run_mutation_receipts) == 2
+            and next(iter(snapshot.run_current.values())).lifecycle_status
+            == "active"
+            and next(iter(snapshot.run_current.values())).state_version == 3
+            and next(
+                iter(snapshot.run_current.values())
+            ).active_player_character_id
+            == "pc.demo-00000001",
+            "DEMO_CHILD_FINAL_RUN_AUTHORITY",
         ),
         (clocks["security_alert"]["value"] == 1, "DEMO_CHILD_FINAL_CLOCK_A"),
         (
@@ -1426,6 +1909,48 @@ def _apply_private_mutation(
         job["error_code"] = "TAMPERED"
     elif mutation == "authority_progress":
         representation["provider_progress"][0]["completed_calls"] = 3
+    elif mutation == "controller_binding":
+        representation["controller_bindings"][0]["value"][
+            "created_at"
+        ] = "2001-01-01T00:00:00+00:00"
+    elif mutation == "player_character_allocation":
+        representation["player_character_id_allocations"][0][
+            "store_player_character_id"
+        ] = "pc.tampered"
+    elif mutation == "player_character_revision":
+        representation["player_character_revisions"][0]["value"][
+            "record_revision"
+        ] = 2
+    elif mutation == "player_character_current":
+        representation["player_character_current"][0]["value"][
+            "lifecycle"
+        ] = "retired"
+    elif mutation == "player_character_creation_receipt":
+        representation["player_character_creation_receipts"][0][
+            "store_operation_id"
+        ] = "tampered-operation"
+    elif mutation == "player_character_mutation_receipt":
+        representation["player_character_mutation_receipts"].append(
+            {"tampered": True}
+        )
+    elif mutation == "run_revision":
+        representation["run_revisions"][0]["value"]["state_version"] = 99
+    elif mutation == "run_current":
+        representation["run_current"][0]["value"][
+            "lifecycle_status"
+        ] = "ended"
+    elif mutation == "run_participation":
+        representation["run_participations"][0][
+            "store_session_id"
+        ] = "tampered-session"
+    elif mutation == "run_creation_receipt":
+        representation["run_creation_receipts"][0][
+            "store_operation_id"
+        ] = "tampered-operation"
+    elif mutation == "run_mutation_receipt":
+        representation["run_mutation_receipts"][0]["value"][
+            "expected_state_version"
+        ] = 99
     else:  # pragma: no cover - argparse owns the closed vocabulary
         raise RuntimeError("unknown private mutation")
 
@@ -1546,6 +2071,17 @@ def _parse_args() -> argparse.Namespace:
             "job_fencing",
             "job_lifecycle",
             "authority_progress",
+            "controller_binding",
+            "player_character_allocation",
+            "player_character_revision",
+            "player_character_current",
+            "player_character_creation_receipt",
+            "player_character_mutation_receipt",
+            "run_revision",
+            "run_current",
+            "run_participation",
+            "run_creation_receipt",
+            "run_mutation_receipt",
         ),
     )
     parser.add_argument(

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from deviation_protocol.api.dependencies import ApiServices
+from deviation_protocol.api.main import build_run_entry_service
 from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
     NarrativeProvider,
@@ -17,24 +19,44 @@ from deviation_protocol.application.narrative_outcome_policy import (
 from deviation_protocol.application.narrative_turn_orchestrator import (
     DurableNarrativeTurnOrchestrator,
 )
+from deviation_protocol.application.player_character_service import (
+    PlayerCharacterService,
+)
 from deviation_protocol.application.resolution import ResolutionResult
 from deviation_protocol.application.rule_resolver import DeterministicRuleResolver
+from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.scenario_initialization import profession_tags_for
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
-from deviation_protocol.domain.scenario import EndingStatus, ScenarioDefinition
-from deviation_protocol.infrastructure.demo_generators import (
-    DemoGenerators,
-    new_demo_generators,
+from deviation_protocol.domain.player_character import (
+    AuthoritySourceRef,
+    PlayerCharacterId,
 )
+from deviation_protocol.domain.player_character_policies import (
+    CreatePlayerCharacterPolicy,
+)
+from deviation_protocol.domain.run import (
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+)
+from deviation_protocol.domain.scenario import EndingStatus, ScenarioDefinition
 from deviation_protocol.infrastructure.demo_authority import (
     CanonicalDemoProviderGuard,
     DemoProviderCheckpoint,
     DeterministicDemoScenarioEventIssuer,
 )
+from deviation_protocol.infrastructure.demo_generators import (
+    DemoGenerators,
+    new_demo_generators,
+)
 from deviation_protocol.infrastructure.demo_persistence import DemoProcessStore
 from deviation_protocol.infrastructure.deterministic_narrative import (
     DeterministicDemoNarrativeProvider,
+)
+from deviation_protocol.infrastructure.player_character_authority import (
+    ConfiguredControllerBinding,
+    ConfiguredControllerBindingResolver,
 )
 from deviation_protocol.infrastructure.scenario_loader import (
     JsonScenarioCatalogLoader,
@@ -47,6 +69,36 @@ SCENARIO_PACK = (
     / "scenarios"
     / "death_certificate_v1.json"
 )
+
+
+class _DemoPlayerCharacterIdIssuer:
+    __slots__ = ("_generator",)
+
+    def __init__(self, generator: Callable[[], str]) -> None:
+        self._generator = generator
+
+    def issue(self) -> PlayerCharacterId:
+        return PlayerCharacterId(value=self._generator())
+
+
+class _DemoRunIdIssuer:
+    __slots__ = ("_generator",)
+
+    def __init__(self, generator: Callable[[], str]) -> None:
+        self._generator = generator
+
+    def issue(self) -> RunId:
+        return RunId(value=self._generator())
+
+
+class _DemoContinuousStoryLineIdIssuer:
+    __slots__ = ("_generator",)
+
+    def __init__(self, generator: Callable[[], str]) -> None:
+        self._generator = generator
+
+    def issue(self) -> ContinuousStoryLineId:
+        return ContinuousStoryLineId(value=self._generator())
 
 
 class _CanonicalDemoNarrativeProvider:
@@ -277,6 +329,15 @@ def build_demo_runtime(
     runtime_provider = _CanonicalDemoNarrativeProvider(runtime_guard)
     scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
     catalog = scenario_catalog.content_catalog
+    controller_binding_resolver = ConfiguredControllerBindingResolver(
+        (
+            ConfiguredControllerBinding(
+                authentication_scheme="demo-dev-only",
+                player_id="demo-player",
+                controller_id="binding.demo-player",
+            ),
+        )
+    )
     orchestrator = CanonicalDemoNarrativeTurnOrchestrator(
         resolver=DeterministicRuleResolver(),
         uow_factory=runtime_store.unit_of_work,
@@ -294,17 +355,50 @@ def build_demo_runtime(
         _canonical_provider_guard=runtime_guard,
         _demo_authority_capability=authority_capability,
     )
-    services = ApiServices(
-        session_service=SessionService(
-            uow_factory=runtime_store.unit_of_work,
-            catalog=catalog,
-            scenario_catalog=scenario_catalog,
-            clock=runtime_generators.clock,
-            session_id_generator=runtime_generators.session_id,
-            seed_generator=runtime_generators.seed,
-            event_id_generator=runtime_generators.event_id,
+    session_service = SessionService(
+        uow_factory=runtime_store.unit_of_work,
+        catalog=catalog,
+        scenario_catalog=scenario_catalog,
+        clock=runtime_generators.clock,
+        session_id_generator=runtime_generators.session_id,
+        seed_generator=runtime_generators.seed,
+        event_id_generator=runtime_generators.event_id,
+    )
+    player_character_service = PlayerCharacterService(
+        uow_factory=runtime_store.unit_of_work,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_id_issuer=_DemoPlayerCharacterIdIssuer(
+            runtime_generators.player_character_id
         ),
+        create_policy=CreatePlayerCharacterPolicy(),
+        source_reference=AuthoritySourceRef(
+            value="source.demo-player-character"
+        ),
+        clock=runtime_generators.clock,
+        binding_integrity_guard_enabled=True,
+    )
+    run_service = RunService(
+        uow_factory=runtime_store.unit_of_work,
+        run_id_issuer=_DemoRunIdIssuer(runtime_generators.run_id),
+        continuous_story_line_id_issuer=(
+            _DemoContinuousStoryLineIdIssuer(
+                runtime_generators.continuous_story_line_id
+            )
+        ),
+        source_reference=RunAuthoritySourceRef(value="source.demo-run"),
+        clock=runtime_generators.clock,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_binding_evidence=player_character_service,
+    )
+    services = ApiServices(
+        session_service=session_service,
         turn_orchestrator=orchestrator,
+        player_character_service=player_character_service,
+        run_service=run_service,
+        run_entry_service=build_run_entry_service(
+            run_service=run_service,
+            session_service=session_service,
+        ),
         engine=None,
         narrative_provider=runtime_provider,
     )

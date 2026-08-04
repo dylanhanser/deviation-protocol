@@ -3524,19 +3524,21 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
     )
 
 
-def test_demo_composition_gets_no_player_character_route_or_schema() -> None:
+def test_demo_composition_exposes_existing_player_character_routes_and_schema() -> None:
     from deviation_protocol.api.demo_composition import build_demo_runtime
 
     runtime = build_demo_runtime()
     app = main.create_app(services=runtime.services)
     schema = app.openapi()
 
-    assert runtime.services.player_character_service is None
-    assert all(
-        not route.path.startswith("/v1/player-characters")
-        for route in app.routes
-    )
-    assert all(
-        not path.startswith("/v1/player-characters") for path in schema["paths"]
-    )
-    assert "CharacterCreationCommand" not in schema["components"]["schemas"]
+    assert runtime.services.player_character_service is not None
+    expected = {
+        "/v1/player-characters/eligible-for-run-entry": {"get"},
+        "/v1/player-characters": {"post"},
+        "/v1/player-characters/{player_character_id}": {"get"},
+        "/v1/player-characters/{player_character_id}/retirement": {"post"},
+    }
+    assert {
+        path: set(schema["paths"][path]) for path in expected
+    } == expected
+    assert "CharacterCreationCommand" in schema["components"]["schemas"]

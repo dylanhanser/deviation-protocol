@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 import importlib
 import inspect
 import json
@@ -24,12 +25,38 @@ from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
 )
 from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
+from deviation_protocol.application.player_character_operations import (
+    CREATION_RESULT_SCHEMA_VERSION,
+    CharacterCreationCommand,
+    CharacterOperationNamespace,
+    CreationReceiptKey,
+    CreationSuccessResult,
+    build_creation_success_receipt,
+    creation_fingerprint,
+)
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
+from deviation_protocol.domain.player_character import (
+    AuthoritySourceRef,
+    CharacterCore,
+    ControllerBindingRef,
+    NarrationPreferences,
+    PlayerCharacterContractVersion,
+    PlayerCharacterId,
+    PlayerCharacterOperationId,
+)
+from deviation_protocol.domain.player_character_policies import (
+    CreatePlayerCharacterPolicy,
+)
 import deviation_protocol.infrastructure.demo_authority as demo_authority_module
 from deviation_protocol.infrastructure.demo_authority import (
     CanonicalDemoProviderGuard,
 )
-from deviation_protocol.infrastructure.demo_generators import new_demo_generators
+from deviation_protocol.api.dependencies import get_demo_dev_principal
+from deviation_protocol.infrastructure.demo_generators import (
+    DemoGenerators,
+    DemoStringSequence,
+    new_demo_generators,
+)
 from deviation_protocol.infrastructure.demo_persistence import (
     DemoProcessStore,
     DemoSessionRepository,
@@ -41,24 +68,37 @@ from deviation_protocol.infrastructure.deterministic_narrative import (
     DeterministicDemoNarrativeProvider,
 )
 from deviation_protocol.infrastructure.errors import OptimisticLockError
+from deviation_protocol.infrastructure.run_persistence import (
+    RunStoredRecordIntegrityError,
+)
 
 
-def test_demo_composition_does_not_register_player_character_routes() -> None:
+def test_demo_composition_registers_exact_player_character_and_run_routes() -> None:
     runtime = build_demo_runtime()
     app = create_app(services=runtime.services)
 
-    assert runtime.services.player_character_service is None
     assert {
         (route.path, frozenset(route.methods))
         for route in app.routes
         if route.path.startswith("/v1/player-characters")
-    } == set()
-    assert {
-        path
-        for path in app.openapi()["paths"]
-        if path.startswith("/v1/player-characters")
-    } == set()
-    assert "PlayerCharacterRetirementRequest" not in app.openapi()[
+        or route.path == "/v1/runs"
+    } == {
+        (
+            "/v1/player-characters/eligible-for-run-entry",
+            frozenset({"GET"}),
+        ),
+        ("/v1/player-characters", frozenset({"POST"})),
+        (
+            "/v1/player-characters/{player_character_id}",
+            frozenset({"GET"}),
+        ),
+        (
+            "/v1/player-characters/{player_character_id}/retirement",
+            frozenset({"POST"}),
+        ),
+        ("/v1/runs", frozenset({"POST"})),
+    }
+    assert "PlayerCharacterRetirementRequest" in app.openapi()[
         "components"
     ]["schemas"]
 
@@ -190,6 +230,41 @@ class FailProviderGameplayCommitStore(DemoProcessStore):
 
     def unit_of_work(self) -> DemoUnitOfWork:
         return FailProviderGameplayCommitUnitOfWork(self)
+
+
+_LATE_INTEGRITY_PRIVATE_TEXT = (
+    "private late integrity authority binding.demo-player Entry.Integrity-1"
+)
+
+
+class LateIntegrityFailureUnitOfWork(DemoUnitOfWork):
+    def _publish_atomically(self) -> None:
+        if not self._store.fail_late_integrity:
+            super()._publish_atomically()
+            return
+        if len(self._pending_run_participations) != 1:
+            raise AssertionError("late integrity injection requires one participation")
+        session_id, stored = next(iter(self._pending_run_participations.items()))
+        del self._pending_run_participations[session_id]
+        self._pending_run_participations["private-late-integrity-session"] = stored
+        self._store.late_integrity_injections += 1
+        try:
+            super()._publish_atomically()
+        except RunStoredRecordIntegrityError as exc:
+            raise RunStoredRecordIntegrityError(
+                _LATE_INTEGRITY_PRIVATE_TEXT
+            ) from exc
+        raise AssertionError("late integrity injection did not fail closed")
+
+
+class LateIntegrityFailureStore(DemoProcessStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_late_integrity = False
+        self.late_integrity_injections = 0
+
+    def unit_of_work(self) -> DemoUnitOfWork:
+        return LateIntegrityFailureUnitOfWork(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -962,6 +1037,12 @@ def test_generator_families_are_exact_and_independent() -> None:
 
     assert generators.clock().isoformat() == "2000-01-01T00:00:00+00:00"
     assert generators.clock().isoformat() == "2000-01-01T00:00:01+00:00"
+    assert generators.player_character_id() == "pc.demo-00000001"
+    assert generators.player_character_id() == "pc.demo-00000002"
+    assert generators.run_id() == "run.demo-00000001"
+    assert generators.run_id() == "run.demo-00000002"
+    assert generators.continuous_story_line_id() == "csl.demo-00000001"
+    assert generators.continuous_story_line_id() == "csl.demo-00000002"
     assert generators.session_id() == "demo-session-00000001"
     assert generators.session_id() == "demo-session-00000002"
     assert generators.event_id() == "demo-event-00000001"
@@ -971,6 +1052,885 @@ def test_generator_families_are_exact_and_independent() -> None:
     assert generators.worker_id() == "demo-worker-00000001"
     assert generators.seed() == 1
     assert generators.seed() == 2
+
+    independent = new_demo_generators()
+    independent.player_character_id()
+    independent.run_id()
+    assert independent.continuous_story_line_id() == "csl.demo-00000001"
+    assert independent.session_id() == "demo-session-00000001"
+
+
+@pytest.mark.parametrize(
+    ("target", "final_value"),
+    (
+        ("player_character_id", "pc.demo-99999999"),
+        ("run_id", "run.demo-99999999"),
+        ("continuous_story_line_id", "csl.demo-99999999"),
+    ),
+)
+def test_new_demo_identity_sequences_exhaust_at_exactly_eight_digits_without_consumption(
+    target: str,
+    final_value: str,
+) -> None:
+    generators = new_demo_generators()
+    sequence = getattr(generators, target)
+    assert isinstance(sequence, DemoStringSequence)
+    sequence._next_value = 99_999_999
+
+    assert sequence() == final_value
+    assert sequence._next_value == 100_000_000
+    for _ in range(2):
+        with pytest.raises(
+            RuntimeError,
+            match="^Demo string sequence exhausted its fixed-width boundary$",
+        ):
+            sequence()
+        assert sequence._next_value == 100_000_000
+
+    independent_first_values = {
+        name: getattr(generators, name)()
+        for name in (
+            "player_character_id",
+            "run_id",
+            "continuous_story_line_id",
+        )
+        if name != target
+    }
+    assert independent_first_values == {
+        name: {
+            "player_character_id": "pc.demo-00000001",
+            "run_id": "run.demo-00000001",
+            "continuous_story_line_id": "csl.demo-00000001",
+        }[name]
+        for name in independent_first_values
+    }
+
+
+def _recording_generators() -> tuple[
+    DemoGenerators, dict[str, list[object]]
+]:
+    base = new_demo_generators()
+    emitted = {
+        name: [] for name in DemoGenerators.__dataclass_fields__
+    }
+
+    def record(name: str, generator):
+        def invoke():
+            value = generator()
+            emitted[name].append(value)
+            return value
+
+        return invoke
+
+    return (
+        DemoGenerators(
+            **{
+                name: record(name, getattr(base, name))
+                for name in DemoGenerators.__dataclass_fields__
+            }
+        ),
+        emitted,
+    )
+
+
+async def _seed_foreign_player_character(store: DemoProcessStore) -> str:
+    player_character_id = PlayerCharacterId(value="pc.demo-foreign-owned")
+    controller_binding = ControllerBindingRef(value="binding.demo-foreign")
+    source_reference = AuthoritySourceRef(value="source.demo-foreign")
+    operation_id = PlayerCharacterOperationId(
+        value="operation.demo-foreign-create"
+    )
+    command = CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(),
+        narration_preferences=NarrationPreferences(),
+    )
+    record = CreatePlayerCharacterPolicy().create(
+        player_character_id=player_character_id,
+        controller_binding=controller_binding,
+        character_core=command.character_core,
+        narration_preferences=command.narration_preferences,
+        source_reference=source_reference,
+    )
+    _, fingerprint = creation_fingerprint(command)
+    receipt = build_creation_success_receipt(
+        key=CreationReceiptKey(
+            controller_binding=controller_binding,
+            operation_namespace=CharacterOperationNamespace.CREATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=CreationSuccessResult(
+            result_schema_version=CREATION_RESULT_SCHEMA_VERSION,
+            player_character_id=player_character_id,
+            contract_version=record.contract_version,
+            resulting_revision=record.record_revision,
+            resulting_lifecycle=record.lifecycle,
+        ),
+    )
+    occurred_at = datetime(2000, 1, 1, tzinfo=timezone.utc)
+    async with store.unit_of_work() as uow:
+        await uow.controller_bindings.add(
+            controller_binding, created_at=occurred_at
+        )
+        await uow.player_characters.add_allocation(
+            player_character_id, created_at=occurred_at
+        )
+        await uow.player_characters.add_initial(
+            record, created_at=occurred_at
+        )
+        await uow.creation_receipts.add(receipt, created_at=occurred_at)
+        await uow.commit()
+    return player_character_id.value
+
+
+@pytest.mark.asyncio
+async def test_demo_services_share_store_clock_catalog_session_and_fixed_authority(
+) -> None:
+    runtime = build_demo_runtime()
+    player_character_service = runtime.services.player_character_service
+    run_service = runtime.services.run_service
+    entry_service = runtime.services.run_entry_service
+
+    assert player_character_service is not None
+    assert run_service is not None
+    assert entry_service is not None
+    assert player_character_service.uow_factory == runtime.store.unit_of_work
+    assert run_service.uow_factory == runtime.store.unit_of_work
+    assert entry_service.uow_factory == runtime.store.unit_of_work
+    assert player_character_service.clock is runtime.generators.clock
+    assert run_service.clock is runtime.generators.clock
+    assert entry_service.clock is runtime.generators.clock
+    assert entry_service.session_service is runtime.services.session_service
+    assert run_service.player_character_binding_evidence is (
+        player_character_service
+    )
+    assert await player_character_service.controller_binding_resolver.resolve(
+        get_demo_dev_principal()
+    ) == await run_service.controller_binding_resolver.resolve(
+        get_demo_dev_principal()
+    )
+    assert (
+        await run_service.controller_binding_resolver.resolve(
+            get_demo_dev_principal()
+        )
+    ).value == "binding.demo-player"
+
+
+@pytest.mark.asyncio
+async def test_demo_public_create_discover_enter_view_action_and_replay_are_atomic(
+) -> None:
+    generators, emitted = _recording_generators()
+    runtime = build_demo_runtime(generators=generators)
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+    creation_body = {
+        "contract_version": "structured-player-character/v1",
+        "character_core": {},
+        "narration_preferences": {},
+    }
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Demo-1"},
+                json=creation_body,
+            )
+            assert created.status_code == 200, created.text
+            assert created.json()["player_character_id"] == {
+                "value": "pc.demo-00000001"
+            }
+            assert emitted["clock"][0].isoformat() == (
+                "2000-01-01T00:00:00+00:00"
+            )
+            assert {
+                name: len(values) for name, values in emitted.items()
+            } == {
+                "clock": 1,
+                "player_character_id": 1,
+                "run_id": 0,
+                "continuous_story_line_id": 0,
+                "session_id": 0,
+                "event_id": 0,
+                "job_id": 0,
+                "lease_token": 0,
+                "worker_id": 0,
+                "seed": 0,
+            }
+            before_create_replay = runtime.store.snapshot()
+            emitted_before_create_replay = deepcopy(emitted)
+            create_replay = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Demo-1"},
+                json=creation_body,
+            )
+            assert create_replay.json() == created.json()
+            assert runtime.store.snapshot() == before_create_replay
+            assert emitted == emitted_before_create_replay
+            create_mismatch = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Demo-1"},
+                json={
+                    **creation_body,
+                    "character_core": {
+                        "name_or_code_name": {
+                            "state": "declared",
+                            "value": {
+                                "authority": "player-expression",
+                                "text": "Changed",
+                            },
+                        }
+                    },
+                },
+            )
+            assert create_mismatch.status_code == 409
+            assert create_mismatch.json()["error"]["error_code"] == (
+                "IDEMPOTENCY_CONFLICT"
+            )
+            assert runtime.store.snapshot() == before_create_replay
+            assert emitted == emitted_before_create_replay
+
+            eligible = await client.get(
+                "/v1/player-characters/eligible-for-run-entry"
+            )
+            assert eligible.status_code == 200
+            assert eligible.json()["eligible_player_characters"] == [
+                created.json()
+            ]
+            entry_body = {
+                "player_character_id": "pc.demo-00000001",
+                "expected_record_revision": 1,
+                "scenario_id": "death_certificate",
+            }
+            pre_entry_snapshot = runtime.store.snapshot()
+            pre_entry_emitted = deepcopy(emitted)
+            missing = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Missing-1"},
+                json={**entry_body, "player_character_id": "pc.demo-missing"},
+            )
+            stale = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Stale-1"},
+                json={**entry_body, "expected_record_revision": 2},
+            )
+            assert missing.status_code == 404
+            assert missing.json()["error"]["error_code"] == (
+                "PLAYER_CHARACTER_NOT_FOUND"
+            )
+            assert stale.status_code == 409
+            assert stale.json()["error"]["error_code"] == (
+                "PLAYER_CHARACTER_STALE"
+            )
+            assert runtime.store.snapshot() == pre_entry_snapshot
+            assert emitted == pre_entry_emitted
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Demo-1"},
+                json=entry_body,
+            )
+            assert entered.status_code == 200, entered.text
+            assert entered.json()["run_id"] == "run.demo-00000001"
+            assert entered.json()["session_id"] == "demo-session-00000001"
+            committed = runtime.store.snapshot()
+            assert len(committed.run_revisions) == 3
+            assert next(iter(committed.run_current.values())).state_version == 3
+            assert len(committed.run_participations) == 1
+            assert len(committed.sessions) == 1
+            assert len(committed.events) == 1
+            assert {
+                name: len(values) for name, values in emitted.items()
+            } == {
+                "clock": 2,
+                "player_character_id": 1,
+                "run_id": 1,
+                "continuous_story_line_id": 1,
+                "session_id": 1,
+                "event_id": 1,
+                "job_id": 0,
+                "lease_token": 0,
+                "worker_id": 0,
+                "seed": 1,
+            }
+
+            emitted_before_entry_replay = deepcopy(emitted)
+            entry_replay = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Demo-1"},
+                json=entry_body,
+            )
+            assert entry_replay.json() == entered.json()
+            assert runtime.store.snapshot() == committed
+            assert emitted == emitted_before_entry_replay
+
+            incompatible = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Demo-1"},
+                json={**entry_body, "scenario_id": "other-scenario"},
+            )
+            assert incompatible.status_code == 409
+            assert incompatible.json()["error"]["error_code"] == (
+                "IDEMPOTENCY_CONFLICT"
+            )
+            occupied = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Demo-2"},
+                json=entry_body,
+            )
+            assert occupied.status_code == 409
+            assert occupied.json()["error"]["error_code"] == (
+                "PLAYER_CHARACTER_NOT_ELIGIBLE"
+            )
+            assert "run.demo-00000001" not in occupied.text
+            assert runtime.store.snapshot() == committed
+            assert emitted == emitted_before_entry_replay
+
+            view = await client.get(
+                "/v1/sessions/demo-session-00000001/view"
+            )
+            assert view.status_code == 200
+            action = await _submit_canonical_step(
+                client,
+                "demo-session-00000001",
+                ordinal=1,
+                identity="run-entry",
+            )
+            assert action.json()["resulting_state_version"] == 1
+
+
+@pytest.mark.asyncio
+async def test_demo_public_run_entry_hides_foreign_owned_player_character_without_issuance(
+) -> None:
+    store = DemoProcessStore()
+    foreign_id = await _seed_foreign_player_character(store)
+    generators, emitted = _recording_generators()
+    runtime = build_demo_runtime(store=store, generators=generators)
+    baseline = store.snapshot()
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            response = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Foreign-1"},
+                json={
+                    "player_character_id": foreign_id,
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+
+    assert response.status_code == 404
+    assert response.json() == {
+        "error": {
+            "error_code": "PLAYER_CHARACTER_NOT_FOUND",
+            "message": "Player character was not found",
+        }
+    }
+    public_text = response.text.casefold()
+    for private_value in (
+        foreign_id,
+        "binding.demo-foreign",
+        "source.demo-foreign",
+        "operation.demo-foreign-create",
+        "entry.foreign-1",
+        "receipt",
+        "run_id",
+        "session_id",
+    ):
+        assert private_value.casefold() not in public_text
+    assert store.snapshot() == baseline
+    assert not baseline.run_revisions
+    assert not baseline.run_current
+    assert not baseline.run_participations
+    assert not baseline.run_creation_receipts
+    assert not baseline.run_mutation_receipts
+    assert not baseline.sessions
+    assert not baseline.snapshots
+    assert not baseline.events
+    assert {name: len(values) for name, values in emitted.items()} == {
+        name: 0 for name in emitted
+    }
+    assert store.active_uows == 0
+    assert not any(
+        lock.locked()
+        for registry in (
+            store._controller_locks,
+            store._player_character_locks,
+            store._run_locks,
+            store._session_locks,
+        )
+        for lock in registry.values()
+    )
+
+
+@pytest.mark.asyncio
+async def test_demo_public_late_uow_integrity_failure_rolls_back_all_entry_families(
+) -> None:
+    store = LateIntegrityFailureStore()
+    generators, emitted = _recording_generators()
+    runtime = build_demo_runtime(store=store, generators=generators)
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Integrity-1"},
+                json={
+                    "contract_version": "structured-player-character/v1",
+                    "character_core": {},
+                    "narration_preferences": {},
+                },
+            )
+            assert created.status_code == 200, created.text
+            baseline = store.snapshot()
+            store.fail_late_integrity = True
+            failed = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Integrity-1"},
+                json={
+                    "player_character_id": "pc.demo-00000001",
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+
+    assert store.late_integrity_injections == 1
+    assert failed.status_code == 500
+    assert failed.json() == {
+        "error": {
+            "error_code": "INTERNAL_SERVER_ERROR",
+            "message": "Internal server error",
+        }
+    }
+    public_text = failed.text.casefold()
+    for private_value in (
+        _LATE_INTEGRITY_PRIVATE_TEXT,
+        "private-late-integrity-session",
+        "binding.demo-player",
+        "source.demo-run",
+        "entry.integrity-1",
+        "pc.demo-00000001",
+        "run.demo-00000001",
+        "csl.demo-00000001",
+        "demo-session-00000001",
+        "receipt",
+    ):
+        assert private_value.casefold() not in public_text
+
+    after = store.snapshot()
+    assert after == baseline
+    assert len(after.controller_bindings) == 1
+    assert len(after.player_character_id_allocations) == 1
+    assert len(after.player_character_revisions) == 1
+    assert len(after.player_character_current) == 1
+    assert len(after.player_character_creation_receipts) == 1
+    assert not after.player_character_mutation_receipts
+    assert not after.run_revisions
+    assert not after.run_current
+    assert not after.run_participations
+    assert not after.run_creation_receipts
+    assert not after.run_mutation_receipts
+    assert not after.sessions
+    assert not after.snapshots
+    assert not after.creation_keys
+    assert not after.events
+    assert {name: len(values) for name, values in emitted.items()} == {
+        "clock": 2,
+        "player_character_id": 1,
+        "run_id": 1,
+        "continuous_story_line_id": 1,
+        "session_id": 1,
+        "event_id": 1,
+        "job_id": 0,
+        "lease_token": 0,
+        "worker_id": 0,
+        "seed": 1,
+    }
+    assert store.active_uows == 0
+    assert not any(
+        lock.locked()
+        for registry in (
+            store._controller_locks,
+            store._player_character_locks,
+            store._run_locks,
+            store._session_locks,
+        )
+        for lock in registry.values()
+    )
+    assert generators.clock().isoformat() == "2000-01-01T00:00:02+00:00"
+    assert generators.player_character_id() == "pc.demo-00000002"
+    assert generators.run_id() == "run.demo-00000002"
+    assert generators.continuous_story_line_id() == "csl.demo-00000002"
+    assert generators.session_id() == "demo-session-00000002"
+    assert generators.seed() == 2
+    assert generators.event_id() == "demo-event-00000002"
+    assert generators.job_id() == "demo-job-00000001"
+    assert generators.lease_token() == "demo-lease-000000000000000000001"
+    assert generators.worker_id() == "demo-worker-00000001"
+
+
+def _generators_failing_after_emission(
+    target: str,
+    mode: str,
+    *,
+    fail_on_call: int,
+) -> tuple[DemoGenerators, dict[str, list[object]]]:
+    generators, emitted = _recording_generators()
+    original = getattr(generators, target)
+    calls = 0
+
+    def invoke():
+        nonlocal calls
+        value = original()
+        calls += 1
+        if calls == fail_on_call:
+            if mode == "exception":
+                raise RuntimeError(f"controlled {target} post-emission failure")
+            if mode == "cancellation":
+                raise asyncio.CancelledError()
+            if mode == "validation":
+                return " invalid "
+            if mode == "conflict":
+                raise OptimisticLockError(
+                    f"controlled {target} post-emission conflict"
+                )
+            raise AssertionError(f"unknown failure mode: {mode}")
+        return value
+
+    return replace(generators, **{target: invoke}), emitted
+
+
+_ISSUANCE_BOUNDARIES = (
+    ("character-create", "clock"),
+    ("character-create", "player_character_id"),
+    ("run-entry", "clock"),
+    ("run-entry", "run_id"),
+    ("run-entry", "continuous_story_line_id"),
+    ("run-entry", "session_id"),
+    ("run-entry", "seed"),
+    ("run-entry", "event_id"),
+)
+_POST_EMISSION_CASES = (
+    *(
+        (operation, target, mode)
+        for operation, target in _ISSUANCE_BOUNDARIES
+        for mode in ("exception", "conflict", "cancellation")
+    ),
+    ("character-create", "player_character_id", "validation"),
+    ("run-entry", "run_id", "validation"),
+    ("run-entry", "continuous_story_line_id", "validation"),
+)
+_EXPECTED_RECORDED_PREFIXES = {
+    "clock": (
+        datetime(2000, 1, 1, tzinfo=timezone.utc),
+        datetime(2000, 1, 1, 0, 0, 1, tzinfo=timezone.utc),
+        datetime(2000, 1, 1, 0, 0, 2, tzinfo=timezone.utc),
+    ),
+    "player_character_id": (
+        "pc.demo-00000001",
+        "pc.demo-00000002",
+    ),
+    "run_id": ("run.demo-00000001", "run.demo-00000002"),
+    "continuous_story_line_id": (
+        "csl.demo-00000001",
+        "csl.demo-00000002",
+    ),
+    "session_id": (
+        "demo-session-00000001",
+        "demo-session-00000002",
+    ),
+    "seed": (1, 2),
+    "event_id": ("demo-event-00000001", "demo-event-00000002"),
+    "job_id": (),
+    "lease_token": (),
+    "worker_id": (),
+}
+
+
+def _assert_recorded_generator_prefixes(
+    emitted: dict[str, list[object]],
+) -> None:
+    for name, values in emitted.items():
+        expected = _EXPECTED_RECORDED_PREFIXES[name]
+        assert values == list(expected[: len(values)])
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("operation", "target", "mode"), _POST_EMISSION_CASES
+)
+async def test_demo_generator_values_never_rewind_after_post_emission_failure(
+    operation: str,
+    target: str,
+    mode: str,
+) -> None:
+    fail_on_call = 2 if operation == "run-entry" and target == "clock" else 1
+    generators, emitted = _generators_failing_after_emission(
+        target, mode, fail_on_call=fail_on_call
+    )
+    runtime = build_demo_runtime(generators=generators)
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    entry_target = operation == "run-entry"
+    creation_body = {
+        "contract_version": "structured-player-character/v1",
+        "character_core": {},
+        "narration_preferences": {},
+    }
+    entry_body = {
+        "player_character_id": "pc.demo-00000001",
+        "expected_record_revision": 1,
+        "scenario_id": "death_certificate",
+    }
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            if entry_target:
+                created = await client.post(
+                    "/v1/player-characters",
+                    headers={"Idempotency-Key": "Create.Boundary-1"},
+                    json=creation_body,
+                )
+                assert created.status_code == 200, created.text
+                baseline = runtime.store.snapshot()
+                request = client.post(
+                    "/v1/runs",
+                    headers={"Idempotency-Key": "Entry.Boundary-1"},
+                    json=entry_body,
+                )
+            else:
+                baseline = runtime.store.snapshot()
+                request = client.post(
+                    "/v1/player-characters",
+                    headers={"Idempotency-Key": "Create.Boundary-1"},
+                    json=creation_body,
+                )
+
+            if mode == "cancellation":
+                with pytest.raises(asyncio.CancelledError):
+                    await request
+            else:
+                response = await request
+                if mode == "conflict":
+                    assert response.status_code == 409
+                    assert response.json() == {
+                        "error": {
+                            "error_code": "OPTIMISTIC_LOCK_CONFLICT",
+                            "message": "State changed concurrently",
+                        }
+                    }
+                else:
+                    assert response.status_code == 500
+                    assert response.json() == {
+                        "error": {
+                            "error_code": "INTERNAL_SERVER_ERROR",
+                            "message": "Internal server error",
+                        }
+                    }
+
+            assert runtime.store.snapshot() == baseline
+            assert runtime.store.active_uows == 0
+            assert not any(
+                lock.locked()
+                for registry in (
+                    runtime.store._controller_locks,
+                    runtime.store._player_character_locks,
+                    runtime.store._run_locks,
+                    runtime.store._session_locks,
+                )
+                for lock in registry.values()
+            )
+            operation_order = (
+                (
+                    "clock",
+                    "run_id",
+                    "continuous_story_line_id",
+                    "session_id",
+                    "seed",
+                    "event_id",
+                )
+                if entry_target
+                else ("clock", "player_character_id")
+            )
+            boundary = operation_order.index(target)
+            expected_counts = {name: 0 for name in emitted}
+            if entry_target:
+                expected_counts.update({"clock": 1, "player_character_id": 1})
+            for name in operation_order[: boundary + 1]:
+                expected_counts[name] += 1
+            assert {name: len(values) for name, values in emitted.items()} == (
+                expected_counts
+            )
+            _assert_recorded_generator_prefixes(emitted)
+
+            if mode == "conflict":
+                if entry_target:
+                    recovered = await client.post(
+                        "/v1/runs",
+                        headers={"Idempotency-Key": "Entry.Boundary-1"},
+                        json=entry_body,
+                    )
+                else:
+                    recovered = await client.post(
+                        "/v1/player-characters",
+                        headers={"Idempotency-Key": "Create.Boundary-1"},
+                        json=creation_body,
+                    )
+                assert recovered.status_code == 200, recovered.text
+                recovered_counts = dict(expected_counts)
+                for name in operation_order:
+                    recovered_counts[name] += 1
+                assert {
+                    name: len(values) for name, values in emitted.items()
+                } == recovered_counts
+                _assert_recorded_generator_prefixes(emitted)
+
+                committed = runtime.store.snapshot()
+                if entry_target:
+                    expected_run_ordinal = 2 if boundary >= 1 else 1
+                    expected_line_ordinal = 2 if boundary >= 2 else 1
+                    expected_session_ordinal = 2 if boundary >= 3 else 1
+                    expected_run_id = (
+                        f"run.demo-0000000{expected_run_ordinal}"
+                    )
+                    expected_line_id = (
+                        f"csl.demo-0000000{expected_line_ordinal}"
+                    )
+                    expected_session_id = (
+                        f"demo-session-0000000{expected_session_ordinal}"
+                    )
+                    assert recovered.json()["run_id"] == expected_run_id
+                    assert recovered.json()["session_id"] == expected_session_id
+                    assert tuple(committed.run_current) == (expected_run_id,)
+                    current = committed.run_current[expected_run_id]
+                    assert current.continuous_story_line_id.value == (
+                        expected_line_id
+                    )
+                    assert tuple(committed.sessions) == (expected_session_id,)
+                    assert len(committed.run_revisions) == 3
+                    assert len(committed.run_participations) == 1
+                    assert len(committed.run_creation_receipts) == 1
+                    assert len(committed.run_mutation_receipts) == 2
+                    assert len(committed.snapshots) == 1
+                    assert len(committed.events) == 1
+                    assert recovered_counts["player_character_id"] == 1
+                else:
+                    expected_character_ordinal = (
+                        2 if target == "player_character_id" else 1
+                    )
+                    expected_character_id = (
+                        f"pc.demo-0000000{expected_character_ordinal}"
+                    )
+                    assert recovered.json()["player_character_id"] == {
+                        "value": expected_character_id
+                    }
+                    assert tuple(committed.player_character_current) == (
+                        expected_character_id,
+                    )
+                    assert len(committed.player_character_revisions) == 1
+                    assert len(committed.player_character_creation_receipts) == 1
+                    assert not committed.run_current
+                    assert recovered_counts["run_id"] == 0
+                    assert recovered_counts["continuous_story_line_id"] == 0
+                assert runtime.store.active_uows == 0
+                assert not any(
+                    lock.locked()
+                    for registry in (
+                        runtime.store._controller_locks,
+                        runtime.store._player_character_locks,
+                        runtime.store._run_locks,
+                        runtime.store._session_locks,
+                    )
+                    for lock in registry.values()
+                )
+
+    if mode != "conflict":
+        next_value = getattr(generators, target)()
+        expected_next = {
+            "clock": (
+                "2000-01-01T00:00:02+00:00"
+                if entry_target
+                else "2000-01-01T00:00:01+00:00"
+            ),
+            "player_character_id": "pc.demo-00000002",
+            "run_id": "run.demo-00000002",
+            "continuous_story_line_id": "csl.demo-00000002",
+            "session_id": "demo-session-00000002",
+            "seed": 2,
+            "event_id": "demo-event-00000002",
+        }[target]
+        if target == "clock":
+            next_value = next_value.isoformat()
+        assert next_value == expected_next
+
+
+@pytest.mark.asyncio
+async def test_view_failure_after_run_entry_preserves_committed_authority(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime = build_demo_runtime()
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    service_type = type(runtime.services.session_service)
+    original = service_type.get_view
+    calls = 0
+
+    async def fail_first_view(self, principal, session_id):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            raise RuntimeError("controlled first View failure")
+        return await original(self, principal, session_id)
+
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.View-Failure"},
+                json={
+                    "contract_version": "structured-player-character/v1",
+                    "character_core": {},
+                    "narration_preferences": {},
+                },
+            )
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.View-Failure"},
+                json={
+                    "player_character_id": created.json()[
+                        "player_character_id"
+                    ]["value"],
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+            assert entered.status_code == 200, entered.text
+            committed = runtime.store.snapshot()
+            monkeypatch.setattr(service_type, "get_view", fail_first_view)
+            path = f"/v1/sessions/{entered.json()['session_id']}/view"
+            failed = await client.get(path)
+            recovered = await client.get(path)
+
+    assert failed.status_code == 500
+    assert failed.json()["error"]["error_code"] == "INTERNAL_SERVER_ERROR"
+    assert recovered.status_code == 200
+    assert recovered.json()["metadata"]["state_version"] == 0
+    assert runtime.store.snapshot() == committed
 
 
 def test_demo_composition_has_no_engine_or_external_provider_fallback(
@@ -2562,7 +3522,8 @@ async def test_direct_or_alternate_provider_caller_cannot_bypass_demo_authority(
 @pytest.mark.asyncio
 async def test_provider_cancellation_rolls_back_progress_and_gameplay_atomically() -> None:
     provider = CancellingProvider()
-    runtime = build_demo_runtime(provider=provider)
+    generators, emitted = _recording_generators()
+    runtime = build_demo_runtime(provider=provider, generators=generators)
     app = create_app(services=runtime.services)
 
     async with app.router.lifespan_context(app):
@@ -2580,6 +3541,7 @@ async def test_provider_cancellation_rolls_back_progress_and_gameplay_atomically
                 identity="provider-cancel",
             )
             before = runtime.store.snapshot()
+            emitted_before = deepcopy(emitted)
             request = asyncio.create_task(
                 client.post(
                     f"/v1/sessions/{session_id}/actions",
@@ -2604,6 +3566,13 @@ async def test_provider_cancellation_rolls_back_progress_and_gameplay_atomically
     cancelled_job = next(iter(after.narrative_jobs.values()))
     assert cancelled_job.status is NarrativeJobStatus.OUTCOME_UNKNOWN
     assert cancelled_job.error_code == "NARRATIVE_OUTCOME_UNKNOWN"
+    for stream in ("job_id", "lease_token", "worker_id"):
+        assert len(emitted[stream]) == len(emitted_before[stream]) + 1
+    assert runtime.generators.job_id() == "demo-job-00000002"
+    assert runtime.generators.lease_token() == (
+        "demo-lease-000000000000000000002"
+    )
+    assert runtime.generators.worker_id() == "demo-worker-00000002"
     assert not runtime.store.any_session_lock_held
     assert runtime.store.active_uows == 0
 
@@ -2611,7 +3580,8 @@ async def test_provider_cancellation_rolls_back_progress_and_gameplay_atomically
 @pytest.mark.asyncio
 async def test_provider_exception_rolls_back_progress_and_gameplay_atomically() -> None:
     provider = ExplodingProvider()
-    runtime = build_demo_runtime(provider=provider)
+    generators, emitted = _recording_generators()
+    runtime = build_demo_runtime(provider=provider, generators=generators)
     app = create_app(services=runtime.services)
 
     async with app.router.lifespan_context(app):
@@ -2629,6 +3599,7 @@ async def test_provider_exception_rolls_back_progress_and_gameplay_atomically() 
                 identity="provider-exception",
             )
             before = runtime.store.snapshot()
+            emitted_before = deepcopy(emitted)
             failed = await client.post(
                 f"/v1/sessions/{session_id}/actions",
                 json={
@@ -2648,6 +3619,13 @@ async def test_provider_exception_rolls_back_progress_and_gameplay_atomically() 
     assert next(iter(after.narrative_jobs.values())).status is (
         NarrativeJobStatus.OUTCOME_UNKNOWN
     )
+    for stream in ("job_id", "lease_token", "worker_id"):
+        assert len(emitted[stream]) == len(emitted_before[stream]) + 1
+    assert runtime.generators.job_id() == "demo-job-00000002"
+    assert runtime.generators.lease_token() == (
+        "demo-lease-000000000000000000002"
+    )
+    assert runtime.generators.worker_id() == "demo-worker-00000002"
 
 
 @pytest.mark.asyncio

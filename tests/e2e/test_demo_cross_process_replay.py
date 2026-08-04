@@ -31,6 +31,9 @@ TRACE_VERSION = 1
 TRACE_CATEGORIES = frozenset(
     {
         "CLOCK",
+        "PLAYER_CHARACTER_ID",
+        "RUN_ID",
+        "CONTINUOUS_STORY_LINE_ID",
         "SESSION_ID",
         "EVENT_ID",
         "JOB_ID",
@@ -62,10 +65,10 @@ COMPLETE_KEYS = frozenset(
 ACTION_PATH = re.compile(r"^/v1/sessions/[^/]+/actions$")
 REQUEST_STATUS_PATH = re.compile(r"^/v1/sessions/[^/]+/requests/[^/]+$")
 EXPECTED_EXACT_REPLAY_SHA256 = (
-    "383fd47b7ab72128ba630fbbe0b513f13f80504ba4aecc969d32ca3dd6d0394b"
+    "365009b4b87a11223f3acfed5958528ed2fddcd5734f80df151041fe1c6eae4f"
 )
 EXPECTED_NORMALIZED_REPLAY_SHA256 = (
-    "3bf5810a398cbf29c2f63ea89695c702404a5256f467a58177f77888f3b76210"
+    "d1fa7d7c5522cec6e92ec2827c4f72fe8013c185b5c5d6a7913b8d4f1e26aff2"
 )
 
 
@@ -519,6 +522,9 @@ def _expected_generator_trace() -> tuple[dict[str, Any], ...]:
             raw_value = ordinal
         else:
             prefix, width = {
+                "PLAYER_CHARACTER_ID": ("pc.demo-", 8),
+                "RUN_ID": ("run.demo-", 8),
+                "CONTINUOUS_STORY_LINE_ID": ("csl.demo-", 8),
                 "SESSION_ID": ("demo-session-", 8),
                 "EVENT_ID": ("demo-event-", 8),
                 "JOB_ID": ("demo-job-", 8),
@@ -539,6 +545,10 @@ def _expected_generator_trace() -> tuple[dict[str, Any], ...]:
         )
 
     emit("CLOCK")
+    emit("PLAYER_CHARACTER_ID")
+    emit("CLOCK")
+    emit("RUN_ID")
+    emit("CONTINUOUS_STORY_LINE_ID")
     emit("SESSION_ID")
     emit("SEED")
     emit("EVENT_ID")
@@ -646,20 +656,110 @@ def _drive_public_path(child: DemoBackendChild, *, identity_family: str) -> tupl
         scenario = next(
             item for item in catalog["scenarios"] if item["scenario_id"] == "death_certificate"
         )
-        create_body = {
-            "client_request_id": _identity(identity_family, "create"),
-            "character_definition_id": scenario["default_character_definition_id"],
-            "scenario_id": scenario["scenario_id"],
+        character_create_key = "Create.Cross-Process-1"
+        character_create_body = {
+            "contract_version": "structured-player-character/v1",
+            "character_core": {},
+            "narration_preferences": {},
         }
-        created = _record_exchange(
+        character_created = _record_exchange(
             transcript,
             method="POST",
-            path="/v1/sessions",
-            request_body=create_body,
-            response=client.post("/v1/sessions", json=create_body),
-            expected_status=201,
+            path="/v1/player-characters",
+            request_body={
+                "idempotency_key": character_create_key,
+                "json": character_create_body,
+            },
+            response=client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": character_create_key},
+                json=character_create_body,
+            ),
+            expected_status=200,
         )
-        session_id = created["session_id"]
+        assert character_created["player_character_id"] == {
+            "value": "pc.demo-00000001"
+        }
+        character_replay = _record_exchange(
+            transcript,
+            method="POST",
+            path="/v1/player-characters",
+            request_body={
+                "idempotency_key": character_create_key,
+                "json": character_create_body,
+            },
+            response=client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": character_create_key},
+                json=character_create_body,
+            ),
+            expected_status=200,
+        )
+        assert character_replay == character_created
+        eligible = _record_exchange(
+            transcript,
+            method="GET",
+            path="/v1/player-characters/eligible-for-run-entry",
+            request_body=None,
+            response=client.get(
+                "/v1/player-characters/eligible-for-run-entry"
+            ),
+            expected_status=200,
+        )
+        assert eligible["eligible_player_characters"] == [character_created]
+
+        entry_key = "Entry.Cross-Process-1"
+        entry_body = {
+            "player_character_id": "pc.demo-00000001",
+            "expected_record_revision": 1,
+            "scenario_id": scenario["scenario_id"],
+        }
+        entered = _record_exchange(
+            transcript,
+            method="POST",
+            path="/v1/runs",
+            request_body={"idempotency_key": entry_key, "json": entry_body},
+            response=client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": entry_key},
+                json=entry_body,
+            ),
+            expected_status=200,
+        )
+        assert entered["run_id"] == "run.demo-00000001"
+        entry_replay = _record_exchange(
+            transcript,
+            method="POST",
+            path="/v1/runs",
+            request_body={"idempotency_key": entry_key, "json": entry_body},
+            response=client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": entry_key},
+                json=entry_body,
+            ),
+            expected_status=200,
+        )
+        assert entry_replay == entered
+        incompatible_body = {**entry_body, "scenario_id": "other-scenario"}
+        incompatible = _record_exchange(
+            transcript,
+            method="POST",
+            path="/v1/runs",
+            request_body={
+                "idempotency_key": entry_key,
+                "json": incompatible_body,
+            },
+            response=client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": entry_key},
+                json=incompatible_body,
+            ),
+            expected_status=409,
+        )
+        assert incompatible["error"]["error_code"] == "IDEMPOTENCY_CONFLICT"
+        assert "run.demo-00000001" not in json.dumps(incompatible)
+
+        session_id = entered["session_id"]
         assert session_id == "demo-session-00000001"
         view_path = f"/v1/sessions/{session_id}/view"
         action_path = f"/v1/sessions/{session_id}/actions"
@@ -894,7 +994,7 @@ def _assert_frozen_replay_output(
     exact_identity: bool,
 ) -> None:
     _assert_independent_replay_source(transcript, identity_family)
-    assert len(transcript) == 60
+    assert len(transcript) == 65
     normalized_digest = hashlib.sha256(
         _canonical_json(_normalize_caller_identities(transcript))
     ).hexdigest()
@@ -913,7 +1013,12 @@ def _assert_independent_replay_source(
     expected_envelope_fields = {"method", "path", "request", "status", "response"}
     expected_sequence: list[tuple[str, str, int]] = [
         ("GET", "/v1/scenarios", 200),
-        ("POST", "/v1/sessions", 201),
+        ("POST", "/v1/player-characters", 200),
+        ("POST", "/v1/player-characters", 200),
+        ("GET", "/v1/player-characters/eligible-for-run-entry", 200),
+        ("POST", "/v1/runs", 200),
+        ("POST", "/v1/runs", 200),
+        ("POST", "/v1/runs", 409),
         ("GET", "/v1/sessions/demo-session-00000001/view", 200),
     ]
     for _ in CANONICAL_ACTIONS:
@@ -924,7 +1029,7 @@ def _assert_independent_replay_source(
                 ("GET", "/v1/sessions/demo-session-00000001/view", 200),
             )
         )
-    assert len(transcript) == len(expected_sequence) == 60
+    assert len(transcript) == len(expected_sequence) == 65
     for exchange, (method, path, status) in zip(
         transcript, expected_sequence, strict=True
     ):
@@ -936,12 +1041,24 @@ def _assert_independent_replay_source(
         )
         assert isinstance(exchange["response"], dict)
 
-    create_request = transcript[1]["request"]
-    assert create_request == {
-        "client_request_id": f"opaque-{identity_family}-create",
-        "character_definition_id": "character.death_certificate.investigator",
-        "scenario_id": "death_certificate",
+    character_request = transcript[1]["request"]
+    assert character_request == {
+        "idempotency_key": "Create.Cross-Process-1",
+        "json": {
+            "contract_version": "structured-player-character/v1",
+            "character_core": {},
+            "narration_preferences": {},
+        },
     }
+    assert transcript[2]["request"] == character_request
+    assert transcript[2]["response"] == transcript[1]["response"]
+    assert transcript[3]["response"]["eligible_player_characters"] == [
+        transcript[1]["response"]
+    ]
+    assert transcript[5]["response"] == transcript[4]["response"]
+    assert transcript[6]["response"]["error"]["error_code"] == (
+        "IDEMPOTENCY_CONFLICT"
+    )
     action_exchanges = [
         exchange
         for exchange in transcript
@@ -1022,7 +1139,10 @@ def test_expected_trace_is_derived_from_canonical_lifecycle() -> None:
     assert sum(ACTION_EVENT_COUNTS) + 1 == 27
     assert len(PROVIDER_ACTIONS) == 4
     assert counts == {
-        "CLOCK": 52,
+        "CLOCK": 53,
+        "PLAYER_CHARACTER_ID": 1,
+        "RUN_ID": 1,
+        "CONTINUOUS_STORY_LINE_ID": 1,
         "EVENT_ID": 27,
         "JOB_ID": 5,
         "LEASE_TOKEN": 4,
@@ -1030,13 +1150,13 @@ def test_expected_trace_is_derived_from_canonical_lifecycle() -> None:
         "SESSION_ID": 1,
         "SEED": 1,
     }
-    assert len(expected) == sum(counts.values()) == 94
-    assert [record["global_ordinal"] for record in expected] == list(range(1, 95))
+    assert len(expected) == sum(counts.values()) == 98
+    assert [record["global_ordinal"] for record in expected] == list(range(1, 99))
     assert [
         record["raw_value"] for record in expected if record["category"] == "CLOCK"
     ] == [
         (datetime(2000, 1, 1, tzinfo=timezone.utc) + timedelta(seconds=index)).isoformat()
-        for index in range(52)
+        for index in range(53)
     ]
     assert _parse_trace(_trace_wire()) == expected
 
@@ -1671,6 +1791,17 @@ def test_private_caller_equivalence_changes_only_direct_whitelisted_bindings() -
         ],
         "snapshots": [{"state": {"unchanged": True}}],
         "provider_progress": [{"session_id": "server-session", "completed_calls": 1}],
+        "controller_bindings": [],
+        "player_character_id_allocations": [],
+        "player_character_revisions": [],
+        "player_character_current": [],
+        "player_character_creation_receipts": [],
+        "player_character_mutation_receipts": [],
+        "run_revisions": [],
+        "run_current": [],
+        "run_participations": [],
+        "run_creation_receipts": [],
+        "run_mutation_receipts": [],
     }
 
     normalized = child_module._caller_identity_equivalence_representation(raw)
@@ -1700,6 +1831,20 @@ def test_private_caller_equivalence_changes_only_direct_whitelisted_bindings() -
         "value"
     ]["payload"]
     assert normalized["snapshots"] == raw["snapshots"]
+    for component in (
+        "controller_bindings",
+        "player_character_id_allocations",
+        "player_character_revisions",
+        "player_character_current",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
+        "run_revisions",
+        "run_current",
+        "run_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
+    ):
+        assert normalized[component] == raw[component]
 
 
 def test_raw_private_evidence_is_schema_complete_and_has_no_normalizer_dependency() -> None:
@@ -1717,6 +1862,17 @@ def test_raw_private_evidence_is_schema_complete_and_has_no_normalizer_dependenc
         "narrative_jobs",
         "events",
         "provider_progress",
+        "controller_bindings",
+        "player_character_id_allocations",
+        "player_character_revisions",
+        "player_character_current",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
+        "run_revisions",
+        "run_current",
+        "run_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
     }
     assert all(
         set(component_digests) == child_module.EXPECTED_PRIVATE_COMPONENTS
@@ -1733,8 +1889,10 @@ def test_raw_private_evidence_is_schema_complete_and_has_no_normalizer_dependenc
     equivalence_b = child_module.EXPECTED_CALLER_EQUIVALENCE_COMPONENT_DIGESTS[
         "browser-b"
     ]
-    assert raw_a["sessions"] != raw_b["sessions"]
-    assert raw_a["creation_keys"] != raw_b["creation_keys"]
+    assert raw_a["sessions"] == raw_b["sessions"]
+    assert raw_a["creation_keys"] == raw_b["creation_keys"]
+    assert raw_a["turn_requests"] != raw_b["turn_requests"]
+    assert raw_a["events"] != raw_b["events"]
     assert equivalence_a["sessions"] == equivalence_b["sessions"]
     assert equivalence_a["creation_keys"] == equivalence_b["creation_keys"]
     assert raw_a["snapshots"] == raw_b["snapshots"]
@@ -1827,6 +1985,17 @@ def test_child_network_guard_blocks_non_loopback_without_transport_attempt() -> 
         "job_fencing",
         "job_lifecycle",
         "authority_progress",
+        "controller_binding",
+        "player_character_allocation",
+        "player_character_revision",
+        "player_character_current",
+        "player_character_creation_receipt",
+        "player_character_mutation_receipt",
+        "run_revision",
+        "run_current",
+        "run_participation",
+        "run_creation_receipt",
+        "run_mutation_receipt",
     ),
 )
 def test_complete_private_expectation_rejects_every_mutated_field_family(

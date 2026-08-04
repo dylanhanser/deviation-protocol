@@ -347,17 +347,30 @@ def test_run_entry_dependency_fails_closed_without_fallback() -> None:
         get_run_entry_service(request)
 
 
-def test_demo_composition_remains_independent_of_run_entry() -> None:
+def test_demo_composition_owns_existing_run_entry_service_and_route() -> None:
     runtime = build_demo_runtime()
     app = main.create_app(services=runtime.services)
 
-    assert runtime.services.run_entry_service is None
-    assert "/v1/runs" not in {
-        route.path for route in app.routes
-    }
-    assert "RunEntryRequest" not in app.openapi().get("components", {}).get(
-        "schemas", {}
+    entry = runtime.services.run_entry_service
+    run = runtime.services.run_service
+    assert entry is not None
+    assert run is not None
+    assert entry.uow_factory == run.uow_factory
+    assert entry.run_id_issuer is run.run_id_issuer
+    assert entry.continuous_story_line_id_issuer is (
+        run.continuous_story_line_id_issuer
     )
+    assert entry.player_character_binding_evidence is (
+        runtime.services.player_character_service
+    )
+    assert entry.session_service is runtime.services.session_service
+    assert {
+        method
+        for route in app.routes
+        if route.path == "/v1/runs"
+        for method in route.methods
+    } == {"POST"}
+    assert "RunEntryRequest" in app.openapi()["components"]["schemas"]
 
 
 def test_default_database_configuration_is_lazy_and_fails_closed(

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import replace
+from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
+import httpx
 import pytest
 
+from deviation_protocol.api.demo_composition import build_demo_runtime
+from deviation_protocol.api.main import create_app
 from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.errors import (
     ConcurrentSessionCreateError,
@@ -15,15 +19,472 @@ from deviation_protocol.application.narrative_jobs import (
     NarrativeJob,
     NarrativeJobStatus,
 )
-from deviation_protocol.application.ports import PersistedSnapshot
+from deviation_protocol.application.player_character_operations import (
+    CREATION_RESULT_SCHEMA_VERSION,
+    MUTATION_RESULT_SCHEMA_VERSION,
+    CharacterCreationCommand,
+    CharacterMutationCommand,
+    CharacterOperationNamespace,
+    CreationReceiptKey,
+    CreationSuccessResult,
+    MutationCommandResult,
+    MutationReceiptKey,
+    MutationSuccessResult,
+    build_creation_success_receipt,
+    build_mutation_success_receipt,
+    creation_fingerprint,
+    evaluate_mutation_policy,
+    mutation_fingerprint,
+)
+from deviation_protocol.application.ports import (
+    MutationReceiptUniquenessConflictError,
+    PersistedSnapshot,
+    RunPlayerCharacterBindingUniquenessConflictError,
+    RunReceiptUniquenessConflictError,
+    RunSessionParticipationUniquenessConflictError,
+)
+from deviation_protocol.application.run_operations import (
+    AttachSessionCommand,
+    BindPlayerCharacterCommand,
+    CreateRunCommand,
+    RunEntryCreationEvidence,
+    RunOperationNamespace,
+    RunReceiptKey,
+    StoredRunSuccessReceipt,
+    activate_first_session_for_run,
+    attach_session_fingerprint,
+    attach_session_result,
+    bind_player_character_fingerprint,
+    bind_player_character_result,
+    bind_player_character_to_run,
+    construct_created_run,
+    creation_result as run_creation_result,
+    run_entry_creation_fingerprint,
+)
+from deviation_protocol.application.run_service import (
+    stage_run_entry_activation,
+    stage_run_entry_binding,
+    stage_run_entry_creation,
+)
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.events import DomainEvent
 from deviation_protocol.domain.models import GameSession
-from deviation_protocol.infrastructure.demo_persistence import DemoProcessStore
-from deviation_protocol.infrastructure.errors import OptimisticLockError
+from deviation_protocol.domain.player_character import (
+    ApplicableCharacterReference,
+    AuthoritySourceRef,
+    CharacterCore,
+    ControllerBindingRef,
+    NarrationPreferences,
+    PlayerCharacterContractVersion,
+    PlayerCharacterId,
+    PlayerCharacterLifecycle,
+    PlayerCharacterMutationKind,
+    PlayerCharacterOperationId,
+)
+from deviation_protocol.domain.player_character_policies import (
+    CreatePlayerCharacterPolicy,
+    PlayerConfirmation,
+)
+from deviation_protocol.domain.run import (
+    ContinuousStoryLineId,
+    RunAuthoritySourceRef,
+    RunId,
+    RunMutationKind,
+    RunOperationId,
+    RunStateVersion,
+)
+from deviation_protocol.infrastructure.demo_generators import new_demo_generators
+from deviation_protocol.infrastructure.demo_persistence import (
+    DemoProcessStore,
+    DemoStoreSnapshot,
+    DemoUnitOfWork,
+)
+from deviation_protocol.infrastructure.errors import (
+    OptimisticLockError,
+    PlayerCharacterRepositoryConflictError,
+)
+from deviation_protocol.infrastructure.player_character_persistence import (
+    PlayerCharacterStoredRecordIntegrityError,
+)
+from deviation_protocol.infrastructure.run_persistence import (
+    RunStoredRecordIntegrityError,
+    creation_receipt_from_storage as run_creation_receipt_from_storage,
+    mutation_receipt_from_storage as run_mutation_receipt_from_storage,
+)
 
 
 NOW = datetime(2000, 1, 1, tzinfo=timezone.utc)
+
+_CREATION_BODY = {
+    "contract_version": "structured-player-character/v1",
+    "character_core": {},
+    "narration_preferences": {},
+}
+
+
+def _character_family(
+    label: str, *, controller_label: str | None = None
+) -> SimpleNamespace:
+    player_character_id = PlayerCharacterId(value=f"pc.demo-test-{label}")
+    controller_binding = ControllerBindingRef(
+        value=f"binding.demo-test-{controller_label or label}"
+    )
+    command = CharacterCreationCommand(
+        contract_version=PlayerCharacterContractVersion.V1,
+        character_core=CharacterCore(),
+        narration_preferences=NarrationPreferences(),
+    )
+    record = CreatePlayerCharacterPolicy().create(
+        player_character_id=player_character_id,
+        controller_binding=controller_binding,
+        character_core=command.character_core,
+        narration_preferences=command.narration_preferences,
+        source_reference=AuthoritySourceRef(value=f"source.demo-test-{label}"),
+    )
+    operation_id = PlayerCharacterOperationId(
+        value=f"operation.demo-test-{label}"
+    )
+    _, fingerprint = creation_fingerprint(command)
+    receipt = build_creation_success_receipt(
+        key=CreationReceiptKey(
+            controller_binding=controller_binding,
+            operation_namespace=CharacterOperationNamespace.CREATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=CreationSuccessResult(
+            result_schema_version=CREATION_RESULT_SCHEMA_VERSION,
+            player_character_id=player_character_id,
+            contract_version=record.contract_version,
+            resulting_revision=record.record_revision,
+            resulting_lifecycle=record.lifecycle,
+        ),
+    )
+    return SimpleNamespace(
+        player_character_id=player_character_id,
+        controller_binding=controller_binding,
+        record=record,
+        receipt=receipt,
+    )
+
+
+def _mutation_family(
+    family: SimpleNamespace,
+    label: str,
+) -> SimpleNamespace:
+    initial = family.record
+    operation_id = PlayerCharacterOperationId(
+        value=f"operation.demo-test-mutate-{label}"
+    )
+    command = CharacterMutationCommand(
+        contract_version=initial.contract_version,
+        command_kind=PlayerCharacterMutationKind.RETIRE,
+        target_player_character_id=initial.player_character_id,
+        expected_revision=initial.record_revision,
+        applicable_reference=ApplicableCharacterReference(
+            player_character_id=initial.player_character_id,
+            contract_version=initial.contract_version,
+            record_revision=initial.record_revision,
+        ),
+        confirmation=PlayerConfirmation(
+            player_character_id=initial.player_character_id,
+            expected_revision=initial.record_revision,
+            operation_id=operation_id,
+            mutation_kind=PlayerCharacterMutationKind.RETIRE,
+            source_reference=AuthoritySourceRef(
+                value=f"source.demo-test-mutate-{label}"
+            ),
+        ),
+    )
+    decision = evaluate_mutation_policy(
+        initial,
+        command=command,
+        operation_id=operation_id,
+    )
+    assert decision.accepted
+    successor = decision.resulting_record
+    assert successor is not None
+    _, fingerprint = mutation_fingerprint(command, operation_id=operation_id)
+    receipt = build_mutation_success_receipt(
+        key=MutationReceiptKey(
+            player_character_id=initial.player_character_id,
+            operation_namespace=CharacterOperationNamespace.MUTATE_V1,
+            operation_id=operation_id,
+        ),
+        fingerprint=fingerprint,
+        result=MutationSuccessResult(
+            result_schema_version=MUTATION_RESULT_SCHEMA_VERSION,
+            player_character_id=successor.player_character_id,
+            contract_version=successor.contract_version,
+            command_kind=PlayerCharacterMutationKind.RETIRE,
+            command_result=MutationCommandResult.RETIRED,
+            resulting_revision=successor.record_revision,
+            resulting_lifecycle=PlayerCharacterLifecycle.RETIRED,
+        ),
+    )
+    return SimpleNamespace(
+        command=command,
+        successor=successor,
+        receipt=receipt,
+    )
+
+
+async def _commit_character_family(
+    store: DemoProcessStore,
+    family: SimpleNamespace,
+    *,
+    add_binding: bool = True,
+) -> None:
+    async with store.unit_of_work() as uow:
+        if add_binding:
+            await uow.controller_bindings.add(
+                family.controller_binding, created_at=NOW
+            )
+        await uow.player_characters.add_allocation(
+            family.player_character_id, created_at=NOW
+        )
+        await uow.player_characters.add_initial(
+            family.record, created_at=NOW
+        )
+        await uow.creation_receipts.add(family.receipt, created_at=NOW)
+        await uow.commit()
+
+
+def _run_entry_family(
+    label: str,
+    *,
+    character_family: SimpleNamespace,
+    session_id: str,
+    run_id: str,
+    continuous_story_line_id: str,
+) -> SimpleNamespace:
+    source = RunAuthoritySourceRef(value=f"source.demo-test-run-{label}")
+    typed_run_id = RunId(value=run_id)
+    typed_line_id = ContinuousStoryLineId(value=continuous_story_line_id)
+    create_operation_id = RunOperationId(
+        value=f"operation.demo-test-run-create-{label}"
+    )
+    bind_operation_id = RunOperationId(
+        value=f"operation.demo-test-run-bind-{label}"
+    )
+    attach_operation_id = RunOperationId(
+        value=f"operation.demo-test-run-attach-{label}"
+    )
+    evidence = RunEntryCreationEvidence.model_validate(
+        {
+            "controller_operation": {
+                "controller_binding": {
+                    "value": character_family.controller_binding.value
+                },
+                "public_operation_key": f"entry.demo-test-{label}",
+            },
+            "player_character": {
+                "player_character_id": {
+                    "value": character_family.player_character_id.value
+                },
+                "pre_entry_record_revision": {"value": 1},
+            },
+            "scenario": {
+                "scenario_id": "death_certificate",
+                "content_version": "death-certificate-1.1.0",
+                "default_character_definition_id": (
+                    "character.death_certificate.investigator"
+                ),
+            },
+            "trusted_run_source": {
+                "source_reference": {"value": source.value}
+            },
+        }
+    )
+    initial = construct_created_run(
+        CreateRunCommand(source_reference=source),
+        run_id=typed_run_id,
+        continuous_story_line_id=typed_line_id,
+        operation_id=create_operation_id,
+        occurred_at=NOW,
+    )
+    _, creation_fingerprint_value = run_entry_creation_fingerprint(evidence)
+    creation_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            operation_namespace=RunOperationNamespace.CREATE_V1,
+            operation_id=create_operation_id,
+        ),
+        fingerprint=creation_fingerprint_value,
+        command_kind=RunMutationKind.CREATE,
+        result=run_creation_result(initial),
+    )
+    reference = ApplicableCharacterReference(
+        player_character_id=character_family.player_character_id,
+        contract_version=character_family.record.contract_version,
+        record_revision=character_family.record.record_revision,
+    )
+    bind_command = BindPlayerCharacterCommand(
+        run_id=typed_run_id,
+        continuous_story_line_id=typed_line_id,
+        target_player_character_id=character_family.player_character_id,
+        expected_state_version=RunStateVersion(value=1),
+        source_reference=source,
+    )
+    bound = bind_player_character_to_run(
+        initial,
+        bind_command,
+        applicable_character_reference=reference,
+        operation_id=bind_operation_id,
+        occurred_at=NOW,
+    )
+    _, binding_fingerprint = bind_player_character_fingerprint(
+        bind_command, operation_id=bind_operation_id
+    )
+    binding_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            run_id=typed_run_id,
+            operation_namespace=(
+                RunOperationNamespace.BIND_PLAYER_CHARACTER_V1
+            ),
+            operation_id=bind_operation_id,
+        ),
+        fingerprint=binding_fingerprint,
+        command_kind=RunMutationKind.BIND_PLAYER_CHARACTER,
+        result=bind_player_character_result(bound),
+    )
+    attach_command = AttachSessionCommand(
+        run_id=typed_run_id,
+        continuous_story_line_id=typed_line_id,
+        session_id=session_id,
+        expected_state_version=RunStateVersion(value=2),
+        source_reference=source,
+    )
+    active = activate_first_session_for_run(
+        bound,
+        attach_command,
+        operation_id=attach_operation_id,
+        occurred_at=NOW,
+    )
+    _, attachment_fingerprint = attach_session_fingerprint(
+        attach_command, operation_id=attach_operation_id
+    )
+    attachment_receipt = StoredRunSuccessReceipt(
+        key=RunReceiptKey(
+            run_id=typed_run_id,
+            operation_namespace=RunOperationNamespace.ATTACH_SESSION_V1,
+            operation_id=attach_operation_id,
+        ),
+        fingerprint=attachment_fingerprint,
+        command_kind=RunMutationKind.ATTACH_SESSION,
+        result=attach_session_result(active),
+    )
+    return SimpleNamespace(
+        initial=initial,
+        creation_receipt=creation_receipt,
+        evidence=evidence,
+        bound=bound,
+        binding_receipt=binding_receipt,
+        active=active,
+        attachment_receipt=attachment_receipt,
+    )
+
+
+async def _stage_run_entry_family(
+    uow: DemoUnitOfWork,
+    family: SimpleNamespace,
+) -> None:
+    await stage_run_entry_creation(
+        uow,
+        family.initial,
+        family.creation_receipt,
+        family.evidence,
+        created_at=NOW,
+    )
+    assert await stage_run_entry_binding(
+        uow,
+        family.bound,
+        family.binding_receipt,
+        created_at=NOW,
+    )
+    assert await stage_run_entry_activation(
+        uow,
+        family.active,
+        family.attachment_receipt,
+        created_at=NOW,
+    )
+
+
+async def _commit_test_session(
+    store: DemoProcessStore,
+    label: str,
+) -> str:
+    session_id = f"session.demo-test-{label}"
+    session = _session(
+        session_id=session_id,
+        player_id=f"player.demo-test-{label}",
+    )
+    async with store.unit_of_work() as uow:
+        await uow.sessions.add_initial(
+            session,
+            character_definition_id="character.demo-test",
+            creation_client_request_id=f"create.demo-test-{label}",
+            state={"label": label},
+            created_at=NOW,
+        )
+        await uow.sessions.persist_events(
+            (
+                _event(
+                    event_id=f"event.demo-test-{label}",
+                    session_id=session_id,
+                ),
+            ),
+            state_version=0,
+        )
+        await uow.commit()
+    return session_id
+
+
+async def _seed_public_run(
+    *,
+    store: DemoProcessStore | None = None,
+) -> tuple[DemoProcessStore, dict[str, object], dict[str, object]]:
+    runtime = build_demo_runtime(store=store)
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Persistence-1"},
+                json=_CREATION_BODY,
+            )
+            assert created.status_code == 200, created.text
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Persistence-1"},
+                json={
+                    "player_character_id": created.json()[
+                        "player_character_id"
+                    ]["value"],
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+            assert entered.status_code == 200, entered.text
+    return runtime.store, created.json(), entered.json()
+
+
+class _FailExpandedCommitUnitOfWork(DemoUnitOfWork):
+    def _publish_atomically(self) -> None:
+        if self._store.fail_expanded_commit:
+            raise OptimisticLockError("controlled expanded authority conflict")
+        super()._publish_atomically()
+
+
+class _FailExpandedCommitStore(DemoProcessStore):
+    def __init__(self) -> None:
+        super().__init__()
+        self.fail_expanded_commit = False
+
+    def unit_of_work(self) -> DemoUnitOfWork:
+        return _FailExpandedCommitUnitOfWork(self)
 
 
 def _session(*, session_id: str = "session-1", player_id: str = "player-1") -> GameSession:
@@ -1254,3 +1715,831 @@ async def test_job_cas_race_and_expired_validated_reclaim_preserve_fencing() -> 
     winner = store.snapshot().narrative_jobs["job-1"]
     assert winner.lease_token == "lease-token-00000000000000000003"
     assert winner.lease_owner == "worker-3"
+
+
+@pytest.mark.asyncio
+async def test_player_character_repository_round_trips_complete_detached_family(
+) -> None:
+    store = DemoProcessStore()
+    family = _character_family("round-trip")
+    await _commit_character_family(store, family)
+
+    async with store.unit_of_work() as uow:
+        binding = await uow.controller_bindings.get(family.controller_binding)
+        loaded = await uow.player_characters.get(family.player_character_id)
+        receipt = await uow.creation_receipts.get(family.receipt.key)
+
+    assert binding == family.controller_binding
+    assert binding is not family.controller_binding
+    assert loaded == family.record
+    assert loaded is not family.record
+    assert receipt == family.receipt
+    assert receipt is not family.receipt
+
+    assert loaded is not None
+    object.__setattr__(
+        loaded,
+        "player_character_id",
+        PlayerCharacterId(value="pc.demo-test-mutated-copy"),
+    )
+    object.__setattr__(
+        receipt.result,
+        "player_character_id",
+        PlayerCharacterId(value="pc.demo-test-mutated-receipt-copy"),
+    )
+    async with store.unit_of_work() as uow:
+        assert await uow.player_characters.get(
+            family.player_character_id
+        ) == family.record
+        assert await uow.creation_receipts.get(
+            family.receipt.key
+        ) == family.receipt
+
+
+@pytest.mark.asyncio
+async def test_player_character_listing_is_owned_active_unbound_stable_and_bounded(
+) -> None:
+    runtime = build_demo_runtime()
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created_ids: list[str] = []
+            for ordinal in range(1, 6):
+                response = await client.post(
+                    "/v1/player-characters",
+                    headers={
+                        "Idempotency-Key": f"Create.Listing-{ordinal}"
+                    },
+                    json=_CREATION_BODY,
+                )
+                assert response.status_code == 200, response.text
+                created_ids.append(
+                    response.json()["player_character_id"]["value"]
+                )
+            retired = await client.post(
+                f"/v1/player-characters/{created_ids[1]}/retirement",
+                headers={"Idempotency-Key": "Retire.Listing-2"},
+                json={
+                    "contract_version": "structured-player-character/v1",
+                    "expected_revision": {"value": 1},
+                    "confirm_retirement": True,
+                },
+            )
+            assert retired.status_code == 200, retired.text
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Listing-3"},
+                json={
+                    "player_character_id": created_ids[2],
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+            assert entered.status_code == 200, entered.text
+
+    foreign = _character_family("foreign")
+    await _commit_character_family(runtime.store, foreign)
+    async with runtime.store.unit_of_work() as uow:
+        listed = await uow.player_characters.list_eligible_for_run_entry(
+            ControllerBindingRef(value="binding.demo-player"), limit=2
+        )
+
+    assert [item.player_character_id.value for item in listed] == [
+        created_ids[0],
+        created_ids[3],
+    ]
+    assert all(
+        item.controller_binding.value == "binding.demo-player"
+        for item in listed
+    )
+    assert all(
+        item.player_character_id != foreign.player_character_id
+        for item in listed
+    )
+
+
+@pytest.mark.asyncio
+async def test_player_character_lock_cas_and_receipt_conflicts_publish_no_partial_state(
+) -> None:
+    store = DemoProcessStore()
+    family = _character_family("race")
+    async with store.unit_of_work() as seed:
+        await seed.controller_bindings.add(
+            family.controller_binding, created_at=NOW
+        )
+        await seed.commit()
+
+    first = store.unit_of_work()
+    second = store.unit_of_work()
+    await first.__aenter__()
+    await second.__aenter__()
+    try:
+        for uow in (first, second):
+            await uow.player_characters.add_allocation(
+                family.player_character_id, created_at=NOW
+            )
+            await uow.player_characters.add_initial(
+                family.record, created_at=NOW
+            )
+            await uow.creation_receipts.add(
+                family.receipt, created_at=NOW
+            )
+        await first.commit()
+        winner = store.snapshot()
+        with pytest.raises(PlayerCharacterRepositoryConflictError):
+            await second.commit()
+        assert store.snapshot() == winner
+    finally:
+        if not first._closed:
+            await first.__aexit__(None, None, None)
+        if not second._closed:
+            await second.__aexit__(None, None, None)
+
+    snapshot = store.snapshot()
+    assert len(snapshot.player_character_current) == 1
+    assert len(snapshot.player_character_revisions) == 1
+    assert len(snapshot.player_character_creation_receipts) == 1
+
+    holder = store.unit_of_work()
+    waiter = store.unit_of_work()
+    await holder.__aenter__()
+    await waiter.__aenter__()
+    waiter_started = asyncio.Event()
+    waiter_acquired = asyncio.Event()
+
+    async def wait_for_character_lock():
+        waiter_started.set()
+        loaded = await waiter.player_characters.get_for_update(
+            family.player_character_id
+        )
+        waiter_acquired.set()
+        return loaded
+
+    waiter_task = asyncio.create_task(wait_for_character_lock())
+    try:
+        locked = await holder.player_characters.get_for_update(
+            family.player_character_id
+        )
+        assert locked == family.record
+        assert locked is not family.record
+        assert store._player_character_locks[
+            family.player_character_id.value
+        ].locked()
+        await waiter_started.wait()
+        await asyncio.sleep(0)
+        assert not waiter_acquired.is_set()
+        await holder.__aexit__(None, None, None)
+        waited = await asyncio.wait_for(waiter_task, timeout=1)
+        assert waited == family.record
+        assert waited is not locked
+        assert waiter_acquired.is_set()
+        assert store._player_character_locks[
+            family.player_character_id.value
+        ].locked()
+    finally:
+        if not waiter_task.done():
+            waiter_task.cancel()
+            with pytest.raises(asyncio.CancelledError):
+                await waiter_task
+        if not holder._closed:
+            await holder.__aexit__(None, None, None)
+        if not waiter._closed:
+            await waiter.__aexit__(None, None, None)
+    assert not store._player_character_locks[
+        family.player_character_id.value
+    ].locked()
+
+    mutation = _mutation_family(family, "race")
+    async with store.unit_of_work() as update:
+        current = await update.player_characters.get_for_update(
+            family.player_character_id
+        )
+        assert current == family.record
+        await update.player_characters.append_revision(
+            mutation.successor, created_at=NOW + timedelta(seconds=1)
+        )
+        assert await update.player_characters.compare_and_swap_current(
+            mutation.successor,
+            expected_revision=1,
+            created_at=NOW + timedelta(seconds=1),
+        )
+        await update.mutation_receipts.add(
+            mutation.receipt, created_at=NOW + timedelta(seconds=1)
+        )
+        await update.commit()
+
+    mutated = store.snapshot()
+    assert len(mutated.player_character_revisions) == 2
+    assert len(mutated.player_character_current) == 1
+    assert len(mutated.player_character_creation_receipts) == 1
+    assert len(mutated.player_character_mutation_receipts) == 1
+    assert next(iter(mutated.player_character_current.values())).record_revision == 2
+
+    async with store.unit_of_work() as stale:
+        current = await stale.player_characters.get_for_update(
+            family.player_character_id
+        )
+        assert current == mutation.successor
+        assert not await stale.player_characters.compare_and_swap_current(
+            mutation.successor,
+            expected_revision=1,
+            created_at=NOW + timedelta(seconds=2),
+        )
+    assert store.snapshot() == mutated
+    assert not store._player_character_locks[
+        family.player_character_id.value
+    ].locked()
+
+    receipt_key, stored_receipt = next(
+        iter(store._player_character_mutation_receipts.items())
+    )
+    partial_family = _character_family("unpublished-receipt-loser")
+    contender = store.unit_of_work()
+    await contender.__aenter__()
+    try:
+        loaded = await contender.player_characters.get_for_update(
+            family.player_character_id
+        )
+        assert loaded == mutation.successor
+        removed = store._player_character_mutation_receipts.pop(receipt_key)
+        assert removed == stored_receipt
+        try:
+            await contender.mutation_receipts.add(
+                mutation.receipt, created_at=NOW + timedelta(seconds=2)
+            )
+            await contender.controller_bindings.add(
+                partial_family.controller_binding,
+                created_at=NOW + timedelta(seconds=2),
+            )
+            await contender.player_characters.add_allocation(
+                partial_family.player_character_id,
+                created_at=NOW + timedelta(seconds=2),
+            )
+            await contender.player_characters.add_initial(
+                partial_family.record,
+                created_at=NOW + timedelta(seconds=2),
+            )
+            await contender.creation_receipts.add(
+                partial_family.receipt,
+                created_at=NOW + timedelta(seconds=2),
+            )
+        finally:
+            store._player_character_mutation_receipts[receipt_key] = (
+                stored_receipt
+            )
+        with pytest.raises(MutationReceiptUniquenessConflictError):
+            await contender.commit()
+    finally:
+        if not contender._closed:
+            await contender.__aexit__(None, None, None)
+
+    assert store.snapshot() == mutated
+    assert (
+        partial_family.controller_binding.value
+        not in store.snapshot().controller_bindings
+    )
+    assert (
+        partial_family.player_character_id.value
+        not in store.snapshot().player_character_id_allocations
+    )
+    assert (
+        partial_family.player_character_id.value
+        not in store.snapshot().player_character_current
+    )
+    assert not any(
+        identity == partial_family.player_character_id.value
+        for identity, _ in store.snapshot().player_character_revisions
+    )
+    assert store.active_uows == 0
+    assert not any(
+        lock.locked()
+        for registry in (
+            store._controller_locks,
+            store._player_character_locks,
+            store._run_locks,
+            store._session_locks,
+        )
+        for lock in registry.values()
+    )
+
+    async with store.unit_of_work() as recovered:
+        recovered_record = await recovered.player_characters.get_for_update(
+            family.player_character_id
+        )
+        recovered_receipt = await recovered.mutation_receipts.get(
+            mutation.receipt.key
+        )
+        assert recovered_record == mutation.successor
+        assert recovered_record is not mutation.successor
+        assert recovered_receipt == mutation.receipt
+        assert recovered_receipt is not mutation.receipt
+    assert not store._player_character_locks[
+        family.player_character_id.value
+    ].locked()
+    assert recovered_record is not None
+    object.__setattr__(
+        recovered_record,
+        "player_character_id",
+        PlayerCharacterId(value="pc.demo-test-detached-mutated"),
+    )
+    async with store.unit_of_work() as reread:
+        assert await reread.player_characters.get(
+            family.player_character_id
+        ) == mutation.successor
+
+    generators = new_demo_generators()
+    assert generators.player_character_id() == "pc.demo-00000001"
+    assert generators.run_id() == "run.demo-00000001"
+    assert generators.continuous_story_line_id() == "csl.demo-00000001"
+
+
+@pytest.mark.asyncio
+async def test_run_repository_round_trips_revisions_binding_receipts_and_participation(
+) -> None:
+    store, created, entered = await _seed_public_run()
+    snapshot = store.snapshot()
+    run_id = RunId(value=str(entered["run_id"]))
+    creation_receipt = run_creation_receipt_from_storage(
+        next(iter(snapshot.run_creation_receipts.values()))
+    )
+    mutation_receipts = tuple(
+        run_mutation_receipt_from_storage(item)
+        for item in snapshot.run_mutation_receipts.values()
+    )
+
+    async with store.unit_of_work() as uow:
+        run = await uow.runs.get(run_id)
+        participation = await uow.run_participations.get(
+            str(entered["session_id"])
+        )
+        loaded_creation = await uow.run_creation_receipts.get(
+            creation_receipt.key
+        )
+        loaded_mutations = []
+        for receipt in mutation_receipts:
+            loaded_mutations.append(
+                await uow.run_mutation_receipts.get(receipt.key)
+            )
+
+    assert run is not None
+    assert run.state_version.value == 3
+    assert run.lifecycle_status.value == "active"
+    assert run.player_character_binding is not None
+    reference = run.player_character_binding.applicable_character_reference
+    assert reference.player_character_id.value == (
+        created["player_character_id"]["value"]
+    )
+    assert participation in run.trusted_participation_references
+    assert loaded_creation == creation_receipt
+    assert tuple(loaded_mutations) == mutation_receipts
+    assert len(snapshot.run_revisions) == 3
+
+
+@pytest.mark.asyncio
+async def test_run_active_binding_participation_and_receipt_uniqueness_are_atomic(
+) -> None:
+    runtime = build_demo_runtime()
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Run-Race"},
+                json=_CREATION_BODY,
+            )
+            character_id = created.json()["player_character_id"]["value"]
+            body = {
+                "player_character_id": character_id,
+                "expected_record_revision": 1,
+                "scenario_id": "death_certificate",
+            }
+            first, second = await asyncio.gather(
+                client.post(
+                    "/v1/runs",
+                    headers={"Idempotency-Key": "Entry.Run-Race-A"},
+                    json=body,
+                ),
+                client.post(
+                    "/v1/runs",
+                    headers={"Idempotency-Key": "Entry.Run-Race-B"},
+                    json=body,
+                ),
+            )
+
+    assert sorted((first.status_code, second.status_code)) == [200, 409]
+    loser = first if first.status_code == 409 else second
+    assert loser.json()["error"]["error_code"] == (
+        "PLAYER_CHARACTER_NOT_ELIGIBLE"
+    )
+    snapshot = runtime.store.snapshot()
+    assert len(snapshot.run_current) == 1
+    assert len(snapshot.run_revisions) == 3
+    assert len(snapshot.run_creation_receipts) == 1
+    assert len(snapshot.run_mutation_receipts) == 2
+    assert len(snapshot.run_participations) == 1
+    assert len(snapshot.sessions) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "collision",
+    ("participation", "mutation-receipt", "active-binding"),
+)
+async def test_run_direct_final_publication_uniqueness_collisions_are_atomic(
+    collision: str,
+) -> None:
+    store = DemoProcessStore()
+    generators = new_demo_generators()
+    partial_binding = ControllerBindingRef(
+        value=f"binding.demo-test-unpublished-run-{collision}"
+    )
+
+    if collision == "participation":
+        winner_character = _character_family("participation-winner")
+        loser_character = _character_family("participation-loser")
+        recovery_character = _character_family("participation-recovery")
+        for character in (
+            winner_character,
+            loser_character,
+            recovery_character,
+        ):
+            await _commit_character_family(store, character)
+        shared_session = await _commit_test_session(store, "participation-shared")
+        recovery_session = await _commit_test_session(
+            store, "participation-recovery"
+        )
+        winner_family = _run_entry_family(
+            "participation-winner",
+            character_family=winner_character,
+            session_id=shared_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        loser_family = _run_entry_family(
+            "participation-loser",
+            character_family=loser_character,
+            session_id=shared_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        first = store.unit_of_work()
+        second = store.unit_of_work()
+        await first.__aenter__()
+        await second.__aenter__()
+        try:
+            owned = await second.sessions.get_owned_for_update(
+                shared_session, "player.demo-test-participation-shared"
+            )
+            assert owned is not None
+            await _stage_run_entry_family(first, winner_family)
+            await _stage_run_entry_family(second, loser_family)
+            assert shared_session in second._pending_run_participations
+            await first.commit()
+            winner_snapshot = store.snapshot()
+            with pytest.raises(
+                RunSessionParticipationUniquenessConflictError
+            ):
+                await second.commit()
+        finally:
+            if not first._closed:
+                await first.__aexit__(None, None, None)
+            if not second._closed:
+                await second.__aexit__(None, None, None)
+        recovery_family = _run_entry_family(
+            "participation-recovery",
+            character_family=recovery_character,
+            session_id=recovery_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        expected_next_ordinal = 4
+    elif collision == "active-binding":
+        shared_character = _character_family("active-shared")
+        recovery_character = _character_family("active-recovery")
+        await _commit_character_family(store, shared_character)
+        await _commit_character_family(store, recovery_character)
+        winner_session = await _commit_test_session(store, "active-winner")
+        loser_session = await _commit_test_session(store, "active-loser")
+        recovery_session = await _commit_test_session(store, "active-recovery")
+        winner_family = _run_entry_family(
+            "active-winner",
+            character_family=shared_character,
+            session_id=winner_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        loser_family = _run_entry_family(
+            "active-loser",
+            character_family=shared_character,
+            session_id=loser_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        first = store.unit_of_work()
+        second = store.unit_of_work()
+        await first.__aenter__()
+        await second.__aenter__()
+        try:
+            assert (
+                await second.runs.get_active_for_player_character_for_update(
+                    shared_character.player_character_id
+                )
+                is None
+            )
+            await _stage_run_entry_family(first, winner_family)
+            await _stage_run_entry_family(second, loser_family)
+            assert (
+                loser_family.active.run_id.value
+                in second._pending_run_current
+            )
+            await first.commit()
+            winner_snapshot = store.snapshot()
+            with pytest.raises(
+                RunPlayerCharacterBindingUniquenessConflictError
+            ):
+                await second.commit()
+        finally:
+            if not first._closed:
+                await first.__aexit__(None, None, None)
+            if not second._closed:
+                await second.__aexit__(None, None, None)
+        recovery_family = _run_entry_family(
+            "active-recovery",
+            character_family=recovery_character,
+            session_id=recovery_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        expected_next_ordinal = 4
+    else:
+        baseline_character = _character_family("receipt-baseline")
+        loser_character = _character_family("receipt-loser")
+        recovery_character = _character_family("receipt-recovery")
+        await _commit_character_family(store, baseline_character)
+        await _commit_character_family(store, loser_character)
+        await _commit_character_family(store, recovery_character)
+        baseline_session = await _commit_test_session(store, "receipt-baseline")
+        loser_session = await _commit_test_session(store, "receipt-loser")
+        recovery_session = await _commit_test_session(store, "receipt-recovery")
+        winner_family = _run_entry_family(
+            "receipt-baseline",
+            character_family=baseline_character,
+            session_id=baseline_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        async with store.unit_of_work() as seed:
+            await _stage_run_entry_family(seed, winner_family)
+            await seed.commit()
+        winner_snapshot = store.snapshot()
+        loser_family = _run_entry_family(
+            "receipt-loser",
+            character_family=loser_character,
+            session_id=loser_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        target_key, target_stored_receipt = next(
+            (key, value)
+            for key, value in store._run_mutation_receipts.items()
+            if key[1] == RunOperationNamespace.ATTACH_SESSION_V1.value
+        )
+        contender = store.unit_of_work()
+        await contender.__aenter__()
+        try:
+            locked = await contender.runs.get_for_update(
+                winner_family.active.run_id
+            )
+            assert locked == winner_family.active
+            await _stage_run_entry_family(contender, loser_family)
+            removed = store._run_mutation_receipts.pop(target_key)
+            assert removed == target_stored_receipt
+            try:
+                await contender.run_mutation_receipts.add(
+                    winner_family.attachment_receipt,
+                    created_at=NOW,
+                )
+                await contender.controller_bindings.add(
+                    partial_binding, created_at=NOW
+                )
+            finally:
+                store._run_mutation_receipts[target_key] = (
+                    target_stored_receipt
+                )
+            assert target_key in contender._pending_run_mutation_receipts
+            with pytest.raises(RunReceiptUniquenessConflictError):
+                await contender.commit()
+        finally:
+            if not contender._closed:
+                await contender.__aexit__(None, None, None)
+        recovery_family = _run_entry_family(
+            "receipt-recovery",
+            character_family=recovery_character,
+            session_id=recovery_session,
+            run_id=generators.run_id(),
+            continuous_story_line_id=generators.continuous_story_line_id(),
+        )
+        expected_next_ordinal = 4
+
+    assert store.snapshot() == winner_snapshot
+    assert partial_binding.value not in winner_snapshot.controller_bindings
+    if loser_family is not None:
+        assert loser_family.active.run_id.value not in winner_snapshot.run_current
+        assert all(
+            item.continuous_story_line_id
+            != loser_family.active.continuous_story_line_id
+            for item in winner_snapshot.run_current.values()
+        )
+    assert len(winner_snapshot.run_current) == 1
+    assert len(winner_snapshot.run_revisions) == 3
+    assert len(winner_snapshot.run_creation_receipts) == 1
+    assert len(winner_snapshot.run_mutation_receipts) == 2
+    assert len(winner_snapshot.run_participations) == 1
+    assert store.active_uows == 0
+    assert not any(
+        lock.locked()
+        for registry in (
+            store._controller_locks,
+            store._player_character_locks,
+            store._run_locks,
+            store._session_locks,
+        )
+        for lock in registry.values()
+    )
+
+    async with store.unit_of_work() as recovery:
+        await _stage_run_entry_family(recovery, recovery_family)
+        await recovery.commit()
+    recovered = store.snapshot()
+    assert set(recovered.run_current) == {
+        winner_family.active.run_id.value,
+        recovery_family.active.run_id.value,
+    }
+    assert len(recovered.run_revisions) == 6
+    assert len(recovered.run_creation_receipts) == 2
+    assert len(recovered.run_mutation_receipts) == 4
+    assert len(recovered.run_participations) == 2
+    assert not any(
+        lock.locked()
+        for registry in (
+            store._controller_locks,
+            store._player_character_locks,
+            store._run_locks,
+            store._session_locks,
+        )
+        for lock in registry.values()
+    )
+    assert generators.run_id() == (
+        f"run.demo-0000000{expected_next_ordinal}"
+    )
+    assert generators.continuous_story_line_id() == (
+        f"csl.demo-0000000{expected_next_ordinal}"
+    )
+    assert generators.player_character_id() == "pc.demo-00000001"
+    assert generators.clock().isoformat() == "2000-01-01T00:00:00+00:00"
+    assert generators.session_id() == "demo-session-00000001"
+    assert generators.seed() == 1
+    assert generators.event_id() == "demo-event-00000001"
+
+
+@pytest.mark.asyncio
+async def test_run_entry_replay_lock_reads_return_complete_current_evidence() -> None:
+    store, _, entered = await _seed_public_run()
+    snapshot = store.snapshot()
+    run_id = RunId(value=str(entered["run_id"]))
+    attachment = next(
+        run_mutation_receipt_from_storage(item)
+        for item in snapshot.run_mutation_receipts.values()
+        if item.operation_namespace == "run.attach-session/v1"
+    )
+    session_id = str(entered["session_id"])
+
+    async with store.unit_of_work() as uow:
+        run = await uow.runs.get_for_update(run_id)
+        evidence = await uow.runs.get_session_attachment_lock_evidence(
+            run_id, receipt_key=attachment.key
+        )
+        session = await uow.sessions.get_owned_for_update(
+            session_id, "demo-player"
+        )
+        initialization_event = await uow.sessions.get_initialization_event(
+            session_id
+        )
+        latest_snapshot = await uow.sessions.get_latest_snapshot_for_update(
+            session_id
+        )
+
+        assert run is not None and run.state_version.value == 3
+        assert evidence is not None
+        assert evidence.canonical_run == run
+        assert evidence.attachment_receipt == attachment
+        assert session is not None and session.session.session_id == session_id
+        assert initialization_event is not None
+        assert latest_snapshot is not None
+        assert latest_snapshot.state_version == 0
+
+
+@pytest.mark.asyncio
+async def test_expanded_uow_rolls_back_every_new_and_existing_family_together() -> None:
+    store = _FailExpandedCommitStore()
+    generators = new_demo_generators()
+    runtime = build_demo_runtime(store=store, generators=generators)
+    app = create_app(services=runtime.services)
+    transport = httpx.ASGITransport(app=app)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(
+            transport=transport, base_url="http://demo.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Create.Rollback-1"},
+                json=_CREATION_BODY,
+            )
+            baseline = store.snapshot()
+            store.fail_expanded_commit = True
+            failed = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Entry.Rollback-1"},
+                json={
+                    "player_character_id": created.json()[
+                        "player_character_id"
+                    ]["value"],
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+
+    assert failed.status_code == 409
+    assert failed.json()["error"]["error_code"] == "OPTIMISTIC_LOCK_CONFLICT"
+    assert store.snapshot() == baseline
+    assert generators.player_character_id() == "pc.demo-00000002"
+    assert generators.run_id() == "run.demo-00000002"
+    assert generators.continuous_story_line_id() == "csl.demo-00000002"
+    assert generators.session_id() == "demo-session-00000002"
+    assert generators.event_id() == "demo-event-00000002"
+    assert generators.seed() == 2
+    assert generators.job_id() == "demo-job-00000001"
+    assert generators.lease_token() == "demo-lease-000000000000000000001"
+    assert generators.worker_id() == "demo-worker-00000001"
+
+
+@pytest.mark.asyncio
+async def test_expanded_snapshot_is_complete_and_detached() -> None:
+    store, _, _ = await _seed_public_run()
+    expected_fields = (
+        "sessions",
+        "snapshots",
+        "creation_keys",
+        "turn_requests",
+        "narrative_jobs",
+        "events",
+        "provider_progress",
+        "controller_bindings",
+        "player_character_id_allocations",
+        "player_character_revisions",
+        "player_character_current",
+        "player_character_creation_receipts",
+        "player_character_mutation_receipts",
+        "run_revisions",
+        "run_current",
+        "run_participations",
+        "run_creation_receipts",
+        "run_mutation_receipts",
+    )
+    assert tuple(DemoStoreSnapshot.__dataclass_fields__) == expected_fields
+
+    snapshot = store.snapshot()
+    authoritative = deepcopy(snapshot)
+    for field in expected_fields:
+        value = getattr(snapshot, field)
+        if isinstance(value, dict):
+            value.clear()
+    assert store.snapshot() == authoritative
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("family", ("player-character", "run"))
+async def test_expanded_integrity_probes_reject_broken_relationships(
+    family: str,
+) -> None:
+    store, created, entered = await _seed_public_run()
+    if family == "player-character":
+        identity = created["player_character_id"]["value"]
+        store._player_character_revisions.pop((identity, 1))
+        async with store.unit_of_work() as uow:
+            with pytest.raises(PlayerCharacterStoredRecordIntegrityError):
+                await uow.player_characters.get(
+                    PlayerCharacterId(value=str(identity))
+                )
+    else:
+        identity = str(entered["run_id"])
+        store._run_revisions.pop((identity, 2))
+        async with store.unit_of_work() as uow:
+            with pytest.raises(RunStoredRecordIntegrityError):
+                await uow.runs.get(RunId(value=identity))
