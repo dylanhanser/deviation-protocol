@@ -100,10 +100,16 @@ passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   received
   `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
   was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
-  manually published by the user. P8-S4 is complete. P8-S5 Web connection and
-  P8-S6 cross-surface evidence/final status closure have not started. Phase 8
-  and the overall project remain incomplete. Push by Codex, deployment,
-  release, later runtime activation, and Provider work remain deferred.**
+  manually published by the user. P8-S4 is complete. The dedicated P8-S5 plan
+  was independently approved and committed/published at
+  `dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained frozen during
+  implementation, and its corrected implementation received
+  `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+  The exact eight-path Web implementation was committed and published at
+  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
+  cross-surface evidence/final status closure has not started. Phase 8 and the
+  overall project remain incomplete. Push by Codex, deployment, release, later
+  runtime activation, and Provider work remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
 `ac5263fd5ca652665d23a082a19b3d66f8a047d1`
@@ -440,14 +446,17 @@ configured service dependency getter, public exposure of the existing
 `PlayerCharacterSelfProjection` DTO, and their corresponding OpenAPI operations
 are implemented and published. P8-S1 adds the bounded eligible-character read,
 and published P8-S2 adds the internal `RunEntryService` transaction that creates
-and activates one Session-backed Run without a public route. Other Player
-Character public routes, general mutation/list/search/administration surfaces,
-frontend and Demo behavior, and scenario/world progression remain absent. The
-published P8-S3 implementation adds the normal `POST /v1/runs` adapter and
-composition. Its five bounded first-review corrections are complete; after the
-subsequent documentation-synchronization finding, the complete 15-path candidate
-received focused independent read-only approval and was committed and published
-at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`.
+and activates one Session-backed Run. Published P8-S3 adds the normal
+`POST /v1/runs` adapter and composition. Its five bounded first-review
+corrections are complete; after the subsequent documentation-synchronization
+finding, the complete 15-path candidate received focused independent read-only
+approval and was committed and published at
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. Published P8-S4 composes the
+existing Player Character and Run-entry operations in deterministic Demo, and
+published P8-S5 connects the primary Web journey to those contracts and the
+existing Session gameplay loop. Other Player Character public routes, general
+mutation/list/search/administration surfaces, broader frontend/profile behavior,
+and scenario/world progression remain absent.
 
 The accepted P5-S3 retirement implementation was locally validated after the
   focused `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`
@@ -3697,10 +3706,12 @@ controller-first authority, operation namespace, receipt replay, durable
 creation family, and one admitted controller-binding-race winner recovery;
 ordinary, corrupt-receipt, unsupported-recovery, and uncertain-commit failures
 remain sanitized, and cancellation propagates through rollback. P5-S1 remains
-unchanged. Demo has no Player Character service, route, method, or OpenAPI path,
-and no frontend creation method exists. P5-S3's first, first-corrected, and
-re-corrected local candidates each received `CHANGES_REQUIRED`; the later
-evidence candidate was followed by the focused verdict
+unchanged. At Phase 5 closure, Demo had no Player Character service, route,
+method, or OpenAPI path, and no frontend creation method existed; later Phase 8
+work superseded only that historical integration status. P5-S3's first,
+first-corrected, and re-corrected local candidates each received
+`CHANGES_REQUIRED`; the later evidence candidate was followed by the focused
+verdict
 `P5_S3_RECEIPT_ADD_RACE_NOT_REACHABLE_UNDER_CURRENT_PRODUCTION_PATH`. The
 accepted and published normal-application retirement result follows
 `STRUCTURED_PLAYER_CHARACTER_P5_S3_PLAN_APPROVED`; correction validation passed
@@ -3818,11 +3829,20 @@ was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
 manually published by the user. P8-S4 is complete: the existing Player
 Character, Run, Run-entry, and Session services are composed over deterministic
 process-local Demo persistence without changing normal composition, schema, or
-public contract. P8-S5 Web connection and P8-S6 cross-surface evidence/final
-status closure have not started. Phase 8 and the overall project remain
-incomplete. P8-S5 is the next gated slice, subject to fresh authorization only
-after this exact seven-document post-publication synchronization is reviewed,
-committed, published, and confirmed on an aligned clean baseline.
+public contract. The dedicated
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+received exact independent approval and was committed/published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86`. It remained frozen during
+implementation. The corrected eight-path implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`,
+was committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`,
+and completes the bounded primary Web connection to Player Character discovery
+or minimal creation, Run entry, same-tab Session recovery, authoritative View,
+and the existing action/status/recovery/terminal loop. P8-S5 is complete.
+P8-S6 cross-surface evidence/final status closure has not started. Phase 8 and
+the overall project remain incomplete. P8-S6 remains gated on independent
+review, separate commit authorization, user publication, and clean-baseline
+confirmation for this P8-S5 post-publication documentation synchronization.
 Later modifications
 to the planning-authority bytes require fresh exact-byte independent review
 before a separately authorized documentation commit; that commit precedes user
@@ -3924,8 +3944,11 @@ accepted implementation. It follows
   `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4
   deterministic Demo parity is complete under the approved plan; the
   independently approved implementation was committed and published at
-  `187d41ba3035c8d717c2fb2578a805402255d979`. P8-S5 and P8-S6 have not
-  started, and Phase 8 and the overall project remain incomplete.
+  `187d41ba3035c8d717c2fb2578a805402255d979`. P8-S5 minimum Web connection is
+  complete under its approved, frozen plan; the corrected implementation was
+  independently approved, committed, and published at
+  `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S6 has not started, and
+  Phase 8 and the overall project remain incomplete.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -3934,7 +3957,7 @@ accepted implementation. It follows
 | `src/deviation_protocol/application/narrative_models.py` (owner of `NarrativeProvider`), `src/deviation_protocol/application/narrative_validation.py`, `src/deviation_protocol/application/narrative_turn_orchestrator.py`, and Provider adapters | Candidate-only boundary already fits; no character mutation field is needed |
 | `src/deviation_protocol/domain/player_memory.py` and `src/deviation_protocol/application/player_memory.py` | Current bounded memory authority remains intact; full integration deferred |
 | scenario content, static character definitions, and `config` | Templates/content must not become canonical identity |
-| `web` | P8-S5 Web connection remains separately allocated and unstarted |
+| `web` | P8-S5 Web connection is published; later Web changes require separate authority |
 | existing frozen product specifications | Implementation may not change approved product rules |
 | Phase 3.2 Demo launcher/smoke/provider | Phase 3.2b remains closed; P8-S4 reused its established seams without editing these paths |
 
@@ -4333,6 +4356,22 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-08-04: The dedicated P8-S5 implementation plan was independently
+  approved, committed, and published at
+  `dceecaf0d7a33ccde07f519f83997489acd5fc86` and remained frozen. Its exact
+  eight-path implementation received
+  `STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`
+  with no actionable findings; all three earlier findings were confirmed
+  corrected and AC-01 through AC-20 passed. Focused frontend verification
+  reported 207 passed and one skipped; typecheck, zero-warning lint, and the
+  100-module build passed. Canonical Offline verification reported 1,978 passed
+  and 182 skipped, and `git diff --check` passed. The implementation was
+  committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`
+  (`feat(web): connect player characters to playable run flow`) with exactly
+  three production and five test paths and no documentation path. P8-S5 is
+  complete. This seven-owner post-publication synchronization is documentation
+  only; P8-S6 has not started, and Phase 8 and the overall project remain
+  incomplete.
 - 2026-08-04: The dedicated P8-S4 implementation plan was independently
   approved, committed, and user-published at
   `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The resulting exact nine-path
@@ -4345,9 +4384,10 @@ deployment, or work outside a separately authorized phase.
   passing legacy-compatibility owner, canonical Offline verification with
   1,978 passed and 182 expected skips, plus successful compilation, doctor,
   `pip check`, Alembic heads/history, and Git diff checks. No real MySQL or live
-  Provider verification belonged to P8-S4. This exact seven-document candidate
-  synchronizes only the post-publication status; P8-S5 and P8-S6 remain
-  unstarted, and Phase 8 and the overall project remain incomplete.
+  Provider verification belonged to P8-S4. That exact seven-document candidate
+  synchronized only the P8-S4 post-publication status. At that historical
+  synchronization point P8-S5 and P8-S6 remained unstarted; the P8-S5 entry
+  above records the superseding current status.
 - 2026-07-29: P4-G0 prepared the five-path documentation-only minimum
   Run-core authority candidate after Phase 3 was independently approved,
   committed, and pushed at `cafb12272e703e8751c78bb6852cec90d7d7ec8d`.

@@ -15,16 +15,23 @@ plan was independently approved, committed, and published at
 `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
 was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
-manually published by the user. P8-S4 is complete. These current worktree bytes
-are the separate exact-seven post-publication documentation synchronization
-candidate; they are unstaged, uncommitted, unpublished, and do not authorize
-P8-S5 or P8-S6.**
+manually published by the user. P8-S4 is complete, and its post-publication
+documentation synchronization was committed and published at
+`60938260b3e63fffbe849a9a6de8863b7f429897`. The dedicated P8-S5
+implementation plan was independently approved, committed, and published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86` and remained frozen. Its corrected
+implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`,
+was committed and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`,
+and completes P8-S5. These current worktree bytes are the separate P8-S5
+post-publication documentation synchronization candidate; they are unstaged,
+uncommitted, unpublished, and do not authorize P8-S6.**
 
 The parent-amendment verdict above is historical and binds only the published
 amendment bytes. The original planning verdict, parent-amendment verdict,
-P8-S4 plan verdict, and P8-S4 implementation verdict cannot approve this
-post-publication synchronization candidate, a later documentation commit,
-P8-S5, or P8-S6.
+P8-S4 verdicts, P8-S5 plan verdict, and P8-S5 implementation verdict cannot
+approve this post-publication synchronization candidate, a later documentation
+commit, or P8-S6.
 
 Phase 5 is complete at the published P5-S3 baseline
 `34d063e387cde69500e4dc018ff087e87f3eee74`
@@ -62,9 +69,18 @@ nine-path implementation received
 `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
 was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
 (`feat(player-character): complete P8-S4 demo persistence`), and was manually
-published by the user. P8-S4 is complete. P8-S5 Web connection and P8-S6
-cross-surface evidence/final status closure have not started, and Phase 8 and
-the overall project remain incomplete. P8-S5 may begin only after this separate
+published by the user. P8-S4 is complete, and its post-publication
+documentation synchronization was committed and published at
+`60938260b3e63fffbe849a9a6de8863b7f429897`. The dedicated
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+was independently approved and published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained frozen during
+implementation, and its corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+The exact eight-path Web implementation was committed and published at
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
+cross-surface evidence/final status closure has not started, and Phase 8 and
+the overall project remain incomplete. P8-S6 may begin only after this P8-S5
 post-publication synchronization is independently reviewed, committed under
 separate authorization, user-published, and confirmed as a clean aligned
 baseline.
@@ -168,8 +184,8 @@ Authority remains divided by subject:
 | --- | --- | --- |
 | [Final Narrative Experience](final_narrative_experience.md) | Approved product authority | Persistent character and Run identity; model/server separation; minimum reading-first direction |
 | [Structured Player Character Contract](structured_player_character_contract.md) | Approved and frozen, partially implemented | Character identity, lifecycle, ownership, applicable reference, binding cardinality, privacy |
-| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus the completed and published P8-S3 normal and P8-S4 Demo reachability of the Session-backed exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
-| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus discovery implemented at P8-S1, internal admission at P8-S2, normal public admission at P8-S3, and unchanged-contract Demo parity at P8-S4 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
+| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus completed and published P8-S3 normal, P8-S4 Demo, and P8-S5 Web reachability of the Session-backed exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
+| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus discovery implemented at P8-S1, internal admission at P8-S2, normal public admission at P8-S3, unchanged-contract Demo parity at P8-S4, and contract consumption at P8-S5 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
 | [Minimum Run Core Plan](minimum_run_core_implementation_plan.md) | Completed historical implementation authority | Run schema, repositories, UoW, identities, participation, receipts, transaction precedent |
 | [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, and synchronized with the approved and published Phase 8 planning authority | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
 | [Architecture](architecture.md) and committed source | Current implemented fact | Composition, Session lifecycle, Demo isolation, persistence and dependency direction |
@@ -264,8 +280,18 @@ was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. The public legacy
 Session-create route remains unbound. P8-S4 now supplies process-local Demo
 Player Character and Run repository/service composition without MySQL or
-production durability. The P8-S5 Web Player Character and Run-entry methods
-remain absent, and P8-S5 remains unstarted.
+production durability. Published P8-S5 adds the Web Player Character
+create/discovery and Run-entry client methods and connects the primary rendered
+journey to them. Scenario discovery and eligible selection—or one minimal
+creation when no eligible character exists—lead to Run entry, the validated
+same-tab Session recovery write, authoritative View loading, and the existing
+action/status/recovery/terminal loop. The primary journey does not use the
+legacy Session-create route, which remains available for existing uses.
+Run-entry and character-creation attempts preserve their exact pre-POST
+idempotency key/body pair, uncertainty-aware explicit manual retry,
+single-flight behavior, stale-completion isolation, and privacy boundaries.
+After Session recovery storage succeeds, safe View recovery is GET-only and
+does not replay Run entry.
 
 Those are the only connections Phase 8 fills.
 
@@ -815,8 +841,8 @@ behavior. An implementer must not create a convenience migration.
 | P8-S1 | Add bounded owned active-unbound character discovery | Approved/published P8-G0 | Implemented, accepted, committed, and published at `95ffe4019e2a69967dfae1fee2a1ecba4a628381` |
 | P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Implemented, accepted, committed, and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; closed with no public route |
 | P8-S3 | Activate normal-app Run-entry API and composition | Accepted/published P8-S2 | Complete: focused independent read-only approval, then committed and published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1` with exactly 3 production, 5 test, and 7 documentation paths |
-| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Complete: independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; separate seven-document post-publication synchronization pending review/publication |
-| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Unimplemented; Web connection remains deferred here |
+| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Complete: independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; post-publication synchronization committed and published at `60938260b3e63fffbe849a9a6de8863b7f429897` |
+| P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Complete: corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; separate post-publication synchronization is the current unstaged candidate |
 | P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Unimplemented; cross-surface evidence and final status closure remain deferred here |
 
 Each slice is separately authorized, leaves an unstaged reviewable candidate,
@@ -1132,8 +1158,9 @@ synchronization finding. The complete 15-path candidate later received focused
 independent read-only approval and was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 then
 received the exact approval and publication recorded in section 20.5. P8-S5
-and P8-S6 have not started, Phase 8 and the overall project remain incomplete,
-and no live Provider was called.
+then received the exact approval and publication recorded in section 20.6.
+P8-S6 has not started, Phase 8 and the overall project remain incomplete, and
+no live Provider was called.
 
 ### 20.5 P8-S4 — Deterministic Demo parity
 
@@ -1201,10 +1228,11 @@ paths, zero dependency paths, and zero generated paths.
 
 **Post-publication documentation-sync path budget: exactly seven and
 separate from implementation/test:** the common exact seven Phase 8 owners
-above. All seven are inspected and synchronized in this separate candidate
-after P8-S4 publication; they are not counted in either the nine mandatory
-implementation/test paths or the conditional maximum of ten. This candidate
-does not authorize its own review, commit, publication, P8-S5, or P8-S6.
+above. All seven were inspected and synchronized after P8-S4 publication; they
+were not counted in either the nine mandatory implementation/test paths or the
+conditional maximum of ten. That synchronization was committed and published
+at `60938260b3e63fffbe849a9a6de8863b7f429897`; it did not authorize its own
+review, commit, publication, P8-S5, or P8-S6.
 
 **Transaction/persistence:** one process-local atomic store publication; exact
 rollback and lock semantics matching application contracts. No database,
@@ -1235,7 +1263,7 @@ published by the user.
 ### 20.6 P8-S5 — Minimum Web connection
 
 **Purpose:** connect existing rendered controls to server authority without a
-frontend redesign.
+frontend redesign. This purpose is implemented and published.
 
 **Production path budget: at most four:**
 
@@ -1257,10 +1285,20 @@ impossible. Such a defect is a stop condition, not silent scope growth.
 - `web/src/test/fixtures.ts`;
 - `web/src/test/server.ts`.
 
+The later approved and frozen
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+narrowed the actual implementation inventory to exactly three production paths
+(`schemas.ts`, `client.ts`, and `App.tsx`) and exactly five test/support paths
+(`client.test.ts`, `App.test.tsx`, `App.action-loop.test.tsx`,
+`App.recovery.test.tsx`, and `fixtures.ts`). `styles.css`, `server.ts`, and
+`sessionRecovery.ts` remained unchanged. That plan was committed and published
+at `dceecaf0d7a33ccde07f519f83997489acd5fc86` and remained frozen.
+
 **Documentation path budget: at most seven:** limited to the common exact seven
 Phase 8 owners above. Edit only applicable owners, and make all applicable
-authority/status/evidence/next-action wording truthful before P8-S5 independent
-review.
+authority/status/evidence/next-action wording truthful. This separate
+post-publication synchronization follows P8-S5 implementation review, commit,
+and publication and precedes P8-S6.
 
 **Persistence:** existing Session `sessionStorage` record only, plus unresolved
 Player Character creation and Run-entry key/body pairs in current component/
@@ -1282,8 +1320,9 @@ storage cannot recover the component-memory attempt, terminal View, clear
 behavior, cancellation/late-response isolation, runtime schema rejection,
 build, typecheck, lint, and deterministic-demo mode.
 
-Within the already authorized `web/src/App.recovery.test.tsx` path, P8-S5 must
-add one mandatory history-sensitive regression proving all of the following:
+Within the authorized `web/src/App.recovery.test.tsx` path, the approved frozen
+P8-S5 plan required one mandatory history-sensitive regression proving all of
+the following:
 
 1. the first POST commits, or is simulated as committed, but its response is
    lost;
@@ -1297,6 +1336,20 @@ add one mandatory history-sensitive regression proving all of the following:
 
 This evidence adds no new test path, automatic recovery, receipt/Run discovery,
 background retry, or durable pending-operation client store.
+
+**Completion:** all three earlier review findings were confirmed corrected,
+AC-01 through AC-20 passed, and the corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`
+with no actionable findings. Focused frontend verification reported 207 passed
+and one skipped; typecheck, zero-warning lint, and the 100-module build passed.
+Canonical Offline verification reported 1,978 passed and 182 skipped, and
+`git diff --check` passed. The exact eight-path implementation was committed
+and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`
+(`feat(web): connect player characters to playable run flow`) with no
+documentation or unauthorized path. The accepted provider-backed action path
+traverses `202`, request-status `PENDING`, request-status `COMMITTED`, and the
+authoritative View, then preserves the established terminal behavior. P8-S5 is
+complete. This separate documentation candidate does not start P8-S6.
 
 ### 20.7 P8-S6 — Evidence and status closure
 
@@ -1330,8 +1383,8 @@ The following requirements apply together with the detailed budgets above:
 | P8-S1 | Implement only `GET /v1/player-characters/eligible-for-run-entry` and its exact DTO/OpenAPI contract | Read-only repository/UoW; no lock, receipt, write, commit, schema, or migration | No general list/search/filter/page/count/admin, Run mutation, Demo activation, or Web work | Focused unit/API/OpenAPI plus real-MySQL ordering/bound/ownership/no-write evidence, `compileall`, Offline, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S1 implementation review and separately authorized P8-S1 commit before P8-S2 |
 | P8-S2 | No public route; implement only trusted composite admission and the narrow Run activation authority | Existing tables; one entry-owned UoW/commit; repositories only flush | No API/composition activation, Demo/Web, terminal Run transition, later Session, Provider, schema, or migration | Focused domain/service plus real-MySQL atomicity, replay, concurrency, rollback, reconstruction, Alembic-parity, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S2 implementation review and separately authorized P8-S2 commit before P8-S3 |
 | P8-S3 | Implement only normal-app `POST /v1/runs`, exact DTO/errors/OpenAPI, and lazy composition | API/composition own no transaction; entry service remains sole UoW/commit owner; no schema or migration | No public Run read/list/bind/attach/terminal/admin, Demo/Web, Provider, deployment, or auth redesign | Focused API/OpenAPI/composition plus one real-MySQL public `POST /v1/runs`-to-terminal playthrough through every canonical action/request-status/View step and persisted Run/Session/gameplay state, cancellation, privacy, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S3 implementation review and separately authorized P8-S3 commit before P8-S4 |
-| P8-S4 | Add deterministic Demo parity for the already frozen Player Character discovery/create and Run-entry routes | One process-local atomic publication with rollback/lock parity; no database or migration | No normal-composition change, Web work, external I/O, credentials, Provider, or persistence guarantee after process exit | Completed focused Demo repository/composition/e2e determinism, executable-child complete generator/snapshot reconstruction, complete backend journey, `compileall`, Offline, and diff checks | Implementation independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; this separate exact-seven post-publication synchronization must be reviewed, separately committed, user-published, and confirmed before P8-S5 |
-| P8-S5 | Consume only the frozen create/discovery/entry contracts and existing Session gameplay protocol | Existing same-tab Session `sessionStorage` record plus unresolved key/body pairs in current component/process memory only; no durable pending-operation state | No server behavior, client lifecycle authority, optimistic binding, profile/search/admin UI, redesign, automatic retry, or reload/cross-context pending-operation recovery guarantee | Focused runtime-schema/client/rendered-loop/recovery tests prove pre-POST key creation, exact manual same-key/body retry, no automatic/replacement retry, history-sensitive 404 retention after an uncertainty-tainted send, precise clear/retain outcomes, honest pre-Session-storage reload limitation, plus typecheck, lint, build, Demo-backed playthrough, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S5 implementation review and separately authorized P8-S5 commit before P8-S6 |
+| P8-S4 | Add deterministic Demo parity for the already frozen Player Character discovery/create and Run-entry routes | One process-local atomic publication with rollback/lock parity; no database or migration | No normal-composition change, Web work, external I/O, credentials, Provider, or persistence guarantee after process exit | Completed focused Demo repository/composition/e2e determinism, executable-child complete generator/snapshot reconstruction, complete backend journey, `compileall`, Offline, and diff checks | Implementation published at `187d41ba3035c8d717c2fb2578a805402255d979`; post-publication synchronization published at `60938260b3e63fffbe849a9a6de8863b7f429897` before P8-S5 |
+| P8-S5 | Consume only the frozen create/discovery/entry contracts and existing Session gameplay protocol | Existing same-tab Session `sessionStorage` record plus unresolved key/body pairs in current component/process memory only; no durable pending-operation state | No server behavior, client lifecycle authority, optimistic binding, profile/search/admin UI, redesign, automatic retry, or reload/cross-context pending-operation recovery guarantee | Completed focused runtime-schema/client/rendered-loop/recovery tests prove pre-POST key creation, exact manual same-key/body retry, no automatic/replacement retry, history-sensitive 404 retention after an uncertainty-tainted send, precise clear/retain outcomes, honest pre-Session-storage reload limitation, plus typecheck, lint, build, Demo-backed playthrough, and diff checks | Corrected implementation independently approved, committed, and published at `2ce56a757beed8a3989d38453da3b6d80342ca05`; synchronize every applicable owner within the seven-document maximum, then independently review, separately commit, user-publish, and confirm this documentation candidate before P8-S6 |
 | P8-S6 | Synchronize implemented facts and close only Phase 8 | No expected production/test mutation; documentation/status only unless work returns to an owning slice | No late feature, duplicate production playthrough, defect fix without regression ownership, deployment, release, Provider, or Phase 6/7 completion | Re-run P8-S3's accepted MySQL entry-to-terminal test and applicable focused/Offline/MySQL/Full/Alembic/Web/Demo evidence; canonical documentation synchronization | Fresh independent complete-Phase-8 review, then separate completion-commit authorization; user push only |
 
 ## 21. Acceptance and evidence matrix
@@ -1351,7 +1404,7 @@ The following requirements apply together with the detailed budgets above:
 | Web | Runtime schema/client tests for both logical-mutation key/body lifetimes, including uncertainty-tainted retention through a later authorization/non-enumerating 404, and rendered full loop through existing terminal View | Durable pending-operation storage, reload-before-Session-storage or cross-device recovery, redesign, profile UI |
 | Existing gameplay | P8-S3 real-MySQL public Run-entry-to-terminal path plus Demo/Web paths through every canonical action step | New scenario/content or Provider behavior |
 | Schema stability | ORM/metadata parity, Alembic `heads`/`history`, no migration diff | New migration |
-| Documentation | For each P8-S1 through P8-S5 boundary, truthful synchronization of every applicable owner within the exact seven-document maximum before the next slice; P8-S4 follows its published post-implementation/publication synchronization sequence; focused links/fences, `git diff --check`, canonical checklist | Mechanical edits to unchanged owners or admission of production/test/migration/generated/dependency/configuration paths through the documentation allowance |
+| Documentation | For each P8-S1 through P8-S5 boundary, truthful synchronization of every applicable owner within the exact seven-document maximum before the next slice; P8-S4 and P8-S5 follow their post-implementation/publication synchronization sequences; focused links/fences, `git diff --check`, canonical checklist | Mechanical edits to unchanged owners or admission of production/test/migration/generated/dependency/configuration paths through the documentation allowance |
 
 Optional additional fuzzing, load testing, manual browser exploration, or UX
 polish may be useful but is not a Phase 8 acceptance gate unless a confirmed
@@ -1411,6 +1464,7 @@ npm --prefix web run test:run -- <focused Web paths>
 npm --prefix web run typecheck
 npm --prefix web run lint
 npm --prefix web run build
+.\scripts\verify.ps1 -Mode Offline
 git diff --check
 ```
 
@@ -1447,9 +1501,11 @@ The published P8-G0 sequence was:
    candidate, run its required local validation, obtain a fresh independent
    review only after all applicable owners are truthful, obtain separate commit
    authorization, and let the user push before beginning the next slice. P8-S4
-   follows the narrower published slice plan's explicit sequence: implementation
-   review, commit, and user publication first, then this separate exact-seven
-   post-publication synchronization review/commit/publication before P8-S5; and
+   followed the narrower published slice plan's explicit implementation review,
+   commit, user-publication, and post-publication synchronization sequence
+   before P8-S5. P8-S5 likewise follows implementation review, commit, and user
+   publication first, then this separate at-most-seven-owner post-publication
+   synchronization review/commit/publication before P8-S6; and
 9. after P8-S6, obtain one fresh independent review of the complete Phase 8
    implementation and synchronized documentation before any completion commit.
 

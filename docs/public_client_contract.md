@@ -863,10 +863,9 @@ objective.
 
 ## Phase 8 Player Character discovery and Run entry
 
-Status: **P8-S4 deterministic Demo parity for the existing Player Character and
-Run-entry contract is implemented, independently approved, committed, published,
-and complete; P8-S5 Web connection and P8-S6 final evidence/status closure have
-not started.**
+Status: **P8-S5 consumption of the existing Player Character, Run-entry, and
+Session gameplay contracts is implemented, independently approved, committed,
+published, and complete; P8-S6 final evidence/status closure has not started.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -901,11 +900,19 @@ was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
 manually published by the user. P8-S4 composes the existing public Player
 Character create/read/retirement, eligible discovery, and Run-entry operations
 in deterministic Demo without adding a Demo-specific request, response, error,
-privacy, recovery, route, or OpenAPI contract. P8-S5 Web connection and P8-S6
-cross-surface evidence/final status closure have not started. Phase 8 and the
-overall project remain incomplete. Phase 5 remains complete at P5-S3; no P5-S4
-exists. Existing Phase 6 and Phase 7 allocations remain planned and
-unimplemented, and neither is a Phase 8 prerequisite.
+privacy, recovery, route, or OpenAPI contract. The dedicated
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+was independently approved and committed/published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained frozen during
+implementation, and its corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+The exact eight-path Web implementation was committed and published at
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 consumes the existing
+contracts without changing any public DTO, error, privacy, recovery, route, or
+OpenAPI authority. P8-S6 cross-surface evidence/final status closure has not
+started. Phase 8 and the overall project remain incomplete. Phase 5 remains
+complete at P5-S3; no P5-S4 exists. Existing Phase 6 and Phase 7 allocations
+remain planned and unimplemented, and neither is a Phase 8 prerequisite.
 
 ### Eligible-character collection
 
@@ -1064,11 +1071,14 @@ validation body is not public contract.
 
 ### Client and recovery boundary
 
-The minimal client may create a character through the existing route, render
-the eligible collection, select one item and one public scenario, submit Run
-entry as one logical attempt, store only the returned Session ID through the
-existing same-tab recovery helper, read the authoritative View, and reuse the
-current action, polling, refresh, and terminal loop.
+The primary Web client now discovers public scenarios and eligible Player
+Characters, creates one minimal character through the existing route only when
+the eligible collection is empty, selects one exact eligible projection and one
+scenario, submits Run entry as one logical attempt, validates the response,
+persists the existing same-tab Session recovery record, reads the authoritative
+View, and reuses the current action, polling, refresh, recovery, and terminal
+loop. That journey does not use the legacy `POST /v1/sessions` route; the route
+and `PublicApiClient.createSession` remain available for existing uses.
 
 For both Player Character creation and Run entry, one logical mutation attempt
 has one exact idempotency key and one exact request body. The Web client MUST:
@@ -1118,6 +1128,15 @@ also unsupported. Phase 8 adds no `localStorage`, new `sessionStorage`
 pending-operation record, IndexedDB, receipt-discovery route, Run-discovery
 route, other server discovery route, durable pending-operation store,
 automatic recovery, or background retry.
+
+After a validated Run-entry success, the client persists the Session recovery
+record before its first authoritative View read and before clearing the
+retained Run-entry pair. Once that record is durable in the current tab, safe
+View recovery uses `GET /v1/sessions/{session_id}/view` and never replays the
+Run-entry mutation. Single-flight and component-generation ownership prevent
+duplicate sends and stale completions; public UI, errors, URLs, logs, and
+storage do not expose the idempotency key or private authority/persistence
+detail.
 
 The client does not infer eligibility, binding, lifecycle, scenario outcome, or
 Run state. It adds no Run/character recovery record, optimistic state,

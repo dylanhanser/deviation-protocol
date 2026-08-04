@@ -564,8 +564,16 @@ was independently approved and committed/published at
 `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
 was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
 manually published by the user. P8-S4 deterministic Demo parity is complete.
-P8-S5 Web connection and P8-S6 cross-surface evidence/final status closure have
-not started. Phase 8 and the overall project remain incomplete.
+The dedicated
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+was independently approved and committed/published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained frozen during
+implementation, and its corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+The exact eight-path Web implementation was committed and published at
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
+cross-surface evidence/final status closure has not started. Phase 8 and the
+overall project remain incomplete.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
@@ -589,8 +597,7 @@ The Phase 8 architecture reuses the current MySQL/`AsyncSession` Unit of Work,
 Player Character aggregate and detached projection, Run revision/current/
 receipt families, P4-S1 binding seam, separate Session participation, existing
 Session initialization/action/View lifecycle, and independent deterministic
-Demo composition. Through P8-S4 the first four items below are implemented; the
-final P8-S5 item remains planned:
+Demo composition. Through P8-S5 all five items below are implemented:
 
 - a bounded owned, active, currently unbound character discovery query;
 - one application-owned atomic admission transaction that creates Run/line,
@@ -599,8 +606,23 @@ final P8-S5 item remains planned:
 - one normal `POST /v1/runs` route plus exact public DTO/OpenAPI behavior;
 - process-local Demo adapters for the existing Player Character and Run ports;
   and
-- the still-planned P8-S5 minimum existing-Web create-or-reuse/select/start
-  connection.
+- the P8-S5 minimum existing-Web create-or-reuse/select/start connection.
+
+The primary Web composition now joins scenario discovery and eligible Player
+Character discovery, creates one minimal character only when the eligible set
+is empty, enters a Run with the selected exact projection revision, persists
+the validated returned Session recovery record before loading the authoritative
+View, and then reuses the established action/request-status/View/terminal loop.
+The client does not call the legacy `POST /v1/sessions` route on this primary
+journey; that route and its client method remain available for existing uses.
+Run-entry mutation attempts preserve one pre-POST idempotency key and exact
+body, remain single-flight, never retry automatically, and retain uncertain
+attempts for explicit exact manual retry. Once Session storage succeeds, safe
+View recovery is GET-only and never replays Run entry. Component-generation
+guards prevent stale completions from mutating replacement client state, and
+public UI/errors/storage continue to exclude the operation key and private
+authority or persistence facts. P8-S5 changed no backend, database, migration,
+provider, deployment, or Run-lifecycle authority.
 
 The P8-S2 transaction has one owner and one commit. It creates Run revisions
 1/2/3 for creation, binding, and first Session participation/activation,

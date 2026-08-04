@@ -25,8 +25,14 @@ approved and committed/published at
 `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
 was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
 manually published by the user. P8-S4 deterministic Demo parity is complete;
-P8-S5 and P8-S6 have not started. Phase 8 and the overall project remain
-incomplete; this status does not mark Phase 3.3, Phase 6, or Phase 7 complete.**
+the dedicated P8-S5 implementation plan was independently approved and
+committed/published at `dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained
+frozen during implementation, and its corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+The exact eight-path Web implementation was committed and published at
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6 has not
+started. Phase 8 and the overall project remain incomplete; this status does
+not mark Phase 3.3, Phase 6, or Phase 7 complete.**
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -111,7 +117,7 @@ binding route or the `active` lifecycle transition.
 ## Phase 8 Session-backed minimum admission
 
 Status: **Implemented through completed, independently approved, committed, and
-published P8-S4 deterministic Demo parity; Phase 8 remains incomplete**
+published P8-S5 minimum Web connection; Phase 8 remains incomplete**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -144,8 +150,15 @@ parity was then implemented under the dedicated approved plan, independently
 approved with
 `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
 committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and manually
-published by the user. P8-S4 is complete. P8-S5 Web connection and P8-S6
-cross-surface evidence/final status closure have not started.
+published by the user. P8-S4 is complete. The dedicated
+[P8-S5 implementation plan](structured_player_character_p8_s5_implementation_plan.md)
+was independently approved and committed/published at
+`dceecaf0d7a33ccde07f519f83997489acd5fc86`, remained frozen during
+implementation, and its corrected implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S5_CORRECTED_IMPLEMENTATION_REVIEW_APPROVED`.
+The exact eight-path Web implementation was committed and published at
+`2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. P8-S6
+cross-surface evidence/final status closure has not started.
 
 ### Narrow authority amendment
 
@@ -225,6 +238,22 @@ not reuse an already emitted deterministic identity.
 After admission, the existing Session View/action/request-status protocol is
 the only Phase 8 progression authority. Current stale, pending, uncertain,
 Provider-failure, rollback, and same-tab recovery rules remain unchanged.
+
+Published P8-S5 now connects the primary Web journey to the existing public
+Player Character discovery/create and Run-entry contracts, then to the existing
+Session progression protocol. It does not use the legacy `POST /v1/sessions`
+route for that journey; the route remains available for existing uses. A
+validated Run-entry success is persisted through the existing same-tab Session
+recovery record before the authoritative View is loaded. Thereafter safe View
+recovery is GET-only and never replays Run entry. Mutation uncertainty retains
+the exact pre-POST idempotency key/body pair for explicit manual retry only,
+with no automatic retry, duplicate in-flight send, stale-completion authority,
+or disclosure of the key or private Run authority.
+
+The accepted rendered provider-backed action path continues through the
+established `202` response, request-status `PENDING`, request-status
+`COMMITTED`, and authoritative View refresh. Existing terminal behavior remains
+the Session/scenario behavior below; P8-S5 adds no Run terminal transition.
 
 In Demo, a failed View read after committed admission likewise does not undo
 the Run, binding, Session, participation, activation, or receipts. The returned
