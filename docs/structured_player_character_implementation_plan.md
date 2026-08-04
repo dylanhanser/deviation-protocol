@@ -95,9 +95,14 @@ passed/124 expected skips, MySQL 136 passed, and Full 1,937 passed/one opt-in
   synchronization finding. The complete 15-path candidate then received focused
   independent read-only approval and was committed and published at
   `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 Demo
-  parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final status
-  closure have not started. Phase 8 and the overall project remain incomplete.
-  Push by Codex, deployment,
+  parity was implemented under the dedicated independently approved plan
+  published at `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The implementation
+  received
+  `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+  was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+  manually published by the user. P8-S4 is complete. P8-S5 Web connection and
+  P8-S6 cross-surface evidence/final status closure have not started. Phase 8
+  and the overall project remain incomplete. Push by Codex, deployment,
   release, later runtime activation, and Provider work remain deferred.**
 
 Phase 2 is committed, pushed, and closed at
@@ -3803,11 +3808,21 @@ actionable technical defect but returned `CHANGES_REQUIRED` solely for one
 Medium documentation-synchronization finding. The complete 15-path candidate
 then received focused independent read-only approval and was committed and
 published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
-P8-S4 planning and implementation, P8-S5 Web connection, and P8-S6 cross-surface
-evidence/final status closure have not started. Phase 8 and the overall project
-remain incomplete. Correct P8-S4 implementation-plan authoring may begin only
-after this post-publication status synchronization is independently reviewed,
-committed, and published; P8-S4 implementation remains unauthorized.
+The dedicated
+[P8-S4 implementation plan](structured_player_character_p8_s4_implementation_plan.md)
+received exact independent approval and was committed/published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its nine-path implementation
+received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 is complete: the existing Player
+Character, Run, Run-entry, and Session services are composed over deterministic
+process-local Demo persistence without changing normal composition, schema, or
+public contract. P8-S5 Web connection and P8-S6 cross-surface evidence/final
+status closure have not started. Phase 8 and the overall project remain
+incomplete. P8-S5 is the next gated slice, subject to fresh authorization only
+after this exact seven-document post-publication synchronization is reviewed,
+committed, published, and confirmed on an aligned clean baseline.
 Later modifications
 to the planning-authority bytes require fresh exact-byte independent review
 before a separately authorized documentation commit; that commit precedes user
@@ -3906,8 +3921,11 @@ accepted implementation. It follows
   `CHANGES_REQUIRED` solely for one Medium documentation-synchronization
   finding. The complete 15-path candidate later received focused independent
   read-only approval and was committed and published at
-  `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 through
-  P8-S6 have not started, and Phase 8 and the overall project remain incomplete.
+  `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4
+  deterministic Demo parity is complete under the approved plan; the
+  independently approved implementation was committed and published at
+  `187d41ba3035c8d717c2fb2578a805402255d979`. P8-S5 and P8-S6 have not
+  started, and Phase 8 and the overall project remain incomplete.
 
 ### Deliberately untouched unless a later phase proves a narrow need
 
@@ -3916,9 +3934,9 @@ accepted implementation. It follows
 | `src/deviation_protocol/application/narrative_models.py` (owner of `NarrativeProvider`), `src/deviation_protocol/application/narrative_validation.py`, `src/deviation_protocol/application/narrative_turn_orchestrator.py`, and Provider adapters | Candidate-only boundary already fits; no character mutation field is needed |
 | `src/deviation_protocol/domain/player_memory.py` and `src/deviation_protocol/application/player_memory.py` | Current bounded memory authority remains intact; full integration deferred |
 | scenario content, static character definitions, and `config` | Templates/content must not become canonical identity |
-| `web` | No creation UI or frontend redesign in the first slice |
+| `web` | P8-S5 Web connection remains separately allocated and unstarted |
 | existing frozen product specifications | Implementation may not change approved product rules |
-| Phase 3.2 Demo launcher/smoke/provider | Phase 3.2b remains closed; Demo parity needs separate explicit scope |
+| Phase 3.2 Demo launcher/smoke/provider | Phase 3.2b remains closed; P8-S4 reused its established seams without editing these paths |
 
 During an authorized implementation closeout, documentation likely requiring
 truthful synchronization includes `PLANS.md`, `docs/architecture.md`, this
@@ -4315,6 +4333,21 @@ deployment, or work outside a separately authorized phase.
 
 ## 32. Review history
 
+- 2026-08-04: The dedicated P8-S4 implementation plan was independently
+  approved, committed, and user-published at
+  `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The resulting exact nine-path
+  implementation received
+  `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+  was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
+  (`feat(player-character): complete P8-S4 demo persistence`), and was manually
+  published by the user. Its independently reviewed pre-commit evidence
+  recorded 451 passing tests across the five mandatory direct owners, one
+  passing legacy-compatibility owner, canonical Offline verification with
+  1,978 passed and 182 expected skips, plus successful compilation, doctor,
+  `pip check`, Alembic heads/history, and Git diff checks. No real MySQL or live
+  Provider verification belonged to P8-S4. This exact seven-document candidate
+  synchronizes only the post-publication status; P8-S5 and P8-S6 remain
+  unstarted, and Phase 8 and the overall project remain incomplete.
 - 2026-07-29: P4-G0 prepared the five-path documentation-only minimum
   Run-core authority candidate after Phase 3 was independently approved,
   committed, and pushed at `cafb12272e703e8751c78bb6852cec90d7d7ec8d`.

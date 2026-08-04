@@ -530,10 +530,9 @@ and re-corrected candidates received `CHANGES_REQUIRED`; the later evidence
   is not a current unstaged candidate, and Phase 8 planning does not reopen it.
   Deployment, release, broader runtime activation, and Provider work remain
   deferred.
-Frontend activation, Demo
-behavior, Provider behavior, Run Protocol integration, narrative integration,
-scenario integration, combat integration, and broader public gameplay
-activation remain deferred. P4-S1 alone is complete; no broader Phase 4
+P4-S1 itself activated no frontend, Demo, Provider, Run Protocol, narrative,
+scenario, combat, or broader public gameplay behavior. Later Phase 5 and Phase
+8 activation is described below. P4-S1 alone is complete; no broader Phase 4
 completion is implied.
 
 ## Phase 8 Run-entry and playable-loop boundary
@@ -558,10 +557,15 @@ independent read-only re-review found no remaining actionable technical defect
 but formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
 synchronization finding. The complete 15-path candidate then received focused
 independent read-only approval and was committed and published at
-`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
-P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure have not started. Phase 8 and the overall project remain
-incomplete.
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. The dedicated
+[P8-S4 implementation plan](structured_player_character_p8_s4_implementation_plan.md)
+was independently approved and committed/published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 deterministic Demo parity is complete.
+P8-S5 Web connection and P8-S6 cross-surface evidence/final status closure have
+not started. Phase 8 and the overall project remain incomplete.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
@@ -573,16 +577,20 @@ controller resolver, Player Character evidence reader, shared SQLAlchemy UoW
 factory, and already-built `SessionService`. The API adapter owns no UoW,
 repository call, commit, replay lookup, retry, or post-result persistence; it
 forwards the trusted principal and one strict command to the existing entry
-coordinator at most once. Demo composition remains independent, has no entry
-service, and exposes no `/v1/runs` route. Real-MySQL production-ASGI evidence
-passed through the canonical 19-action terminal journey with a scripted
-no-network Provider; no live Provider was called.
+coordinator at most once. P8-S4 leaves that normal composition unchanged and
+composes the same Player Character, Run, Run-entry, and Session services in the
+independent Demo root over one process-local store. Existing conditional route
+registration now exposes the already-defined Player Character operations and
+`POST /v1/runs` in Demo without duplicate routes or OpenAPI operations.
+Real-MySQL production-ASGI evidence remains owned by P8-S3. P8-S4 added no
+MySQL or live-Provider claim.
 
-The planned architecture reuses the current MySQL/`AsyncSession` Unit of Work,
+The Phase 8 architecture reuses the current MySQL/`AsyncSession` Unit of Work,
 Player Character aggregate and detached projection, Run revision/current/
 receipt families, P4-S1 binding seam, separate Session participation, existing
 Session initialization/action/View lifecycle, and independent deterministic
-Demo composition. It adds only:
+Demo composition. Through P8-S4 the first four items below are implemented; the
+final P8-S5 item remains planned:
 
 - a bounded owned, active, currently unbound character discovery query;
 - one application-owned atomic admission transaction that creates Run/line,
@@ -591,9 +599,10 @@ Demo composition. It adds only:
 - one normal `POST /v1/runs` route plus exact public DTO/OpenAPI behavior;
 - process-local Demo adapters for the existing Player Character and Run ports;
   and
-- the minimum existing-Web create-or-reuse/select/start connection.
+- the still-planned P8-S5 minimum existing-Web create-or-reuse/select/start
+  connection.
 
-The planned transaction has one owner and one commit. It creates Run revisions
+The P8-S2 transaction has one owner and one commit. It creates Run revisions
 1/2/3 for creation, binding, and first Session participation/activation,
 respectively. Existing schema `20260729_0005` already admits those lifecycle,
 mutation, binding, receipt, participation, and uniqueness forms; Phase 8
@@ -638,18 +647,28 @@ The Phase 3.2a Demo has an independent composition root,
 
 - `DeterministicDemoNarrativeProvider`;
 - `DemoProcessStore`, a process-local transactional implementation of the
-  existing persistence ports;
-- deterministic Session/event/job/lease/worker ID sequences, Session seeds,
-  and one shared logical UTC clock; and
+  existing Session, Player Character, Run, receipt, participation, and gameplay
+  persistence ports, with detached reconstruction, locking reads, CAS,
+  uniqueness enforcement, rollback, and one atomic UoW publication;
+- independent deterministic Player Character, Run, and continuous-story-line
+  identity sequences alongside the existing Session/event/job/lease/worker ID
+  sequences, Session seeds, and one shared logical UTC clock;
+- the existing `PlayerCharacterService`, `RunService`, `RunEntryService`, and
+  single shared `SessionService`, using the fixed Demo principal/controller
+  authority and existing service-conditional route registration; and
 - `CanonicalDemoNarrativeTurnOrchestrator`, which preserves the normal
   validation, outcome-policy, issuer, StoryDirector, and public API authority
   chain.
 
 The Demo composition does not create a database engine, read Provider
 credentials, call DeepSeek, or serve as a normal-composition fallback. Demo
-state lasts only for that backend process. Cross-process replay tests exercise
-fresh OS processes and compare the complete public path plus the private
-test-only generator trace.
+state and receipts last only for that backend process. Within one process,
+exact create and Run-entry replay returns committed results without a new
+mutation or generator consumption; values already emitted before rollback are
+not rewound. Fresh-process evidence executes scenario discovery, Player
+Character create/discovery, Run entry, authoritative View, and the canonical
+19-action ending in separate OS processes and compares deterministic public and
+generator traces without non-loopback network or real Provider access.
 
 ## Phase 3.2b local Demo Web boundary
 

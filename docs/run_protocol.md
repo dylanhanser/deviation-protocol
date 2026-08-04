@@ -19,9 +19,14 @@ remaining actionable technical defect but formally returned `CHANGES_REQUIRED`
 solely for one Medium documentation-synchronization finding. The complete
 15-path candidate then received focused independent read-only approval and was
 committed and published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`.
-P8-S3 is complete. P8-S4, P8-S5, and P8-S6 have not started. Phase 8 and the
-overall project remain incomplete; this status does not mark Phase 3.3, Phase
-6, or Phase 7 complete.**
+P8-S3 is complete. The dedicated P8-S4 implementation plan was independently
+approved and committed/published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 deterministic Demo parity is complete;
+P8-S5 and P8-S6 have not started. Phase 8 and the overall project remain
+incomplete; this status does not mark Phase 3.3, Phase 6, or Phase 7 complete.**
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -106,7 +111,7 @@ binding route or the `active` lifecycle transition.
 ## Phase 8 Session-backed minimum admission
 
 Status: **Implemented through completed, independently approved, committed, and
-published P8-S3 normal entry; Phase 8 remains incomplete**
+published P8-S4 deterministic Demo parity; Phase 8 remains incomplete**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -135,8 +140,12 @@ synchronization finding described above and returned `CHANGES_REQUIRED`. The
 complete 15-path candidate later received focused independent read-only approval
 and was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 Demo
-parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final status
-closure have not started.
+parity was then implemented under the dedicated approved plan, independently
+approved with
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and manually
+published by the user. P8-S4 is complete. P8-S5 Web connection and P8-S6
+cross-surface evidence/final status closure have not started.
 
 ### Narrow authority amendment
 
@@ -203,11 +212,24 @@ Run may commit. The loser receives exact replay, incompatible-key conflict, or
 already-bound ineligibility without a second Run, Session, participation, or
 binding.
 
+Published P8-S4 makes this same established admission service reachable in the
+deterministic Demo through process-local Player Character, Run, receipt,
+participation, and Session repositories sharing one UoW publication boundary.
+It does not originate revisions 1/2/3 or activation. Exact entry replay returns
+the committed Run/Session result without another mutation or generator
+consumption, while conflicts and rollback publish no partial authority and do
+not reuse an already emitted deterministic identity.
+
 ### Progression, completion, recovery, and exit
 
 After admission, the existing Session View/action/request-status protocol is
 the only Phase 8 progression authority. Current stale, pending, uncertain,
 Provider-failure, rollback, and same-tab recovery rules remain unchanged.
+
+In Demo, a failed View read after committed admission likewise does not undo
+the Run, binding, Session, participation, activation, or receipts. The returned
+Session identity remains the authority for retrying the existing View read; no
+Demo-specific recovery operation exists.
 
 An existing scenario ending is not a Run ending. `ENDED`, `RESOLVED`, and
 `FAILED` remain Session/scenario projections. The Run remains `active`, its

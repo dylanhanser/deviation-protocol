@@ -4,7 +4,7 @@ Status: **Approved and frozen structured player-character product
 specification — partially implemented through completed Phase 3, Minimum Run
 Core, completed internal-only P4-S1 binding, and completed, published Phase 5
 through P5-S3 public activation, plus completed and published P8-S3 normal Run
-entry.**
+entry and P8-S4 deterministic Demo parity.**
 
 Authority scope: **Normative player-character identity, canonical record,
 revision, lifecycle, validation, projection, and adjacent-authority
@@ -880,11 +880,21 @@ actionable technical defect but formally returned `CHANGES_REQUIRED` solely for
 one Medium documentation-synchronization finding. The complete 15-path candidate
 then received focused independent read-only approval and was committed and
 published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
-P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure have not started. Phase 8
-and the overall project remain incomplete.
+The dedicated
+[P8-S4 implementation plan](structured_player_character_p8_s4_implementation_plan.md)
+was independently approved and committed/published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 is complete: the fixed Demo controller
+can create, read, retire, and discover only its owned Player Characters through
+the existing service and public projections, and can use the same ownership,
+revision, lifecycle, compatibility, binding, replay, and non-enumeration rules
+for Run entry. P8-S5 Web connection and P8-S6 cross-surface evidence/final
+status closure have not started. Phase 8 and the overall project remain
+incomplete.
 
-The planned Phase 8 character-side boundary is narrow:
+The implemented Phase 8 character-side boundary through P8-S4 remains narrow:
 
 - a bounded discovery query returns only detached projections of records owned
   by the resolved controller, currently `active`, and without an active Run
@@ -1100,10 +1110,14 @@ bounded corrections. Its subsequent independent re-review returned
 `CHANGES_REQUIRED` solely for the Medium documentation-synchronization finding.
 The complete 15-path candidate later received focused independent read-only
 approval and was committed and published at
-`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 through
-P8-S6 have not started, and Phase 8 and the overall project remain incomplete.
-Demo parity remains P8-S4, Web connection remains P8-S5, and cross-surface
-evidence/final status closure remains P8-S6. Phase 6 and Phase 7 remain
-allocated and unimplemented. The approved final
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 then
+completed under its independently approved and published plan. The
+implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 deterministic Demo parity is complete.
+P8-S5 Web connection and P8-S6 cross-surface evidence/final status closure have
+not started, and Phase 8 and the overall project remain incomplete. Phase 6 and
+Phase 7 remain allocated and unimplemented. The approved final
 narrative experience specification remains approved, frozen, and not
 implemented. Phase 3.2b remains closed.

@@ -59,10 +59,9 @@ documents.
   lifecycle remains `pre_first_turn`, and the reserved public
   `RunService.bind_player_character(...)` command remains rejected.
 - Except for completed P4-S1, Phase 4 work remains unimplemented or deferred.
-  No repository authority defines a P4-S2 objective. API routes,
-  frontend activation, Demo behavior, Provider behavior, full Run Protocol,
-  narrative integration, scenario integration, combat integration, and public
-  gameplay activation remain unimplemented or deferred as assigned.
+  No repository authority defines a P4-S2 objective. P4-S1 itself activated no
+  API route, frontend, Demo, Provider, narrative, scenario, combat, or public
+  gameplay behavior; subsequent Phase 5 and Phase 8 work is tracked below.
 - P5-S1 owned-read API activation is completed and published at
   `5955c47eac07429107b93ef85da6a055bd2044ef`
   (`feat(player-character): activate owned-read API`).
@@ -134,7 +133,7 @@ documents.
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
 | Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
-| Phase 8 | **Partially implemented through completed, independently approved, committed, and published P8-S3; P8-S4 through P8-S6 have not started; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
+| Phase 8 | **Partially implemented through completed, independently approved, committed, and published P8-S4; P8-S5 and P8-S6 have not started; incomplete** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
 
@@ -425,10 +424,19 @@ stages:
      `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`
      (`feat(run): add P8-S3 playable-loop adapter`) with exactly three
      production, five test, and seven documentation paths. P8-S3 is complete.
-     P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface
-     evidence/final status closure have not started. Phase 8 neither implements
-     nor completes Phase 6 or Phase 7, and Phase 8 and the overall project remain
-     incomplete.
+     The dedicated
+     [P8-S4 implementation plan](docs/structured_player_character_p8_s4_implementation_plan.md)
+     was independently approved and published at
+     `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The implementation then
+     received
+     `STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+     was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
+     (`feat(player-character): complete P8-S4 demo persistence`), and was
+     manually published by the user. P8-S4 deterministic Demo
+     persistence/composition parity is complete. P8-S5 Web connection and
+     P8-S6 cross-surface evidence/final status closure have not started. Phase
+     8 neither implements nor completes Phase 6 or Phase 7, and Phase 8 and the
+     overall project remain incomplete.
 
 P3-S1 canonical creation orchestration is implemented, independently approved,
 committed, pushed, complete, and closed at
@@ -673,7 +681,7 @@ The canonical decision is
 
 ## Phase 8: Structured Player Character Run Entry and Minimum Playable Loop
 
-Status: **Partially implemented through completed, independently approved, committed, and published P8-S3; P8-S4 through P8-S6 have not started — incomplete.**
+Status: **Partially implemented through completed, independently approved, committed, and published P8-S4; P8-S5 and P8-S6 have not started — incomplete.**
 
 Phase 8 is explicitly allocated to the next selected product priority: create
 or reuse an owned Structured Player Character, discover/select an eligible one,
@@ -725,13 +733,23 @@ A later focused independent read-only review approved the complete 15-path
 candidate. It was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`
 (`feat(run): add P8-S3 playable-loop adapter`) with exactly three production,
-five test, and seven documentation paths. P8-S3 is complete. P8-S4 planning and
-implementation, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure have not started. Phase 8 and the overall project remain
-incomplete. The Provider used by the playthrough was scripted and no-network;
-no live Provider ran. Correct P8-S4 implementation-plan authoring may begin only
-after this post-publication status synchronization is independently reviewed,
-committed, and published; P8-S4 implementation remains unauthorized.
+five test, and seven documentation paths. P8-S3 is complete. The dedicated
+[P8-S4 implementation plan](docs/structured_player_character_p8_s4_implementation_plan.md)
+was independently approved, committed, and published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its exact nine-path implementation
+received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
+(`feat(player-character): complete P8-S4 demo persistence`), and was manually
+published by the user. It completes deterministic Demo persistence/composition
+parity by reusing the established Player Character, Run-entry, Session, and
+gameplay services over process-local authority; the published P8-S4 plan defines
+the detailed verification matrix, and the Phase 8 plan records its reviewed
+completion evidence. P8-S5 Web connection is the next gated
+slice and remains unstarted, as does P8-S6 cross-surface evidence/final status
+closure. Phase 8 and the overall project remain incomplete. P8-S4 used no real
+Provider or non-loopback network dependency and did not claim real-MySQL
+verification.
 
 ## Deferred
 
@@ -795,6 +813,10 @@ manually.
   completed, independently approved, committed, and published implementation at
   `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`:
   [`docs/structured_player_character_p8_s3_implementation_plan.md`](docs/structured_player_character_p8_s3_implementation_plan.md).
+- Approved and published P8-S4 deterministic Demo parity implementation plan
+  and completed, independently approved, committed, and published implementation
+  at `187d41ba3035c8d717c2fb2578a805402255d979`:
+  [`docs/structured_player_character_p8_s4_implementation_plan.md`](docs/structured_player_character_p8_s4_implementation_plan.md).
 - Implemented architecture and composition roots:
   [`docs/architecture.md`](docs/architecture.md).
 - Production Provider distribution:

@@ -6,24 +6,25 @@ Status: **Approved and published Phase 8 planning authority. Its seven-document
 planning candidate received independent approval with
 `STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED` and was
 committed and published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`
-(`docs(player-character): approve phase 8 playable-loop plan`). This plan does
-not authorize implementation. The current worktree bytes are an unapproved,
-uncommitted, and unpublished candidate amendment limited to the P8-S4 test-path
-budget.**
+(`docs(player-character): approve phase 8 playable-loop plan`). Its P8-S4
+test-budget amendment subsequently received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_PARENT_TEST_BUDGET_AMENDMENT_INDEPENDENT_REVIEW_APPROVED`
+and was committed and published at
+`753b3967aa6819cefbcd33ffe1844c75e22e330a`. The dedicated P8-S4 implementation
+plan was independently approved, committed, and published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. The implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 is complete. These current worktree bytes
+are the separate exact-seven post-publication documentation synchronization
+candidate; they are unstaged, uncommitted, unpublished, and do not authorize
+P8-S5 or P8-S6.**
 
-The sole future success verdict for an independent read-only review of the exact
-amended parent-plan bytes is:
-
-```text
-STRUCTURED_PLAYER_CHARACTER_P8_S4_PARENT_TEST_BUDGET_AMENDMENT_INDEPENDENT_REVIEW_APPROVED
-```
-
-That verdict binds only the exact amended bytes and reviewer-reported SHA-256.
-It does not authorize a commit, push, publication, correction of the existing
-P8-S4 implementation-plan candidate, P8-S4 implementation, P8-S5, or P8-S6.
-After approval, the amendment still requires separate commit authorization,
-user publication, and confirmation of a new clean aligned baseline before the
-P8-S4 candidate may change. No approval or publication is claimed here.
+The parent-amendment verdict above is historical and binds only the published
+amendment bytes. The original planning verdict, parent-amendment verdict,
+P8-S4 plan verdict, and P8-S4 implementation verdict cannot approve this
+post-publication synchronization candidate, a later documentation commit,
+P8-S5, or P8-S6.
 
 Phase 5 is complete at the published P5-S3 baseline
 `34d063e387cde69500e4dc018ff087e87f3eee74`
@@ -55,19 +56,27 @@ approval and was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`
 (`feat(run): add P8-S3 playable-loop adapter`) with exactly three production,
 five test, and seven documentation paths. P8-S3 is complete. P8-S4 planning and
-implementation, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure have not started, and Phase 8 and the overall project remain
-incomplete. Correct P8-S4 implementation-plan authoring may begin only after
-this post-publication status synchronization is independently reviewed,
-committed, and published; P8-S4 implementation remains unauthorized.
+implementation then proceeded under the dedicated plan independently approved
+and published at `375a2a7ae018c9c9c79272e5de7da703818d1f20`. The exact
+nine-path implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
+(`feat(player-character): complete P8-S4 demo persistence`), and was manually
+published by the user. P8-S4 is complete. P8-S5 Web connection and P8-S6
+cross-surface evidence/final status closure have not started, and Phase 8 and
+the overall project remain incomplete. P8-S5 may begin only after this separate
+post-publication synchronization is independently reviewed, committed under
+separate authorization, user-published, and confirmed as a clean aligned
+baseline.
 
 This document is the dedicated implementation plan for:
 
 > **Phase 8 — Structured Player Character Run Entry and Minimum Playable Loop**
 
-It records an approved planning boundary only. It creates no runtime capability, route,
-test, migration, frontend behavior, Demo behavior, Provider behavior,
-deployment, or production activation.
+This document records the approved planning boundary and status history; the
+document itself creates no runtime capability, route, test, migration, frontend
+behavior, Demo behavior, Provider behavior, deployment, or production
+activation.
 
 The historical successful verdict for the independent review of the exact
 published seven-document planning candidate was:
@@ -77,13 +86,15 @@ STRUCTURED_PLAYER_CHARACTER_RUN_PLAYABLE_LOOP_PLAN_REVIEW_APPROVED
 ```
 
 The historical `P8-REV-002` correction made this exact reachable review verdict
-the only operative token for that published candidate. It is not operative for
-the current amendment; the amendment token above is its sole success verdict.
-Generic `APPROVED`, P5-S1/P5-S2/P5-S3, Phase 6, Phase 7, implementation-review,
-historical, blocked, and differently named tokens cannot satisfy the gate.
-Review binds the exact complete candidate bytes and the SHA-256 inventory
-recorded after the candidate is frozen. Any byte change invalidates that
-inventory and requires a fresh independent planning review.
+the only operative token for that published candidate. The later parent-
+amendment token described above was separately operative only for its exact
+published amendment bytes. Both are historical and non-operative for the
+current synchronization candidate. Generic `APPROVED`, P5-S1/P5-S2/P5-S3,
+Phase 6, Phase 7, implementation-review, historical, blocked, and differently
+named tokens cannot satisfy a later gate. Review binds the exact complete
+candidate bytes and the SHA-256 inventory recorded after the candidate is
+frozen. Any byte change invalidates that inventory and requires a fresh
+independent review.
 
 An earlier fresh independent read-only review returned `CHANGES_REQUIRED`.
 That is a preserved historical review record, not the operative planning
@@ -157,8 +168,8 @@ Authority remains divided by subject:
 | --- | --- | --- |
 | [Final Narrative Experience](final_narrative_experience.md) | Approved product authority | Persistent character and Run identity; model/server separation; minimum reading-first direction |
 | [Structured Player Character Contract](structured_player_character_contract.md) | Approved and frozen, partially implemented | Character identity, lifecycle, ownership, applicable reference, binding cardinality, privacy |
-| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus the completed and published P8-S3 Session-backed exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
-| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus discovery implemented at P8-S1, internal admission implemented at P8-S2, and normal public admission completed and published at P8-S3 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
+| [Run Protocol](run_protocol.md), including the approved and published Phase 8 amendment | Approved Phase 3.3 design plus the completed and published P8-S3 normal and P8-S4 Demo reachability of the Session-backed exception | Run lifecycle, Run/line ownership, Session-backed minimum admission, world/protocol non-claims |
+| [Public Client Contract](public_client_contract.md), including the approved and published Phase 8 amendment | Current public authority plus discovery implemented at P8-S1, internal admission at P8-S2, normal public admission at P8-S3, and unchanged-contract Demo parity at P8-S4 | Exact discovery/admission wire contract, errors, OpenAPI, client trust |
 | [Minimum Run Core Plan](minimum_run_core_implementation_plan.md) | Completed historical implementation authority | Run schema, repositories, UoW, identities, participation, receipts, transaction precedent |
 | [Structured Player Character Downstream Plan](structured_player_character_implementation_plan.md) | Approved, partially implemented, and synchronized with the approved and published Phase 8 planning authority | Completed Phase 5, retained Phase 6/7 allocations, repository implementation sequence |
 | [Architecture](architecture.md) and committed source | Current implemented fact | Composition, Session lifecycle, Demo isolation, persistence and dependency direction |
@@ -251,9 +262,10 @@ are complete. After the subsequent documentation-synchronization finding, the
 complete 15-path candidate received focused independent read-only approval and
 was committed and published at
 `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. The public legacy
-Session-create route remains unbound. Demo composition still has no Player
-Character or Run repositories/services, and Web has no Player Character or
-Run-entry methods.
+Session-create route remains unbound. P8-S4 now supplies process-local Demo
+Player Character and Run repository/service composition without MySQL or
+production durability. The P8-S5 Web Player Character and Run-entry methods
+remain absent, and P8-S5 remains unstarted.
 
 Those are the only connections Phase 8 fills.
 
@@ -683,10 +695,11 @@ must satisfy domain validation without becoming production policy.
 
 ### 17.1 Demo
 
-Demo gains process-local implementations of the already existing Player
-Character and Run repository/UoW ports, including locks, CAS, receipts, binding
-uniqueness, participation uniqueness, rollback, and detached reconstruction.
-It composes the existing Player Character service, Run service, and new entry
+Published P8-S4 gives Demo process-local implementations of the already
+existing Player Character and Run repository/UoW ports, including locks, CAS,
+receipts, binding uniqueness, participation uniqueness, rollback, and detached
+reconstruction.
+It composes the existing Player Character service, Run service, and entry
 service with deterministic identities and the existing fixed Demo principal.
 
 This necessarily makes the already completed Player Character create/read/
@@ -802,7 +815,7 @@ behavior. An implementer must not create a convenience migration.
 | P8-S1 | Add bounded owned active-unbound character discovery | Approved/published P8-G0 | Implemented, accepted, committed, and published at `95ffe4019e2a69967dfae1fee2a1ecba4a628381` |
 | P8-S2 | Implement one atomic internal Run-entry transaction and Session-backed activation | Accepted P8-S1 | Implemented, accepted, committed, and published at `70815b181624e5475d2d978bef0db1ed3b22324e`; closed with no public route |
 | P8-S3 | Activate normal-app Run-entry API and composition | Accepted/published P8-S2 | Complete: focused independent read-only approval, then committed and published at `ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1` with exactly 3 production, 5 test, and 7 documentation paths |
-| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Unimplemented; Demo parity remains deferred here |
+| P8-S4 | Add deterministic Demo persistence/composition parity | Accepted P8-S3 | Complete: independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; separate seven-document post-publication synchronization pending review/publication |
 | P8-S5 | Connect the existing Web client to the minimum journey | Accepted P8-S4 | Unimplemented; Web connection remains deferred here |
 | P8-S6 | Run cross-surface evidence, synchronize status, and close the stage candidate | Accepted P8-S5 | Unimplemented; cross-surface evidence and final status closure remain deferred here |
 
@@ -1117,14 +1130,15 @@ persistence, privacy, architecture, cleanup, or test-discrimination defect but
 formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
 synchronization finding. The complete 15-path candidate later received focused
 independent read-only approval and was committed and published at
-`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete; P8-S4, P8-S5,
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. P8-S4 then
+received the exact approval and publication recorded in section 20.5. P8-S5
 and P8-S6 have not started, Phase 8 and the overall project remain incomplete,
 and no live Provider was called.
 
 ### 20.5 P8-S4 — Deterministic Demo parity
 
 **Purpose:** make the planned backend journey executable locally without MySQL
-or external Provider I/O.
+or external Provider I/O. This purpose is implemented and published.
 
 **Mandatory production path budget: exactly three:**
 
@@ -1145,10 +1159,11 @@ The accepted `P8-FRESH-003` correction authorizes the executable child because
 `test_demo_cross_process_replay.py` launches that exact path. The child
 explicitly reconstructs every `DemoGenerators` field, freezes the complete
 generator-category trace, validates the complete `DemoStoreSnapshot` field
-manifest, and builds the schema-complete private snapshot representation. P8-S4
-adds Player Character and Run-entry persistence families and deterministic
-identities to that topology, so the cross-process evidence would be incomplete
-if the executed reconstruction owner remained inspection-only.
+manifest, and builds the schema-complete private snapshot representation. The
+published P8-S4 implementation adds Player Character and Run-entry persistence
+families and deterministic identities to that topology, so the cross-process
+evidence would be incomplete if the executed reconstruction owner remained
+inspection-only.
 
 The two additional existing unit-test owners are mandatory because P8-S4 adds
 no new public route or schema. It composes the already-existing Player Character
@@ -1158,23 +1173,22 @@ populated. Therefore
 `test_demo_composition_remains_independent_of_run_entry` in
 `tests/unit/test_run_composition.py` and
 `test_demo_composition_gets_no_player_character_route_or_schema` in
-`tests/unit/test_player_character_api.py` cannot retain their older Demo-
-exclusion expectations. P8-S4 must replace only those obsolete assertions with
+`tests/unit/test_player_character_api.py` could not retain their older Demo-
+exclusion expectations. P8-S4 replaced only those obsolete assertions with
 expectations consistent with Demo composition ownership. Broad rewrites of
-either file are unauthorized, and unrelated normal-composition assertions must
-remain unchanged. This is required P8-S4 test maintenance, not P8-S5 Web work or
-P8-S6 cross-surface closure, and it does not claim the corrections are already
-implemented.
+either file remained unauthorized, and unrelated normal-composition assertions
+remained unchanged. This was required P8-S4 test maintenance, not P8-S5 Web
+work or P8-S6 cross-surface closure.
 
 **Conditional test/support path budget: at most one:**
 
-- `tests/unit/test_demo_scripts.py`, only if the later implementation preflight
+- `tests/unit/test_demo_scripts.py`, only if the implementation preflight
   proves that its launcher or smoke assertions enumerate the exact affected
   route inventory.
 
-Current inspection finds no exact affected route-inventory assertion in that
-file, so the objective predicate remains inactive. If later evidence activates
-it, only the narrow expected route inventory may change.
+The implementation preflight found no exact affected route-inventory assertion
+in that file, so the objective predicate remained inactive and the file stayed
+unchanged.
 
 **Implementation-and-test totals:** exactly nine mandatory paths: three
 production plus six test/support. If the sole conditional predicate activates,
@@ -1185,12 +1199,12 @@ path outside these inventories stops P8-S4 for plan reassessment.
 **Other implementation path budgets:** zero migration paths, zero configuration
 paths, zero dependency paths, and zero generated paths.
 
-**Later post-publication documentation-sync path budget: exactly seven and
+**Post-publication documentation-sync path budget: exactly seven and
 separate from implementation/test:** the common exact seven Phase 8 owners
-above. All seven are inspected and synchronized after P8-S4 publication; they
-are not counted in either the nine mandatory implementation/test paths or the
-conditional maximum of ten. This does not authorize documentation sync before
-the separately reviewed implementation is committed and user-published.
+above. All seven are inspected and synchronized in this separate candidate
+after P8-S4 publication; they are not counted in either the nine mandatory
+implementation/test paths or the conditional maximum of ten. This candidate
+does not authorize its own review, commit, publication, P8-S5, or P8-S6.
 
 **Transaction/persistence:** one process-local atomic store publication; exact
 rollback and lock semantics matching application contracts. No database,
@@ -1202,6 +1216,21 @@ rollback, active binding, participation, process restart state loss, two fresh
 processes with identical public/generator traces, executable-child
 reconstruction of every generator field/category and the complete expanded
 store snapshot, no external I/O, and preserved canonical action sequence.
+
+**Completion:** the exact three production and six mandatory test/support paths
+were independently reviewed. Focused results were 48 Demo-persistence, 75
+Demo-composition, 13 Run-composition, 200 Player Character API, and 115
+cross-process tests passing; the combined five-owner selection passed 451, and
+the legacy compatibility owner passed one. Canonical Offline verification
+recorded 1,978 passed and 182 expected skips. Compilation, doctor, `pip check`,
+Alembic heads/history, and Git diff checks passed. These are the reviewed
+pre-commit implementation results, not reruns by this synchronization task. No
+real MySQL or live Provider verification belonged to P8-S4. The implementation
+received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`
+(`feat(player-character): complete P8-S4 demo persistence`), and was manually
+published by the user.
 
 ### 20.6 P8-S5 — Minimum Web connection
 
@@ -1301,7 +1330,7 @@ The following requirements apply together with the detailed budgets above:
 | P8-S1 | Implement only `GET /v1/player-characters/eligible-for-run-entry` and its exact DTO/OpenAPI contract | Read-only repository/UoW; no lock, receipt, write, commit, schema, or migration | No general list/search/filter/page/count/admin, Run mutation, Demo activation, or Web work | Focused unit/API/OpenAPI plus real-MySQL ordering/bound/ownership/no-write evidence, `compileall`, Offline, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S1 implementation review and separately authorized P8-S1 commit before P8-S2 |
 | P8-S2 | No public route; implement only trusted composite admission and the narrow Run activation authority | Existing tables; one entry-owned UoW/commit; repositories only flush | No API/composition activation, Demo/Web, terminal Run transition, later Session, Provider, schema, or migration | Focused domain/service plus real-MySQL atomicity, replay, concurrency, rollback, reconstruction, Alembic-parity, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S2 implementation review and separately authorized P8-S2 commit before P8-S3 |
 | P8-S3 | Implement only normal-app `POST /v1/runs`, exact DTO/errors/OpenAPI, and lazy composition | API/composition own no transaction; entry service remains sole UoW/commit owner; no schema or migration | No public Run read/list/bind/attach/terminal/admin, Demo/Web, Provider, deployment, or auth redesign | Focused API/OpenAPI/composition plus one real-MySQL public `POST /v1/runs`-to-terminal playthrough through every canonical action/request-status/View step and persisted Run/Session/gameplay state, cancellation, privacy, `compileall`, Offline/MySQL, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S3 implementation review and separately authorized P8-S3 commit before P8-S4 |
-| P8-S4 | Add deterministic Demo parity for the already frozen Player Character discovery/create and Run-entry routes | One process-local atomic publication with rollback/lock parity; no database or migration | No normal-composition change, Web work, external I/O, credentials, Provider, or persistence guarantee after process exit | Focused Demo repository/composition/e2e determinism, executable-child complete generator/snapshot reconstruction, and complete backend journey, `compileall`, Offline, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S4 implementation review and separately authorized P8-S4 commit before P8-S5 |
+| P8-S4 | Add deterministic Demo parity for the already frozen Player Character discovery/create and Run-entry routes | One process-local atomic publication with rollback/lock parity; no database or migration | No normal-composition change, Web work, external I/O, credentials, Provider, or persistence guarantee after process exit | Completed focused Demo repository/composition/e2e determinism, executable-child complete generator/snapshot reconstruction, complete backend journey, `compileall`, Offline, and diff checks | Implementation independently approved, committed, and published at `187d41ba3035c8d717c2fb2578a805402255d979`; this separate exact-seven post-publication synchronization must be reviewed, separately committed, user-published, and confirmed before P8-S5 |
 | P8-S5 | Consume only the frozen create/discovery/entry contracts and existing Session gameplay protocol | Existing same-tab Session `sessionStorage` record plus unresolved key/body pairs in current component/process memory only; no durable pending-operation state | No server behavior, client lifecycle authority, optimistic binding, profile/search/admin UI, redesign, automatic retry, or reload/cross-context pending-operation recovery guarantee | Focused runtime-schema/client/rendered-loop/recovery tests prove pre-POST key creation, exact manual same-key/body retry, no automatic/replacement retry, history-sensitive 404 retention after an uncertainty-tainted send, precise clear/retain outcomes, honest pre-Session-storage reload limitation, plus typecheck, lint, build, Demo-backed playthrough, and diff checks | Synchronize every applicable Phase 8 owner within the seven-document maximum, then fresh P8-S5 implementation review and separately authorized P8-S5 commit before P8-S6 |
 | P8-S6 | Synchronize implemented facts and close only Phase 8 | No expected production/test mutation; documentation/status only unless work returns to an owning slice | No late feature, duplicate production playthrough, defect fix without regression ownership, deployment, release, Provider, or Phase 6/7 completion | Re-run P8-S3's accepted MySQL entry-to-terminal test and applicable focused/Offline/MySQL/Full/Alembic/Web/Demo evidence; canonical documentation synchronization | Fresh independent complete-Phase-8 review, then separate completion-commit authorization; user push only |
 
@@ -1322,7 +1351,7 @@ The following requirements apply together with the detailed budgets above:
 | Web | Runtime schema/client tests for both logical-mutation key/body lifetimes, including uncertainty-tainted retention through a later authorization/non-enumerating 404, and rendered full loop through existing terminal View | Durable pending-operation storage, reload-before-Session-storage or cross-device recovery, redesign, profile UI |
 | Existing gameplay | P8-S3 real-MySQL public Run-entry-to-terminal path plus Demo/Web paths through every canonical action step | New scenario/content or Provider behavior |
 | Schema stability | ORM/metadata parity, Alembic `heads`/`history`, no migration diff | New migration |
-| Documentation | For each P8-S1 through P8-S5 candidate, truthful synchronization of every applicable owner within the exact seven-document maximum before independent review; focused links/fences, `git diff --check`, canonical checklist | Mechanical edits to unchanged owners or admission of production/test/migration/generated/dependency/configuration paths through the documentation allowance |
+| Documentation | For each P8-S1 through P8-S5 boundary, truthful synchronization of every applicable owner within the exact seven-document maximum before the next slice; P8-S4 follows its published post-implementation/publication synchronization sequence; focused links/fences, `git diff --check`, canonical checklist | Mechanical edits to unchanged owners or admission of production/test/migration/generated/dependency/configuration paths through the documentation allowance |
 
 Optional additional fuzzing, load testing, manual browser exploration, or UX
 polish may be useful but is not a Phase 8 acceptance gate unless a confirmed
@@ -1417,7 +1446,10 @@ The published P8-G0 sequence was:
    within the exact seven-document documentation maximum, freeze its exact
    candidate, run its required local validation, obtain a fresh independent
    review only after all applicable owners are truthful, obtain separate commit
-   authorization, and let the user push before beginning the next slice; and
+   authorization, and let the user push before beginning the next slice. P8-S4
+   follows the narrower published slice plan's explicit sequence: implementation
+   review, commit, and user publication first, then this separate exact-seven
+   post-publication synchronization review/commit/publication before P8-S5; and
 9. after P8-S6, obtain one fresh independent review of the complete Phase 8
    implementation and synchronized documentation before any completion commit.
 

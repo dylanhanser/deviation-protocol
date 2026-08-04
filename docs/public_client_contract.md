@@ -863,8 +863,10 @@ objective.
 
 ## Phase 8 Player Character discovery and Run entry
 
-Status: **P8-S3 normal public Run entry is implemented, independently approved,
-committed, published, and complete; Demo and Web activation remain deferred.**
+Status: **P8-S4 deterministic Demo parity for the existing Player Character and
+Run-entry contract is implemented, independently approved, committed, published,
+and complete; P8-S5 Web connection and P8-S6 final evidence/status closure have
+not started.**
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -890,17 +892,25 @@ OpenAPI, MySQL, privacy, architecture, or test-discrimination defect but
 formally returned `CHANGES_REQUIRED` solely for one Medium documentation-
 synchronization finding. The complete 15-path candidate then received focused
 independent read-only approval and was committed and published at
-`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete.
-P8-S4 Demo parity, P8-S5 Web connection, and P8-S6 cross-surface evidence/final
-status closure have not started. Phase 8 and the overall project remain
-incomplete. Phase 5 remains complete at P5-S3; no P5-S4 exists. Existing Phase
-6 and Phase 7 allocations remain planned and unimplemented, and neither is a
-Phase 8 prerequisite.
+`ac07a5fe267adfb0281ec2658b2fcbd0085f6eb1`. P8-S3 is complete. The dedicated
+[P8-S4 implementation plan](structured_player_character_p8_s4_implementation_plan.md)
+was independently approved and committed/published at
+`375a2a7ae018c9c9c79272e5de7da703818d1f20`. Its implementation received
+`STRUCTURED_PLAYER_CHARACTER_P8_S4_IMPLEMENTATION_CORRECTION_INDEPENDENT_REVIEW_APPROVED`,
+was committed as `187d41ba3035c8d717c2fb2578a805402255d979`, and was
+manually published by the user. P8-S4 composes the existing public Player
+Character create/read/retirement, eligible discovery, and Run-entry operations
+in deterministic Demo without adding a Demo-specific request, response, error,
+privacy, recovery, route, or OpenAPI contract. P8-S5 Web connection and P8-S6
+cross-surface evidence/final status closure have not started. Phase 8 and the
+overall project remain incomplete. Phase 5 remains complete at P5-S3; no P5-S4
+exists. Existing Phase 6 and Phase 7 allocations remain planned and
+unimplemented, and neither is a Phase 8 prerequisite.
 
 ### Eligible-character collection
 
-P8-S1 implements one purpose-specific normal operation; Demo parity remains
-deferred:
+P8-S1 implements one purpose-specific operation. Published P8-S4 now exposes
+that same existing contract in deterministic Demo composition:
 
 ```http
 GET /v1/player-characters/eligible-for-run-entry
@@ -945,7 +955,8 @@ or recovery.
 ### Run-entry request
 
 The published P8-S3 implementation provides one normal-application mutation.
-Demo parity remains deferred to P8-S4:
+Published P8-S4 exposes the same operation and contract in deterministic Demo
+composition without a second adapter or public shape:
 
 ```http
 POST /v1/runs
