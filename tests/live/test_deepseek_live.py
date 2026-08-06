@@ -14,7 +14,10 @@ from deviation_protocol.application.dynamic_narrative_models import (
     DynamicSelectedPlayerCharacter,
 )
 from deviation_protocol.application.narrative_models import NarrativeBoundaryError
-from deviation_protocol.application.narrative_prompt import PromptBuilder
+from deviation_protocol.application.narrative_prompt import (
+    PromptBuilder,
+    default_style_profile,
+)
 from deviation_protocol.infrastructure.deepseek_narrative import (
     DeepSeekNarrativeProvider,
     DeepSeekSettings,
@@ -65,7 +68,10 @@ async def test_one_safe_deepseek_dynamic_narrative_smoke() -> None:
             minimum=350, target=650, maximum=900
         ),
     )
-    provider = DeepSeekNarrativeProvider(settings, PromptBuilder())
+    provider = DeepSeekNarrativeProvider(
+        settings,
+        PromptBuilder(profiles=(default_style_profile(),)),
+    )
     try:
         candidate = await provider.generate_dynamic(request)
     except NarrativeBoundaryError as exc:

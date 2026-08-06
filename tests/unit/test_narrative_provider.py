@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import asyncio
 import json
 import importlib
@@ -7,6 +8,7 @@ import os
 import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -225,6 +227,76 @@ def _untrusted(**updates: Any) -> UntrustedNarrativeProposal:
 
 def _builder() -> PromptBuilder:
     return PromptBuilder(profiles=(default_style_profile(),))
+
+
+def test_dynamic_live_smoke_uses_canonical_prompt_profiles_before_provider_entry() -> None:
+    live_test_path = Path(__file__).resolve().parents[1] / "live" / "test_deepseek_live.py"
+    source = live_test_path.read_text(encoding="utf-8")
+
+    with pytest.raises(ValidationError):
+        PromptBuilder()
+    with pytest.raises(ValidationError):
+        PromptBuilder(profiles=())
+
+    def assert_canonical_construction(candidate_source: str) -> None:
+        tree = ast.parse(candidate_source, filename=str(live_test_path))
+        canonical_imports = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.ImportFrom)
+            and node.module == "deviation_protocol.application.narrative_prompt"
+        ]
+        assert len(canonical_imports) == 1
+        assert {alias.name for alias in canonical_imports[0].names} == {
+            "PromptBuilder",
+            "default_style_profile",
+        }
+        smoke = next(
+            node
+            for node in tree.body
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name == "test_one_safe_deepseek_dynamic_narrative_smoke"
+        )
+        provider_calls = [
+            node
+            for node in ast.walk(smoke)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "DeepSeekNarrativeProvider"
+        ]
+        assert len(provider_calls) == 1
+        provider_call = provider_calls[0]
+        assert len(provider_call.args) == 2
+        builder_call = provider_call.args[1]
+        assert isinstance(builder_call, ast.Call)
+        assert isinstance(builder_call.func, ast.Name)
+        assert builder_call.func.id == "PromptBuilder"
+        assert builder_call.args == []
+        assert len(builder_call.keywords) == 1
+        profiles_keyword = builder_call.keywords[0]
+        assert profiles_keyword.arg == "profiles"
+        assert isinstance(profiles_keyword.value, ast.Tuple)
+        assert len(profiles_keyword.value.elts) == 1
+        profile_call = profiles_keyword.value.elts[0]
+        assert isinstance(profile_call, ast.Call)
+        assert isinstance(profile_call.func, ast.Name)
+        assert profile_call.func.id == "default_style_profile"
+        assert profile_call.args == []
+        assert profile_call.keywords == []
+
+        builder = PromptBuilder(profiles=(default_style_profile(),))
+        assert builder.profiles == (default_style_profile(),)
+
+    assert_canonical_construction(source)
+
+    stale_source = source.replace(
+        "PromptBuilder(profiles=(default_style_profile(),))",
+        "PromptBuilder()",
+        1,
+    )
+    assert stale_source != source
+    with pytest.raises(AssertionError):
+        assert_canonical_construction(stale_source)
 
 
 def _prompt_input_data(user_prompt: str) -> dict[str, Any]:
