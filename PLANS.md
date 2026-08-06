@@ -15,29 +15,37 @@ documents.
 
 ## Dynamic Narrative Vertical Spike planning
 
-The separate experimental Dynamic Narrative Vertical Spike has an unstaged
-implementation candidate awaiting independent implementation review. Its
-detailed canonical authority is the
-[approved and frozen implementation plan](docs/dynamic_narrative_vertical_spike_plan.md).
-The focused seven-finding verification concluded
-`DYNAMIC_NARRATIVE_VERTICAL_SPIKE_FOCUSED_SEVEN_FINDING_VERIFICATION_APPROVED`
-with zero material findings against the reviewed pre-freeze candidate. The
-approved plan was published at baseline
-`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564`, and a separate explicit task
-authorized the current bounded 24-path candidate against that baseline. The
-candidate is not independently approved, committed, published,
-production-complete, or evidence-complete. Real-Provider smoke, Manual Fake
-browser evidence, and Optional Live browser evaluation remain separately
-authorized later activities. The next lifecycle step is one independent DNVS
-implementation review governed by the frozen plan and baseline. The spike does
-not reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
+The separate experimental Dynamic Narrative Vertical Spike implementation was
+published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated
+Live-smoke correction was published at
+`e2678e6bba8497ed77bc5ba8c21b1ce8d001b2b9`. Its detailed canonical
+authority remains the [DNVS plan](docs/dynamic_narrative_vertical_spike_plan.md).
+The original plan approval/freeze at
+`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564` and its successful focused
+seven-finding verification remain historical authority.
+All unaffected approved and frozen authority remains in force. The Manual Fake
+browser execution contract and its directly dependent Fake failure, observation,
+continuity-witness, and focused-test requirements have passed independent review
+and are approved and frozen as documentation authority. Their exact seven-path
+implementation has not started or completed. The published implementation remains
+intact, and Manual Fake browser evidence remains incomplete until that later
+separately authorized implementation and browser-evidence task.
+Automated Offline longevity evidence remains complete at exactly 510 turns,
+510 Fake invocations, active state version 510, and 20 story slots. Automated
+Live smoke evidence remains complete at one smoke execution, one real Provider
+invocation, one Provider HTTP request, zero retries, and successful strict
+schema validation. Manual Fake browser evidence and Optional Live browser
+evidence remain incomplete. After user publication and clean aligned-baseline
+confirmation, the next lifecycle step is the separately authorized exact
+seven-path implementation, not browser evidence execution. The spike does not
+reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
 P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
 no P8-S7 exists. Phase 6 and Phase 7, the Structured Player Character programme,
 and the overall project remain incomplete. Completing the spike would not
-establish production Provider distribution. No DNVS staging, commit, push,
-real Provider call, or browser-evidence activity has occurred.
+establish production Provider distribution. The completed automated Live smoke
+does not constitute browser evidence or production Provider distribution.
 
 ## P4-S1 completion baseline
 
