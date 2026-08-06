@@ -151,3 +151,29 @@ $env:RUN_LIVE_DEEPSEEK_TEST = "1"
 ```
 
 live smoke 成功时只显示安全正文和最小诊断元数据；生产 API 不返回 model/usage。失败只报告稳定错误码。
+
+## Experimental dynamic Provider boundary
+
+The DNVS candidate reuses `DeepSeekSettings`, the existing DeepSeek transport,
+HTTP client ownership, and shutdown path. Its additive application Protocol is
+exactly `generate_dynamic(DynamicNarrativeRequest) ->
+UntrustedDynamicNarrativeCandidate` plus `aclose()`. The dynamic adapter builds
+one bounded prompt, performs exactly one transport call, accepts only one strict
+JSON object with no floats or duplicate keys, and returns no authoritative
+capability. Dynamic composition refuses any settings whose `max_retries` is not
+zero, so no layer can recreate a job, repeat a Provider invocation, or retry a
+transport request automatically.
+
+`DEVIATION_DEMO_DYNAMIC_PROVIDER` is a composition selector, not Provider
+configuration. Missing or exact `fake` selects the bounded deterministic Fake;
+only exact explicit `live` constructs DeepSeek settings and transport. Empty or
+invalid selection, invalid Live settings, or Fake construction failure fails
+closed and never falls back. Credentials never select a mode and are never sent
+to the Web child. Fake reads no Provider variable and constructs no transport.
+
+The automated dynamic live smoke remains separately authorized: it is exactly
+one real Provider call and zero retries. Manual Fake browser evidence is exactly
+eight submitted actions and zero real calls; Optional Live browser evaluation,
+if separately authorized, is exactly eight requests. None of those activities
+is implied by the current unstaged implementation candidate or by its Offline
+tests.

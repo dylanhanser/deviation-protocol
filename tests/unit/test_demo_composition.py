@@ -17,7 +17,10 @@ import pytest
 from deviation_protocol.api.demo_composition import (
     CanonicalDemoNarrativeTurnOrchestrator,
     DemoRuntime,
+    DynamicDemoConfigurationError,
+    DynamicDemoShutdownError,
     build_demo_runtime,
+    build_dynamic_demo_runtime,
 )
 from deviation_protocol.api.main import create_app
 from deviation_protocol.application.narrative_models import NarrativeRequest
@@ -3487,6 +3490,168 @@ async def test_post_provider_proposal_validation_failure_preserves_progress_and_
     failed_job = next(iter(after.narrative_jobs.values()))
     assert failed_job.status is NarrativeJobStatus.FAILED_TERMINAL
     assert failed_job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
+
+
+def test_dynamic_composition_defaults_to_fake_without_credential_selection() -> None:
+    runtime = build_dynamic_demo_runtime(
+        environ={"DEEPSEEK_API_KEY": "unused-test-value"}
+    )
+    assert runtime.provider.__class__.__name__ == "_DynamicFakeProvider"
+    assert runtime.provider.invocation_count == 0
+
+
+def test_dynamic_composition_invalid_selector_fails_closed() -> None:
+    with pytest.raises(DynamicDemoConfigurationError):
+        build_dynamic_demo_runtime(
+            environ={"DEVIATION_DEMO_DYNAMIC_PROVIDER": ""}
+        )
+
+
+@pytest.mark.asyncio
+async def test_dynamic_runtime_closes_owned_provider_exactly_once() -> None:
+    class ClosableProvider:
+        def __init__(self) -> None:
+            self.closes = 0
+
+        async def generate_dynamic(self, request):  # pragma: no cover - no call
+            raise AssertionError("shutdown test must not invoke the Provider")
+
+        async def aclose(self) -> None:
+            self.closes += 1
+
+    provider = ClosableProvider()
+    runtime = build_dynamic_demo_runtime(
+        provider=provider,
+        own_injected_provider=True,
+        environ={},
+    )
+    await asyncio.gather(runtime.aclose(), runtime.aclose(), runtime.aclose())
+    assert provider.closes == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_runtime_leaves_injected_caller_owned_provider_open() -> None:
+    class CallerOwnedProvider:
+        def __init__(self) -> None:
+            self.closes = 0
+
+        async def generate_dynamic(self, request):  # pragma: no cover - no call
+            raise AssertionError("shutdown ownership test must not call Provider")
+
+        async def aclose(self) -> None:
+            self.closes += 1
+
+    provider = CallerOwnedProvider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    await runtime.aclose()
+    assert provider.closes == 0
+
+
+def test_dynamic_live_selection_with_missing_or_retrying_settings_fails_closed() -> None:
+    with pytest.raises(DynamicDemoConfigurationError):
+        build_dynamic_demo_runtime(
+            environ={"DEVIATION_DEMO_DYNAMIC_PROVIDER": "live"}
+        )
+    with pytest.raises(DynamicDemoConfigurationError):
+        build_dynamic_demo_runtime(
+            environ={
+                "DEVIATION_DEMO_DYNAMIC_PROVIDER": "live",
+                "DEEPSEEK_API_KEY": "unit-test-sentinel",
+                "DEEPSEEK_MAX_RETRIES": "1",
+            }
+        )
+
+
+@pytest.mark.asyncio
+async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries() -> None:
+    runtime = build_dynamic_demo_runtime(
+        environ={
+            "DEVIATION_DEMO_DYNAMIC_PROVIDER": "live",
+            "DEEPSEEK_API_KEY": "unit-test-sentinel",
+            "DEEPSEEK_MAX_RETRIES": "0",
+        }
+    )
+    try:
+        assert runtime.provider.__class__.__name__ == "DeepSeekNarrativeProvider"
+        assert runtime.services.turn_orchestrator.provider_name == "deepseek"
+        assert runtime.services.turn_orchestrator.live_provider_references
+        assert runtime.provider._settings.max_retries == 0
+    finally:
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_runtime_closes_all_resources_and_sanitizes_close_failure() -> None:
+    class Resource:
+        def __init__(self, *, fail: bool = False) -> None:
+            self.fail = fail
+            self.closes = 0
+
+        async def aclose(self) -> None:
+            self.closes += 1
+            if self.fail:
+                raise RuntimeError("private close detail")
+
+    base = build_dynamic_demo_runtime(environ={})
+    first = Resource(fail=True)
+    second = Resource()
+    runtime = DemoRuntime(
+        services=base.services,
+        store=base.store,
+        generators=base.generators,
+        provider=base.provider,
+        _owned_resources=(first, second),
+    )
+    try:
+        with pytest.raises(DynamicDemoShutdownError) as captured:
+            await runtime.aclose()
+        assert str(captured.value) == "DYNAMIC_DEMO_SHUTDOWN_FAILED"
+        assert first.closes == second.closes == 1
+        with pytest.raises(DynamicDemoShutdownError):
+            await runtime.aclose()
+        assert first.closes == second.closes == 1
+    finally:
+        await base.aclose()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_runtime_shutdown_survives_repeated_owner_cancellation() -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class SlowResource:
+        def __init__(self) -> None:
+            self.closes = 0
+
+        async def aclose(self) -> None:
+            self.closes += 1
+            entered.set()
+            await release.wait()
+
+    base = build_dynamic_demo_runtime(environ={})
+    resource = SlowResource()
+    runtime = DemoRuntime(
+        services=base.services,
+        store=base.store,
+        generators=base.generators,
+        provider=base.provider,
+        _owned_resources=(resource,),
+    )
+    try:
+        closing = asyncio.create_task(runtime.aclose())
+        await entered.wait()
+        closing.cancel()
+        closing.cancel()
+        closing.cancel()
+        release.set()
+        with pytest.raises(asyncio.CancelledError):
+            await closing
+        assert resource.closes == 1
+        await runtime.aclose()
+        assert resource.closes == 1
+    finally:
+        release.set()
+        await base.aclose()
 
 
 @pytest.mark.asyncio

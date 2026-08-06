@@ -11,6 +11,12 @@ from urllib.parse import urlsplit
 import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
+from deviation_protocol.application.dynamic_narrative_models import (
+    DynamicNarrativeCandidatePayload,
+    DynamicNarrativeRequest,
+    DynamicPromptBuilder,
+    UntrustedDynamicNarrativeCandidate,
+)
 from deviation_protocol.application.narrative_models import (
     MAX_NARRATIVE_USAGE_TOKENS,
     NarrativeProposalPayload,
@@ -205,6 +211,7 @@ class DeepSeekNarrativeProvider:
         transport_factory: TransportFactory = HttpxDeepSeekTransport,
         waiter: Waiter = asyncio.sleep,
         clock: Clock = time.perf_counter,
+        dynamic_prompt_builder: DynamicPromptBuilder | None = None,
     ) -> None:
         self._settings = settings
         self._prompt_builder = prompt_builder
@@ -213,6 +220,7 @@ class DeepSeekNarrativeProvider:
         self._owns_transport = transport is None
         self._waiter = waiter
         self._clock = clock
+        self._dynamic_prompt_builder = dynamic_prompt_builder or DynamicPromptBuilder()
         self._closed = False
 
     def __repr__(self) -> str:
@@ -341,6 +349,96 @@ class DeepSeekNarrativeProvider:
         if last_retry_kind == "rate":  # pragma: no cover - loop always raises
             raise NarrativeProviderRateLimitError()
         raise NarrativeProviderUnavailableError()  # pragma: no cover
+
+    async def generate_dynamic(
+        self, request: DynamicNarrativeRequest
+    ) -> UntrustedDynamicNarrativeCandidate:
+        """Make the spike's one exact, non-retried dynamic Provider attempt."""
+
+        if self._closed:
+            raise NarrativeProviderUnavailableError()
+        if self._settings.max_retries != 0:
+            raise NarrativeProviderRequestError()
+        try:
+            prompt = self._dynamic_prompt_builder.build(request)
+        except (TypeError, ValueError):
+            raise NarrativeProviderRequestError() from None
+        payload: dict[str, Any] = {
+            "model": self._settings.model,
+            "messages": [
+                {"role": "system", "content": prompt.system},
+                {"role": "user", "content": prompt.user},
+            ],
+            "thinking": {"type": "disabled"},
+            "stream": False,
+            "response_format": {"type": "json_object"},
+            "max_tokens": self._settings.max_tokens,
+        }
+        headers = {
+            "Authorization": "Bearer " + self._settings.api_key.get_secret_value(),
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        }
+        started = self._clock()
+        try:
+            response = await self._get_transport().post_json(
+                url=OFFICIAL_DEEPSEEK_CHAT_COMPLETIONS_URL,
+                headers=headers,
+                payload=payload,
+                timeout_seconds=self._settings.timeout_seconds,
+            )
+        except (DeepSeekTransportTimeout, DeepSeekTransportConnectionError):
+            raise NarrativeProviderUnavailableError() from None
+        except DeepSeekTransportResponseError:
+            raise NarrativeProviderResponseError() from None
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            raise NarrativeProviderUnavailableError() from None
+
+        if response.status_code != 200:
+            self._raise_status(response.status_code)
+        if len(response.body_text.encode("utf-8")) > MAX_RESPONSE_BYTES:
+            raise NarrativeProviderResponseError()
+        envelope = _parse_envelope(response.body_text)
+        finish_reason, content = _choice_content(envelope)
+        if finish_reason == "length":
+            raise NarrativeProviderTruncatedError()
+        if finish_reason != "stop" or not isinstance(content, str) or not content.strip():
+            raise NarrativeProviderResponseError()
+        try:
+            json.loads(
+                content,
+                parse_float=_reject_float,
+                parse_constant=_reject_constant,
+                object_pairs_hook=_reject_duplicate_object_keys,
+            )
+            candidate = DynamicNarrativeCandidatePayload.model_validate_json(content)
+        except (UnicodeError, json.JSONDecodeError, TypeError, ValueError):
+            raise NarrativeProviderResponseError() from None
+        elapsed_ms = max(0, int((self._clock() - started) * 1_000))
+        body_request_id = envelope.get("id")
+        request_id = (
+            body_request_id
+            if isinstance(body_request_id, str)
+            and 1 <= len(body_request_id) <= 256
+            and _safe_request_id(body_request_id)
+            else response.request_id
+            if response.request_id is not None and _safe_request_id(response.request_id)
+            else None
+        )
+        return UntrustedDynamicNarrativeCandidate(
+            candidate=candidate,
+            provider_metadata=NarrativeProviderMetadata(
+                provider="deepseek",
+                model=self._settings.model,
+                request_id=request_id,
+                finish_reason=finish_reason,
+                attempts=1,
+                latency_ms=elapsed_ms,
+            ),
+            usage=_usage(envelope.get("usage")),
+        )
 
     async def _backoff(self, failed_attempt: int) -> None:
         delay = min(

@@ -175,6 +175,90 @@ function withSessionId(
   };
 }
 
+const initialNoNpcSuggestionTexts = [
+  "Observe the surroundings.",
+  "Investigate the immediate situation.",
+  "Attempt a cautious change to the current situation.",
+] as const;
+
+const initialGuideSuggestionTexts = [
+  "Observe the surroundings.",
+  "Speak to Guide.",
+  "Attempt a cautious change to the current situation.",
+] as const;
+
+const laterServerSuggestionTexts = [
+  "Trace the newly revealed signal.",
+  "Compare the committed public facts.",
+  "Proceed using the changed situation.",
+] as const;
+
+function dynamicSuggestionSubmission(
+  stateVersion: number,
+  ordinal: number,
+  description: string,
+) {
+  const identitySuffix = `${stateVersion.toString(16).padStart(2, "0")}${ordinal
+    .toString(16)
+    .padStart(2, "0")}${"a".repeat(56)}`;
+  return {
+    turn_id: `dst.${identitySuffix}`,
+    client_request_id: `dsr.${identitySuffix}`,
+    action_type: "CUSTOM" as const,
+    description,
+  };
+}
+
+function dynamicSuggestionViewFixture({
+  stateVersion,
+  suggestionTexts,
+  visibleNpcs = [],
+  customLabel = "Scenario-owned free action",
+}: {
+  stateVersion: number;
+  suggestionTexts: readonly [string, string, string];
+  visibleNpcs?: PlayerSessionView["player_state"]["visible_npcs"];
+  customLabel?: string;
+}): PlayerSessionView {
+  const view = freeActionViewFixture(stateVersion);
+  return {
+    ...view,
+    narrative_frame: {
+      ...view.narrative_frame,
+      visible_entities: visibleNpcs.map((npc) => npc.npc_id),
+    },
+    player_state: {
+      ...view.player_state,
+      visible_npcs: visibleNpcs,
+    },
+    action_affordances: {
+      mode: "FREE_ACTIONS",
+      actions: [
+        {
+          action_type: "CUSTOM",
+          label: customLabel,
+          input_kind: "DESCRIPTION",
+          max_input_length: 150,
+          target_required: false,
+          targets: [],
+        },
+      ],
+      choices: [],
+      suggested_actions: suggestionTexts.map((text, ordinal) => ({
+        suggestion_id: `sug.${stateVersion
+          .toString(16)
+          .padStart(2, "0")}${ordinal
+          .toString(16)
+          .padStart(2, "0")}${"b".repeat(60)}`,
+        ordinal,
+        label: text,
+        description: text,
+        submission: dynamicSuggestionSubmission(stateVersion, ordinal, text),
+      })),
+    },
+  };
+}
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   let reject!: (reason?: unknown) => void;
@@ -660,6 +744,253 @@ describe("action_affordances and synchronous lifecycle", () => {
       "the exact deterministic Demo warning was not rendered",
     );
   });
+
+  it("submits all three authoritative dynamic suggestions verbatim, then keeps free CUSTOM independent", async () => {
+    let viewReads = 0;
+    const submittedBodies: unknown[] = [];
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "client-owned-free-turn",
+      clientRequestId: "client-owned-free-request",
+    }));
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          viewReads += 1;
+          return HttpResponse.json(
+            dynamicSuggestionViewFixture({
+              stateVersion: viewReads,
+              suggestionTexts:
+                viewReads <= 3
+                  ? initialNoNpcSuggestionTexts
+                  : laterServerSuggestionTexts,
+            }),
+          );
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          const body = await request.json();
+          submittedBodies.push(body);
+          return HttpResponse.json(
+            committedActionResponseFixture(
+              (body as { client_request_id: string }).client_request_id,
+              99,
+            ),
+          );
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderActionApp({ actionIdentityFactory });
+    await loadSession(user);
+
+    for (const [ordinal, text] of initialNoNpcSuggestionTexts.entries()) {
+      await user.click(screen.getByRole("button", { name: text }));
+      await waitFor(() => expect(viewReads).toBe(ordinal + 2));
+      expect(actionIdentityFactory).not.toHaveBeenCalled();
+    }
+
+    expect(submittedBodies).toEqual(
+      initialNoNpcSuggestionTexts.map((text, ordinal) =>
+        dynamicSuggestionSubmission(ordinal + 1, ordinal, text),
+      ),
+    );
+    for (const text of laterServerSuggestionTexts) {
+      expect(screen.getByRole("button", { name: text })).toBeVisible();
+    }
+    expect(screen.queryByText("权威 View 已推进到版本 99。")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+    ).toBeVisible();
+
+    await user.type(screen.getByLabelText("行动描述"), "A separate free action.");
+    expect(
+      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+    ).toBeEnabled();
+    await user.click(
+      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+    );
+    await waitFor(() => expect(viewReads).toBe(5));
+
+    expect(actionIdentityFactory).toHaveBeenCalledTimes(1);
+    expect(submittedBodies[3]).toEqual({
+      turn_id: "client-owned-free-turn",
+      client_request_id: "client-owned-free-request",
+      action_type: "CUSTOM",
+      description: "A separate free action.",
+    });
+    expect(screen.getByText("权威 View：当前")).toBeVisible();
+  });
+
+  it.each([
+    {
+      branch: "zero eligible NPCs",
+      visibleNpcs: [],
+      suggestionTexts: initialNoNpcSuggestionTexts,
+      middleLabel: "Investigate the immediate situation.",
+    },
+    {
+      branch: "one eligible NPC",
+      visibleNpcs: [
+        {
+          npc_id: "npc.public.guide",
+          npc_definition_id: "npc.definition.guide",
+          display_name: "Guide",
+        },
+      ],
+      suggestionTexts: initialGuideSuggestionTexts,
+      middleLabel: "Speak to Guide.",
+    },
+    {
+      branch: "multiple eligible NPCs with the server-selected Guide",
+      visibleNpcs: [
+        {
+          npc_id: "npc.public.guide",
+          npc_definition_id: "npc.definition.guide",
+          display_name: "Guide",
+        },
+        {
+          npc_id: "npc.public.observer",
+          npc_definition_id: "npc.definition.observer",
+          display_name: "Observer",
+        },
+      ],
+      suggestionTexts: initialGuideSuggestionTexts,
+      middleLabel: "Speak to Guide.",
+    },
+  ])(
+    "renders the exact initial suggestion branch for $branch and submits its server payload",
+    async ({ visibleNpcs, suggestionTexts, middleLabel }) => {
+      let viewReads = 0;
+      const submittedBodies: unknown[] = [];
+      const actionIdentityFactory = vi.fn(() => ({
+        turnId: "must-not-be-created",
+        clientRequestId: "must-not-be-created",
+      }));
+      server.use(
+        scenarioHandler(),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/view`,
+          () => {
+            viewReads += 1;
+            return HttpResponse.json(
+              dynamicSuggestionViewFixture({
+                stateVersion: viewReads,
+                suggestionTexts,
+                visibleNpcs: [...visibleNpcs],
+              }),
+            );
+          },
+        ),
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          async ({ request }) => {
+            const body = await request.json();
+            submittedBodies.push(body);
+            return HttpResponse.json(
+              committedActionResponseFixture(
+                (body as { client_request_id: string }).client_request_id,
+                2,
+              ),
+            );
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      renderActionApp({ actionIdentityFactory });
+      await loadSession(user);
+
+      const suggestionGroup = screen.getByRole("group", {
+        name: "动态建议行动",
+      });
+      expect(within(suggestionGroup).getAllByRole("button")).toHaveLength(3);
+      for (const text of suggestionTexts) {
+        expect(
+          within(suggestionGroup).getByRole("button", { name: text }),
+        ).toBeVisible();
+      }
+      const playerState = screen
+        .getByRole("heading", { name: "公开玩家状态" })
+        .closest("section");
+      expect(playerState).toHaveTextContent(`可见 NPC${visibleNpcs.length}`);
+      expect(
+        screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+      ).toBeVisible();
+
+      await user.click(
+        within(suggestionGroup).getByRole("button", { name: middleLabel }),
+      );
+      await waitFor(() => expect(viewReads).toBe(2));
+
+      expect(submittedBodies).toEqual([
+        dynamicSuggestionSubmission(1, 1, middleLabel),
+      ]);
+      expect(actionIdentityFactory).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each([
+    ["absent", undefined],
+    ["invalid", "Bad\u0000Name"],
+    ["over-bound", "N".repeat(121)],
+  ] as const)(
+    "does not render a fallback or progress when the server refuses an %s selected NPC name",
+    async (_caseName, selectedNpcName) => {
+      let viewReads = 0;
+      let actionPosts = 0;
+      server.use(
+        scenarioHandler(),
+        http.get(
+          `${apiOrigin}/v1/sessions/session-public-1/view`,
+          () => {
+            viewReads += 1;
+            const selectedNameIsValid =
+              selectedNpcName !== undefined &&
+              !/[\p{Cc}\p{Cf}]/u.test(selectedNpcName) &&
+              Array.from(selectedNpcName).length <= 120;
+            if (selectedNameIsValid) {
+              throw new Error("the invalid selected-NPC vector was not invalid");
+            }
+            return HttpResponse.json(
+              errorFixture("INTERNAL_SERVER_ERROR", "Internal server error"),
+              { status: 500 },
+            );
+          },
+        ),
+        http.post(
+          `${apiOrigin}/v1/sessions/session-public-1/actions`,
+          () => {
+            actionPosts += 1;
+            return HttpResponse.json({}, { status: 500 });
+          },
+        ),
+      );
+      const user = userEvent.setup();
+      renderActionApp();
+      await user.type(await screen.findByLabelText("Session ID"), "session-public-1");
+      await user.click(
+        screen.getByRole("button", { name: "读取 PlayerSessionView" }),
+      );
+
+      expect(await screen.findByRole("alert")).toHaveTextContent(
+        "Internal server error",
+      );
+      expect(viewReads).toBe(1);
+      expect(actionPosts).toBe(0);
+      expect(
+        screen.queryByText("当前 Session：session-public-1"),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("group", { name: "动态建议行动" }),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "当前可执行行动" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("rejects a version-4 choice divergence served and rendered by App", async () => {
     let currentVersion = 0;
@@ -1694,9 +2025,13 @@ describe("HTTP 202 request-status lifecycle", () => {
     let statusReads = 0;
     let viewReads = 0;
     const observedStatusIds: string[] = [];
+    const pollStarted = deferred<void>();
+    const pollGate = deferred<void>();
     const pollWait = vi.fn(
       async (...parameters: [number, AbortSignal]) => {
         void parameters;
+        pollStarted.resolve();
+        await pollGate.promise;
       },
     );
     server.use(
@@ -1746,7 +2081,7 @@ describe("HTTP 202 request-status lifecycle", () => {
             client_action: "RESPONSE_AVAILABLE",
             error_code: null,
             retry_after_seconds: null,
-            response: committedActionResponseFixture("opaque-request-1", 2),
+            response: committedActionResponseFixture("opaque-request-1", 99),
           });
         },
       ),
@@ -1762,6 +2097,16 @@ describe("HTTP 202 request-status lifecycle", () => {
     );
     await user.click(within(talkForm).getByRole("button", { name: "提交交谈" }));
 
+    await pollStarted.promise;
+    expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(2);
+    expect(screen.queryAllByText("权威 View 已推进到版本 2。")).toHaveLength(0);
+    expect(screen.queryAllByText("权威 View 已推进到版本 99。")).toHaveLength(0);
+    expect(within(talkForm).getByRole("button", { name: "提交交谈" })).toBeDisabled();
+    expect(actionPosts).toBe(1);
+    expect(statusReads).toBe(1);
+    expect(viewReads).toBe(1);
+
+    pollGate.resolve();
     await waitFor(() => expect(viewReads).toBe(2));
     expect(actionPosts).toBe(1);
     expect(statusReads).toBe(2);
@@ -1772,6 +2117,8 @@ describe("HTTP 202 request-status lifecycle", () => {
     expect(pollWait).toHaveBeenCalledTimes(1);
     expect(pollWait.mock.calls[0]?.[0]).toBe(2_000);
     expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(2);
+    expect(screen.queryAllByText("权威 View 已推进到版本 99。")).toHaveLength(0);
     expect(storedRecoveryRecord()).toEqual({
       version: 1,
       session_id: "session-public-1",
@@ -2057,6 +2404,8 @@ describe("HTTP 202 request-status lifecycle", () => {
     expect(statusReads).toBe(1);
     expect(pollWait).not.toHaveBeenCalled();
     expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(2);
+    expect(screen.queryAllByText("权威 View 已推进到版本 3。")).toHaveLength(0);
   });
 
   it.each([
@@ -2123,6 +2472,8 @@ describe("HTTP 202 request-status lifecycle", () => {
       expect(actionPosts).toBe(1);
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
+      expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(2);
+      expect(screen.queryAllByText("权威 View 已推进到版本 2。")).toHaveLength(0);
     },
   );
 

@@ -1210,3 +1210,30 @@ application/domain 不导入 `httpx`、DeepSeek SDK、环境设置或供应商�
 DeepSeek adapter 只在 infrastructure，配置限制为官方 HTTPS host、`deepseek-v4-flash`/`deepseek-v4-pro`、显式 timeout、有界 max tokens 和最多 2 次 retry（最多 3 次 HTTP attempt）。生产默认 retry 为 0，因为 read timeout、连接中断等错误不能证明供应商没有收到请求；显式开启 retry 可能重复供应商工作或计费，本系统不保证 exactly-once billing。请求固定 non-stream、JSON object、thinking disabled，并禁用所有工具/Beta/Web 能力。400/401/402/422 不重试；429、500、503、连接与 timeout 仅在配置允许时使用可注入的有界退避；空 content 或 JSON 解析失败最多额外尝试一次且受总上限约束；`finish_reason=length` 直接作为截断失败。client 延迟创建并支持异步关闭，日志和 DTO 不包含 key、Authorization、完整 prompt 或原始响应。
 
 本段记录 Phase 2.2b-1 当时尚未接线的边界；现行 Phase 2.2c 生产行为以文首的三阶段架构为准。详细配置、数据合同与 smoke 规则见 [`docs/narrative_provider.md`](narrative_provider.md)。
+
+## Experimental Dynamic Narrative Vertical Spike candidate
+
+The DNVS candidate is a separate local Demo composition, not a production
+composition or a new formal phase. It enters the existing authoritative Run,
+Session, participation, Player Character, snapshot, event, turn-response, and
+narrative-job boundaries through a director-free dynamic Session service. The
+server constructs every View and exact suggestion submission; the Web client
+only renders and returns those contracts. Provider output remains an untrusted
+candidate until current authority, finite public/hidden provenance, state
+version, job lease, request binding, and storage-slot validation all succeed.
+
+Each accepted dynamic turn uses prepare/call/finalize transactions. The single
+Provider await occurs outside every UoW and lock. Finalize atomically publishes
+the successor snapshot, event, response, committed job, accepted prose, and
+Session version. Cancellation and uncertain publication are reconciled from a
+fresh UoW and never cause automatic Provider replay. A permanent process-local
+ledger admits exactly 512 distinct attempts per Session; attempt 512 may create
+a job, while the next distinct attempt is rejected before job creation or
+Provider invocation. Exact replays and concurrent followers join existing
+authority and consume no new reservation.
+
+No schema or migration changes are needed: existing narrative-job JSON,
+snapshots, turn responses, and the literal 20-slot dynamic-facts allowlist carry
+the bounded experimental state. The candidate remains unstaged and awaits
+independent implementation review. It does not establish production or evidence
+completion and does not change Phase 6, Phase 7, completed Phase 8, or P8-S6.

@@ -1996,4 +1996,114 @@ describe("public action and request-status contracts", () => {
       }).success,
     ).toBe(false);
   });
+
+  it("parses every server-owned dynamic identity and reuses each exact nested HTTP payload", async () => {
+    const source = freeActionViewFixture();
+    const freeCustom = {
+      action_type: "CUSTOM" as const,
+      label: "Server-owned free CUSTOM label",
+      input_kind: "DESCRIPTION" as const,
+      max_input_length: 150,
+      target_required: false,
+      targets: [],
+    };
+    const suggested_actions = [0, 1, 2].map((ordinal) => ({
+      suggestion_id: `sug.server-owned-${ordinal}`,
+      ordinal,
+      label: `Server suggestion ${ordinal}`,
+      description: `Server suggestion ${ordinal}`,
+      submission: {
+        turn_id: `dst.server-owned-${ordinal}`,
+        client_request_id: `dsr.server-owned-${ordinal}`,
+        action_type: "CUSTOM" as const,
+        description: `Server suggestion ${ordinal}`,
+      },
+    }));
+    const authoritativeView = {
+      ...source,
+      action_affordances: {
+        mode: "FREE_ACTIONS",
+        actions: [freeCustom],
+        decision_id: null,
+        choices: [],
+        suggested_actions,
+      },
+    };
+    const observedBodies: unknown[] = [];
+    server.use(
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () =>
+        HttpResponse.json(authoritativeView),
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          const body = await request.json();
+          observedBodies.push(body);
+          const requestId = (body as { client_request_id: string })
+            .client_request_id;
+          return HttpResponse.json(
+            synchronousActionResponseFixture(requestId),
+          );
+        },
+      ),
+    );
+
+    const api = client();
+    const parsed = await api.getSessionView("session-public-1");
+    expect(parsed.action_affordances.actions).toEqual([freeCustom]);
+    expect(parsed.action_affordances.actions[0]?.label).toBe(
+      "Server-owned free CUSTOM label",
+    );
+    expect(parsed.action_affordances.suggested_actions).toEqual(
+      suggested_actions,
+    );
+    expect(
+      parsed.action_affordances.suggested_actions?.map(
+        ({ suggestion_id, ordinal, submission }) => ({
+          suggestion_id,
+          ordinal,
+          turn_id: submission.turn_id,
+          client_request_id: submission.client_request_id,
+        }),
+      ),
+    ).toEqual([
+      {
+        suggestion_id: "sug.server-owned-0",
+        ordinal: 0,
+        turn_id: "dst.server-owned-0",
+        client_request_id: "dsr.server-owned-0",
+      },
+      {
+        suggestion_id: "sug.server-owned-1",
+        ordinal: 1,
+        turn_id: "dst.server-owned-1",
+        client_request_id: "dsr.server-owned-1",
+      },
+      {
+        suggestion_id: "sug.server-owned-2",
+        ordinal: 2,
+        turn_id: "dst.server-owned-2",
+        client_request_id: "dsr.server-owned-2",
+      },
+    ]);
+
+    for (const suggestion of parsed.action_affordances.suggested_actions ?? []) {
+      await api.submitAction("session-public-1", suggestion.submission);
+    }
+
+    expect(observedBodies).toEqual(
+      suggested_actions.map((suggestion) => suggestion.submission),
+    );
+    for (const [index, body] of observedBodies.entries()) {
+      expect(Object.keys(body as Record<string, unknown>)).toEqual([
+        "turn_id",
+        "client_request_id",
+        "action_type",
+        "description",
+      ]);
+      expect(body).not.toHaveProperty("suggestion_id");
+      expect(body).not.toHaveProperty("label");
+      expect(body).toEqual(suggested_actions[index]?.submission);
+    }
+  });
 });

@@ -15,36 +15,29 @@ documents.
 
 ## Dynamic Narrative Vertical Spike planning
 
-The separate experimental Dynamic Narrative Vertical Spike is planned. Its
+The separate experimental Dynamic Narrative Vertical Spike has an unstaged
+implementation candidate awaiting independent implementation review. Its
 detailed canonical authority is the
 [approved and frozen implementation plan](docs/dynamic_narrative_vertical_spike_plan.md).
 The focused seven-finding verification concluded
 `DYNAMIC_NARRATIVE_VERTICAL_SPIKE_FOCUSED_SEVEN_FINDING_VERIFICATION_APPROVED`
 with zero material findings against the reviewed pre-freeze candidate. The
-spike remains unimplemented, not production-complete, and not evidence-complete;
-plan approval and freeze do not authorize implementation, which still requires
-a separate explicit task. Once separately authorized, the frozen plan governs
-that implementation scope; later substantive normative changes require the
-repository's existing amendment and re-verification process. The next lifecycle
-step follows the later focused freeze-transition verification's
-`DYNAMIC_NARRATIVE_VERTICAL_SPIKE_PLAN_APPROVAL_AND_FREEZE_FOCUSED_VERIFICATION_CHANGES_REQUIRED`
-verdict, which identified only this sequencing wording and did not alter the
-approved or frozen status. The corrected wording must receive a fresh bounded
-read-only verification. Only after that verification returns `APPROVED` may a
-separately authorized plan-document commit limited to `PLANS.md` and
-`docs/dynamic_narrative_vertical_spike_plan.md` be performed. That commit does
-not authorize implementation, and push/publication remains a separate action.
-The committed plan documentation must be published and the repository confirmed
-at a clean, aligned baseline before any implementation task is generated or
-executed. DNVS implementation remains a later, separately authorized task
-against that revalidated clean, aligned baseline. The spike does not reopen
-completed Phase 8 and is neither Phase 6 nor Phase 7. P8-S6 and Phase 8 are
+approved plan was published at baseline
+`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564`, and a separate explicit task
+authorized the current bounded 24-path candidate against that baseline. The
+candidate is not independently approved, committed, published,
+production-complete, or evidence-complete. Real-Provider smoke, Manual Fake
+browser evidence, and Optional Live browser evaluation remain separately
+authorized later activities. The next lifecycle step is one independent DNVS
+implementation review governed by the frozen plan and baseline. The spike does
+not reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
+P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
 no P8-S7 exists. Phase 6 and Phase 7, the Structured Player Character programme,
 and the overall project remain incomplete. Completing the spike would not
-establish production Provider distribution. No implementation, test campaign,
-staging, commit, or push has occurred.
+establish production Provider distribution. No DNVS staging, commit, push,
+real Provider call, or browser-evidence activity has occurred.
 
 ## P4-S1 completion baseline
 

@@ -11,13 +11,21 @@ from pydantic import ValidationError
 
 from deviation_protocol.api import main
 from deviation_protocol.application.action_gateway import ActionGateway, ActionRoute
-from deviation_protocol.application.session_service import PlayerSessionView
+from deviation_protocol.application.session_service import (
+    PlayerSessionView,
+    PublicActionAffordance,
+    PublicActionAffordanceSet,
+    PublicActionMode,
+    PublicSuggestedAction,
+    PublicSuggestedActionSubmission,
+)
 from deviation_protocol.application.narrative_outcome_policy import (
     allowed_narrative_outcomes,
     available_narrative_actions,
 )
 from deviation_protocol.domain.actions import ActionContext, ActionSubmission, ActionType
 from deviation_protocol.domain.policies import InputContractPolicy
+from deviation_protocol.domain.policies import ActionInputKind
 from deviation_protocol.domain.scenario import ScenarioCatalog
 from deviation_protocol.domain.state import GameState
 from tests.unit.test_phase_2_4a_playtest import (
@@ -27,6 +35,59 @@ from tests.unit.test_phase_2_4a_playtest import (
 
 
 SESSION_PATH = "/v1/sessions/playtest-session"
+
+
+def test_dynamic_suggestions_are_additive_and_deterministic_views_omit_them() -> None:
+    deterministic = PublicActionAffordanceSet(
+        mode=PublicActionMode.FREE_ACTIONS,
+        actions=(
+            PublicActionAffordance(
+                action_type=ActionType.CUSTOM,
+                label="自由行动",
+                input_kind=ActionInputKind.DESCRIPTION,
+                max_input_length=150,
+                target_required=False,
+            ),
+        ),
+    )
+    assert "suggested_actions" not in deterministic.model_dump(exclude_none=True)
+
+    suggestions = tuple(
+        PublicSuggestedAction(
+            suggestion_id=f"sug.{index}",
+            ordinal=index,
+            label=f"Suggestion {index}",
+            description=f"Suggestion {index}",
+            submission=PublicSuggestedActionSubmission(
+                turn_id=f"dst.{index}",
+                client_request_id=f"dsr.{index}",
+                action_type=ActionType.CUSTOM,
+                description=f"Suggestion {index}",
+            ),
+        )
+        for index in range(3)
+    )
+    dynamic = deterministic.model_dump(mode="json")
+    dynamic["suggested_actions"] = [
+        item.model_dump(mode="json") for item in suggestions
+    ]
+    validated = PublicActionAffordanceSet.model_validate(dynamic)
+    assert tuple(item.ordinal for item in validated.suggested_actions or ()) == (0, 1, 2)
+
+    app, _, _ = build_playtest()
+    components = app.openapi()["components"]["schemas"]
+    assert "PublicSuggestedAction" not in components
+    assert "PublicSuggestedActionSubmission" not in components
+    suggestion_schema = components["PublicActionAffordanceSet"]["properties"][
+        "suggested_actions"
+    ]
+    array_schema = suggestion_schema["anyOf"][0]
+    assert (array_schema["minItems"], array_schema["maxItems"]) == (3, 3)
+    assert array_schema["items"]["additionalProperties"] is False
+    assert (
+        array_schema["items"]["properties"]["submission"]["additionalProperties"]
+        is False
+    )
 
 
 async def _create(app: Any, request_id: str = "public-contract-create") -> None:

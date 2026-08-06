@@ -6,10 +6,10 @@ Pre-freeze correction task identity:
 Approval-and-freeze task identity:
 `DYNAMIC_NARRATIVE_VERTICAL_SPIKE_PLAN_APPROVAL_AND_FREEZE`.
 
-Status: **Experimental vertical spike. Planned; implementation plan approved
-and frozen. Unimplemented, not production-complete, and not evidence-complete.
-Implementation is not automatically authorized and still requires a separate
-explicit task.**
+Status: **Experimental vertical spike. Implementation plan approved and
+frozen; a complete unstaged implementation candidate is awaiting independent
+implementation review. It is not independently approved, production-complete,
+or evidence-complete.**
 
 Approval-and-freeze record:
 
@@ -21,8 +21,8 @@ Approval-and-freeze record:
 | Material findings | None |
 | Approval result | Approved |
 | Freeze result | Frozen |
-| Implementation state | Unimplemented |
-| Implementation authorization | Separate explicit authorization still required |
+| Implementation state | Unstaged implementation candidate awaiting independent review |
+| Implementation authorization | Separately authorized against published baseline `66af1361370be7dd2dfc2a3be8dbf1b5d13f4564` |
 | Freeze consequence | Later substantive normative changes require the repository's existing amendment and re-verification process before implementation proceeds under the changed text |
 
 The focused verifier reviewed the exact pre-freeze identity above, not the
@@ -59,9 +59,9 @@ either phase, the Structured Player Character programme, or the project.
 This document is the approved and frozen implementation plan for the
 experimental spike. Approval and freeze authorize no implementation, test
 campaign, live call, staging, commit, publication, deployment, or push.
-Implementation requires a separate explicit task. Once implementation is
-separately authorized against the required baseline, this frozen normative
-scope governs that work.
+Implementation required and received a separate explicit task against baseline
+`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564`; this frozen normative scope
+governs the resulting unstaged candidate and its independent review.
 
 The prior six-finding correction established and retains these substantive
 boundaries:
@@ -3610,14 +3610,11 @@ No implementation test, MySQL test, Demo, frontend build, live Provider call,
 stage, commit, push, fetch, or other remote operation belongs to plan
 authoring.
 
-## 19. Exact next action after plan approval and freeze
+## 19. Exact next action after implementation candidate completion
 
-Preserve the exact two-file unstaged approved-and-frozen candidate. The next
-action is one focused independent read-only verification of the approval/freeze
-status transition and preservation of the reviewed technical content, bound to
-the final SHA-256 identities of `PLANS.md` and
-`docs/dynamic_narrative_vertical_spike_plan.md`. Do not stage, commit, push,
-publish, or begin implementation. After that bounded verification, any staging,
-commit, publication, or implementation still requires its own repository-
-compliant authority; implementation remains unimplemented and requires a
-separate explicit task against a revalidated baseline.
+Return the implementation report and complete unstaged 24-path candidate to the
+coordinating ChatGPT conversation for generation of one independent DNVS
+implementation-review task governed by this frozen plan and baseline
+`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564`. Do not stage, commit, push,
+execute real Provider or browser evidence, or begin a later lifecycle task in
+the implementation session.

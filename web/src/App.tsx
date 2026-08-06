@@ -14,6 +14,7 @@ import {
   type PlayerCharacterSelfProjection,
   type PublicActionAffordance,
   type PublicPlayableActionType,
+  type PublicSuggestedAction,
   type PublicScenarioDescription,
   type RunEntryRequest,
 } from "./api/schemas";
@@ -522,11 +523,13 @@ function ActionPanel({
   disabled,
   disabledReason,
   onSubmit,
+  onSubmitSuggestion,
 }: {
   view: PlayerSessionView;
   disabled: boolean;
   disabledReason: string | null;
   onSubmit: (intent: ActionIntent) => void;
+  onSubmitSuggestion: (suggestion: PublicSuggestedAction) => void;
 }) {
   const affordances = view.action_affordances;
   if (affordances.mode === "ENDED") {
@@ -542,6 +545,22 @@ function ActionPanel({
       </p>
       {disabledReason === null ? null : (
         <p className="disabled-reason">行动已禁用：{disabledReason}</p>
+      )}
+
+      {affordances.suggested_actions === undefined ? null : (
+        <div className="dynamic-suggestions" role="group" aria-label="动态建议行动">
+          <h3>动态建议行动</h3>
+          {affordances.suggested_actions.map((suggestion) => (
+            <button
+              key={suggestion.suggestion_id}
+              type="button"
+              disabled={disabled}
+              onClick={() => onSubmitSuggestion(suggestion)}
+            >
+              {suggestion.label}
+            </button>
+          ))}
+        </div>
       )}
 
       {affordances.mode === "DECISION" ? (
@@ -1609,7 +1628,7 @@ export default function App({
     explicitlyAbandonSession();
   }
 
-  async function handleAction(intent: ActionIntent) {
+  async function handleActionRequest(requestFactory: () => ActionRequest) {
     const current = loadedSessionRef.current;
     if (
       current === null ||
@@ -1630,12 +1649,7 @@ export default function App({
     let stage: "building" | "posting" | "polling" | "refreshing" =
       "building";
     try {
-      const identity = actionIdentityFactory();
-      const request: ActionRequest = actionRequestSchema.parse({
-        turn_id: identity.turnId,
-        client_request_id: identity.clientRequestId,
-        ...intent,
-      });
+      const request = requestFactory();
       stage = "posting";
       const submitted = await client.submitAction(
         current.sessionId,
@@ -1734,6 +1748,23 @@ export default function App({
     } finally {
       finishForegroundOperation(operation);
     }
+  }
+
+  async function handleAction(intent: ActionIntent) {
+    await handleActionRequest(() => {
+      const identity = actionIdentityFactory();
+      return actionRequestSchema.parse({
+        turn_id: identity.turnId,
+        client_request_id: identity.clientRequestId,
+        ...intent,
+      });
+    });
+  }
+
+  async function handleSuggestedAction(suggestion: PublicSuggestedAction) {
+    await handleActionRequest(() =>
+      actionRequestSchema.parse(suggestion.submission),
+    );
   }
 
   const operationStatus =
@@ -2092,6 +2123,9 @@ export default function App({
           }
           disabledReason={actionDisabledReason}
           onSubmit={(intent) => void handleAction(intent)}
+          onSubmitSuggestion={(suggestion) =>
+            void handleSuggestedAction(suggestion)
+          }
         />
       )}
     </main>

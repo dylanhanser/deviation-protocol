@@ -77,6 +77,21 @@ With existing Python and Web dependencies, start the long-running local Demo:
 pwsh -NoProfile -File .\scripts\start-demo.ps1
 ```
 
+The experimental Dynamic Narrative Vertical Spike candidate can instead be
+started with its local deterministic Fake:
+
+```powershell
+pwsh -NoProfile -File .\scripts\start-demo.ps1 -Mode DynamicNarrative -DynamicProvider Fake
+```
+
+Dynamic mode is local, temporary, experimental, and not a production Provider.
+Omitting `-DynamicProvider` in DynamicNarrative mode also selects Fake. Only an
+exact explicit `-DynamicProvider Live` may construct the existing DeepSeek
+adapter; it never falls back to Live, and Live use and browser evidence require
+separate authorization. Both Web variants keep Vite's
+`--mode deterministic-demo` dotenv isolation. `VITE_APP_MODE` is only a
+presentation label and receives no Provider configuration or credential.
+
 The launcher starts the dedicated Demo backend at `127.0.0.1:8000` and Vite at
 `127.0.0.1:5173`. It installs nothing and opens no browser. The page labels this
 mode as a deterministic, local-only Demo with temporary data and explicitly

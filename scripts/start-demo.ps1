@@ -1,7 +1,16 @@
 #requires -Version 7.0
 
 [CmdletBinding()]
-param()
+param(
+    [ValidateSet("Deterministic", "DynamicNarrative")]
+    [string]$Mode = "Deterministic",
+
+    [ValidateSet("Fake", "Live")]
+    [string]$DynamicProvider = "Fake",
+
+    [ValidateRange(1, 10)]
+    [int]$FakeFailureAtAction
+)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -137,6 +146,15 @@ function Remove-SensitiveChildEnvironment {
             $name.Equals("DATABASE_URL", [StringComparison]::OrdinalIgnoreCase) -or
             $name.Equals("TEST_DATABASE_URL", [StringComparison]::OrdinalIgnoreCase) -or
             $name.Equals("RUN_LIVE_DEEPSEEK_TEST", [StringComparison]::OrdinalIgnoreCase) -or
+            $name.Equals("DEVIATION_DEMO_MODE", [StringComparison]::OrdinalIgnoreCase) -or
+            $name.Equals(
+                "DEVIATION_DEMO_DYNAMIC_PROVIDER",
+                [StringComparison]::OrdinalIgnoreCase
+            ) -or
+            $name.Equals(
+                "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION",
+                [StringComparison]::OrdinalIgnoreCase
+            ) -or
             $name.Equals(
                 "DEVIATION_DEMO_SCENARIO_RESPONSE_FILE",
                 [StringComparison]::OrdinalIgnoreCase
@@ -193,6 +211,22 @@ try {
     if (-not (Test-Path -LiteralPath (Join-Path $webRoot "node_modules") -PathType Container)) {
         throw "web/node_modules is missing. Install dependencies separately before launch."
     }
+    if (
+        $Mode -eq "Deterministic" -and
+        (
+            $PSBoundParameters.ContainsKey("DynamicProvider") -or
+            $PSBoundParameters.ContainsKey("FakeFailureAtAction")
+        )
+    ) {
+        throw "Dynamic Provider parameters require -Mode DynamicNarrative."
+    }
+    if (
+        $Mode -eq "DynamicNarrative" -and
+        $DynamicProvider -eq "Live" -and
+        $PSBoundParameters.ContainsKey("FakeFailureAtAction")
+    ) {
+        throw "-FakeFailureAtAction is valid only with -DynamicProvider Fake."
+    }
 
     $cmdPath = Get-ValidatedComSpec
     $npmCmdPath = Get-ValidatedNpmCmd
@@ -219,6 +253,33 @@ try {
         [void]$backendStartInfo.ArgumentList.Add($argument)
     }
     Remove-SensitiveChildEnvironment -StartInfo $backendStartInfo
+    if ($Mode -eq "DynamicNarrative") {
+        $backendStartInfo.Environment["DEVIATION_DEMO_MODE"] = "dynamic-narrative"
+        $backendStartInfo.Environment["DEVIATION_DEMO_DYNAMIC_PROVIDER"] =
+            $DynamicProvider.ToLowerInvariant()
+        if ($PSBoundParameters.ContainsKey("FakeFailureAtAction")) {
+            $backendStartInfo.Environment["DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION"] =
+                $FakeFailureAtAction.ToString([Globalization.CultureInfo]::InvariantCulture)
+        }
+        if ($DynamicProvider -eq "Live") {
+            foreach ($name in @(
+                "DEEPSEEK_API_KEY",
+                "DEEPSEEK_BASE_URL",
+                "DEEPSEEK_MODEL",
+                "DEEPSEEK_TIMEOUT_SECONDS",
+                "DEEPSEEK_MAX_TOKENS",
+                "DEEPSEEK_MAX_RETRIES"
+            )) {
+                $value = [Environment]::GetEnvironmentVariable(
+                    $name,
+                    [EnvironmentVariableTarget]::Process
+                )
+                if ($null -ne $value) {
+                    $backendStartInfo.Environment[$name] = $value
+                }
+            }
+        }
+    }
 
     $webStartInfo = [Diagnostics.ProcessStartInfo]::new()
     $webStartInfo.FileName = $cmdPath
@@ -229,7 +290,12 @@ try {
         $npmCmdPath +
         '" run dev -- --host 127.0.0.1 --port 5173 --strictPort --mode deterministic-demo"'
     Remove-SensitiveChildEnvironment -StartInfo $webStartInfo
-    $webStartInfo.Environment["VITE_APP_MODE"] = "deterministic-demo"
+    $webStartInfo.Environment["VITE_APP_MODE"] = if ($Mode -eq "DynamicNarrative") {
+        "dynamic-narrative"
+    }
+    else {
+        "deterministic-demo"
+    }
 
     $backendProcess = [Diagnostics.Process]::Start($backendStartInfo)
     if ($null -eq $backendProcess) {
@@ -246,7 +312,12 @@ try {
     $cancelHandler = $cancelState.HandleCancel
     [Console]::add_CancelKeyPress($cancelHandler)
 
-    Write-Host "Deterministic Demo: local only, temporary data, not a production Provider."
+    if ($Mode -eq "DynamicNarrative") {
+        Write-Host "Dynamic Narrative Demo ($DynamicProvider): local experimental mode, temporary data."
+    }
+    else {
+        Write-Host "Deterministic Demo: local only, temporary data, not a production Provider."
+    }
     Write-Host "Web: http://127.0.0.1:5173"
     Write-Host "Press Ctrl+C to stop the launcher-owned process trees."
 

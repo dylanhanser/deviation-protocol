@@ -962,7 +962,11 @@ def test_launcher_and_smoke_freeze_loopback_single_worker_demo_composition() -> 
         assert '"1"' in script
         assert "--reload" not in script
         assert "--host 127.0.0.1 --port 5173 --strictPort --mode deterministic-demo" in script
-        assert '$webStartInfo.Environment["VITE_APP_MODE"] = "deterministic-demo"' in script
+        if path == START_SCRIPT:
+            assert '$webStartInfo.Environment["VITE_APP_MODE"] = if ($Mode -eq "DynamicNarrative")' in script
+            assert '"dynamic-narrative"' in script
+        else:
+            assert '$webStartInfo.Environment["VITE_APP_MODE"] = "deterministic-demo"' in script
         assert "npm install" not in script
         assert "npm ci" not in script
         assert "npx" not in script
@@ -979,3 +983,21 @@ def test_port_checks_precede_every_child_launch() -> None:
         first_start = script.index("$backendProcess =", port_checks_end)
         assert script.index("Assert-AvailableLoopbackPort -Port 8000") < first_start
         assert script.index("Assert-AvailableLoopbackPort -Port 5173") < first_start
+
+
+def test_dynamic_launcher_selection_is_explicit_and_keeps_vite_dotenv_isolated() -> None:
+    script = START_SCRIPT.read_text(encoding="utf-8")
+    assert '[ValidateSet("Deterministic", "DynamicNarrative")]' in script
+    assert '[ValidateSet("Fake", "Live")]' in script
+    assert '[string]$DynamicProvider = "Fake"' in script
+    assert '$backendStartInfo.Environment["DEVIATION_DEMO_MODE"] = "dynamic-narrative"' in script
+    assert '$backendStartInfo.Environment["DEVIATION_DEMO_DYNAMIC_PROVIDER"]' in script
+    assert '--mode deterministic-demo' in script
+    assert 'VITE_APP_MODE' in script
+    assert 'VITE_DEEPSEEK' not in script
+    for inherited_name in (
+        "DEVIATION_DEMO_MODE",
+        "DEVIATION_DEMO_DYNAMIC_PROVIDER",
+        "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION",
+    ):
+        assert f'"{inherited_name}"' in script

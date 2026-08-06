@@ -606,3 +606,19 @@ Phase 3.3 is acceptable only when:
 - [Narrative Provider boundary](narrative_provider.md)
 - [NPC Relationship and Temporary Residence](npc_relationship_residence.md)
 - [Current scenario specification](scenarios/death_certificate_v1.md)
+
+## Experimental Dynamic Narrative Vertical Spike boundary
+
+The DNVS candidate reuses the current implemented Run-entry operation and its
+one active Player Character binding. It creates the Session, participation,
+snapshot, initial event, and declared runtime NPCs atomically, assigning NPC
+instance IDs from scenario declaration order as `scenario-npc-1..N`. Dynamic
+story state remains Session/GameState authority; Run identity, continuous-story
+line identity, participation, binding, lifecycle, and ownership remain unchanged
+and are revalidated on every reconstruction.
+
+This experimental composition neither implements nor amends the deferred formal
+Run Protocol described in this document. It is outside Phase 8, creates no
+P8-S7, and leaves completed P8-S6/Phase 8 and incomplete Phase 6/Phase 7 exactly
+as recorded in `PLANS.md`. The unstaged candidate still requires independent
+implementation review and later separately authorized evidence.

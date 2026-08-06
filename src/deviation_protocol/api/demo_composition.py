@@ -1,18 +1,40 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import hashlib
+import os
 from pathlib import Path
+from typing import Any, Mapping
 
 from deviation_protocol.api.dependencies import ApiServices
 from deviation_protocol.api.main import build_run_entry_service
+from deviation_protocol.application.dynamic_narrative_models import (
+    DynamicNarrativeCandidatePayload,
+    DynamicNarrativeProvider,
+    DynamicNextScene,
+    DynamicPublicFactProposal,
+    NarrativeProviderMetadata,
+    UntrustedDynamicNarrativeCandidate,
+    canonical_json,
+)
+from deviation_protocol.application.dynamic_narrative_orchestrator import (
+    DynamicNarrativeOrchestrator,
+    DynamicSessionService,
+)
 from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
     NarrativeProvider,
+    NarrativeProviderUnavailableError,
     NarrativeRequest,
     UntrustedNarrativeProposal,
 )
 from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
+from deviation_protocol.application.narrative_prompt import (
+    PromptBuilder,
+    default_style_profile,
+)
 from deviation_protocol.application.narrative_outcome_policy import (
     available_narrative_actions,
 )
@@ -41,6 +63,11 @@ from deviation_protocol.domain.run import (
     RunId,
 )
 from deviation_protocol.domain.scenario import EndingStatus, ScenarioDefinition
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
+from deviation_protocol.infrastructure.deepseek_narrative import (
+    DeepSeekNarrativeProvider,
+    DeepSeekSettings,
+)
 from deviation_protocol.infrastructure.demo_authority import (
     CanonicalDemoProviderGuard,
     DemoProviderCheckpoint,
@@ -123,7 +150,145 @@ class DemoRuntime:
     services: ApiServices
     store: DemoProcessStore
     generators: DemoGenerators
-    provider: NarrativeProvider
+    provider: Any
+    _owned_resources: tuple[Any, ...] = field(default=(), repr=False, compare=False)
+    _close_lock: asyncio.Lock = field(default_factory=asyncio.Lock, repr=False, compare=False)
+    _close_task: asyncio.Task[None] | None = field(default=None, repr=False, compare=False)
+
+    async def aclose(self) -> None:
+        async with self._close_lock:
+            task = self._close_task
+            if task is None:
+                task = asyncio.create_task(self._close_owned_resources())
+                object.__setattr__(self, "_close_task", task)
+        owner = asyncio.current_task()
+        if owner is None:
+            raise RuntimeError("Demo shutdown requires an owner task")
+        baseline = owner.cancelling()
+        cancellation_requested = baseline > 0
+
+        def balance() -> None:
+            nonlocal cancellation_requested
+            current = owner.cancelling()
+            if current < baseline:
+                raise RuntimeError("Demo shutdown cancellation crossed its baseline")
+            excess = current - baseline
+            if excess:
+                cancellation_requested = True
+            for _ in range(excess):
+                if owner.uncancel() < baseline:
+                    raise RuntimeError("Demo shutdown cancellation crossed its baseline")
+
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                cancellation_requested = True
+            finally:
+                balance()
+        balance()
+        task.result()
+        if cancellation_requested:
+            raise asyncio.CancelledError
+
+    async def _close_owned_resources(self) -> None:
+        failed = False
+        for resource in reversed(self._owned_resources):
+            try:
+                await resource.aclose()
+            except BaseException:
+                failed = True
+        if failed:
+            raise DynamicDemoShutdownError() from None
+
+
+class DynamicDemoConfigurationError(RuntimeError):
+    code = "DYNAMIC_DEMO_CONFIGURATION_INVALID"
+
+    def __init__(self) -> None:
+        super().__init__(self.code)
+
+
+class DynamicDemoShutdownError(RuntimeError):
+    code = "DYNAMIC_DEMO_SHUTDOWN_FAILED"
+
+    def __init__(self) -> None:
+        super().__init__(self.code)
+
+
+class _DynamicFakeProvider:
+    __slots__ = ("_failure_at", "_invocations", "_closed")
+
+    def __init__(self, failure_at: int | None = None) -> None:
+        if failure_at is not None and not 1 <= failure_at <= 10:
+            raise DynamicDemoConfigurationError()
+        self._failure_at = failure_at
+        self._invocations = 0
+        self._closed = False
+
+    @property
+    def invocation_count(self) -> int:
+        return self._invocations
+
+    async def generate_dynamic(self, request):
+        if self._closed:
+            raise NarrativeProviderUnavailableError()
+        request_bytes = canonical_json(request.model_dump(mode="json")).encode("utf-8")
+        request_digest = hashlib.sha256(request_bytes).hexdigest()
+        stable_number = int(request_digest[:12], 16)
+        self._invocations += 1
+        if self._failure_at == (stable_number % 10) + 1:
+            raise NarrativeProviderUnavailableError()
+        stable_label = request_digest[:12]
+        result_schedule = (
+            NarrativeOutcomeResult.SUCCESS,
+            NarrativeOutcomeResult.AMBIGUOUS,
+            NarrativeOutcomeResult.FAILURE,
+            NarrativeOutcomeResult.NO_EFFECT,
+        )
+        result = result_schedule[stable_number % len(result_schedule)]
+        stem = (
+            "你看见琥珀微光轻颤，静候尘埃缓缓落下。"
+        )
+        narrative = (stem * 8)[: max(350, min(650, request.narrative_length.target))]
+        if len(narrative) < request.narrative_length.minimum:
+            narrative += "琥珀微光轻颤。" * 50
+            narrative = narrative[: request.narrative_length.minimum]
+        suggestions = (
+            f"Consider possibility alpha ({stable_label}).",
+            f"Consider possibility beta ({stable_label}).",
+            f"Consider possibility gamma ({stable_label}).",
+        )
+        return UntrustedDynamicNarrativeCandidate(
+            candidate=DynamicNarrativeCandidatePayload(
+                schema_version="dynamic-narrative-candidate-v1",
+                narrative_text=narrative,
+                result=result,
+                proposed_consequences=("The atmosphere shifts.",),
+                proposed_public_facts=(
+                    DynamicPublicFactProposal(
+                        key=f"note.{stable_label}",
+                        value=f"Visible change {stable_label}.",
+                    ),
+                ),
+                next_scene=DynamicNextScene(
+                    title=f"Dynamic scene {stable_label}",
+                    summary=f"The sequence continues at marker {stable_label}.",
+                ),
+                suggested_actions=suggestions,
+                continuation="TERMINAL" if stable_number % 2 == 0 else "CONTINUE",
+            ),
+            provider_metadata=NarrativeProviderMetadata(
+                provider="dynamic-fake",
+                model="dynamic-fake-v1",
+                finish_reason="stop",
+                attempts=1,
+                latency_ms=0,
+            ),
+        )
+
+    async def aclose(self) -> None:
+        self._closed = True
 
 
 @dataclass(slots=True)
@@ -407,4 +572,158 @@ def build_demo_runtime(
         store=runtime_store,
         generators=runtime_generators,
         provider=runtime_provider,
+        _owned_resources=(runtime_provider,),
+    )
+
+
+def build_dynamic_demo_runtime(
+    *,
+    store: DemoProcessStore | None = None,
+    generators: DemoGenerators | None = None,
+    provider: DynamicNarrativeProvider | None = None,
+    own_injected_provider: bool = False,
+    environ: Mapping[str, str] | None = None,
+) -> DemoRuntime:
+    """Build the one process-lifetime, director-free Dynamic Narrative Demo."""
+
+    source = os.environ if environ is None else environ
+    selector = source.get("DEVIATION_DEMO_DYNAMIC_PROVIDER", "fake")
+    if selector not in {"fake", "live"}:
+        raise DynamicDemoConfigurationError()
+    if own_injected_provider and provider is None:
+        raise DynamicDemoConfigurationError()
+    if provider is not None and selector == "live":
+        raise DynamicDemoConfigurationError()
+    failure_text = source.get("DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION")
+    if failure_text is not None and (selector != "fake" or provider is not None):
+        raise DynamicDemoConfigurationError()
+    failure_at: int | None = None
+    if failure_text is not None:
+        try:
+            failure_at = int(failure_text)
+        except ValueError:
+            raise DynamicDemoConfigurationError() from None
+        if not 1 <= failure_at <= 10:
+            raise DynamicDemoConfigurationError()
+
+    runtime_store = store or DemoProcessStore()
+    runtime_generators = generators or new_demo_generators()
+    scenario_catalog = JsonScenarioCatalogLoader(SCENARIO_PACK).load()
+    catalog = scenario_catalog.content_catalog
+    controller_binding_resolver = ConfiguredControllerBindingResolver(
+        (
+            ConfiguredControllerBinding(
+                authentication_scheme="demo-dev-only",
+                player_id="demo-player",
+                controller_id="binding.demo-player",
+            ),
+        )
+    )
+    player_character_service = PlayerCharacterService(
+        uow_factory=runtime_store.unit_of_work,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_id_issuer=_DemoPlayerCharacterIdIssuer(
+            runtime_generators.player_character_id
+        ),
+        create_policy=CreatePlayerCharacterPolicy(),
+        source_reference=AuthoritySourceRef(value="source.demo-player-character"),
+        clock=runtime_generators.clock,
+        binding_integrity_guard_enabled=True,
+    )
+    run_service = RunService(
+        uow_factory=runtime_store.unit_of_work,
+        run_id_issuer=_DemoRunIdIssuer(runtime_generators.run_id),
+        continuous_story_line_id_issuer=_DemoContinuousStoryLineIdIssuer(
+            runtime_generators.continuous_story_line_id
+        ),
+        source_reference=RunAuthoritySourceRef(value="source.demo-run"),
+        clock=runtime_generators.clock,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_binding_evidence=player_character_service,
+    )
+    session_service = DynamicSessionService(
+        uow_factory=runtime_store.unit_of_work,
+        catalog=catalog,
+        scenario_catalog=scenario_catalog,
+        clock=runtime_generators.clock,
+        session_id_generator=runtime_generators.session_id,
+        seed_generator=runtime_generators.seed,
+        event_id_generator=runtime_generators.event_id,
+    )
+
+    owned = False
+    selected_provider: DynamicNarrativeProvider
+    provider_name: str
+    model_name: str
+    live_provider_references: tuple[str, ...] = ()
+    if provider is not None:
+        selected_provider = provider
+        owned = own_injected_provider
+        provider_name = "dynamic-injected"
+        model_name = "dynamic-injected-v1"
+    elif selector == "fake":
+        selected_provider = _DynamicFakeProvider(failure_at)
+        owned = True
+        provider_name = "dynamic-fake"
+        model_name = "dynamic-fake-v1"
+    else:
+        if failure_text is not None:
+            raise DynamicDemoConfigurationError()
+        try:
+            settings = DeepSeekSettings.from_environment(source)
+        except (TypeError, ValueError):
+            raise DynamicDemoConfigurationError() from None
+        if settings.max_retries != 0:
+            raise DynamicDemoConfigurationError()
+        selected_provider = DeepSeekNarrativeProvider(
+            settings,
+            PromptBuilder(profiles=(default_style_profile(),)),
+        )
+        owned = True
+        provider_name = "deepseek"
+        model_name = settings.model
+        live_provider_references = (settings.base_url, settings.model)
+
+    orchestrator = DynamicNarrativeOrchestrator(
+        resolver=DeterministicRuleResolver(),
+        uow_factory=runtime_store.unit_of_work,
+        catalog=catalog,
+        scenario_catalog=scenario_catalog,
+        provider=selected_provider,
+        dynamic_session_service=session_service,
+        provider_name=provider_name,
+        model_name=model_name,
+        live_provider_references=live_provider_references,
+        publication_event_reader=lambda session_id, sequence_no: tuple(
+            event
+            for event in runtime_store.snapshot().events
+            if event.session_id == session_id and event.sequence_no == sequence_no
+        ),
+        clock=runtime_generators.clock,
+        event_id_generator=runtime_generators.event_id,
+        job_id_generator=runtime_generators.job_id,
+        lease_token_generator=runtime_generators.lease_token,
+        worker_id_generator=runtime_generators.worker_id,
+    )
+    session_service.narrative_terminal_uncertainty_probe = (
+        orchestrator.request_is_terminal_uncertain
+    )
+    services = ApiServices(
+        session_service=session_service,
+        turn_orchestrator=orchestrator,
+        player_character_service=player_character_service,
+        run_service=run_service,
+        run_entry_service=build_run_entry_service(
+            run_service=run_service,
+            session_service=session_service,
+        ),
+        engine=None,
+        narrative_provider=selected_provider,  # type: ignore[arg-type]
+    )
+    return DemoRuntime(
+        services=services,
+        store=runtime_store,
+        generators=runtime_generators,
+        provider=selected_provider,
+        _owned_resources=(selected_provider,) if owned else (),
     )

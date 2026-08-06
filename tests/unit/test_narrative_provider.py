@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import importlib
 import os
@@ -11,6 +12,16 @@ from typing import Any
 import pytest
 import httpx
 from pydantic import ValidationError
+
+from deviation_protocol.application.dynamic_narrative_models import (
+    DynamicCurrentScene,
+    DynamicNarrativeLength,
+    DynamicNarrativeRequest,
+    DynamicPlayerAction,
+    DynamicScenarioPremise,
+    DynamicScenarioRole,
+    DynamicSelectedPlayerCharacter,
+)
 
 from deviation_protocol.application.narrative_models import (
     MAX_NARRATIVE_USAGE_TOKENS,
@@ -873,6 +884,21 @@ def _settings(**updates: Any) -> DeepSeekSettings:
     return DeepSeekSettings(**data)
 
 
+def _dynamic_request() -> DynamicNarrativeRequest:
+    return DynamicNarrativeRequest(
+        scenario_premise=DynamicScenarioPremise(title="Public title", hook="Public hook"),
+        selected_player_character=DynamicSelectedPlayerCharacter(
+            contract_version="structured-player-character/v1", lifecycle="active"
+        ),
+        scenario_role=DynamicScenarioRole(
+            display_name="Investigator", description="A public scenario role."
+        ),
+        current_scene=DynamicCurrentScene(title="Current", summary="Current public scene."),
+        player_action=DynamicPlayerAction(description="Look around."),
+        narrative_length=DynamicNarrativeLength(minimum=350, target=650, maximum=900),
+    )
+
+
 def test_missing_process_key_is_a_safe_optional_runtime_configuration() -> None:
     with pytest.raises(ValueError, match="not configured"):
         DeepSeekSettings.from_environment({})
@@ -1607,6 +1633,186 @@ async def test_fake_provider_is_stable_and_satisfies_vendor_neutral_boundary() -
     first = await FakeProvider().generate(_request())
     second = await FakeProvider().generate(_request())
     assert first == second
+
+
+def _dynamic_candidate_payload() -> dict[str, object]:
+    return {
+        "schema_version": "dynamic-narrative-candidate-v1",
+        "narrative_text": "叙" * 350,
+        "result": "SUCCESS",
+        "proposed_consequences": [],
+        "proposed_public_facts": [],
+        "next_scene": {"title": "下一幕", "summary": "公开场景继续。"},
+        "suggested_actions": ["观察四周。", "询问近况。", "谨慎前进。"],
+        "continuation": "CONTINUE",
+    }
+
+
+@pytest.mark.asyncio
+async def test_dynamic_deepseek_contract_parses_once_without_retry() -> None:
+    dynamic_payload = _dynamic_candidate_payload()
+    transport = FakeTransport(
+        [_response(content=json.dumps(dynamic_payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    result = await provider.generate_dynamic(_dynamic_request())
+
+    assert result.candidate.next_scene.title == "下一幕"
+    assert result.provider_metadata.attempts == 1
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "missing",
+    (
+        ("schema_version",),
+        ("narrative_text",),
+        ("result",),
+        ("proposed_consequences",),
+        ("proposed_public_facts",),
+        ("next_scene",),
+        ("suggested_actions",),
+        ("continuation",),
+        ("proposed_consequences", "proposed_public_facts"),
+    ),
+)
+async def test_dynamic_deepseek_requires_every_candidate_field_without_defaults(
+    missing: tuple[str, ...],
+) -> None:
+    payload = _dynamic_candidate_payload()
+    for field in missing:
+        del payload[field]
+    transport = FakeTransport(
+        [_response(content=json.dumps(payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderResponseError) as error:
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert "叙" not in str(error.value)
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "updates",
+    (
+        {"unexpected": "forbidden"},
+        {"proposed_consequences": "not-an-array"},
+        {"proposed_public_facts": [{"key": "safe", "value": 1}]},
+        {"next_scene": {"title": "下一幕", "summary": "公开。", "extra": 1}},
+        {"suggested_actions": ["观察。", 2, "前进。"]},
+    ),
+)
+async def test_dynamic_deepseek_rejects_extra_wrong_and_malformed_candidate_fields(
+    updates: dict[str, object],
+) -> None:
+    payload = _dynamic_candidate_payload()
+    payload.update(updates)
+    transport = FakeTransport(
+        [_response(content=json.dumps(payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderResponseError):
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_deepseek_transport_uncertainty_is_never_retried() -> None:
+    transport = FakeTransport(
+        [DeepSeekTransportTimeout(), DeepSeekHttpResponse(status_code=200, body_text="{}")]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderUnavailableError):
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert len(transport.calls) == 1
+    assert len(transport.scripted) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    [
+        '{"schema_version":"dynamic-narrative-candidate-v1",'
+        '"narrative_text":"first","narrative_text":"second"}',
+        '{"schema_version":"dynamic-narrative-candidate-v1",'
+        '"narrative_text":"valid","result":"SUCCESS",'
+        '"proposed_consequences":[1.5]}',
+    ],
+)
+async def test_dynamic_deepseek_rejects_duplicate_members_and_floats_without_retry(
+    content: str,
+) -> None:
+    transport = FakeTransport([_response(content=content)])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderResponseError):
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_deepseek_refuses_retry_configuration_before_transport() -> None:
+    transport = FakeTransport([_response(content="must-not-be-read")])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=1), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderRequestError):
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert transport.calls == []
+
+
+@pytest.mark.asyncio
+async def test_dynamic_deepseek_propagates_cancellation_without_second_call() -> None:
+    entered = asyncio.Event()
+    release = asyncio.Event()
+
+    class SuspendedTransport:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def post_json(self, **_kwargs):
+            self.calls += 1
+            entered.set()
+            await release.wait()
+            raise AssertionError("cancelled transport must not resume")
+
+        async def aclose(self) -> None:
+            return None
+
+    transport = SuspendedTransport()
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+    task = asyncio.create_task(provider.generate_dynamic(_dynamic_request()))
+    await entered.wait()
+    task.cancel()
+
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    assert transport.calls == 1
 
 
 async def _no_wait(_: float) -> None:

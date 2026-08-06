@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping
+from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass, field as dataclass_field
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
@@ -9,6 +9,7 @@ import json
 import re
 import secrets
 from typing import Annotated, Any, Literal
+import unicodedata
 from uuid import uuid4
 
 from pydantic import (
@@ -16,6 +17,8 @@ from pydantic import (
     ConfigDict,
     Field,
     ValidationError,
+    WithJsonSchema,
+    field_validator,
     model_serializer,
     model_validator,
 )
@@ -104,7 +107,7 @@ class PreparedRunEntryInitialization:
     character_definition_id: str
     creation_request_id: str
     initial_state: GameState
-    initial_frame: NarrativeFrame
+    initial_frame: NarrativeFrame | None
     initialization_event: DomainEvent
     created_at: datetime
 
@@ -224,6 +227,156 @@ class PublicDecisionChoice(BaseModel):
     target_ids: tuple[str, ...] = Field(default=(), max_length=16)
 
 
+def _normalize_public_suggestion_text(value: str) -> str:
+    value.encode("utf-8")
+    normalized = re.sub(r"\s+", " ", unicodedata.normalize("NFC", value)).strip()
+    if any(
+        unicodedata.category(character) in {"Cc", "Cf", "Cs"}
+        for character in normalized
+    ):
+        raise ValueError("public suggestion text contains a prohibited character")
+    return normalized
+
+
+class PublicSuggestedActionSubmission(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    turn_id: Annotated[
+        str,
+        Field(
+            strict=True,
+            min_length=1,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        ),
+    ]
+    client_request_id: Annotated[
+        str,
+        Field(
+            strict=True,
+            min_length=1,
+            max_length=64,
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        ),
+    ]
+    action_type: Literal[ActionType.CUSTOM] = ActionType.CUSTOM
+    description: Annotated[str, Field(strict=True, min_length=1, max_length=150)]
+
+    @field_validator("description", mode="before")
+    @classmethod
+    def normalize_description(cls, value: object) -> object:
+        return (
+            _normalize_public_suggestion_text(value)
+            if isinstance(value, str)
+            else value
+        )
+
+
+class PublicSuggestedAction(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+    suggestion_id: Annotated[
+        str,
+        Field(
+            strict=True,
+            min_length=1,
+            max_length=128,
+            pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+        ),
+    ]
+    ordinal: Annotated[int, Field(strict=True, ge=0, le=2)]
+    label: Annotated[str, Field(strict=True, min_length=1, max_length=150)]
+    description: Annotated[str, Field(strict=True, min_length=1, max_length=150)]
+    submission: PublicSuggestedActionSubmission
+
+    @field_validator("label", "description", mode="before")
+    @classmethod
+    def normalize_text(cls, value: object) -> object:
+        return (
+            _normalize_public_suggestion_text(value)
+            if isinstance(value, str)
+            else value
+        )
+
+    @model_validator(mode="after")
+    def validate_copy_shape(self) -> PublicSuggestedAction:
+        if not (
+            self.label == self.description == self.submission.description
+        ):
+            raise ValueError("public suggestion text copies do not match")
+        return self
+
+
+_PUBLIC_SUGGESTED_ACTIONS_JSON_SCHEMA = {
+    "anyOf": [
+        {
+            "type": "array",
+            "minItems": 3,
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "additionalProperties": False,
+                "required": [
+                    "suggestion_id",
+                    "ordinal",
+                    "label",
+                    "description",
+                    "submission",
+                ],
+                "properties": {
+                    "suggestion_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 128,
+                        "pattern": r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+                    },
+                    "ordinal": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 2,
+                    },
+                    "label": {"type": "string", "minLength": 1, "maxLength": 150},
+                    "description": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 150,
+                    },
+                    "submission": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": [
+                            "turn_id",
+                            "client_request_id",
+                            "action_type",
+                            "description",
+                        ],
+                        "properties": {
+                            "turn_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64,
+                                "pattern": r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+                            },
+                            "client_request_id": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 64,
+                                "pattern": r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+                            },
+                            "action_type": {"type": "string", "const": "CUSTOM"},
+                            "description": {
+                                "type": "string",
+                                "minLength": 1,
+                                "maxLength": 150,
+                            },
+                        },
+                    },
+                },
+            },
+        },
+        {"type": "null"},
+    ]
+}
+
+
 class PublicActionMode(StrEnum):
     FREE_ACTIONS = "FREE_ACTIONS"
     DECISION = "DECISION"
@@ -236,17 +389,51 @@ class PublicActionAffordanceSet(BaseModel):
     actions: tuple[PublicActionAffordance, ...] = Field(default=(), max_length=16)
     decision_id: str | None = None
     choices: tuple[PublicDecisionChoice, ...] = Field(default=(), max_length=32)
+    suggested_actions: Annotated[
+        tuple[Any, ...] | None,
+        WithJsonSchema(_PUBLIC_SUGGESTED_ACTIONS_JSON_SCHEMA),
+    ] = Field(default=None, min_length=3, max_length=3)
+
+    @field_validator("suggested_actions", mode="before")
+    @classmethod
+    def validate_suggested_action_models(cls, value: object) -> object:
+        if value is None or not isinstance(value, (tuple, list)):
+            return value
+        return tuple(PublicSuggestedAction.model_validate(item) for item in value)
 
     @model_validator(mode="after")
     def validate_mode_shape(self) -> PublicActionAffordanceSet:
         if self.mode is PublicActionMode.DECISION:
-            valid = self.decision_id is not None and bool(self.choices) and not self.actions
+            valid = (
+                self.decision_id is not None
+                and bool(self.choices)
+                and not self.actions
+                and self.suggested_actions is None
+            )
         elif self.mode is PublicActionMode.FREE_ACTIONS:
             valid = self.decision_id is None and not self.choices
         else:
-            valid = self.decision_id is None and not self.choices and not self.actions
+            valid = (
+                self.decision_id is None
+                and not self.choices
+                and not self.actions
+                and self.suggested_actions is None
+            )
         if not valid:
             raise ValueError("public action affordance mode has an invalid shape")
+        if self.suggested_actions is not None:
+            suggestions = self.suggested_actions
+            if (
+                self.mode is not PublicActionMode.FREE_ACTIONS
+                or len(self.actions) != 1
+                or self.actions[0].action_type is not ActionType.CUSTOM
+                or tuple(item.ordinal for item in suggestions) != (0, 1, 2)
+                or len({item.suggestion_id for item in suggestions}) != 3
+                or len({item.submission.turn_id for item in suggestions}) != 3
+                or len({item.submission.client_request_id for item in suggestions}) != 3
+                or len({item.description for item in suggestions}) != 3
+            ):
+                raise ValueError("dynamic public suggestions have an invalid shape")
         return self
 
 
@@ -450,6 +637,9 @@ class SessionService:
     continue_policy: ScenarioContinuePolicy = dataclass_field(
         default_factory=ScenarioContinuePolicy
     )
+    narrative_terminal_uncertainty_probe: (
+        Callable[[str, str], Awaitable[bool]] | None
+    ) = None
 
     def __post_init__(self) -> None:
         if (
@@ -457,6 +647,11 @@ class SessionService:
             and self.scenario_catalog.content_catalog != self.catalog
         ):
             raise ValueError("SessionService catalogs must describe the same content")
+        if (
+            self.narrative_terminal_uncertainty_probe is not None
+            and not callable(self.narrative_terminal_uncertainty_probe)
+        ):
+            raise ValueError("narrative terminal-uncertainty probe must be callable")
 
     async def create(
         self,
@@ -988,69 +1183,92 @@ class SessionService:
             stored = await uow.turn_requests.get_by_client_request_id(
                 session_id, client_request_id
             )
-            if stored is not None:
-                try:
-                    response = TurnResponse.model_validate(stored.response)
-                except (ValidationError, TypeError, ValueError):
-                    raise StoredTurnResponseInvalidError(session_id) from None
-                if (
-                    response.session_id != session_id
-                    or response.client_request_id != client_request_id
-                    or response.action_signature != stored.action_signature
-                ):
-                    raise StoredTurnResponseInvalidError(session_id)
-                return NarrativeRequestStatusResult(
-                    session_id=session_id,
-                    client_request_id=client_request_id,
-                    status=PublicNarrativeRequestStatus.COMMITTED,
-                    client_action=NarrativeRequestClientAction.RESPONSE_AVAILABLE,
-                    response=response,
-                )
             job = await uow.narrative_jobs.get_by_client_request_id(
                 session_id, client_request_id
             )
-            if job is None:
-                raise NarrativeRequestNotFoundError(session_id)
-            if job.status in {
-                NarrativeJobStatus.PREPARED,
-                NarrativeJobStatus.IN_PROGRESS,
-                NarrativeJobStatus.PROPOSAL_VALIDATED,
-            }:
-                return NarrativeRequestStatusResult(
-                    session_id=session_id,
-                    client_request_id=client_request_id,
-                    status=PublicNarrativeRequestStatus.PENDING,
-                    client_action=NarrativeRequestClientAction.POLL_SAME_REQUEST,
-                    retry_after_seconds=NARRATIVE_REQUEST_RETRY_AFTER_SECONDS,
-                )
-            if job.status is NarrativeJobStatus.STALE:
-                return NarrativeRequestStatusResult(
-                    session_id=session_id,
-                    client_request_id=client_request_id,
-                    status=PublicNarrativeRequestStatus.STALE,
-                    client_action=NarrativeRequestClientAction.REFRESH_VIEW,
-                    error_code="NARRATIVE_REQUEST_STALE",
-                )
-            if job.status is NarrativeJobStatus.OUTCOME_UNKNOWN:
-                return NarrativeRequestStatusResult(
-                    session_id=session_id,
-                    client_request_id=client_request_id,
-                    status=PublicNarrativeRequestStatus.OUTCOME_UNKNOWN,
-                    client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
-                    error_code="NARRATIVE_OUTCOME_UNKNOWN",
-                )
-            if job.status in {
-                NarrativeJobStatus.FAILED_RETRYABLE,
-                NarrativeJobStatus.FAILED_TERMINAL,
-            }:
-                return NarrativeRequestStatusResult(
-                    session_id=session_id,
-                    client_request_id=client_request_id,
-                    status=PublicNarrativeRequestStatus.FAILED,
-                    client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
-                    error_code="NARRATIVE_REQUEST_FAILED",
-                )
-            raise StoredTurnResponseInvalidError(session_id)
+
+        # The dynamic spike's process-local ledger is consulted only after the
+        # ownership/read UoW has closed.  Its stable terminal-uncertain result
+        # and a durable terminal job outcome both precede the response-artifact
+        # shortcut: a partial finalize must not become authoritative merely
+        # because one response-shaped artifact is present.
+        if (
+            self.narrative_terminal_uncertainty_probe is not None
+            and await self.narrative_terminal_uncertainty_probe(
+                session_id, client_request_id
+            )
+        ) or (job is not None and job.status is NarrativeJobStatus.OUTCOME_UNKNOWN):
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.OUTCOME_UNKNOWN,
+                client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
+                error_code="NARRATIVE_OUTCOME_UNKNOWN",
+            )
+
+        if stored is not None and (
+            job is None or job.status is NarrativeJobStatus.COMMITTED
+        ):
+            try:
+                response = TurnResponse.model_validate(stored.response)
+            except (ValidationError, TypeError, ValueError):
+                raise StoredTurnResponseInvalidError(session_id) from None
+            if (
+                response.session_id != session_id
+                or response.client_request_id != client_request_id
+                or response.action_signature != stored.action_signature
+            ):
+                raise StoredTurnResponseInvalidError(session_id)
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.COMMITTED,
+                client_action=NarrativeRequestClientAction.RESPONSE_AVAILABLE,
+                response=response,
+            )
+
+        if job is None:
+            raise NarrativeRequestNotFoundError(session_id)
+        if job.status in {
+            NarrativeJobStatus.PREPARED,
+            NarrativeJobStatus.IN_PROGRESS,
+            NarrativeJobStatus.PROPOSAL_VALIDATED,
+        }:
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.PENDING,
+                client_action=NarrativeRequestClientAction.POLL_SAME_REQUEST,
+                retry_after_seconds=NARRATIVE_REQUEST_RETRY_AFTER_SECONDS,
+            )
+        if job.status is NarrativeJobStatus.STALE:
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.STALE,
+                client_action=NarrativeRequestClientAction.REFRESH_VIEW,
+                error_code="NARRATIVE_REQUEST_STALE",
+            )
+        if job.status is NarrativeJobStatus.OUTCOME_UNKNOWN:
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.OUTCOME_UNKNOWN,
+                client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
+                error_code="NARRATIVE_OUTCOME_UNKNOWN",
+            )
+        if job.status in {
+            NarrativeJobStatus.FAILED_RETRYABLE,
+            NarrativeJobStatus.FAILED_TERMINAL,
+        }:
+            return NarrativeRequestStatusResult(
+                session_id=session_id,
+                client_request_id=client_request_id,
+                status=PublicNarrativeRequestStatus.FAILED,
+                client_action=NarrativeRequestClientAction.DO_NOT_RETRY,
+                error_code="NARRATIVE_REQUEST_FAILED",
+            )
+        raise StoredTurnResponseInvalidError(session_id)
 
     async def require_owner(
         self, principal: RequestPrincipal, session_id: str

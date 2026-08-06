@@ -643,24 +643,61 @@ const publicDecisionChoiceSchema = z.object({
   target_ids: z.array(plainStringSchema).max(16),
 });
 
+const publicSuggestedActionSubmissionSchema = z
+  .object({
+    turn_id: safeId64Schema,
+    client_request_id: safeId64Schema,
+    action_type: z.literal("CUSTOM"),
+    description: z.string().min(1).max(150),
+  })
+  .strict();
+
+export const publicSuggestedActionSchema = z
+  .object({
+    suggestion_id: safeId128Schema,
+    ordinal: z.number().int().min(0).max(2),
+    label: z.string().min(1).max(150),
+    description: z.string().min(1).max(150),
+    submission: publicSuggestedActionSubmissionSchema,
+  })
+  .strict()
+  .superRefine((suggestion, context) => {
+    if (
+      suggestion.label !== suggestion.description ||
+      suggestion.description !== suggestion.submission.description
+    ) {
+      context.addIssue({
+        code: "custom",
+        path: ["description"],
+        message: "dynamic suggestion text copies do not match",
+      });
+    }
+  });
+
 export const publicActionAffordanceSetSchema = z
   .object({
     mode: z.enum(["FREE_ACTIONS", "DECISION", "ENDED"]),
     actions: z.array(publicActionAffordanceSchema).max(16),
     decision_id: z.string().nullish(),
     choices: z.array(publicDecisionChoiceSchema).max(32),
+    suggested_actions: z
+      .array(publicSuggestedActionSchema)
+      .length(3)
+      .optional(),
   })
   .superRefine((set, context) => {
     const isValid =
       set.mode === "DECISION"
-        ? set.decision_id != null &&
+          ? set.decision_id != null &&
           set.choices.length > 0 &&
-          set.actions.length === 0
+          set.actions.length === 0 &&
+          set.suggested_actions === undefined
         : set.mode === "FREE_ACTIONS"
           ? set.decision_id == null && set.choices.length === 0
           : set.decision_id == null &&
             set.choices.length === 0 &&
-            set.actions.length === 0;
+            set.actions.length === 0 &&
+            set.suggested_actions === undefined;
     if (!isValid) {
       context.addIssue({
         code: "custom",
@@ -683,6 +720,25 @@ export const publicActionAffordanceSetSchema = z
         path: ["choices"],
         message: "decision affordances repeat a choice ID",
       });
+    }
+    if (set.suggested_actions !== undefined) {
+      const suggestions = set.suggested_actions;
+      const validDynamicShape =
+        set.mode === "FREE_ACTIONS" &&
+        set.actions.length === 1 &&
+        set.actions[0]?.action_type === "CUSTOM" &&
+        suggestions.map((item) => item.ordinal).join(",") === "0,1,2" &&
+        new Set(suggestions.map((item) => item.suggestion_id)).size === 3 &&
+        new Set(suggestions.map((item) => item.submission.turn_id)).size === 3 &&
+        new Set(suggestions.map((item) => item.submission.client_request_id)).size === 3 &&
+        new Set(suggestions.map((item) => item.description)).size === 3;
+      if (!validDynamicShape) {
+        context.addIssue({
+          code: "custom",
+          path: ["suggested_actions"],
+          message: "dynamic suggestion affordances have an invalid shape",
+        });
+      }
     }
   });
 
@@ -1108,6 +1164,9 @@ export type PublicActionAffordance = z.infer<
 >;
 export type PublicDecisionChoice = z.infer<
   typeof publicDecisionChoiceSchema
+>;
+export type PublicSuggestedAction = z.infer<
+  typeof publicSuggestedActionSchema
 >;
 export type PlayerSessionView = z.infer<typeof playerSessionViewSchema>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;

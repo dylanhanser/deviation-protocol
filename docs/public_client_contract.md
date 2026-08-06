@@ -1292,3 +1292,27 @@ modes, safe targets, shared Gateway input contracts, ownership 404,
 `SNAPSHOT_INVALID`, read-only queries, OpenAPI response/error schemas and model
 exclusions, and absence of scenario-ID branches. Browser and MySQL tests use
 Scripted Providers; live DeepSeek remains opt-in and is not used here.
+
+## Experimental dynamic suggestion extension
+
+The DNVS candidate adds one optional `suggested_actions` member to
+`action_affordances`. Its absence preserves the existing deterministic public
+contract. When present, each entry contains server-owned `suggestion_id`,
+zero-based `ordinal`, equal plain-text `label` and `description`, and a complete
+nested action submission containing `turn_id`, `client_request_id`, `CUSTOM`,
+and `description`. The client must submit that nested object unchanged and must
+not generate, parse, or replace either identity.
+
+Dynamic active Views expose exactly one free `CUSTOM` description affordance
+with the scenario-authoritative label and exactly three current server
+suggestions. Suggestions from a stale View are not capabilities: the server
+revalidates their complete normalized 13-field submission and current
+presentation binding. A successful action is not rendered as progression until
+the server returns or polling resolves to an authoritative response and a fresh
+View is loaded. Pending, stale, outcome-unknown, capacity, and terminal failure
+continue to use the existing sanitized response/error and recovery rules; the
+client never retries an action automatically.
+
+This additive extension belongs only to the experimental implementation
+candidate awaiting independent review. It does not complete production or
+evidence work and does not alter Phase 6, Phase 7, or completed Phase 8.
