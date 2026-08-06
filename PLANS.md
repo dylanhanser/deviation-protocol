@@ -26,19 +26,32 @@ seven-finding verification remain historical authority.
 All unaffected approved and frozen authority remains in force. The Manual Fake
 browser execution contract and its directly dependent Fake failure, observation,
 continuity-witness, and focused-test requirements have passed independent review
-and are approved and frozen as documentation authority. Their exact seven-path
-implementation has not started or completed. The published implementation remains
-intact, and Manual Fake browser evidence remains incomplete until that later
-separately authorized implementation and browser-evidence task.
+and are approved and frozen as documentation authority. The exact seven-path
+implementation has started and produced a complete implementation candidate.
+Its required implementation verification passed: focused backend pytest
+`277 passed`; focused React test `39 passed, 1 skipped`; compileall passed;
+Offline verification `2165 passed, 182 skipped`; and `git diff --check` passed.
+These overlapping command totals are not a unique-test total. Its first
+independent implementation review returned changes required only for stale
+lifecycle documentation and weakened production Live-provider construction
+coverage; it found no runtime correctness defect. P2 was corrected and
+accepted; the remaining Section 9 P1 wording was corrected and received final
+independent approval. No implementation, P1, or P2 finding remains. The exact
+seven-path implementation is approved for its single closure commit: the
+containing commit is the designated implementation closure commit, publication
+is established when it is present on `origin/main`, and that committed and
+published seven-path change closes this Manual Fake implementation lifecycle.
+Manual Fake browser evidence remains incomplete and unexecuted as a later
+separately authorized browser-evidence task.
 Automated Offline longevity evidence remains complete at exactly 510 turns,
 510 Fake invocations, active state version 510, and 20 story slots. Automated
 Live smoke evidence remains complete at one smoke execution, one real Provider
 invocation, one Provider HTTP request, zero retries, and successful strict
 schema validation. Manual Fake browser evidence and Optional Live browser
-evidence remain incomplete. After user publication and clean aligned-baseline
-confirmation, the next lifecycle step is the separately authorized exact
-seven-path implementation, not browser evidence execution. The spike does not
-reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
+evidence remain incomplete; Optional Live remains optional. The next lifecycle
+step is the designated closure commit and its publication, not browser evidence
+execution. The spike does not reopen completed Phase 8 and is neither Phase 6
+nor Phase 7.
 P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;

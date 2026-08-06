@@ -825,6 +825,159 @@ describe("action_affordances and synchronous lifecycle", () => {
     expect(screen.getByText("权威 View：当前")).toBeVisible();
   });
 
+  it("recovers the canonical fifth Fake failure without replay and continues through item eight", async () => {
+    const anchor = "A visible amber marker appears beside the sealed doorway.";
+    const continuity =
+      "The visible amber marker established earlier now identifies the route forward.";
+    const suggestionTexts = [
+      initialNoNpcSuggestionTexts,
+      ["Follow the amber trace.", "Compare the new marker.", "Inspect the changed route."],
+      ["Check the committed signal.", "Ask what changed.", "Map the visible route."],
+      ["Review the public marker.", "Compare the current scene.", "Proceed cautiously."],
+      ["Return to the marker.", "Observe the sealed doorway.", "Use the recovered route."],
+      ["Trace the later signal.", "Compare the retained facts.", "Advance through the change."],
+      ["Use the amber route.", "Review the prior marker.", "Wait for a new signal."],
+      ["Confirm the route forward.", "Inspect the final marker.", "Compare the visible changes."],
+    ] as const;
+    const submittedBodies: unknown[] = [];
+    let actionPosts = 0;
+    let viewReads = 0;
+    let committedVersion = 0;
+    const actionIdentityFactory = deterministicActionIdentityFactory();
+
+    function manualFakeView(version: number): PlayerSessionView {
+      const view = dynamicSuggestionViewFixture({
+        stateVersion: version,
+        suggestionTexts: suggestionTexts[version]!,
+        customLabel: "自由行动",
+      });
+      return {
+        ...view,
+        presentation: {
+          ...view.presentation,
+          scene_summary: version === 7 ? continuity : `Manual Fake View ${version}`,
+        },
+        recent_narrative_texts: version === 0 ? [] : [anchor],
+      };
+    }
+
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          viewReads += 1;
+          return HttpResponse.json(manualFakeView(committedVersion));
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          actionPosts += 1;
+          const body = await request.json();
+          submittedBodies.push(body);
+          if (actionPosts === 5) {
+            return HttpResponse.json(
+              errorFixture(
+                "NARRATIVE_OUTCOME_UNKNOWN",
+                "Narrative turn cannot be committed",
+              ),
+              { status: 409 },
+            );
+          }
+          committedVersion += 1;
+          return HttpResponse.json(
+            synchronousActionResponseFixture(
+              (body as { client_request_id: string }).client_request_id,
+              committedVersion,
+            ),
+          );
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    const rendered = renderActionApp({ actionIdentityFactory });
+    await loadSession(user);
+
+    async function submitCustom(description: string, expectedPosts: number) {
+      const form = actionForm("提交自由行动");
+      const input = within(form).getByLabelText("行动描述");
+      await user.clear(input);
+      await user.type(input, description);
+      await user.click(within(form).getByRole("button", { name: "提交自由行动" }));
+      await waitFor(() => expect(actionPosts).toBe(expectedPosts));
+    }
+
+    await user.click(screen.getByRole("button", { name: "Observe the surroundings." }));
+    await waitFor(() => expect(committedVersion).toBe(1));
+    expect(screen.getAllByText(anchor)).toHaveLength(2);
+
+    await submitCustom("Examine the visible floor markings without touching anything.", 2);
+    await user.click(screen.getByRole("button", { name: "Ask what changed." }));
+    await waitFor(() => expect(committedVersion).toBe(3));
+    await submitCustom(
+      "Wait quietly and compare the current scene with the last visible change.",
+      4,
+    );
+    await submitCustom("Pause and listen for changes in the room.", 5);
+    expect(
+      await screen.findByText(
+        "HTTP 409 · NARRATIVE_OUTCOME_UNKNOWN · Narrative turn cannot be committed",
+      ),
+    ).toBeVisible();
+    expect(committedVersion).toBe(4);
+    expect(actionPosts).toBe(5);
+    const readsBeforeRecovery = viewReads;
+
+    rendered.unmount();
+    renderActionApp({ actionIdentityFactory });
+    await screen.findByText("当前 Session：session-public-1");
+    await waitFor(() => expect(viewReads).toBe(readsBeforeRecovery + 1));
+    expect(actionPosts).toBe(5);
+
+    await user.click(screen.getByRole("button", { name: "Use the recovered route." }));
+    await waitFor(() => expect(committedVersion).toBe(5));
+    await submitCustom(
+      "Follow the earlier visible change and check what it now affects.",
+      7,
+    );
+    await user.click(screen.getByRole("button", { name: "Use the amber route." }));
+    await waitFor(() => expect(committedVersion).toBe(7));
+    expect(await screen.findByText(continuity)).toBeVisible();
+
+    expect(actionPosts).toBe(8);
+    expect(submittedBodies).toEqual([
+      dynamicSuggestionSubmission(0, 0, "Observe the surroundings."),
+      {
+        turn_id: "opaque-turn-1",
+        client_request_id: "opaque-request-1",
+        action_type: "CUSTOM",
+        description: "Examine the visible floor markings without touching anything.",
+      },
+      dynamicSuggestionSubmission(2, 1, "Ask what changed."),
+      {
+        turn_id: "opaque-turn-2",
+        client_request_id: "opaque-request-2",
+        action_type: "CUSTOM",
+        description: "Wait quietly and compare the current scene with the last visible change.",
+      },
+      {
+        turn_id: "opaque-turn-3",
+        client_request_id: "opaque-request-3",
+        action_type: "CUSTOM",
+        description: "Pause and listen for changes in the room.",
+      },
+      dynamicSuggestionSubmission(4, 2, "Use the recovered route."),
+      {
+        turn_id: "opaque-turn-4",
+        client_request_id: "opaque-request-4",
+        action_type: "CUSTOM",
+        description: "Follow the earlier visible change and check what it now affects.",
+      },
+      dynamicSuggestionSubmission(6, 0, "Use the amber route."),
+    ]);
+  });
+
   it.each([
     {
       branch: "zero eligible NPCs",

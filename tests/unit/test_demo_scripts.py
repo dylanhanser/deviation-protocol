@@ -985,16 +985,34 @@ def test_port_checks_precede_every_child_launch() -> None:
         assert script.index("Assert-AvailableLoopbackPort -Port 5173") < first_start
 
 
-def test_dynamic_launcher_selection_is_explicit_and_keeps_vite_dotenv_isolated() -> None:
+def test_manual_fake_launcher_observation_is_backend_only_and_default_remains_deterministic() -> None:
     script = START_SCRIPT.read_text(encoding="utf-8")
     assert '[ValidateSet("Deterministic", "DynamicNarrative")]' in script
     assert '[ValidateSet("Fake", "Live")]' in script
     assert '[string]$DynamicProvider = "Fake"' in script
     assert '$backendStartInfo.Environment["DEVIATION_DEMO_MODE"] = "dynamic-narrative"' in script
     assert '$backendStartInfo.Environment["DEVIATION_DEMO_DYNAMIC_PROVIDER"]' in script
+    assert '[int]$FakeFailureAtAction' in script
+    assert '$FakeFailureAtAction.ToString([Globalization.CultureInfo]::InvariantCulture)' in script
+    assert 'if ($PSBoundParameters.ContainsKey("FakeFailureAtAction")) {' in script
     assert '--mode deterministic-demo' in script
     assert 'VITE_APP_MODE' in script
     assert 'VITE_DEEPSEEK' not in script
+    assert "RedirectStandardOutput" not in script
+    assert "RedirectStandardError" not in script
+    assert "Dynamic Narrative Demo ($DynamicProvider): local experimental mode, temporary data." in script
+    assert "Deterministic Demo: local only, temporary data, not a production Provider." in script
+    backend_block = script.split("$backendStartInfo =", maxsplit=1)[1].split(
+        "$webStartInfo =", maxsplit=1
+    )[0]
+    web_block = script.split("$webStartInfo =", maxsplit=1)[1]
+    assert "DEVIATION_DEMO_DYNAMIC_PROVIDER" in backend_block
+    assert "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION" in backend_block
+    assert "DEVIATION_DEMO_DYNAMIC_PROVIDER" not in web_block
+    assert "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION" not in web_block
+    assert "DEEPSEEK_" not in backend_block.split(
+        'if ($DynamicProvider -eq "Live")', maxsplit=1
+    )[0]
     for inherited_name in (
         "DEVIATION_DEMO_MODE",
         "DEVIATION_DEMO_DYNAMIC_PROVIDER",

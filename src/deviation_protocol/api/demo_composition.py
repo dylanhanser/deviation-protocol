@@ -225,6 +225,11 @@ class _DynamicFakeProvider:
         self._failure_at = failure_at
         self._invocations = 0
         self._closed = False
+        if failure_at is not None:
+            print(
+                "DNVS_FAKE_EVIDENCE event=reset cumulative_invocations=0",
+                flush=True,
+            )
 
     @property
     def invocation_count(self) -> int:
@@ -233,12 +238,22 @@ class _DynamicFakeProvider:
     async def generate_dynamic(self, request):
         if self._closed:
             raise NarrativeProviderUnavailableError()
+        self._invocations += 1
+        ordinal = self._invocations
+        intentional_failure = ordinal == self._failure_at
+        if self._failure_at is not None:
+            outcome = "INTENTIONAL_FAILURE" if intentional_failure else "SUCCESS"
+            print(
+                "DNVS_FAKE_EVIDENCE "
+                f"event=invocation ordinal={ordinal} outcome={outcome} "
+                f"cumulative_invocations={ordinal}",
+                flush=True,
+            )
+        if intentional_failure:
+            raise NarrativeProviderUnavailableError()
         request_bytes = canonical_json(request.model_dump(mode="json")).encode("utf-8")
         request_digest = hashlib.sha256(request_bytes).hexdigest()
         stable_number = int(request_digest[:12], 16)
-        self._invocations += 1
-        if self._failure_at == (stable_number % 10) + 1:
-            raise NarrativeProviderUnavailableError()
         stable_label = request_digest[:12]
         result_schedule = (
             NarrativeOutcomeResult.SUCCESS,
@@ -254,6 +269,32 @@ class _DynamicFakeProvider:
         if len(narrative) < request.narrative_length.minimum:
             narrative += "琥珀微光轻颤。" * 50
             narrative = narrative[: request.narrative_length.minimum]
+        anchor_key = "manual.continuity.anchor"
+        anchor_value = "A visible amber marker appears beside the sealed doorway."
+        has_anchor = any(
+            fact.key == anchor_key and fact.value == anchor_value
+            for fact in request.canonical_facts
+        )
+        if not has_anchor:
+            narrative = (anchor_value + narrative)[: request.narrative_length.maximum]
+            proposed_public_facts = (
+                DynamicPublicFactProposal(key=anchor_key, value=anchor_value),
+            )
+            next_scene = DynamicNextScene(
+                title=f"Dynamic scene {stable_label}",
+                summary=f"The sequence continues at marker {stable_label}.",
+            )
+        else:
+            proposed_public_facts = (
+                DynamicPublicFactProposal(
+                    key=f"note.{stable_label}",
+                    value=f"Visible change {stable_label}.",
+                ),
+            )
+            next_scene = DynamicNextScene(
+                title=f"Dynamic scene {stable_label}",
+                summary="The visible amber marker established earlier now identifies the route forward.",
+            )
         suggestions = (
             f"Consider possibility alpha ({stable_label}).",
             f"Consider possibility beta ({stable_label}).",
@@ -265,16 +306,8 @@ class _DynamicFakeProvider:
                 narrative_text=narrative,
                 result=result,
                 proposed_consequences=("The atmosphere shifts.",),
-                proposed_public_facts=(
-                    DynamicPublicFactProposal(
-                        key=f"note.{stable_label}",
-                        value=f"Visible change {stable_label}.",
-                    ),
-                ),
-                next_scene=DynamicNextScene(
-                    title=f"Dynamic scene {stable_label}",
-                    summary=f"The sequence continues at marker {stable_label}.",
-                ),
+                proposed_public_facts=proposed_public_facts,
+                next_scene=next_scene,
                 suggested_actions=suggestions,
                 continuation="TERMINAL" if stable_number % 2 == 0 else "CONTINUE",
             ),

@@ -372,7 +372,7 @@ async def test_dynamic_run_entry_view_and_server_suggestion_commit_are_direct() 
         assert successor["metadata"]["state_version"] == 1
         assert len(successor["action_affordances"]["suggested_actions"]) == 3
         assert successor["narrative_frame"]["frame_id"] == (
-            "frame.dynamic.7cd5e0ac8b06e112335d0497f1d15d454428838bf439d4f7d2a7c008c0d47641"
+            "frame.dynamic.76c4a26f7e393564187f55ffa704757692f6d0ac9f7c82f429f7f61f2ed36da7"
         )
         assert re.fullmatch(
             r"Dynamic scene [0-9a-f]{12}", successor["presentation"]["scene_title"]
@@ -1644,7 +1644,9 @@ async def test_fake_candidate_is_derived_only_from_complete_committed_request_in
 
 
 @pytest.mark.asyncio
-async def test_fake_configured_failure_uses_literal_independent_vectors() -> None:
+async def test_fake_failure_selector_uses_provider_instance_ordinals_and_safe_tokens(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     canonical_request_bytes = (
         b'{"canonical_facts":[],"current_scene":{"summary":"Scene summary.",'
         b'"title":"Scene"},"language":"zh-CN","narrative_length":{"maximum":900,'
@@ -1665,8 +1667,6 @@ async def test_fake_configured_failure_uses_literal_independent_vectors() -> Non
     unrelated_literal_digest = (
         "9737a42fc62268875470adff1170c10ef9b9b12b82dcba427569873c73b6ba56"
     )
-    configured_failure_slot = 2
-    configured_success_slot = 3
     request = DynamicNarrativeRequest.model_validate_json(canonical_request_bytes)
     unrelated = DynamicNarrativeRequest.model_validate_json(unrelated_request_bytes)
 
@@ -1678,44 +1678,41 @@ async def test_fake_configured_failure_uses_literal_independent_vectors() -> Non
         unrelated_literal_digest
     )
 
-    target_first = _DynamicFakeProvider(configured_failure_slot)
-    with pytest.raises(NarrativeProviderUnavailableError):
-        await target_first.generate_dynamic(request)
-    unrelated_result = await target_first.generate_dynamic(unrelated)
-    with pytest.raises(NarrativeProviderUnavailableError):
-        await target_first.generate_dynamic(request)
-    assert target_first.invocation_count == 3
-
-    unrelated_first = _DynamicFakeProvider(configured_failure_slot)
-    assert await unrelated_first.generate_dynamic(unrelated) == unrelated_result
-    with pytest.raises(NarrativeProviderUnavailableError):
-        await unrelated_first.generate_dynamic(request)
-    assert unrelated_first.invocation_count == 2
-
-    independent = _DynamicFakeProvider(configured_failure_slot)
-    with pytest.raises(NarrativeProviderUnavailableError):
-        await independent.generate_dynamic(request)
-    assert independent.invocation_count == 1
-
-    concurrent = _DynamicFakeProvider(configured_failure_slot)
-    failures = await asyncio.gather(
-        *(concurrent.generate_dynamic(request) for _ in range(6)),
-        return_exceptions=True,
+    later = request.model_copy(
+        update={
+            "player_action": request.player_action.model_copy(
+                update={"description": "A later, different free action."}
+            )
+        }
     )
-    assert all(
-        isinstance(result, NarrativeProviderUnavailableError) for result in failures
+    provider = _DynamicFakeProvider(5)
+    first = await provider.generate_dynamic(request)
+    second = await provider.generate_dynamic(unrelated)
+    third = await provider.generate_dynamic(request)
+    fourth = await provider.generate_dynamic(later)
+    with pytest.raises(NarrativeProviderUnavailableError):
+        await provider.generate_dynamic(unrelated)
+    recovered = await asyncio.gather(
+        provider.generate_dynamic(request),
+        provider.generate_dynamic(unrelated),
+        provider.generate_dynamic(request),
     )
-    assert concurrent.invocation_count == 6
 
-    stable_success = _DynamicFakeProvider(configured_success_slot)
-    first = await stable_success.generate_dynamic(request)
-    await stable_success.generate_dynamic(unrelated)
-    repeated = await stable_success.generate_dynamic(request)
-    assert first == repeated
-    assert first.candidate.result is NarrativeOutcomeResult.AMBIGUOUS
-    assert first.candidate.next_scene.title == "Dynamic scene e0ba3562add9"
-    assert first.candidate.continuation == "CONTINUE"
-    assert stable_success.invocation_count == 3
+    assert first == third
+    assert first != second != fourth
+    assert all(result.candidate.schema_version == "dynamic-narrative-candidate-v1" for result in recovered)
+    assert provider.invocation_count == 8
+    assert capsys.readouterr().out.splitlines() == [
+        "DNVS_FAKE_EVIDENCE event=reset cumulative_invocations=0",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=1 outcome=SUCCESS cumulative_invocations=1",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=2 outcome=SUCCESS cumulative_invocations=2",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=3 outcome=SUCCESS cumulative_invocations=3",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=4 outcome=SUCCESS cumulative_invocations=4",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=5 outcome=INTENTIONAL_FAILURE cumulative_invocations=5",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=6 outcome=SUCCESS cumulative_invocations=6",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=7 outcome=SUCCESS cumulative_invocations=7",
+        "DNVS_FAKE_EVIDENCE event=invocation ordinal=8 outcome=SUCCESS cumulative_invocations=8",
+    ]
 
 
 def test_initial_no_visible_npc_suggestion_uses_exact_investigate_literal() -> None:
@@ -2207,7 +2204,7 @@ async def test_fact_ring_rolls_over_in_exact_twelve_slot_order() -> None:
     runtime, client, session_id = await _entered_dynamic_client()
     try:
         committed_keys: list[str] = []
-        for _ in range(15):
+        for action_index in range(15):
             view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
             response = await client.post(
                 f"/v1/sessions/{session_id}/actions",
@@ -2219,7 +2216,11 @@ async def test_fact_ring_rolls_over_in_exact_twelve_slot_order() -> None:
             ]["dynamic_facts"]
             title = current["dynamic.narrative.scene.title"]
             marker = title.removeprefix("Dynamic scene ")
-            committed_keys.append(f"note.{marker}")
+            committed_keys.append(
+                "manual.continuity.anchor"
+                if action_index in {0, 13}
+                else f"note.{marker}"
+            )
         slots = runtime.store.snapshot().snapshots[session_id].state[
             "scenario_runtime"
         ]["dynamic_facts"]
@@ -4092,6 +4093,137 @@ async def test_finalize_commit_uncertainty_uses_one_retained_reconciliation(
             )
         assert runtime.provider.invocation_count == 0
         assert len(runtime.store.snapshot().narrative_jobs) == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_manual_fake_eight_submission_sequence_recovers_and_continues(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    runtime = build_dynamic_demo_runtime(
+        environ={
+            "DEVIATION_DEMO_DYNAMIC_PROVIDER": "fake",
+            "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION": "5",
+        }
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    submitted_bodies: list[dict[str, object]] = []
+
+    async def current_view() -> httpx.Response:
+        response = await client.get(f"/v1/sessions/{session_id}/view")
+        assert response.status_code == 200
+        return response
+
+    async def submit_suggestion(index: int) -> httpx.Response:
+        view = (await current_view()).json()
+        body = view["action_affordances"]["suggested_actions"][index]["submission"]
+        submitted_bodies.append(body)
+        return await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+
+    async def submit_custom(item: int, description: str) -> httpx.Response:
+        body: dict[str, object] = {
+            "turn_id": f"manual-fake-turn-{item}",
+            "client_request_id": f"manual-fake-request-{item}",
+            "action_type": "CUSTOM",
+            "description": description,
+        }
+        submitted_bodies.append(body)
+        return await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+
+    try:
+        versions = [(await current_view()).json()["metadata"]["state_version"]]
+
+        first = await submit_suggestion(0)
+        assert first.status_code == 200
+        assert first.json()["resulting_state_version"] == 1
+        assert first.json()["narrative_text"].startswith(
+            "A visible amber marker appears beside the sealed doorway."
+        )
+        versions.append((await current_view()).json()["metadata"]["state_version"])
+
+        second = await submit_custom(
+            2,
+            "Examine the visible floor markings without touching anything.",
+        )
+        assert second.status_code == 200
+        assert second.json()["resulting_state_version"] == 2
+        versions.append((await current_view()).json()["metadata"]["state_version"])
+
+        third = await submit_suggestion(1)
+        assert third.status_code == 200
+        assert third.json()["resulting_state_version"] == 3
+        versions.append((await current_view()).json()["metadata"]["state_version"])
+
+        fourth = await submit_custom(
+            4,
+            "Wait quietly and compare the current scene with the last visible change.",
+        )
+        assert fourth.status_code == 200
+        assert fourth.json()["resulting_state_version"] == 4
+        item_four_view = await current_view()
+        item_four_bytes = item_four_view.content
+        versions.append(item_four_view.json()["metadata"]["state_version"])
+
+        fifth = await submit_custom(5, "Pause and listen for changes in the room.")
+        assert fifth.status_code == 409
+        assert fifth.json() == {
+            "error": {
+                "error_code": "NARRATIVE_OUTCOME_UNKNOWN",
+                "message": "Narrative turn cannot be committed",
+            }
+        }
+        recovered = await current_view()
+        assert recovered.content == item_four_bytes
+        versions.append(recovered.json()["metadata"]["state_version"])
+
+        sixth = await submit_suggestion(2)
+        assert sixth.status_code == 200
+        assert sixth.json()["resulting_state_version"] == 5
+        versions.append((await current_view()).json()["metadata"]["state_version"])
+
+        seventh = await submit_custom(
+            7,
+            "Follow the earlier visible change and check what it now affects.",
+        )
+        assert seventh.status_code == 200
+        assert seventh.json()["resulting_state_version"] == 6
+        versions.append((await current_view()).json()["metadata"]["state_version"])
+
+        eighth = await submit_suggestion(0)
+        assert eighth.status_code == 200
+        assert eighth.json()["resulting_state_version"] == 7
+        final_view = await current_view()
+        assert final_view.json()["metadata"]["state_version"] == 7
+        assert final_view.json()["presentation"]["scene_summary"] == (
+            "The visible amber marker established earlier now identifies the route forward."
+        )
+        versions.append(final_view.json()["metadata"]["state_version"])
+
+        assert versions == [0, 1, 2, 3, 4, 4, 5, 6, 7]
+        assert len(submitted_bodies) == 8
+        assert submitted_bodies[0]["description"] == "Observe the surroundings."
+        assert submitted_bodies[2]["description"] != submitted_bodies[0]["description"]
+        assert submitted_bodies[5]["description"] != submitted_bodies[4]["description"]
+        snapshot = runtime.store.snapshot()
+        jobs = tuple(snapshot.narrative_jobs.values())
+        assert len(jobs) == 8
+        assert sum(job.status is NarrativeJobStatus.COMMITTED for job in jobs) == 7
+        assert sum(job.status is NarrativeJobStatus.OUTCOME_UNKNOWN for job in jobs) == 1
+        assert len(snapshot.turn_requests) == 7
+        assert runtime.provider.invocation_count == 8
+        assert capsys.readouterr().out.splitlines() == [
+            "DNVS_FAKE_EVIDENCE event=reset cumulative_invocations=0",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=1 outcome=SUCCESS cumulative_invocations=1",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=2 outcome=SUCCESS cumulative_invocations=2",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=3 outcome=SUCCESS cumulative_invocations=3",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=4 outcome=SUCCESS cumulative_invocations=4",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=5 outcome=INTENTIONAL_FAILURE cumulative_invocations=5",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=6 outcome=SUCCESS cumulative_invocations=6",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=7 outcome=SUCCESS cumulative_invocations=7",
+            "DNVS_FAKE_EVIDENCE event=invocation ordinal=8 outcome=SUCCESS cumulative_invocations=8",
+        ]
     finally:
         await client.aclose()
         await runtime.aclose()

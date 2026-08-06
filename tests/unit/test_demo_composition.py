@@ -14,6 +14,7 @@ import sys
 import httpx
 import pytest
 
+import deviation_protocol.api.demo_composition as demo_composition_module
 from deviation_protocol.api.demo_composition import (
     CanonicalDemoNarrativeTurnOrchestrator,
     DemoRuntime,
@@ -69,6 +70,9 @@ from deviation_protocol.infrastructure.demo_persistence import (
 )
 from deviation_protocol.infrastructure.deterministic_narrative import (
     DeterministicDemoNarrativeProvider,
+)
+from deviation_protocol.infrastructure.deepseek_narrative import (
+    DeepSeekNarrativeProvider,
 )
 from deviation_protocol.infrastructure.errors import OptimisticLockError
 from deviation_protocol.infrastructure.run_persistence import (
@@ -3500,6 +3504,64 @@ def test_dynamic_composition_defaults_to_fake_without_credential_selection() -> 
     assert runtime.provider.invocation_count == 0
 
 
+@pytest.mark.asyncio
+async def test_dynamic_fake_observation_resets_and_never_constructs_live(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class CredentialSentinel(dict[str, str]):
+        def get(self, key: str, default=None):
+            if key.startswith("DEEPSEEK_"):
+                raise AssertionError("Fake selection must not inspect credentials")
+            return super().get(key, default)
+
+    source = CredentialSentinel(
+        {
+            "DEVIATION_DEMO_DYNAMIC_PROVIDER": "fake",
+            "DEVIATION_DEMO_DYNAMIC_FAKE_FAILURE_AT_ACTION": "5",
+            "DEEPSEEK_API_KEY": "inherited-sentinel-must-not-be-read",
+        }
+    )
+    live_calls: list[str] = []
+
+    def forbidden_settings(*args, **kwargs):
+        del args, kwargs
+        live_calls.append("settings")
+        raise AssertionError("Fake selection must not read Live settings")
+
+    def forbidden_live_provider(*args, **kwargs):
+        del args, kwargs
+        live_calls.append("provider")
+        raise AssertionError("Fake selection must not construct a Live Provider")
+
+    with monkeypatch.context() as trapped:
+        trapped.setattr(
+            demo_composition_module.DeepSeekSettings,
+            "from_environment",
+            forbidden_settings,
+        )
+        trapped.setattr(
+            demo_composition_module,
+            "DeepSeekNarrativeProvider",
+            forbidden_live_provider,
+        )
+        first = build_dynamic_demo_runtime(environ=source)
+        second = build_dynamic_demo_runtime(environ=source)
+        try:
+            assert first.provider.__class__.__name__ == "_DynamicFakeProvider"
+            assert second.provider.__class__.__name__ == "_DynamicFakeProvider"
+            assert first.provider.invocation_count == second.provider.invocation_count == 0
+            assert first._owned_resources == (first.provider,)
+            assert second._owned_resources == (second.provider,)
+            assert live_calls == []
+        finally:
+            await first.aclose()
+            await second.aclose()
+
+    assert capsys.readouterr().out.splitlines() == [
+        "DNVS_FAKE_EVIDENCE event=reset cumulative_invocations=0",
+        "DNVS_FAKE_EVIDENCE event=reset cumulative_invocations=0",
+    ]
 def test_dynamic_composition_invalid_selector_fails_closed() -> None:
     with pytest.raises(DynamicDemoConfigurationError):
         build_dynamic_demo_runtime(
@@ -3563,7 +3625,9 @@ def test_dynamic_live_selection_with_missing_or_retrying_settings_fails_closed()
 
 
 @pytest.mark.asyncio
-async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries() -> None:
+async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     runtime = build_dynamic_demo_runtime(
         environ={
             "DEVIATION_DEMO_DYNAMIC_PROVIDER": "live",
@@ -3572,10 +3636,11 @@ async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries
         }
     )
     try:
-        assert runtime.provider.__class__.__name__ == "DeepSeekNarrativeProvider"
+        assert isinstance(runtime.provider, DeepSeekNarrativeProvider)
         assert runtime.services.turn_orchestrator.provider_name == "deepseek"
         assert runtime.services.turn_orchestrator.live_provider_references
         assert runtime.provider._settings.max_retries == 0
+        assert capsys.readouterr().out == ""
     finally:
         await runtime.aclose()
 
