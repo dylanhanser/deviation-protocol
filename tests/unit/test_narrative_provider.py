@@ -17,9 +17,15 @@ from pydantic import ValidationError
 
 from deviation_protocol.application.dynamic_narrative_models import (
     DynamicCurrentScene,
+    DynamicGeneratedPublicFactKeyGrammar,
     DynamicNarrativeLength,
     DynamicNarrativeRequest,
+    DynamicNarrativeResponseCategory,
+    DynamicNarrativeResponseError,
+    DynamicNarrativeSchemaFailureFamily,
     DynamicPlayerAction,
+    DynamicProviderCandidateContract,
+    DynamicProviderCandidateContractError,
     DynamicScenarioPremise,
     DynamicScenarioRole,
     DynamicSelectedPlayerCharacter,
@@ -1720,6 +1726,37 @@ def _dynamic_candidate_payload() -> dict[str, object]:
     }
 
 
+def _reachable_exception_chain(error: BaseException) -> tuple[BaseException, ...]:
+    pending = [error]
+    reachable: list[BaseException] = []
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+        reachable.append(current)
+        for nested in (current.__context__, current.__cause__):
+            if nested is not None:
+                pending.append(nested)
+    return tuple(reachable)
+
+
+def _assert_exception_surface_excludes_canary(
+    error: BaseException, canary: str
+) -> tuple[BaseException, ...]:
+    reachable = _reachable_exception_chain(error)
+    for current in reachable:
+        for surface in (
+            str(current),
+            repr(current),
+            repr(current.args),
+            repr(vars(current)),
+        ):
+            assert canary not in surface
+    return reachable
+
+
 @pytest.mark.asyncio
 async def test_dynamic_deepseek_contract_parses_once_without_retry() -> None:
     dynamic_payload = _dynamic_candidate_payload()
@@ -1734,6 +1771,268 @@ async def test_dynamic_deepseek_contract_parses_once_without_retry() -> None:
 
     assert result.candidate.next_scene.title == "下一幕"
     assert result.provider_metadata.attempts == 1
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_deepseek_malformed_envelope_severs_raw_exception_graph() -> None:
+    canary = "INERT-SENSITIVE-ENVELOPE-CANARY-98317"
+    malformed_envelope = (
+        '{"id":"'
+        + canary
+        + '","choices":[{"finish_reason":"stop","message":{"content":"{}"}}]'
+    )
+    transport = FakeTransport(
+        [DeepSeekHttpResponse(status_code=200, body_text=malformed_envelope)]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(NarrativeProviderResponseError) as caught:
+        await provider.generate_dynamic(_dynamic_request())
+
+    error = caught.value
+    assert type(error) is NarrativeProviderResponseError
+    assert error.code == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+    assert error.public_message == "Narrative processing failed."
+    assert str(error) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+    assert error.args == ("NARRATIVE_PROVIDER_RESPONSE_INVALID",)
+    reachable = _assert_exception_surface_excludes_canary(error, canary)
+    assert reachable == (error,)
+    assert error.__context__ is None
+    assert error.__cause__ is None
+    assert not any(isinstance(item, json.JSONDecodeError) for item in reachable)
+    assert not any(
+        isinstance(item, (UnicodeError, TypeError, ValueError)) for item in reachable
+    )
+    assert canary not in repr(transport.calls)
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure_kind", ("decoder", "pydantic", "contract"))
+async def test_dynamic_sanitized_boundary_severs_raw_exception_chains(
+    failure_kind: str,
+) -> None:
+    canary = f"INERT-SENSITIVE-{failure_kind.upper()}-CANARY-74921"
+    payload = _dynamic_candidate_payload()
+    if failure_kind == "decoder":
+        content = '{"rejected":"' + canary + '"'
+        expected_category = DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+        expected_family = None
+    elif failure_kind == "pydantic":
+        payload["result"] = canary
+        content = json.dumps(payload, ensure_ascii=False)
+        expected_category = DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+        expected_family = DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL
+    else:
+        payload["proposed_public_facts"] = [
+            {"key": canary, "value": "A safe synthetic public observation."}
+        ]
+        content = json.dumps(payload, ensure_ascii=False)
+        expected_category = DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+        expected_family = (
+            DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
+        )
+
+    if failure_kind != "decoder":
+        decoded = json.loads(content)
+        with pytest.raises(DynamicProviderCandidateContractError) as contract_error:
+            DynamicProviderCandidateContract.validate_response_json(decoded, content)
+        contract_chain = _assert_exception_surface_excludes_canary(
+            contract_error.value, canary
+        )
+        assert contract_chain == (contract_error.value,)
+        assert contract_error.value.__context__ is None
+        assert contract_error.value.__cause__ is None
+        assert not any(isinstance(item, ValidationError) for item in contract_chain)
+
+    transport = FakeTransport([_response(content=content)])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as caught:
+        await provider.generate_dynamic(_dynamic_request())
+
+    error = caught.value
+    assert error.category is expected_category
+    assert error.schema_failure_family is expected_family
+    provider_chain = _assert_exception_surface_excludes_canary(error, canary)
+    # A raise-from-None inside either raw handler would leave __context__ reachable.
+    assert provider_chain == (error,)
+    assert error.__context__ is None
+    assert error.__cause__ is None
+    assert not any(
+        isinstance(
+            item,
+            (
+                json.JSONDecodeError,
+                ValidationError,
+                DynamicProviderCandidateContractError,
+            ),
+        )
+        for item in provider_chain
+    )
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "key",
+    (
+        "public-note-aa",
+        DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE,
+        "public-note-aaaaaa-bbbbbb-cccccc-dddddd",
+    ),
+)
+async def test_dynamic_deepseek_schema_accepts_exact_public_fact_key_grammar(
+    key: str,
+) -> None:
+    payload = _dynamic_candidate_payload()
+    payload["proposed_public_facts"] = [
+        {"key": key, "value": "A plainly synthetic public observation."}
+    ]
+    transport = FakeTransport(
+        [_response(content=json.dumps(payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    result = await provider.generate_dynamic(_dynamic_request())
+
+    assert result.candidate.proposed_public_facts[0].key == key
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "position",
+    ("proposed_consequences[0]", "result", "next_scene.summary"),
+)
+async def test_dynamic_deepseek_routes_standard_json_float_positions_to_type_family(
+    position: str,
+) -> None:
+    ordinary_float = 1.5
+    payload = _dynamic_candidate_payload()
+    if position == "proposed_consequences[0]":
+        payload["proposed_consequences"] = [ordinary_float]
+    elif position == "result":
+        payload["result"] = ordinary_float
+    else:
+        next_scene = payload["next_scene"]
+        assert isinstance(next_scene, dict)
+        next_scene["summary"] = ordinary_float
+    content = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+    decoded = json.loads(content)
+    assert isinstance(decoded, dict)
+    if position == "proposed_consequences[0]":
+        rejected_value = decoded["proposed_consequences"][0]
+    elif position == "result":
+        rejected_value = decoded["result"]
+    else:
+        decoded_next_scene = decoded["next_scene"]
+        assert isinstance(decoded_next_scene, dict)
+        rejected_value = decoded_next_scene["summary"]
+    assert type(rejected_value) is float
+    assert rejected_value == ordinary_float
+
+    with pytest.raises(DynamicProviderCandidateContractError) as contract_caught:
+        DynamicProviderCandidateContract.validate_response_json(decoded, content)
+
+    assert (
+        contract_caught.value.family
+        is DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL
+    )
+    contract_chain = _assert_exception_surface_excludes_canary(
+        contract_caught.value, str(ordinary_float)
+    )
+    assert contract_chain == (contract_caught.value,)
+    assert contract_caught.value.__context__ is None
+    assert contract_caught.value.__cause__ is None
+    assert not any(isinstance(item, ValidationError) for item in contract_chain)
+
+    transport = FakeTransport([_response(content=content)])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as caught:
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert (
+        caught.value.category
+        is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    )
+    assert (
+        caught.value.schema_failure_family
+        is DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL
+    )
+    assert (
+        caught.value.category
+        is not DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+    )
+    provider_chain = _assert_exception_surface_excludes_canary(
+        caught.value, str(ordinary_float)
+    )
+    assert provider_chain == (caught.value,)
+    assert caught.value.__context__ is None
+    assert caught.value.__cause__ is None
+    assert not any(
+        isinstance(
+            item,
+            (
+                json.JSONDecodeError,
+                ValidationError,
+                DynamicProviderCandidateContractError,
+            ),
+        )
+        for item in provider_chain
+    )
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "key",
+    (
+        "",
+        "public-note-a",
+        "public-note-aaaaaa-bbbbbb-cccccc-ddddddd",
+        "fact.synthetic",
+        "public-note-receipt",
+        "public-note-" + "a" * 48,
+        "public-note-aa--bb",
+        " public-note-aa ",
+    ),
+)
+async def test_dynamic_deepseek_schema_rejects_unsafe_public_fact_keys(
+    key: str,
+) -> None:
+    payload = _dynamic_candidate_payload()
+    payload["proposed_public_facts"] = [
+        {"key": key, "value": "A plainly synthetic public observation."}
+    ]
+    transport = FakeTransport(
+        [_response(content=json.dumps(payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as error:
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert error.value.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    assert (
+        error.value.schema_failure_family
+        is DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
+    )
+    assert str(error.value) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+    if key:
+        assert key not in str(error.value)
     assert len(transport.calls) == 1
 
 
@@ -1765,26 +2064,48 @@ async def test_dynamic_deepseek_requires_every_candidate_field_without_defaults(
         _settings(max_retries=0), _builder(), transport=transport
     )
 
-    with pytest.raises(NarrativeProviderResponseError) as error:
+    with pytest.raises(DynamicNarrativeResponseError) as error:
         await provider.generate_dynamic(_dynamic_request())
 
+    assert error.value.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    assert (
+        error.value.schema_failure_family
+        is DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS
+    )
+    assert str(error.value) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
     assert "叙" not in str(error.value)
     assert len(transport.calls) == 1
 
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "updates",
+    ("updates", "expected_family"),
     (
-        {"unexpected": "forbidden"},
-        {"proposed_consequences": "not-an-array"},
-        {"proposed_public_facts": [{"key": "safe", "value": 1}]},
-        {"next_scene": {"title": "下一幕", "summary": "公开。", "extra": 1}},
-        {"suggested_actions": ["观察。", 2, "前进。"]},
+        (
+            {"unexpected": "forbidden"},
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+        ),
+        (
+            {"proposed_consequences": "not-an-array"},
+            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+        ),
+        (
+            {"proposed_public_facts": [{"key": "safe", "value": 1}]},
+            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+        ),
+        (
+            {"next_scene": {"title": "下一幕", "summary": "公开。", "extra": 1}},
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+        ),
+        (
+            {"suggested_actions": ["观察。", 2, "前进。"]},
+            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+        ),
     ),
 )
 async def test_dynamic_deepseek_rejects_extra_wrong_and_malformed_candidate_fields(
     updates: dict[str, object],
+    expected_family: DynamicNarrativeSchemaFailureFamily,
 ) -> None:
     payload = _dynamic_candidate_payload()
     payload.update(updates)
@@ -1795,9 +2116,149 @@ async def test_dynamic_deepseek_rejects_extra_wrong_and_malformed_candidate_fiel
         _settings(max_retries=0), _builder(), transport=transport
     )
 
-    with pytest.raises(NarrativeProviderResponseError):
+    with pytest.raises(DynamicNarrativeResponseError) as error:
         await provider.generate_dynamic(_dynamic_request())
 
+    assert error.value.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    assert error.value.schema_failure_family is expected_family
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "content",
+    (
+        None,
+        "",
+        "   ",
+        "not-json-INERT_RAW_SENTINEL",
+        "```json\n{}\n```",
+        'Prose before {"schema_version":"dynamic-narrative-candidate-v1"}',
+        '{"schema_version":"dynamic-narrative-candidate-v1"} prose after',
+    ),
+)
+async def test_dynamic_deepseek_classifies_non_single_object_content_as_unparseable(
+    content: object,
+) -> None:
+    transport = FakeTransport([_response(content=content)])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as error:
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert error.value.category is DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+    assert error.value.schema_failure_family is None
+    assert str(error.value) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+    assert "INERT_RAW_SENTINEL" not in str(error.value)
+    assert error.value.args == ("NARRATIVE_PROVIDER_RESPONSE_INVALID",)
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("decoded", ([], "string", 1, True, None))
+async def test_dynamic_deepseek_classifies_decoded_non_schema_values_as_schema_invalid(
+    decoded: object,
+) -> None:
+    transport = FakeTransport([_response(content=json.dumps(decoded))])
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as error:
+        await provider.generate_dynamic(_dynamic_request())
+
+    assert error.value.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    assert (
+        error.value.schema_failure_family
+        is DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE
+    )
+    assert str(error.value) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+    assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case", "expected_family"),
+    (
+        (
+            "root",
+            DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
+        ),
+        (
+            "required_over_type_key_bounds",
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+        ),
+        (
+            "type_over_key_bounds",
+            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+        ),
+        (
+            "key_over_bounds",
+            DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+        ),
+        (
+            "bounds",
+            DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS,
+        ),
+    ),
+)
+async def test_dynamic_schema_failure_families_have_deterministic_precedence(
+    case: str,
+    expected_family: DynamicNarrativeSchemaFailureFamily,
+) -> None:
+    payload: object = _dynamic_candidate_payload()
+    if case == "root":
+        payload = []
+    else:
+        assert isinstance(payload, dict)
+        payload["suggested_actions"] = ["same", "same", "third"]
+        if case in {
+            "required_over_type_key_bounds",
+            "type_over_key_bounds",
+            "key_over_bounds",
+        }:
+            payload["proposed_public_facts"] = [
+                {
+                    "key": "INERT_REJECTED_KEY_VALUE",
+                    "value": "INERT_REJECTED_FIELD_VALUE",
+                }
+            ]
+        if case in {"required_over_type_key_bounds", "type_over_key_bounds"}:
+            payload["result"] = 7
+        if case == "required_over_type_key_bounds":
+            del payload["schema_version"]
+    transport = FakeTransport(
+        [_response(content=json.dumps(payload, ensure_ascii=False))]
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    with pytest.raises(DynamicNarrativeResponseError) as caught:
+        await provider.generate_dynamic(_dynamic_request())
+
+    error = caught.value
+    assert error.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+    assert error.schema_failure_family is expected_family
+    assert tuple(DynamicProviderCandidateContract.SCHEMA_FAILURE_PRECEDENCE) == (
+        DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
+        DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+        DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+        DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+        DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS,
+    )
+    safe_exception_surface = str(error) + repr(error) + repr(vars(error))
+    for prohibited in (
+        "INERT_REJECTED_KEY_VALUE",
+        "INERT_REJECTED_FIELD_VALUE",
+        "proposed_public_facts.0.key",
+        "suggested_actions",
+        "validation error",
+    ):
+        assert prohibited not in safe_exception_surface
+    assert error.args == ("NARRATIVE_PROVIDER_RESPONSE_INVALID",)
     assert len(transport.calls) == 1
 
 
@@ -1823,12 +2284,12 @@ async def test_dynamic_deepseek_transport_uncertainty_is_never_retried() -> None
     [
         '{"schema_version":"dynamic-narrative-candidate-v1",'
         '"narrative_text":"first","narrative_text":"second"}',
-        '{"schema_version":"dynamic-narrative-candidate-v1",'
-        '"narrative_text":"valid","result":"SUCCESS",'
-        '"proposed_consequences":[1.5]}',
+        '{"nonstandard":NaN}',
+        '{"nonstandard":Infinity}',
+        '{"nonstandard":-Infinity}',
     ],
 )
-async def test_dynamic_deepseek_rejects_duplicate_members_and_floats_without_retry(
+async def test_dynamic_deepseek_keeps_duplicates_and_nonstandard_numbers_unparseable(
     content: str,
 ) -> None:
     transport = FakeTransport([_response(content=content)])
@@ -1836,9 +2297,13 @@ async def test_dynamic_deepseek_rejects_duplicate_members_and_floats_without_ret
         _settings(max_retries=0), _builder(), transport=transport
     )
 
-    with pytest.raises(NarrativeProviderResponseError):
+    with pytest.raises(DynamicNarrativeResponseError) as error:
         await provider.generate_dynamic(_dynamic_request())
 
+    assert error.value.category is DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+    assert error.value.schema_failure_family is None
+    assert error.value.__context__ is None
+    assert error.value.__cause__ is None
     assert len(transport.calls) == 1
 
 

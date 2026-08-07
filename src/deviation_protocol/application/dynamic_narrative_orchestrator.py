@@ -22,10 +22,17 @@ from deviation_protocol.application.dynamic_narrative_models import (
     DynamicCanonicalFact,
     DynamicCurrentScene,
     DynamicNarrativeCapacityExhaustedError,
+    DynamicGenerationInstruction,
+    DynamicNarrativeLengthBand,
+    DynamicNarrativeLengthPolicy,
     DynamicNarrativeLength,
     DynamicNarrativeProvider,
     DynamicNarrativeRequest,
+    DynamicNarrativeResponseCategory,
+    DynamicNarrativeResponseError,
+    DynamicNarrativeSchemaFailureFamily,
     DynamicPlayerAction,
+    DynamicProviderCandidateContract,
     DynamicScenarioPremise,
     DynamicScenarioRole,
     DynamicSelectedPlayerCharacter,
@@ -966,7 +973,39 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     """Closed, sanitized local-only proposal-rejection classifications."""
 
     PRE_REVALIDATION = "DNVS_LIVE_DIAG_PRE_REVALIDATION"
+    PRE_RESPONSE_UNPARSEABLE = "DNVS_LIVE_DIAG_PRE_RESPONSE_UNPARSEABLE"
+    PRE_RESPONSE_SCHEMA_INVALID = "DNVS_LIVE_DIAG_PRE_RESPONSE_SCHEMA_INVALID"
+    RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE = (
+        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE"
+    )
+    RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS = (
+        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS"
+    )
+    RECOVERY_SCHEMA_TYPE_OR_LITERAL = (
+        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_TYPE_OR_LITERAL"
+    )
+    RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS = (
+        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS"
+    )
+    RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT = (
+        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT"
+    )
+    FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE = (
+        "DNVS_LIVE_DIAG_FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE"
+    )
+    FINAL_SCHEMA_REQUIRED_OR_EXTRA_FIELDS = (
+        "DNVS_LIVE_DIAG_FINAL_SCHEMA_REQUIRED_OR_EXTRA_FIELDS"
+    )
+    FINAL_SCHEMA_TYPE_OR_LITERAL = "DNVS_LIVE_DIAG_FINAL_SCHEMA_TYPE_OR_LITERAL"
+    FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS = (
+        "DNVS_LIVE_DIAG_FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS"
+    )
+    FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT = (
+        "DNVS_LIVE_DIAG_FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT"
+    )
     PRE_LENGTH = "DNVS_LIVE_DIAG_PRE_LENGTH"
+    PRE_LENGTH_BELOW_MINIMUM = "DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM"
+    PRE_LENGTH_ABOVE_MAXIMUM = "DNVS_LIVE_DIAG_PRE_LENGTH_ABOVE_MAXIMUM"
     PRE_REPEAT_SUBMITTED_ACTION = "DNVS_LIVE_DIAG_PRE_REPEAT_SUBMITTED_ACTION"
     PRE_STORAGE_BOUNDARY = "DNVS_LIVE_DIAG_PRE_STORAGE_BOUNDARY"
     PRE_REFERENCE_INDEX = "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX"
@@ -979,6 +1018,61 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     FINAL_VALUE = "DNVS_LIVE_DIAG_FINAL_VALUE"
 
 
+_SCHEMA_RECOVERY_INSTRUCTION = {
+    DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE: (
+        DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE
+    ),
+    DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS: (
+        DynamicGenerationInstruction.REPLACE_SCHEMA_REQUIRED_OR_EXTRA_FIELDS
+    ),
+    DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL: (
+        DynamicGenerationInstruction.REPLACE_SCHEMA_TYPE_OR_LITERAL
+    ),
+    DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
+        DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS
+    ),
+    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
+        DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
+    ),
+}
+
+_SCHEMA_RECOVERY_DIAGNOSTIC = {
+    DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE: (
+        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE
+    ),
+    DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS: (
+        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS
+    ),
+    DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL: (
+        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_TYPE_OR_LITERAL
+    ),
+    DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
+        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS
+    ),
+    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
+        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
+    ),
+}
+
+_SCHEMA_FINAL_DIAGNOSTIC = {
+    DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE: (
+        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE
+    ),
+    DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS: (
+        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_REQUIRED_OR_EXTRA_FIELDS
+    ),
+    DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL: (
+        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_TYPE_OR_LITERAL
+    ),
+    DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
+        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS
+    ),
+    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
+        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
+    ),
+}
+
+
 def _noop_rejection_diagnostic(_token: DynamicNarrativeRejectionDiagnostic) -> None:
     return None
 
@@ -987,6 +1081,14 @@ class _FinalizationDiagnosticError(NarrativeProposalRejectedError):
     def __init__(self, token: DynamicNarrativeRejectionDiagnostic) -> None:
         super().__init__()
         self.token = token
+
+
+class _RecoverableGenerationError(NarrativeProposalRejectedError):
+    """Internal-only replacement signal; it contains no candidate data."""
+
+    def __init__(self, instruction: DynamicGenerationInstruction) -> None:
+        super().__init__()
+        self.instruction = instruction
 
 
 @dataclass(slots=True)
@@ -1289,41 +1391,40 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         # the Provider.  A delivered cancellation is therefore stabilized from
         # durable job authority without executing model work.
         await self._before_provider_entry()
-        assert self.provider is not None
         try:
-            untrusted = await self.provider.generate_dynamic(request)
-        except asyncio.CancelledError:
-            marker = asyncio.create_task(
-                self._record_terminal_job(
-                    claimed,
-                    NarrativeJobStatus.OUTCOME_UNKNOWN,
-                    "NARRATIVE_OUTCOME_UNKNOWN",
-                )
+            untrusted = await self._generate_dynamic(
+                request,
+                claimed,
+                owner_task,
+                cancellation_baseline,
+                allow_response_recovery=True,
             )
-            await self._await_retained(
-                marker, owner_task, cancellation_baseline, True
-            )
-            raise asyncio.CancelledError
-        except NarrativeBoundaryError as exc:
-            uncertain = exc.code == "NARRATIVE_PROVIDER_UNAVAILABLE"
-            status = (
-                NarrativeJobStatus.OUTCOME_UNKNOWN
-                if uncertain
-                else NarrativeJobStatus.FAILED_TERMINAL
-            )
-            await self._record_terminal_job(claimed, status, exc.code)
-            if uncertain:
-                raise NarrativeOutcomeUnknownError(claimed.session_id) from None
-            raise
-        except Exception:
-            await self._record_terminal_job(
-                claimed, NarrativeJobStatus.OUTCOME_UNKNOWN, "NARRATIVE_OUTCOME_UNKNOWN"
-            )
-            raise NarrativeOutcomeUnknownError(claimed.session_id) from None
-        try:
             validated = self._validate_candidate(
-                untrusted, request=request, resolved=resolved, job=claimed
+                untrusted,
+                request=request,
+                resolved=resolved,
+                job=claimed,
+                allow_length_recovery=True,
             )
+        except _RecoverableGenerationError as recovery:
+            replacement_request = request.with_generation_instruction(recovery.instruction)
+            replacement = await self._generate_dynamic(
+                replacement_request, claimed, owner_task, cancellation_baseline
+            )
+            try:
+                validated = self._validate_candidate(
+                    replacement,
+                    request=replacement_request,
+                    resolved=resolved,
+                    job=claimed,
+                )
+            except NarrativeBoundaryError:
+                await self._record_terminal_job(
+                    claimed,
+                    NarrativeJobStatus.FAILED_TERMINAL,
+                    "NARRATIVE_PROPOSAL_REJECTED",
+                )
+                raise
         except NarrativeBoundaryError:
             await self._record_terminal_job(
                 claimed, NarrativeJobStatus.FAILED_TERMINAL, "NARRATIVE_PROPOSAL_REJECTED"
@@ -1399,6 +1500,84 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 return reconciled.response
             raise NarrativeOutcomeUnknownError(submission.session_id) from None
 
+    async def _generate_dynamic(
+        self,
+        request: DynamicNarrativeRequest,
+        claimed: NarrativeJob,
+        owner_task: asyncio.Task[Any],
+        cancellation_baseline: int,
+        *,
+        allow_response_recovery: bool = False,
+    ) -> UntrustedDynamicNarrativeCandidate:
+        assert self.provider is not None
+        try:
+            return await self.provider.generate_dynamic(request)
+        except asyncio.CancelledError:
+            marker = asyncio.create_task(
+                self._record_terminal_job(
+                    claimed,
+                    NarrativeJobStatus.OUTCOME_UNKNOWN,
+                    "NARRATIVE_OUTCOME_UNKNOWN",
+                )
+            )
+            await self._await_retained(
+                marker, owner_task, cancellation_baseline, True
+            )
+            raise asyncio.CancelledError
+        except DynamicNarrativeResponseError as exc:
+            if allow_response_recovery:
+                if (
+                    exc.category
+                    is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+                ):
+                    assert exc.schema_failure_family is not None
+                    self._report_rejection(
+                        _SCHEMA_RECOVERY_DIAGNOSTIC[exc.schema_failure_family]
+                    )
+                    instruction = _SCHEMA_RECOVERY_INSTRUCTION[
+                        exc.schema_failure_family
+                    ]
+                else:
+                    instruction = DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID
+                raise _RecoverableGenerationError(
+                    instruction
+                ) from None
+            if (
+                exc.category
+                is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+            ):
+                assert exc.schema_failure_family is not None
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID
+                )
+                self._report_rejection(
+                    _SCHEMA_FINAL_DIAGNOSTIC[exc.schema_failure_family]
+                )
+            else:
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_UNPARSEABLE
+                )
+            await self._record_terminal_job(
+                claimed, NarrativeJobStatus.FAILED_TERMINAL, exc.code
+            )
+            raise
+        except NarrativeBoundaryError as exc:
+            uncertain = exc.code == "NARRATIVE_PROVIDER_UNAVAILABLE"
+            status = (
+                NarrativeJobStatus.OUTCOME_UNKNOWN
+                if uncertain
+                else NarrativeJobStatus.FAILED_TERMINAL
+            )
+            await self._record_terminal_job(claimed, status, exc.code)
+            if uncertain:
+                raise NarrativeOutcomeUnknownError(claimed.session_id) from None
+            raise
+        except Exception:
+            await self._record_terminal_job(
+                claimed, NarrativeJobStatus.OUTCOME_UNKNOWN, "NARRATIVE_OUTCOME_UNKNOWN"
+            )
+            raise NarrativeOutcomeUnknownError(claimed.session_id) from None
+
     async def _publish_job(
         self,
         entry: _AttemptEntry,
@@ -1423,7 +1602,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 )
             )
             public_reference_digest = _public_reference_digest(
-                _public_reference_records(request, resolved)
+                _public_reference_records(request, resolved, self.catalog)
             )
         except (TypeError, ValueError):
             raise NarrativeRequestRejectedError() from None
@@ -1704,6 +1883,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         request: DynamicNarrativeRequest,
         resolved: _ResolvedAttempt,
         job: NarrativeJob,
+        allow_length_recovery: bool = False,
     ) -> ValidatedDynamicNarrativeCandidate:
         try:
             detached = UntrustedDynamicNarrativeCandidate.model_validate_json(
@@ -1713,11 +1893,44 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             self._report_rejection(DynamicNarrativeRejectionDiagnostic.PRE_REVALIDATION)
             raise NarrativeProposalRejectedError() from None
         candidate = detached.candidate
-        if not request.narrative_length.minimum <= len(candidate.narrative_text) <= request.narrative_length.maximum:
-            self._report_rejection(DynamicNarrativeRejectionDiagnostic.PRE_LENGTH)
+        length_band = DynamicNarrativeLengthPolicy.classify(
+            len(candidate.narrative_text), preferred=request.narrative_length
+        )
+        is_replacement = (
+            request.generation_instruction is not DynamicGenerationInstruction.ORDINARY
+        )
+        if length_band is DynamicNarrativeLengthBand.DEGRADED:
+            if allow_length_recovery:
+                raise _RecoverableGenerationError(
+                    DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM
+                )
+            if not is_replacement:
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_BELOW_MINIMUM
+                )
+                raise NarrativeProposalRejectedError()
+        elif length_band is DynamicNarrativeLengthBand.BELOW_ABSOLUTE_FLOOR:
+            if allow_length_recovery:
+                raise _RecoverableGenerationError(
+                    DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM
+                )
+            self._report_rejection(
+                DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_BELOW_MINIMUM
+            )
             raise NarrativeProposalRejectedError()
-        submitted = request.player_action.description
-        if submitted in candidate.suggested_actions:
+        elif length_band is DynamicNarrativeLengthBand.ABOVE_CEILING:
+            if allow_length_recovery:
+                raise _RecoverableGenerationError(
+                    DynamicGenerationInstruction.REPLACE_ABOVE_MAXIMUM
+                )
+            self._report_rejection(
+                DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_ABOVE_MAXIMUM
+            )
+            raise NarrativeProposalRejectedError()
+        if DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE.is_violated(
+            candidate.suggested_actions,
+            submitted_action=request.player_action.description,
+        ):
             self._report_rejection(
                 DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION
             )
@@ -1750,7 +1963,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             )
             public = {
                 record.normalized
-                for record in _public_reference_records(request, resolved)
+                for record in _public_reference_records(request, resolved, self.catalog)
             }
             hidden = tuple(
                 record for record in hidden if record.normalized not in public
@@ -1879,7 +2092,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 except (NarrativeBoundaryError, TypeError, ValueError):
                     raise NarrativeJobStaleError(submission.session_id) from None
                 current_public_digest = _public_reference_digest(
-                    _public_reference_records(current_request, current_resolved)
+                    _public_reference_records(current_request, current_resolved, self.catalog)
                 )
                 if (
                     authority.persisted.session.state_version
@@ -3231,10 +3444,6 @@ def _scenario_hidden_references(
         _hidden_scalar(records, f"{prefix}.rule_id", rule.rule_id)
         _hidden_scalar(records, f"{prefix}.rule_version", rule.rule_version)
         _hidden_tuple(records, f"{prefix}.allowed_phase_ids", rule.allowed_phase_ids)
-        matcher = rule.intent
-        matcher_prefix = f"hidden:{type(matcher).__name__}:{owner}.intent"
-        for name in ("required_any_terms", "required_action_terms", "forbidden_terms"):
-            _hidden_tuple(records, f"{matcher_prefix}.{name}", getattr(matcher, name), human=True)
         _hidden_tuple(records, f"{prefix}.required_visible_npc_definition_ids", rule.required_visible_npc_definition_ids)
         for q, requirement in enumerate(rule.required_fact_values):
             requirement_prefix = f"hidden:{type(requirement).__name__}:{owner}.required_fact_values[{q}]"
@@ -3256,7 +3465,6 @@ def _scenario_hidden_references(
                     _hidden_json(records, f"{fact_prefix}.value", fact_effect.value)
             _hidden_tuple(records, f"{effect_prefix}.opened_location_ids", effect.opened_location_ids)
             _hidden_scalar(records, f"{effect_prefix}.new_location_id", effect.new_location_id)
-            _hidden_tuple(records, f"{effect_prefix}.required_prose_any_terms", effect.required_prose_any_terms, human=True)
             _hidden_tuple(records, f"{effect_prefix}.player_alive_acknowledgement_npc_definition_ids", effect.player_alive_acknowledgement_npc_definition_ids)
             _hidden_scalar(records, f"{effect_prefix}.player_alive_acknowledgement_public_text", effect.player_alive_acknowledgement_public_text, human=True)
             _hidden_scalar(records, f"{effect_prefix}.fixed_public_narrative_text", effect.fixed_public_narrative_text, human=True)
@@ -3290,8 +3498,6 @@ def _scenario_hidden_references(
             _hidden_scalar(records, f"{prefix}.ending_id", ending.ending_id)
             _hidden_scalar(records, f"{prefix}.title", ending.title, human=True)
             _hidden_scalar(records, f"{prefix}.summary", ending.summary, human=True)
-        for index, action in enumerate(public.actions):
-            _hidden_scalar(records, f"hidden:{type(action).__name__}:{owner}.actions[{index}].label", action.label, human=True)
     return records
 
 
@@ -3567,10 +3773,40 @@ def _append_public_json_references(
 
 
 def _public_reference_records(
-    request: DynamicNarrativeRequest, resolved: _ResolvedAttempt
+    request: DynamicNarrativeRequest,
+    resolved: _ResolvedAttempt,
+    catalog: ContentCatalog,
 ) -> tuple[_PublicReferenceRecord, ...]:
     frame_id = resolved.view.narrative_frame.frame_id
     records: list[_PublicReferenceRecord] = []
+    public = resolved.authority.definition.public_client
+    if public is None:
+        raise ValueError("public projection is unavailable")
+    if (
+        _normalize_public_text(public.title, maximum=120)
+        != request.scenario_premise.title
+        or _normalize_public_text(public.hook, maximum=300)
+        != request.scenario_premise.hook
+    ):
+        raise ValueError("public premise provenance does not match the Provider request")
+    premise_owner = (
+        f"scenario-public-projection:{resolved.authority.definition.scenario_id}:"
+        f"{resolved.authority.definition.content_version}"
+    )
+    _append_public_reference(
+        records,
+        frame_id=frame_id,
+        owner_key=premise_owner,
+        field_path="ScenarioDefinition.public_client.title",
+        value=public.title,
+    )
+    _append_public_reference(
+        records,
+        frame_id=frame_id,
+        owner_key=premise_owner,
+        field_path="ScenarioDefinition.public_client.hook",
+        value=public.hook,
+    )
     visible_ids = set(resolved.view.narrative_frame.visible_entities)
     visible_npcs = tuple(
         sorted(
@@ -3605,12 +3841,37 @@ def _public_reference_records(
         )
 
     role_owner = resolved.authority.state.player.character_definition_id
+    role = next(
+        (
+            item
+            for item in public.playable_characters
+            if item.character_definition_id == role_owner
+        ),
+        None,
+    )
+    role_character = catalog.character(role_owner)
+    if role is None or role_character is None:
+        raise ValueError("selected public role cannot be reconstructed")
+    if (
+        _normalize_public_text(role_character.display_name, maximum=120)
+        != request.scenario_role.display_name
+        or _normalize_public_text(role.description, maximum=300)
+        != request.scenario_role.description
+    ):
+        raise ValueError("public role provenance does not match the Provider request")
     _append_public_reference(
         records,
         frame_id=frame_id,
         owner_key=f"scenario-role:{role_owner}",
-        field_path="scenario_role.display_name",
-        value=request.scenario_role.display_name,
+        field_path="CharacterDefinition.display_name",
+        value=role_character.display_name,
+    )
+    _append_public_reference(
+        records,
+        frame_id=frame_id,
+        owner_key=f"scenario-role:{role_owner}",
+        field_path="PublicPlayableCharacter.description",
+        value=role.description,
     )
 
     for index, fact in enumerate(request.canonical_facts):

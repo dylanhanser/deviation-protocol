@@ -34,18 +34,160 @@ change. The separately authorized Manual Fake browser walkthrough completed
 with `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`; Optional Live
 browser evidence remains incomplete and optional.**
 
-### Current sanitized Optional Live diagnostic candidate
+### Current Provider-stability correction status and Optional Live gate
 
-The completed DNVS evidence lifecycle remains closed. Three separately
-authorized Optional Live requests returned proposal rejection without a state
-commit. Their precise historical category is unrecoverable because the stopped
-process retained only the public error. This uncommitted implementation
-candidate adds only a local, fixed-token, sanitized rejection diagnostic for a
-separately authorized future Live request. It changes no narrative rule,
-Prompt behavior, Provider behavior, public error, or evidence status. No
-Provider call was made during implementation or automated verification. Another
-Live request remains separately authorized and pending; this candidate awaits
-independent review.
+The completed DNVS evidence lifecycle remains closed. The first
+new-process/new-browser-Session Optional Live action exposed a genuine
+below-minimum result and emitted
+`DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM` with HTTP 503 and no state change. It established
+only that a structurally parseable proposal's `narrative_text` was shorter than
+the unchanged hard 350..900 Unicode-character range; the rejected text and exact
+length remain intentionally unknown. Validation stopped before
+protected-reference scanning, so that action did not confirm the preceding
+source-taxonomy correction. The resulting five-path uncommitted candidate added
+the buffered 500..700 Unicode-character prompt target and at most one
+length-triggered complete replacement generation. The next
+new-process/new-browser-Session action was submitted once and returned HTTP 503
+`NARRATIVE_PROVIDER_RESPONSE_INVALID` /
+`Narrative processing failed`; it emitted no `DNVS_LIVE_DIAG` token, was not
+repeated, and stopped before length and protected-reference validation. Its raw
+content, parser subtype, schema defect, narrative length/content, and hidden
+references all remain unknown. It proves neither length recovery nor taxonomy
+correction, and manual evidence alone does not prove Provider call count,
+atomicity, or parser subtype.
+
+After response hardening, four actions were submitted across option choices and
+free input, all under the same public Session ID `demo-session-00000001`. Every
+action ended with HTTP 503 and the final
+`DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM` token. Each final structurally parsed
+candidate failed the existing 350-character minimum before protected-reference
+validation. No transition succeeded; switching between option choices and free
+input did not avoid the result; the hard-350 policy was unusable in those
+attempts. Exact lengths, initial failure class, Provider-call count, raw
+content, and hidden references remain unknown. These four actions support no
+parser-failure claim, and manual evidence does not independently prove
+persistence atomicity. The protocol initially authorized one action but four were
+submitted; neutrally, they were not replay and were not four fresh processes.
+
+The later repository-read-only real-Provider diagnostic exercised three fresh
+production-backend actions through Live runtime construction, ASGI character
+creation and Run entry, current View retrieval, the first offered action, the
+production submission path, the real DeepSeek adapter, strict parsing,
+proposal-schema validation, application validation, terminal finalization, and
+replay. Action 1 stopped before any HTTP response because of sandbox-network
+transport failure. Actions 2 and 3 reached DeepSeek, returned HTTP 200, and
+produced strict, schema-valid preferred-band proposals whose `narrative_text`
+lengths were respectively 372 and 379 Unicode characters. Both were rejected
+at `PRE_INTERNAL_MARKER` / `INTERNAL_IDENTIFIER_SHAPE` /
+`internal_id_prefix:fact`, specifically in
+`candidate.proposed_public_facts[0].key`; the matched field was not narrative
+prose. Neither generated key overlapped the protected-reference index, so the
+evidence does not show disclosure of a real protected or authoritative
+identifier. It confirms a prompt/schema/generated-public-key contract mismatch,
+but does not establish the exact cause of any unrecoverable historical Live
+failure. No transition committed during the diagnostic, and the diagnostic
+changed no repository file.
+
+The uncommitted correction preserves Provider-visible authoritative public
+premise title/hook and selected-role description provenance while keeping
+matcher control vocabulary, required-prose vocabulary, and public action labels
+outside the human substring index. `DynamicPromptBuilder` remains the sole
+prompt authority and its stable Provider prompt/response contract now requires
+one complete unwrapped JSON object with the exact proposal schema/types, the
+preferred 350..900 inclusive output contract, and the 500..700 target for
+ordinary and replacement generation. Its user-side response contract uses
+`DynamicGeneratedPublicFactKeyGrammar` as the single authority for the exact
+generated public-fact-key grammar
+`^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$` and its safe synthetic
+example; the system instruction does not contain that grammar or example. The
+stable Provider prompt/response contract never mentions the post-replacement
+120-character fallback. Real DeepSeek proposal-schema validation uses the same
+grammar authority; existing deterministic Fake and persisted public-fact labels
+remain compatible and require no migration. The real dynamic response boundary
+carries only typed sanitized `UNPARSEABLE_RESPONSE` or
+`SCHEMA_INVALID_RESPONSE` control state into orchestration; raw content and
+parser/schema details never cross it. One shared application replacement
+allowance covers only those two first structural outcomes and first
+below-preferred/above-maximum outcomes. A first `narrative_text` below 350,
+including 119, 120, and 349, or above 900 consumes that allowance and cannot
+commit. Only a replacement in the 120..349 degraded band becomes eligible, and
+it traverses the same complete production schema, semantic, internal-marker,
+secret, protected-reference, public-premise, selected-role, player-isolation,
+authority, provenance, stale-state, and transactional pipeline. A replacement
+below the absolute 120 floor ends with the existing HTTP 503 proposal rejection
+and exactly one final below-minimum token. A replacement above 900 ends with the
+final above-maximum token and is never truncated or committed. Preferred
+replacement boundaries 350 and 900 remain normally eligible. A valid first
+result uses one application generation, an eligible first failure uses at most
+two, every other first failure uses one, and a replacement failure never causes
+a third. A degraded success has no public flag or diagnostic token and commits
+one transition exactly as a preferred success. Invalid content and proposals
+are never persisted. The complete candidate scanner remains unchanged over all
+string mapping keys and string leaves; it retains normalized internal-marker,
+internal-ID-shape, 48-or-more hexadecimal secret-shape, and protected-reference
+rejection with no public-fact field exemption. Public errors, Provider settings,
+transport retries, terminal replay, single-commit atomicity, non-Live outputs/composition, and
+Phase 6 remain unchanged. No external Provider call was made during
+implementation or automated verification. The whole seven-path candidate
+remains uncommitted, and post-correction Live success evidence remains zero.
+The earlier generated-public-key correction checkpoint recorded focused pytest
+`37 passed`, the complete affected-module pytest command `490 passed`, and
+`git diff --check` passed; those historical counts overlap and are not a
+unique-test total.
+
+The subsequent Provider-stability schema/contract correction addressed three
+runtime findings:
+
+1. sanitized exception boundaries for JSON decoding, Pydantic validation, and
+   generated-key contract rejection;
+2. standard decoding and strict-field classification of ordinary finite JSON
+   floats; and
+3. one named submitted-action exclusion authority shared by contract rendering,
+   Provider prompt construction, and runtime enforcement.
+
+The original correction task returned
+`DNVS_LIVE_PROVIDER_STABILITY_SCHEMA_CONTRACT_REVIEW_CORRECTIONS_CANDIDATE_COMPLETE`.
+Its first independent focused review confirmed that all three runtime fixes were
+correct and returned
+`DNVS_LIVE_PROVIDER_STABILITY_SCHEMA_CONTRACT_REVIEW_CORRECTIONS_FOCUSED_REVIEW_CHANGES_REQUIRED`
+only because two regression-evidence gaps remained: recursive exception-graph
+coverage for malformed outer Provider response-envelope parsing through
+`DeepSeekNarrativeProvider.generate_dynamic`, and representative ordinary-float
+coverage at `proposed_consequences[0]`, top-level `result`, and nested
+`next_scene.summary`.
+
+The bounded single-file `tests/unit/test_narrative_provider.py` correction
+returned
+`DNVS_LIVE_PROVIDER_STABILITY_SCHEMA_CONTRACT_REVIEW_TEST_GAPS_CORRECTION_CANDIDATE_COMPLETE`
+and closed both gaps. Its final independent focused review returned
+`DNVS_LIVE_PROVIDER_STABILITY_SCHEMA_CONTRACT_REVIEW_TEST_GAPS_CORRECTION_FOCUSED_REVIEW_APPROVED`
+with no blocking finding, no non-blocking finding, and no residual evidence gap
+within the adjudicated correction scope. The correction session recorded
+`4 passed` for the newly added malformed-envelope and positional-float tests,
+`17 passed` for the relevant regression selection, `427 passed` for the complete
+authorized two-file suite, and canonical Offline verification at `2275 passed,
+182 skipped`; compileall, pip check, Alembic heads/history, internal diff, and
+`git diff --check` passed. The final review separately recorded `4 passed` for
+the two new test symbols, `16 passed` for directly relevant preservation, and
+`git diff --check` passed.
+
+The three runtime corrections and both evidence corrections are therefore
+independently approved. They preserve the five deterministic schema families and
+their precedence; maximum one replacement and two application-level generations;
+one non-retried HTTP attempt per generation and zero Provider transport retries;
+one generation for primary success; two generations, one replacement, one
+commit, and revision `+1` for valid recovery; two generations and zero commits
+for invalid replacement; and zero additional generations for replay, follower,
+or terminal duplicate suppression. No third generation or deterministic
+fallback exists. Complete final validation, safety scanning, authority
+revalidation, stale-state checking, provenance, and transactional finalization
+remain mandatory.
+
+This bounded two-document synchronization records that state and is complete as
+a documentation candidate; it must receive one fresh independent focused review
+before any later workflow authorization. Optional Live remains separate,
+incomplete, and unperformed by this task. Neither that Optional Live run nor
+staging, commit, or push is authorized by this candidate.
 
 Approval-and-freeze record:
 
@@ -77,10 +219,19 @@ is exactly 510 submitted turns using an injected deterministic Fake. Its
 separately authorized automated live smoke is exactly 1 real Provider call with
 exactly 0 automatic retries. Its required Manual Fake browser walkthrough is
 exactly 8 submitted dynamic actions with exactly 0 real Provider calls and
-exactly 0 automatic retries. Its Optional Live browser evaluation, if separately
-authorized and performed under exact explicit Live selection, is exactly 8
-submitted dynamic actions and exactly 8 real Provider requests with exactly 0
-automatic retries. These four evidence activities are independent. Every
+exactly 0 automatic retries. Its current post-correction Optional Live gate, only
+if separately and manually authorized after this documentation synchronization
+receives independent approval, uses one new backend process, one new browser
+Session, and one new Run to submit exactly 1 gameplay Action: the first currently
+offered Action through the production action pipeline. It starts no second
+gameplay Action. That Action normally causes 1 application-level Provider
+generation; the existing shared structural/length replacement allowance permits
+at most 1 replacement generation, so the Action permits at most 2
+application-level generations and exactly 0 Provider transport retries. A
+replacement does not authorize another gameplay Action. The earlier plan for an
+exactly 8-Action, 8-request Optional Live evaluation is superseded historical
+wording and is non-operative for the current gate; no automatic sequence of 8
+Actions is permitted. These four evidence activities are independent. Every
 active dynamic turn accepts one genuinely free-form action and shows exactly
 three contextual server-supplied suggestions. Accepted actions may lead to
 materially different consequences and following scenes, and the session is not
@@ -299,9 +450,16 @@ about it.
 
 Although the general settings type permits explicitly configured retries, the
 dynamic Demo must require `DEEPSEEK_MAX_RETRIES=0` and fail closed for any
-other value. One dynamic action therefore causes at most one Provider
-invocation and one HTTP attempt. An uncertain transport outcome is never
-resent automatically.
+other value. One gameplay Action normally causes one application-level Provider
+generation. The existing shared structural/length recovery allowance may cause
+at most one replacement generation, so the Action permits at most two
+application-level Provider generations. Each generation makes at most one
+Provider transport attempt, or HTTP attempt, and neither attempt is retried.
+The Action therefore normally makes one transport attempt and makes at most two
+only when the shared replacement is triggered; transport retries remain exactly
+zero. The replacement is not a transport retry, does not create or authorize
+another gameplay Action, and cannot cause a third generation or third transport
+attempt. An uncertain transport outcome is never resent automatically.
 
 ### 4.3 Provider request, prompt, validation, and job seams
 
@@ -325,8 +483,10 @@ proposal DTO.
 
 `NarrativeJob` in `application/narrative_jobs.py` already persists bounded
 generic JSON for `narrative_request` and `validated_proposal`, binds it to the
-session/action/state fingerprint, limits one Provider invocation, supports a
-fenced lease and CAS status transitions, and exposes accepted text only after
+session/action/state fingerprint, permits one Provider invocation plus at most
+one sanitized full replacement only after a typed unparseable/schema-invalid
+response or directional length rejection under the shared allowance, supports
+a fenced lease and CAS status transitions, and exposes accepted text only after
 `COMMITTED`. No job schema, repository port, ORM model, or migration change is
 needed for a new prompt/proposal schema version.
 
@@ -538,9 +698,11 @@ neutral runtime/Frame and full evidence for both halves.
    action signature, state version/fingerprint, Run binding, safe prompt
    context, committed frame/View identity, optional suggestion identity, and
    dynamic prompt schema.
-7. The orchestrator calls exactly
-   `await self._provider.generate_dynamic(provider_request)` once outside every
-   UoW and lock; live mode performs at most one HTTP attempt.
+7. The orchestrator calls
+   `await self._provider.generate_dynamic(provider_request)` outside every UoW
+   and lock. It normally calls once and may call once more only for the shared
+   application-level complete-replacement allowance; each Live invocation
+   performs at most one HTTP transport attempt.
 8. Only a strictly parsed and semantically validated candidate reaches
    finalize. Finalize reloads and revalidates the Session, snapshot, action,
    request digest, Run/Player Character binding, committed View/frame,
@@ -1135,7 +1297,7 @@ DTO with these fields:
 | `canonical_facts` | 0..12 entries; `key` 1..96 and bounded JSON `value` at most 500 canonical serialized characters | Current committed Frame must-render facts in phase-declared order followed by may-render facts in their separately frozen order, with dynamic entries admitted only by section 6.4's public slot allowlist |
 | `recent_turns` | 0..6 committed narrative fragments, each 1..900 characters | `recent_committed_texts`; newest six only |
 | `player_action` | literal `CUSTOM`, normalized description 1..150 | Current validated submission |
-| `narrative_length` | minimum 350, target 650, maximum 900 for the current scenario | Existing scenario definition |
+| `narrative_length` | requested/preferred minimum 350, target 650, maximum 900 for the current scenario | Existing scenario definition; the post-replacement absolute 120 floor is runtime-only and never enters the request or prompt |
 | `projection_truncated` | strict boolean, default `false` | Server-derived projection result; never model- or client-controlled |
 
 `scenario_premise` is not a new scenario DTO. Request construction consumes
@@ -1201,13 +1363,21 @@ The exact untrusted response payload is:
 
 ```text
 DynamicPublicFactProposal
-  key: normalized semantic public fact identifier, 1..80 characters and
-       matching ^[A-Za-z0-9][A-Za-z0-9_.:-]*$
+  key: compatible internal/persisted semantic public fact label, 1..80
+       characters and matching ^[A-Za-z0-9][A-Za-z0-9_.:-]*$
   value: normalized public statement, 1..300 characters
+
+Real external-Provider generated key contract
+  authority: DynamicGeneratedPublicFactKeyGrammar
+  key: exact, unnormalized ASCII, 14..39 characters, matching
+       ^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$
+  construction: literal public-note- followed by 1..4 lowercase ASCII
+                letter/digit tokens of 2..6 characters, single-hyphen separated
+  synthetic example: public-note-amber-path
 
 DynamicNarrativeCandidatePayload
   schema_version: literal dynamic-narrative-candidate-v1
-  narrative_text: string, structural 1..10,000; semantic current bound 350..900
+  narrative_text: string, structural 1..10,000; first-generation preferred bound 350..900; replacement-only absolute floor 120
   result: SUCCESS | AMBIGUOUS | FAILURE | NO_EFFECT
   proposed_consequences: tuple of 0..3 strings, each 1..120
   proposed_public_facts: tuple of 0..3 DynamicPublicFactProposal values
@@ -1219,23 +1389,48 @@ DynamicNarrativeCandidatePayload
 ```
 
 `result` reuses `NarrativeOutcomeResult`. Every model is strict, frozen, and
-`extra="forbid"`. JSON duplicate members, floats, non-standard numbers,
-unknown fields, missing fields, wrong types, invalid UTF-8/Unicode, NUL,
-control characters, over-limit data, and trailing data reject the whole
-candidate. Strings are NFC-normalized and surrounding/collapsible transport
-whitespace is normalized before comparison. Empty-after-normalization values
-reject. Consequences reject duplicates under NFC, collapsed whitespace, and
+`extra="forbid"`. The response framing admits exactly one complete unwrapped JSON
+object. Malformed JSON, Markdown fences, leading or trailing prose, multiple
+JSON values, duplicate object members, and the nonstandard numeric constants
+`NaN`, `Infinity`, and `-Infinity` are `UNPARSEABLE_RESPONSE`; no response
+salvage, Markdown stripping, permissive parsing, numeric coercion, or
+duplicate-member acceptance occurs. Ordinary finite JSON floats are decoded by
+the standard JSON rules and reach strict candidate validation without coercion.
+A float in an incompatible strict field is `TYPE_OR_LITERAL`, not
+`UNPARSEABLE_RESPONSE`; representative coverage owns
+`proposed_consequences[0]`, top-level `result`, and nested
+`next_scene.summary`. Unknown or missing fields, wrong types, invalid
+UTF-8/Unicode, NUL, control characters, and over-limit data reject the whole
+candidate through their closed schema family. The unchanged deterministic
+precedence is `ROOT_OR_OBJECT_SHAPE`, `REQUIRED_OR_EXTRA_FIELDS`,
+`TYPE_OR_LITERAL`, `BOUNDS_OR_UNIQUENESS`, then
+`GENERATED_PUBLIC_FACT_KEY_CONTRACT`.
+
+Strings are NFC-normalized and surrounding/collapsible transport whitespace is
+normalized before comparison. Empty-after-normalization values reject.
+Consequences reject duplicates under NFC, collapsed whitespace, and
 case-folding. Public fact keys and values receive that same normalization;
 repeated normalized keys within one candidate reject the whole candidate,
 whether their values are equal or different. Suggestions use the exact existing
 action-text normalization and must remain pairwise distinct by case-sensitive
-code-point equality after normalization; each must also differ from the
-normalized just-submitted action. The server never treats a public semantic
-`key` as a `runtime.dynamic_facts` storage key.
+code-point equality after normalization.
+`DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE` is the one
+named authority requiring every suggestion to differ from
+`player_action.description` after NFC normalization and collapsing whitespace
+runs to one ASCII space before stripping. Contract rendering consumes that
+authority, `DynamicPromptBuilder` includes the rendered authoritative rule in
+the Provider prompt, and runtime enforcement consumes the same authority. A
+normalized repeat remains `PRE_REPEAT_SUBMITTED_ACTION`: terminal,
+nonrecoverable, sanitized, pre-commit, and ineligible for replacement. It uses
+one application-level generation, constructs no replacement prompt, and commits
+no state change. The server never treats a public semantic `key` as a
+`runtime.dynamic_facts` storage key.
 
 Semantic validation also requires:
 
-- prose length within the request's 350..900 range;
+- first-generation prose within the request's preferred 350..900 range, or
+  replacement prose within 120..900 after the shared allowance was consumed;
+  replacement-only 120..349 is degraded eligibility, not relaxed validation;
 - preservation of every must-render/fixed fact and no protected internal or
   secret-like marker;
 - no unprovided public/internal identifier, receipt, authority, persistence,
@@ -1254,6 +1449,17 @@ version, event, or fact. No partial candidate field is accepted.
 Provider metadata and usage reuse the existing server-produced
 `NarrativeProviderMetadata` and `NarrativeUsage`. The candidate cannot supply
 or override model, endpoint, request ID, latency, attempt count, or usage.
+
+The broader internal/persisted key shape remains frozen for deterministic Fake
+compatibility, existing validated-job replay, and the fact-ring consumer; it is
+not the external-Provider generation contract. At the real DeepSeek boundary,
+the decoded raw `proposed_public_facts[*].key` is checked against
+`DynamicGeneratedPublicFactKeyGrammar` before normalized model construction.
+Blank, padded, malformed, authority-shaped, control-marker-shaped, and
+48-or-more hexadecimal candidates therefore enter the existing sanitized
+`SCHEMA_INVALID_RESPONSE` replacement path. A direct typed/test seam remains
+subject to the unchanged complete-candidate scan, so the compatible internal
+shape creates no scanner bypass and requires no persisted-data migration.
 
 The owning application port and its return envelope are exact and live in the
 already budgeted new `application/dynamic_narrative_models.py` path:
@@ -1288,10 +1494,22 @@ The method may raise only the existing sanitized Provider families
 `NarrativeProviderUnavailableError`, `NarrativeProviderResponseError`, and
 `NarrativeProviderTruncatedError` for Provider/transport/envelope/parser
 failures. It propagates `asyncio.CancelledError` unchanged and never converts it
-to a Provider family; no retry, second call, fallback, partial return, or raw
-exception escapes the dynamic boundary. Candidate semantic rejection occurs
-after return and uses the already frozen `NarrativeProposalRejectedError`/
-`NARRATIVE_PROPOSAL_REJECTED` path, not a second port call.
+to a Provider family; no transport retry, fallback, partial return, or raw
+exception escapes the dynamic boundary. The application may make one separate
+complete-replacement invocation for an initial typed structural or length
+failure under the shared allowance. Candidate semantic rejection after return
+uses the already frozen `NarrativeProposalRejectedError`/
+`NARRATIVE_PROPOSAL_REJECTED` path and never creates another allowance.
+
+Raw JSON-decoder, Pydantic, and generated-key contract exceptions are reduced
+to closed state inside their respective handlers; the exported sanitized error
+is raised only after control has left the raw handler. Exported sanitized
+exception graphs retain neither raw `__context__` nor raw `__cause__`, and
+recursive traversal cannot reach a raw parser, validation, or contract
+exception. Rejected response fragments, field paths, values, identifiers,
+references, and secrets are not retained on the exported error surface. Direct
+recursive regression coverage now includes malformed outer Provider
+response-envelope parsing through `DeepSeekNarrativeProvider.generate_dynamic`.
 
 The private composition Fake in `api/demo_composition.py` implements exactly
 `generate_dynamic()` and `aclose()`: it deterministically returns the complete
@@ -1308,9 +1526,11 @@ and strict `DynamicNarrativeCandidatePayload` parsing; with the required
 
 The sole call site is `DynamicNarrativeOrchestrator.handle()` in the already
 budgeted new orchestrator path: after durable claim and after every UoW/lock is
-closed, it executes exactly `await
-self._provider.generate_dynamic(provider_request)`, then validates and finalizes
-the returned wrapper. The orchestrator holds the borrowed operational reference;
+closed, it executes `await
+self._provider.generate_dynamic(provider_request)`, optionally repeats that
+same call once with a typed complete-replacement instruction under the shared
+allowance, then validates and finalizes the returned wrapper. The orchestrator
+holds the borrowed operational reference;
 the process-lifetime `DemoRuntime` owns a composition-created Fake or Live
 Provider and calls its `aclose()` during wrapper-lifespan shutdown. An injected
 Provider remains caller-owned unless the existing planned explicit test-only
@@ -1354,8 +1574,13 @@ complete value. A record is admitted only from this finite whitelist:
 1. `PlayerVisibleStateProjection.visible_npcs[*].display_name` for each NPC in
    the exact current Frame/projection visibility intersection, in the canonical
    `(npc_definition_id,npc_id)` order;
-2. the current `PublicPlayableCharacter.display_name` scenario-role field; and
-3. for each exact current `DynamicNarrativeRequest.canonical_facts[*]` entry in
+2. `ScenarioDefinition.public_client.title` and `.hook`, each revalidated
+   against the complete normalized `request.scenario_premise` field;
+3. the selected `CharacterDefinition.display_name` and
+   `PublicPlayableCharacter.description`, each reconstructed from the selected
+   authoritative public role and revalidated against `request.scenario_role`;
+   and
+4. for each exact current `DynamicNarrativeRequest.canonical_facts[*]` entry in
    request order, its complete semantic `key`, followed by every recursively
    contained string object key and string leaf of its already public `value` in
    canonical JSON object-key order and array order. Dynamic entries can reach
@@ -1368,11 +1593,11 @@ complete display-name value, not an unprojected alias. If the owning object,
 field path, current public classification, or Frame/View binding cannot be
 reconstructed, no record is created and the build fails closed.
 
-`public_client.title`, `public_client.hook`, presentation title, scene title or
-summary, ending prose, scenario-role description, recent committed narrative,
-prior suggestion or consequence text, player action text, and every other free-
-prose field grant no reference authority even when their whole value happens to
-equal a hidden reference. Operational dynamic slots never grant authority.
+Presentation title, scene title or summary, ending prose, recent committed
+narrative, prior suggestion or consequence text, player action text, and every
+other free-prose field grant no reference authority even when their whole value
+happens to equal a hidden reference. Operational dynamic slots never grant
+authority.
 Session, Run, Player Character, scenario/content, phase, location, NPC, clue,
 event, decision, job, request, receipt, rule, version, fingerprint, and lease
 identifiers never become public-reference authority merely because some wire
@@ -1460,7 +1685,7 @@ concrete fields are read:
 | `SuggestedActionDefinition` | In exact declaration order: scalar `action_id`; scalar `action_type`; human-text scalar `label_hint`; ordered `target_ids`; ordered `required_any_profession_tags`; optional scalar `server_event_type`; ordered `mutable_fact_updates`, reading each `NarrativeFactEffect.fact_id` followed by **JSON keys and string leaves** of `value`; ordered `opened_location_ids`; optional scalar `new_location_id`; optional human-text scalar `server_narrative_text`. |
 | `CustomActionConstraints` | Ordered `allowed_action_types` only. Numeric `max_description_length` and boolean `must_target_visible_entity` are excluded. |
 | `EndingRuleDefinition` | In exact declaration order: scalar `ending_id`; exclude protocol literal `status`; then ordered `conditions` by the exhaustive concrete-condition table; exclude numeric `priority`. |
-| `PublicClientScenarioDefinition` and contained public definitions | Skip current free-prose `title` and `hook`; traverse ordered `playable_characters`, reading only each `PublicPlayableCharacterDefinition.character_definition_id` and excluding its current request-safe `description`; read scalar `default_character_definition_id`; traverse ordered `scenes`, reading each `PublicScenePresentationDefinition.phase_id`, human-text `title`, and human-text `summary`; traverse ordered `endings`, reading each `PublicEndingPresentationDefinition.ending_id`, human-text `title`, and human-text `summary`; traverse ordered `actions`, reading each `PublicActionPresentationDefinition.label` and excluding its `action_type` protocol literal. Current title/hook/role description/current presentation remains non-authorizing free prose, but a value independently present in one of the enumerated future/hidden fields remains protected. |
+| `PublicClientScenarioDefinition` and contained public definitions | Skip current public `title`, `hook`, each selected-role `description`, and every `actions[*].label`: these are either exact structured-public provenance (the first three) or non-secret UI vocabulary (the label). Traverse ordered `playable_characters`, reading only each `PublicPlayableCharacterDefinition.character_definition_id`; read scalar `default_character_definition_id`; traverse ordered `scenes`, reading each `PublicScenePresentationDefinition.phase_id`, human-text `title`, and human-text `summary`; traverse ordered `endings`, reading each `PublicEndingPresentationDefinition.ending_id`, human-text `title`, and human-text `summary`; exclude each `actions[*].action_type` protocol literal. A value independently present in an enumerated future/hidden field remains protected. |
 | `MemoryRuleDefinition` | In declaration order: required scalars `rule_id`, then `rule_version`; exclude protocol enums `source_event_type` and `operation`; ordered `required_narrative_outcome_rule_ids`; ordered `required_scenario_event_types`; exclude ordered protocol enums `required_outcome_results` and boolean `requires_scenario_completed`; optional scalar `npc_definition_id`; optional scalar enum value `npc_milestone.value`; optional scalar `public_fact_id`; ordered `allowed_ending_ids`; optional scalar enum value `significant_experience_category.value`; optional human-text scalar enum value `significant_experience_summary.value`; exclude boolean `important_experience`. |
 | `ContentCatalog` | After exact `content_version` equality is proved, read scalar `content_version`, then traverse all and only the six current definition collections in this fixed declaration order: `characters`, `npcs`, `items`, `equipment`, `skills`, `effects`. Each collection is traversed in stored tuple order with no content-dependent subset filtering and no cross-collection sort. Fields are exactly the finite catalog table below. Numeric `schema_version` and every field excluded there are not scanned. |
 | Restored runtime and current authority records | Traverse no aggregate generically. Use only the per-type/per-field classification tables below for `GameSession`, `GameState`/runtime NPC identity, `CanonicalRun` and its exact nested participation/provenance/active-binding types, `NarrativeJob`, `ScenarioRuntimeState` and its three exact nested evidence/clock types, and the directly used public projection types. `dynamic_facts` is classified by literal slot in section 6.4 and never recursively collected. |
@@ -1504,12 +1729,10 @@ declaring type and appends the exact field/member/JSON location:
 1. From `NarrativeOutcomeRuleDefinition`: `rule_id`, `rule_version`, each
    `allowed_phase_ids` string in tuple order. The first two are required scalars;
    `allowed_phase_ids` is an ordered collection.
-2. From its required scalar `intent` object's `NarrativeIntentMatcher`, preserve
-   the type's declaration order: exclude ordered `action_types` because its
-   values are generic `ActionType` protocol literals; extract ordered
-   `required_any_terms`, then ordered `required_action_terms`, then ordered
-   `forbidden_terms`; exclude boolean `requires_target`. Empty term tuples
-   contribute no records under the common rule.
+2. From its required scalar `intent` object's `NarrativeIntentMatcher`, exclude
+   `action_types`, `required_any_terms`, `required_action_terms`,
+   `forbidden_terms`, and `requires_target`: the three term families are
+   non-secret routing/control vocabulary and contribute no hidden records.
 3. Back on `NarrativeOutcomeRuleDefinition`: each
    ordered `required_visible_npc_definition_ids` string; then each ordered
    `required_fact_values` record in tuple order, reading
@@ -1525,8 +1748,8 @@ declaring type and appends the exact field/member/JSON location:
    and string leaves** of `value`; every ordered `mutable_fact_updates` record's
    `fact_id` then **JSON keys and string leaves** of `value`; ordered
    `opened_location_ids`; optional scalar `new_location_id`; exclude booleans
-   `resolves_current_decision` and `expose_in_frame`; extract ordered human-text
-   `required_prose_any_terms`; ordered
+   `resolves_current_decision` and `expose_in_frame`; exclude ordered human-text
+   `required_prose_any_terms` as non-secret control vocabulary; ordered
    `player_alive_acknowledgement_npc_definition_ids`; optional human-text scalar
    `player_alive_acknowledgement_public_text`; optional human-text scalar
    `fixed_public_narrative_text`; and ordered human-text
@@ -1901,7 +2124,8 @@ state, or persistence commands.
 ## 7. Prompt and context strategy
 
 `DynamicPromptBuilder` is a single versioned builder for this experiment, not
-a general prompt framework. It emits byte-stable system and user messages.
+a general prompt framework. It emits byte-stable system and user messages that
+together form the stable Provider prompt/response contract.
 
 The stable system instruction states:
 
@@ -1919,13 +2143,37 @@ The stable system instruction states:
    persistence/identity commands; and
 9. return only the exact JSON schema.
 
+The system instruction does not contain the generated public-fact-key grammar
+or its safe example.
+
 The user message contains the exact canonical request JSON from section 6.1:
 public title/hook premise, Provider-safe character and role projection, current
 scene, current public NPC labels, canonical fact window, newest six committed
 narrative fragments, current player action, length targets, and the always-
 present server-derived `projection_truncated` boolean, followed by the strict
-response schema. It contains no authoritative scenario summary, 500-character
-hook, hidden-reference set, response example, or reference fiction.
+response schema and user-side response contract. It includes the rendered
+`DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE`; prompt and
+runtime therefore consume the same named relational authority. The response
+contract is
+constructed from the single `DynamicGeneratedPublicFactKeyGrammar` authority
+and places the exact
+`^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$` grammar and the plainly
+synthetic `public-note-amber-path` example in the user message. Proposal-schema
+validation uses the same authority. The user message contains no authoritative
+scenario summary, 500-character hook, hidden-reference set, internal-ID-shaped
+example, detector-prefix inventory, secret-shaped example, 120-character
+fallback, or reference fiction.
+
+The generated key's literal `public-note-` prefix makes its public,
+non-authoritative representation explicit. The grammar contains no period, so
+no member can have the detector's `<internal-prefix>.<value>` shape. Its only
+variable pieces are 2..6 lowercase ASCII letter/digit tokens separated by
+hyphens; every normalized all-alphanumeric internal marker is longer than one
+token, and markers containing spaces or underscores cannot occur. No
+contiguous hexadecimal run can exceed six characters, so the 48-or-more
+hexadecimal secret shape is impossible. The 14..39 bound follows directly from
+one to four tokens. These are positive grammar properties; the prompt exposes
+none of the detector's internal prefix inventory.
 
 The dynamic request is at most 16,000 characters/32,000 UTF-8 bytes. System
 text is at most 12,000 characters. The combined messages retain the existing
@@ -1944,8 +2192,10 @@ latest committed Session/View + exact bound Run/Player Character
   -> atomic ledger decision: sole OWNER or same-entry FOLLOWER within 512 ceiling
   -> OWNER validates action and freezes bounded public context/bindings
   -> OWNER commits one PREPARED job and publishes its discoverable identity
-  -> OWNER awaits DynamicNarrativeProvider.generate_dynamic(provider_request) once with no UoW/lock
-  -> strict candidate parse and semantic validation
+  -> OWNER awaits DynamicNarrativeProvider.generate_dynamic(provider_request) with no UoW/lock
+  -> raw generated-key grammar plus strict candidate schema validation
+  -> optional one complete replacement under the shared application allowance
+  -> complete safety, protected-reference, semantic and authority validation
   -> validated proposal stored under fenced job lease
   -> Session/job re-locked and every binding recomputed
   -> independent dynamic transition policy builds detached candidate state
@@ -2421,8 +2671,12 @@ ledger probes must directly prove all of the following:
 1. both callers carry the same complete attempt identity and fingerprint;
 2. exactly one permanent reservation, one in-flight entry, and one owner token
    exist, and the second caller is `FOLLOWER` with the same completion future;
-3. exactly one narrative job is created and no more than one Provider invocation
-   occurs;
+3. exactly one narrative job is created and normally one Provider invocation
+occurs; only an initial typed unparseable/schema-invalid response, below-
+preferred result, or above-maximum result may make one sanitized full-
+replacement invocation under the one shared application allowance, never a
+third; replacement-only 120..349 success still uses this same job and complete
+validation/finalization path;
 4. both callers reconcile to the one authoritative outcome, or to the exact
    same frozen sanitized `TERMINAL_NO_JOB` or `TERMINAL_UNCERTAIN` outcome;
 5. the follower never takes over, prepares, creates, calls, or finalizes;
@@ -2729,7 +2983,7 @@ The final selection truth table is:
 | Exact explicit Live with missing/invalid dynamic configuration | Sanitized startup failure; no fallback and no key/config value printed |
 | Provider auth/balance/request/rate/response/truncation failure | Existing stable 503 narrative envelope; safe terminal job; exact last committed independently constructed dynamic View unchanged; no deterministic fallback |
 | Timeout/connection interruption after request may have started | `OUTCOME_UNKNOWN`, `DO_NOT_RETRY`, zero automatic resend; exact last committed dynamic View unchanged; no deterministic fallback |
-| Concurrent exact duplicate | The first caller is the sole owner; every duplicate is a shield-waiting follower of the same ledger entry; one reservation/job/Provider call maximum and section 8.1.2 exact reconciliation only |
+| Concurrent exact duplicate | Exact duplicates share one reservation and one job. The first caller is the sole owner; every later duplicate is a shield-waiting follower of the same ledger entry and creates no additional reservation, job, or owner. Followers add zero application-level Provider generations and zero transport attempts. The owner normally performs one application-level Provider generation and retains the same shared allowance for at most one replacement generation, so the owner performs at most two application-level Provider generations and at most two non-retried transport attempts. No follower receives a separate replacement allowance, and exact-duplicate handling cannot cause a third generation. The terminal outcome is shared or replayed through section 8.1.2 exact reconciliation only. |
 | Controlled owner failure before publication commit begins, or after an attempted commit when fresh-UoW reconciliation proves absence | Owner signals `TERMINAL_NO_JOB`, retains the reservation and maps the follower to the exact 503 `NARRATIVE_REQUEST_REJECTED` envelope; no job, Provider call, takeover, or indefinite wait |
 | Job-publication commit cancellation/exception | Run the retained fresh-UoW marker algorithm: proven job becomes `JOB_PUBLISHED`, proven absence becomes `TERMINAL_NO_JOB`, and unknowable/mismatched state becomes `TERMINAL_UNCERTAIN`; cancellation receipt alone never proves no job |
 | Proven pre-finalize/pre-commit cancellation | Only fresh-UoW `COMPLETE_OLD` proof permits zero story publication and the old View; settle the durable job, signal `TERMINAL_AUTHORITATIVE`, then re-raise owner cancellation |
@@ -2805,8 +3059,9 @@ stable errors, Player Character/Run validators, `InputContractPolicy`,
 `StoryMutationValidator`, canonical JSON/prompt bounds, and internal-marker
 validation patterns.
 
-Tests: strict positive/negative schema vectors; duplicate/unknown/float/size/
-Unicode rejection; the exact three initial literal template vectors including
+Tests: strict positive/negative schema vectors; duplicate/unknown/ordinary-float
+strict-field/size/Unicode rejection; nonstandard-number framing rejection; the
+exact three initial literal template vectors including
 the stable selected-visible-NPC and genuinely-no-visible-NPC branches plus
 invalid/absent/over-bound selected-name failure; exactly three unique normalized
 suggestions; exact server-derived suggestion ID/ordinal/complete payload vectors
@@ -2888,9 +3143,9 @@ DTOs, Run participation/current record reads, `PlayerCharacterSelfProjection`,
 and sanitized API behavior.
 
 Production behavior: CUSTOM-only validation; no StoryDirector sequencing;
-director-free Run entry; exact one
-`DynamicNarrativeProvider.generate_dynamic(provider_request)` await outside
-UoW/locks; exact rebind; 512-attempt
+director-free Run entry; normally one and at most two
+`DynamicNarrativeProvider.generate_dynamic(provider_request)` awaits outside
+UoW/locks under the single shared complete-replacement allowance; exact rebind; 512-attempt
 ledger with the exact sole-owner/shared-follower lifecycle; ring-fact/scene/
 suggestion commit; exactly three server-identity public suggestions; free-CUSTOM
 label selected from the unique scenario public action and bound into canonical
@@ -3036,7 +3291,8 @@ line endings/UTF-8, and documentation consistency. Automated Offline longevity,
 automated live smoke, Manual Fake browser walkthrough, and Optional Live browser
 evaluation remain four separate evidence boundaries; this plan authorizes none
 of their execution, and both live activities require separate explicit user
-authorization.
+authorization. Optional Live is additionally prohibited until an independent
+read-only review approves this Provider-stability documentation synchronization.
 The required implementation report records the exact application mode and
 Provider selector used for each activity, confirms credentials and fallback
 never selected Live, distinguishes automated Offline longevity, automated live
@@ -3060,9 +3316,13 @@ transaction/concurrency/atomicity results; exactly 510 submitted
 Offline turns; exactly 1 automated live-smoke real
 Provider call with exactly 0 automatic retries; exactly 8 Manual Fake browser
 actions with exactly 0 real Provider calls and exactly 0 automatic retries; and,
-if authorized and performed, exactly 8 Optional Live browser actions and exactly
-8 real Provider requests with exactly 0 automatic retries. It does not conflate
-any of these counts with the 512 runtime capacity.
+for the current post-correction Optional Live gate if independently reviewed and
+then separately manually authorized, exactly 1 gameplay Action, normally 1 and
+at most 2 application-level Provider generations under the existing shared
+replacement allowance, and exactly 0 Provider transport retries. The report
+must confirm that no second gameplay Action starts and that replacement does not
+authorize one. It does not conflate any of these counts with each other or with
+the 512 runtime capacity.
 
 Prohibited adjacent work: frozen Phase 8 plans, final-experience authority,
 guardrail edits without a confirmed reusable defect, implementation expansion,
@@ -3163,12 +3423,16 @@ The exact test ownership and authoritative outcomes are:
 | Evidence item | Owning existing declared test path | Required authoritative outcome |
 | --- | --- | --- |
 | Every strict request/candidate field, bound, canonical byte vector and rejection | `tests/unit/test_dynamic_narrative.py` | Valid detached DTO or whole-candidate rejection; no partial salvage |
+| Sanitized dynamic Provider exception boundaries, including malformed outer response-envelope parsing | `tests/unit/test_narrative_provider.py` | JSON-decoder, Pydantic, generated-key contract, and outer-envelope failures export only closed sanitized errors after their raw handlers; recursive `__context__`/`__cause__` traversal reaches no raw exception or rejected fragment/path/value/identifier/reference/secret |
+| Ordinary finite JSON floats and invalid/nonstandard framing | `tests/unit/test_narrative_provider.py` | Ordinary `1.5` at `proposed_consequences[0]`, top-level `result`, or nested `next_scene.summary` reaches strict validation unchanged and rejects as `TYPE_OR_LITERAL`, never `UNPARSEABLE_RESPONSE`; malformed/framed/prose/multiple/duplicate/`NaN`/`Infinity`/`-Infinity` inputs remain `UNPARSEABLE_RESPONSE` with no salvage or coercion |
+| Submitted-action exclusion contract, prompt, and runtime | `tests/unit/test_dynamic_narrative.py` and `tests/unit/test_narrative_provider.py` | `DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE` is the sole rendered and enforced NFC/whitespace-normalized authority; a repeat is terminal sanitized `PRE_REPEAT_SUBMITTED_ACTION` after one generation, with no replacement prompt or state commit |
+| Short-narrative policy boundaries, shared replacement budget, validation, final diagnostics, atomicity and replay | `tests/unit/test_dynamic_narrative.py` | First 119/120/349 replace, first 350/900 commit once, first 901 replaces; replacement 119 fails below, 120/349 is degraded-eligible only through the complete pipeline, 350/900 is preferred-eligible, and 901 fails above; degraded success has two calls, one action/job/commit, no token or public flag, only replacement persistence, full authority/provenance revalidation, and inert replay; every exhausted or semantic/safety failure has no third call or state commit and only its final existing public error/diagnostic |
 | All 23 `NarrativeFrame` fields, empty/omission rules, stable ordering, initial/later/reconstruction values and exact frame-ID vectors, including synthetic phase declaration `fact.zeta,fact.alpha` | `tests/unit/test_dynamic_narrative.py` | Byte-identical direct neutral Frame from identical committed authority; must facts serialize/digest/project as zeta then alpha without lexical sorting; duplicate/missing/invalid required facts fail closed |
 | Last-committed-View reconstruction after each non-commit outcome | `tests/unit/test_dynamic_narrative.py` | Exact prior Frame ID, presentation, prose, facts and suggestions; no deterministic fallback |
 | Finite non-outcome hidden extraction: `ScenePhaseDefinition.entry_conditions`, `DecisionWindowDefinition.conditions`, every concrete condition branch, and all six exact `ContentCatalog` collections/types/fields | `tests/unit/test_dynamic_narrative.py` | Declaration/tuple/JSON order, exact owner/source key, scalar/optional/collection/None/empty handling, key-and-value scanning, complete-value comparison and duplicate provenance match section 6.3.2; every excluded field stays excluded; maintenance literals fail closed on a future field; no reflection/generic traversal/subset selection |
-| Field-exact outcome-rule hidden extraction and provenance: matcher `required_any_terms`, `required_action_terms`, `forbidden_terms`; effect `required_prose_any_terms`, `forbidden_prose_terms`, `player_alive_acknowledgement_public_text`, `fixed_public_narrative_text`; rule `safe_description` | `tests/unit/test_dynamic_narrative.py` | Every field/tuple/rule/effect ordinal is extracted in section 6.3 order with source identity and duplicate provenance; an exact protected value in a candidate key or value without eligible structured provenance wholly rejects with no state change |
+| Field-exact outcome-rule hidden extraction and provenance | `tests/unit/test_dynamic_narrative.py` | `NarrativeIntentMatcher.required_any_terms`, `.required_action_terms`, `.forbidden_terms`, `NarrativeOutcomeEffectTemplate.required_prose_any_terms`, and `PublicClientScenarioDefinition.actions[*].label` are absent as non-secret control/UI vocabulary; `forbidden_prose_terms`, `player_alive_acknowledgement_public_text`, `fixed_public_narrative_text`, and rule `safe_description` retain exact source identity and duplicate provenance. An exact remaining protected value in a candidate key or value without eligible structured provenance wholly rejects with no state change. |
 | Per-type/per-field `GameSession`, `GameState`/`PlayerState`/`NpcState`, `CanonicalRun`/provenance/participation/active-binding/reference, `NarrativeJob`, `ScenarioRuntimeState`/clock/evidence, public-projection, and dynamic-request classification | `tests/unit/test_dynamic_narrative.py` | Every current field has exactly one `PUBLIC`/`HIDDEN`/`STORAGE`/`IRRELEVANT` role; only named complete public values authorize, each hidden field independently forbids, nested hidden containers scan only named fields, operational/prior/model storage never authorizes or independently forbids, and structurally irrelevant fields are never compared |
-| General provenance rules: `May`, alias in ordinary word, case-fold, NFKC punctuation, incidental title/hook substring, whole free-prose equality, exact structured public projection, structured public value versus a different hidden value, harmless unlisted text, hidden object key and hidden value | `tests/unit/test_dynamic_narrative.py` | Only exact complete equality with an eligible current structured-public record can authorize that same hidden value; incidental and different values reject, harmless values pass, and key-and-value scanning remains intact |
+| General provenance rules: `May`, alias in ordinary word, case-fold, NFKC punctuation, exact authoritative premise title/hook and selected-role display/description, untrusted player-action equality, exact structured public projection, structured public value versus a different hidden value, harmless unlisted text, hidden object key and hidden value | `tests/unit/test_dynamic_narrative.py` | Only exact complete equality with an eligible current structured-public record can authorize that same hidden value; request values are revalidated against their authoritative public owner; player free text never authorizes; incidental and different values reject, harmless values pass, and key-and-value scanning remains intact |
 | Slot-exact public/hidden/operational classification across every `dynamic.narrative.*` slot and prior accepted prose/presentation | `tests/unit/test_dynamic_narrative.py` | No generic `dynamic_facts` recursion; public fact wrapper semantics alone produce eligible authority; storage alone produces no hidden value; operational/prior-public/model-authored text grants no disclosure and is not falsely forbidden |
 | Repeated result/continuation and prior-text multi-turn vectors | `tests/unit/test_dynamic_narrative.py` | Consecutive `SUCCESS`, `AMBIGUOUS`, `FAILURE`, `NO_EFFECT`, `CONTINUE` and advisory `TERMINAL`, plus prior permitted scene/suggestion/consequence/prose, pass without storage-induced rejection; any value independently matching an enumerated hidden source still rejects; no operational literal authorizes another hidden value |
 | Initial suggestion templates with zero, one and multiple eligible visible NPCs plus invalid/absent/over-bound selected display names | `tests/unit/test_dynamic_narrative.py` | Exact three English strings, punctuation/capitalization/whitespace and nested CUSTOM text from section 5.2; stable `(npc_definition_id,npc_id)` selection; genuinely empty source uses investigate branch; invalid selected name fails the complete View without fallback |
@@ -3619,14 +3883,34 @@ Provider acceptance requirement.
 
 ### 14.6 Separately authorized optional real-Provider browser evaluation
 
-Only when the user separately elects and explicitly authorizes this optional
-activity, launch the dynamic Demo with the real Provider, existing secret
-configuration, and `DEEPSEEK_MAX_RETRIES=0`. If performed, submit exactly 8
-valid dynamic actions; each action initiates exactly 1 real Provider request, for
-exactly 8 real Provider requests total and exactly 0 automatic retries. This
-bounded, manual browser-based, secret-safe activity may incur corresponding
-cost; uncertain outcomes are not replayed, and no deliberate real-network
-interruption is part of it.
+The current post-correction gate is prohibited until this Provider-stability
+documentation synchronization receives one independent read-only review and
+approval. Only after that approval may the user separately and manually
+authorize this optional activity. That separate authorization launches the
+dynamic Demo with the real
+Provider, existing secret configuration, and `DEEPSEEK_MAX_RETRIES=0` in one new
+backend process, then creates one new browser Session and one new Run. Retrieve
+the current View and submit exactly 1 gameplay Action through the production
+action pipeline by selecting the first currently offered Action, matching the
+intended production-backend evidence. Stop after that Action's terminal result;
+start no second gameplay Action.
+
+The single gameplay Action normally causes 1 application-level Provider
+generation. The existing shared structural/length replacement allowance may
+cause at most 1 complete replacement generation, so the application-level cost
+boundary for the Action is 1 initial generation plus at most 1 replacement
+generation, with a maximum of 2 application-level generations. Provider
+transport retries remain exactly 0. Triggering a replacement neither creates
+nor authorizes another gameplay Action, and the one-Action gate is not an
+unconditional one-Provider-request ceiling. No automatic sequence of 8 Actions
+is permitted. This bounded, manual browser-based, secret-safe activity may incur
+corresponding cost; uncertain outcomes are not replayed, and no deliberate
+real-network interruption is part of it.
+
+The earlier Optional Live plan described exactly 8 submitted gameplay Actions
+and exactly 8 real Provider requests. That evaluation was never completed and
+is now superseded historical, non-operative wording. It cannot authorize the
+next run or any Action beyond the single current post-correction Action.
 
 The launch command must contain the exact explicit Live selector:
 
@@ -3638,14 +3922,16 @@ The key's presence, omission of `-DynamicProvider`, application mode, settings
 defaults, fake-construction failure, or any other fallback path can never select
 Live.
 
-This optional evaluation is distinct from the automated live smoke with exactly
-1 real Provider call and exactly 0 automatic retries, and from the Manual Fake
+This current optional evaluation is distinct from the automated live smoke with
+exactly 1 real Provider call and exactly 0 automatic retries, and from the Manual Fake
 browser walkthrough. It is not run by implementation,
-Offline/Full verification, ordinary acceptance, or this plan-correction task;
+Offline/Full verification, ordinary acceptance, or this documentation-
+synchronization task;
 it is not a prerequisite for implementation review, acceptance, phase status,
 or use of deterministic mode. Its authorization does not add quota, billing,
 retry, telemetry, or production-distribution scope. Evidence remains
-secret-safe and limited to bounded counts and paraphrases.
+secret-safe and limited to bounded counts and paraphrases. Its authorization is
+also separate from staging, commit, and push authorization.
 
 ### 14.7 Normative evidence separation
 
@@ -3656,12 +3942,15 @@ Every report must keep these four activities in separate rows:
 | Automated Offline longevity | Exactly 510 submitted turns; exactly 510 injected deterministic Fake invocations; active state version 510; exactly 20 story slots | **Complete; preserved by this correction** | Automated, network-free, non-browser, non-manual, secret-free and unpaid; never browser evidence |
 | Automated live smoke | Exactly 1 smoke execution, 1 real Provider invocation, 1 Provider HTTP request, 0 retries; strict schema validation passed | **Complete; preserved by this correction** | Separately and explicitly authorized; automated, non-browser, not part of Offline or either browser activity |
 | Manual Fake browser walkthrough | Exactly 8 submitted dynamic actions; exactly 8 Fake invocations; explicit Fake; exactly 0 real Provider constructions/invocations; exactly 0 external Provider HTTP requests; exactly 0 automatic or manual retries | **Complete; `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`** | Manual browser evidence only; separate from automated Offline; used the one canonical matrix and no ninth submission |
-| Optional Live browser evaluation | If separately authorized and performed, exactly 8 submitted dynamic actions and exactly 8 real Provider requests; exactly 0 automatic retries | **Incomplete and optional** | Manual browser evidence; exact explicit Live selection; separate from automated live smoke and automated Offline; optional and potentially paid |
+| Current post-correction Optional Live browser evaluation | After independent approval of this Provider-stability documentation synchronization and separate manual authorization: exactly 1 gameplay Action; normally 1 application-level Provider generation; at most 2 application-level generations if the existing shared allowance triggers 1 replacement; exactly 0 Provider transport retries; no second gameplay Action | **Incomplete and optional; prohibited pending the independent documentation review and later separate authorization** | One new process, new Session, and new Run; first currently offered Action through the production action pipeline; no automatic 8-Action sequence; separate from automated live smoke, automated Offline, staging, commit, and push; optional and potentially paid |
 
-Only the automated Offline row owns the exact 510-turn claim. Both browser rows
-use the fixed exact count of 8 submitted dynamic actions; no approximate, ranged,
-or variable browser evidence count is permitted. Separately, the process-local
-runtime enforces 512 total distinct reserved attempts per Session. That safety
+Only the automated Offline row owns the exact 510-turn claim. The completed
+Manual Fake browser row owns its exact historical count of 8 submitted dynamic
+actions. The current post-correction Optional Live row owns exactly 1 gameplay
+Action, normally 1 and at most 2 application-level Provider generations, and
+exactly 0 Provider transport retries. The superseded 8-Action Optional Live plan
+is historical and non-operative. Separately, the process-local runtime enforces
+512 total distinct reserved attempts per Session. That safety
 ceiling is not an evidence activity, browser count, Provider-call count, or
 Offline longevity count. The two capacity units above the 510-turn Offline run
 are not evidence and contribute no residual-capacity claim to any evidence row.
@@ -3671,11 +3960,12 @@ completed 510 Offline turns counts as browser evidence.
 ## 15. Acceptance criteria
 
 The original 24-path implementation candidate was governed by the criteria
-below. Criteria 1–30 and 32–33 retain their approved meaning and are not
-reopened by the Manual Fake correction. Criterion 31 is superseded by the
-canonical section 14.5 contract, and criterion 34 now identifies the current
-documentation-only correction candidate rather than describing the already
-published implementation as unstaged.
+below. Criteria 1–30 and 33 retain their approved meaning and are not reopened
+by the Manual Fake correction. Criterion 31 is superseded by the canonical
+section 14.5 contract. Criterion 32 is amended only to replace the superseded
+Optional Live count with the current post-correction gate, criterion 34 retains
+the Manual Fake documentation boundary, and criterion 35 records the current
+Provider-stability documentation synchronization.
 
 1. all 24 and only the 24 frozen paths change, with exactly 9 production, 8
    test and 7 documentation paths, and exactly 3 new and 21 modified;
@@ -3785,9 +4075,16 @@ published implementation as unstaged.
 23. suspended concurrent submissions separately prove (a) different request
     identities both prepare/call lock-free before serialized revalidation leaves
     at most one winner and one stale loser, and (b) exact duplicates create one
-    reservation/entry/owner/job and at most one Provider call while the follower
-    shield-waits outside the lock, never takes over, and reconciles to the same
-    authority or exact sanitized terminal outcome;
+    reservation/entry/owner/job while the follower shield-waits outside the
+    lock, never takes over, creates no additional reservation/job/owner, and adds
+    zero application-level Provider generations and zero transport attempts. The
+    owner normally performs one application-level Provider generation and
+    retains the same shared allowance for at most one replacement generation, so
+    the owner performs at most two application-level Provider generations and at
+    most two non-retried transport attempts. No follower receives a separate
+    replacement allowance, exact-duplicate handling cannot cause a third
+    generation, and the follower reconciles to the same authority or exact
+    sanitized terminal outcome;
 24. every individual Session/snapshot/Run/participation/character/revision/
     story/View/frame/suggestion binding mutation fails closed before proposal
     commit;
@@ -3804,8 +4101,19 @@ published implementation as unstaged.
     controlled exit signalling once, fresh-UoW authoritative follower replay,
     fixed no-job/uncertain envelopes, retained reservation, and follower
     cancellation that cannot cancel the owner/shared operation;
-26. one live dynamic action has at most one Provider invocation/HTTP attempt and
-    is never automatically resent after uncertainty;
+26. one live dynamic action has one Provider invocation/HTTP attempt unless its
+first outcome is the typed sanitized `UNPARSEABLE_RESPONSE`,
+`SCHEMA_INVALID_RESPONSE`, below-preferred, or above-maximum category, in which
+case the one shared application allowance permits at most one sanitized complete
+replacement invocation/HTTP attempt; first 119/120/349 all replace, first
+350/900 commit through the normal pipeline, and first 901 replaces; replacement
+119 rejects below the absolute floor, 120/349 are degraded-eligible only through
+the full pipeline, 350/900 remain preferred-eligible, and 901 rejects above the
+ceiling without truncation; a valid first outcome uses one application
+generation, any eligible first failure uses at most two, every other first
+failure uses one, a replacement failure never causes a third, successful
+degradation emits no diagnostic or public flag, and uncertainty is never
+automatically resent;
 27. `api/demo.py` wraps the injected-services application lifespan and the
     process-lifetime `DemoRuntime` closes a composition-owned Fake or Live
     Provider exactly once; Live's actual `_get_transport()` lazily constructs
@@ -3841,12 +4149,21 @@ published implementation as unstaged.
     constructions/invocations and 0 external Provider HTTP requests, performs
     exactly 0 automatic or manual retries, and remains separate from automated
     Offline longevity;
-32. the Optional Live browser evaluation, if separately authorized and
-    performed, submits exactly 8 dynamic actions, makes exactly 8 real Provider
-    requests with exactly 0 automatic retries, uses exact
-    `-DynamicProvider Live`, remains separate from automated live smoke and
-    automated Offline longevity, and remains outside implementation and required
-    acceptance gates;
+32. the current post-correction Optional Live browser evaluation remains
+    prohibited until this Provider-stability documentation synchronization
+    receives independent read-only approval and then separate manual
+    authorization. If both gates pass, one new backend process, new browser
+    Session, and new Run use exact
+    `-DynamicProvider Live` to submit exactly 1 gameplay Action through the
+    production action pipeline by selecting the first currently offered Action;
+    no second gameplay Action starts. The Action normally causes 1
+    application-level Provider generation and the existing shared replacement
+    allowance permits at most 1 replacement, for at most 2 application-level
+    generations and exactly 0 Provider transport retries. Replacement does not
+    authorize another gameplay Action, no automatic 8-Action sequence is
+    permitted, and Optional Live remains separate from automated live smoke,
+    automated Offline longevity, implementation, required acceptance, staging,
+    commit, and push gates;
 33. documentation synchronization records the completed Manual Fake browser
     evidence and assesses Guardrail impact as None; completed 510-turn Offline
     and one-call Live evidence remain valid, Optional Live browser evidence
@@ -3858,7 +4175,16 @@ published implementation as unstaged.
     published implementation, and records the exact seven-path implementation
     as complete, verified, committed, and published at
     `d84a0528febb6c270494f35e2843e7e350fbd040`, closing only this Manual Fake
-    implementation lifecycle.
+    implementation lifecycle; and
+35. the three Provider-stability schema/contract runtime corrections are
+    independently approved; the first focused review found the runtime fixes
+    correct and left only the malformed-envelope exception-graph and three-
+    position ordinary-float evidence gaps; the bounded single-test-file
+    correction closed both; the final focused review approved them with no
+    blocking finding, non-blocking finding, or residual in-scope evidence gap;
+    and this two-document synchronization is complete as an unstaged candidate
+    awaiting its own independent focused review, without performing or
+    authorizing Optional Live.
 
 ## 16. Review, Git, publication, and rollback boundaries
 
@@ -3982,13 +4308,18 @@ required to:
     submissions are wholly server identified through normalized 13-field
     `ActionSubmission` equality rather than raw wire presence;
 11. verify 512 is only the process-local runtime capacity, exactly 510 is only
-    the automated Offline longevity count, the Manual Fake browser walkthrough
-    is exactly 8 submitted actions with exactly 0 real Provider calls and
-    exactly 0 automatic retries, the Optional Live browser evaluation when
-    authorized and performed is exactly 8 submitted actions with exactly 8 real
-    Provider requests and exactly 0 automatic retries, no approximate or ranged
-    browser count remains, and every transaction/concurrency evidence item has
-    one declared test-path owner and fail-closed outcome;
+    the automated Offline longevity count, and the completed Manual Fake browser
+    walkthrough is exactly 8 submitted actions with exactly 0 real Provider
+    calls and exactly 0 automatic retries. Separately verify that the current
+    post-correction Optional Live gate remains prohibited pending independent
+    approval and later separate manual authorization; if those gates pass, it
+    permits exactly 1 gameplay Action, normally 1 and at most 2
+    application-level Provider generations under the existing replacement
+    allowance, exactly 0 Provider transport retries, no second gameplay Action,
+    and no automatic 8-Action sequence. Verify the historical 8-Action Optional
+    Live plan is superseded and non-operative, and that every transaction/
+    concurrency evidence item has one declared test-path owner and fail-closed
+    outcome;
 12. verify the exact-duplicate test is separate from the different-request race
     and proves the sole-owner/follower lifecycle, single reservation/job/call,
     retained-task `shield` cancellation deferral with actual-owner
@@ -4031,12 +4362,18 @@ are bounded to this Manual Fake plan/runtime seam and receive exact future
 regression ownership in section 14.5.6; they do not establish or change a
 reusable repository-wide engineering or safety rule.
 
-## 19. Exact next action after Manual Fake evidence-status authoring
+## 19. Exact next action after Provider-stability documentation synchronization
 
-Return the exact two-document unstaged candidate and its hashes to the
-coordinating ChatGPT conversation for a separate independent read-only review.
-Do not stage, commit, push, execute Optional Live, or repeat Manual Fake
-evidence. No staging or commit is authorized. Optional Live remains separate,
-incomplete, optional, and requires new explicit authorization. No further
-Manual Fake execution, implementation review, P1/P2 review, Demo run, or
-Provider evaluation belongs to this authoring task.
+Return the complete unstaged documentation-synchronization report and resulting
+hashes to the coordinating ChatGPT conversation. Do not stage, commit, push,
+execute Optional Live, or repeat Manual Fake evidence. The exact next step is
+one fresh independent focused review of this two-document synchronization. A new
+real-Provider Action must not be considered until that review approves the
+synchronization and the user later provides separate manual authorization. Only
+then may one new-process, new-browser-Session, new-Run, single-gameplay-Action
+Optional Live run be authorized. That Action must select the first currently
+offered Action through the production action pipeline, start no second Action,
+use normally 1 and at most 2 application-level Provider generations under the
+existing shared replacement allowance, and use exactly 0 Provider transport
+retries. This synchronization provides no successful post-correction Live
+evidence and authorizes no staging, commit, or push.

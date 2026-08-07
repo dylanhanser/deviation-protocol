@@ -39,9 +39,9 @@ Automated Offline longevity evidence remains complete at exactly 510 turns,
 Live smoke evidence remains complete at one smoke execution, one real Provider
 invocation, one Provider HTTP request, zero retries, and successful strict
 schema validation. Optional Live browser evidence remains incomplete and
-optional. This documentation candidate awaits separate independent review and
-is not authorized for staging or commit. The spike does not reopen completed
-Phase 8 and is neither Phase 6 nor Phase 7.
+optional. This current two-document synchronization candidate awaits separate
+independent review and is not authorized for staging or commit. The spike does
+not reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
 P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
@@ -50,13 +50,123 @@ and the overall project remain incomplete. Completing the spike would not
 establish production Provider distribution. The completed automated Live smoke
 does not constitute browser evidence or production Provider distribution.
 
-DNVS remains closed as an evidence lifecycle and Phase 6 remains paused. Three
-separately authorized Optional Live requests reached proposal rejection without
-a state commit; their precise historical rejection category is unrecoverable
-because the stopped process retained only the public error. A sanitized local
-Live diagnostic implementation candidate is pending independent review. This
-implementation authorizes no further Optional Live call; the next lifecycle
-action is independent review of this exact candidate.
+DNVS remains closed as an evidence lifecycle and Phase 6 remains paused. The
+first new-process/new-browser-Session Optional Live action exposed a genuine
+below-minimum result and emitted the sanitized
+`DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM` token with HTTP 503 and no state
+change. It
+proved only a structurally parseable narrative shorter than the unchanged hard
+350..900 Unicode-character range; the rejected text and exact length remain
+unknown, and validation stopped before protected-reference scanning. The
+resulting five-path uncommitted candidate added the buffered 500..700
+Unicode-character prompt target and at most one length-triggered complete
+replacement generation. The next new-process/new-browser-Session action was
+submitted once and returned HTTP 503
+`NARRATIVE_PROVIDER_RESPONSE_INVALID` / `Narrative processing failed`, emitted
+no `DNVS_LIVE_DIAG` token, was not repeated, and stopped before length and
+protected-reference validation. Its raw content, parser subtype, schema defect,
+narrative length/content, and hidden references all remain unknown; it proves
+neither length recovery nor taxonomy correction. Manual evidence alone does not
+prove Provider call count, atomicity, or parser subtype.
+
+After response hardening, four actions were submitted across option choices and
+free input, all under the same public Session ID `demo-session-00000001`. Each
+ended with HTTP 503 and the final
+`DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM` token. In each case the final
+structurally parsed candidate failed the then-existing 350-character minimum
+before protected-reference validation; no transition succeeded, and changing
+between option and free input did not avoid the result. The hard-350 policy was
+therefore unusable in those attempts. Exact lengths, the initial failure class,
+Provider-call count, raw content, and hidden references remain unknown; there
+is no parser-failure claim for these four actions, and manual evidence does not
+independently prove persistence atomicity. The protocol initially
+authorized one action, but four were submitted. They were not replay and are
+not described as four fresh processes.
+
+The later repository-read-only real-Provider diagnostic exercised three fresh
+production-backend actions through Live composition, ASGI character creation,
+Run entry, current View, the first offered action, production submission, the
+real DeepSeek adapter, strict parsing/schema validation, application
+validation, terminal finalization, and replay. Action 1 stopped before an HTTP
+response because of sandbox networking. Actions 2 and 3 reached DeepSeek and
+returned HTTP 200 with strict, schema-valid preferred-band proposals of 372 and
+379 Unicode characters. Both were rejected specifically in
+`candidate.proposed_public_facts[0].key` at `PRE_INTERNAL_MARKER` /
+`INTERNAL_IDENTIFIER_SHAPE` / `internal_id_prefix:fact`; the matched field was
+not narrative prose. Neither key overlapped the protected-reference index, so
+the evidence shows a prompt/schema/generated-public-key contract mismatch, not
+disclosure of a real protected or authoritative identifier. It does not
+establish the exact cause of unrecoverable historical Live failures. No
+transition committed, and the diagnostic changed no repository file.
+
+The uncommitted correction candidate preserves the protected-reference source
+taxonomy and makes `DynamicPromptBuilder` the sole hardened single-object prompt
+authority. It distinguishes only sanitized unparseable-response and
+schema-invalid-response categories at the real dynamic response boundary and
+shares one application replacement allowance across those categories and
+below-preferred and above-maximum outcomes. The Provider-visible preferred
+output contract remains 350..900 inclusive with a 500..700 target and never
+discloses the 120-character fallback. It defines the exact real-Provider
+generated public-fact-key grammar
+`^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$` and enforces that one
+authority in both the prompt and the real DeepSeek proposal-schema boundary.
+Existing deterministic Fake and persisted key conventions remain compatible
+without a migration. A first result below 350 or above 900 consumes the sole
+complete-replacement allowance and never commits. Only a replacement in the
+120..349 degraded band may become eligible, and it still traverses the complete
+schema, semantic, marker/secret, protected-reference, player-isolation,
+authority, provenance, stale-state, and transactional pipeline. A replacement
+below the absolute 120 floor ends with the existing public HTTP 503 proposal
+rejection and one final below-minimum token; anything above 900 ends with the
+corresponding final above-maximum rejection and is never truncated or
+committed. A preferred valid first result uses one application generation; an
+eligible first failure uses at most two; every other first failure uses one; no
+replacement failure causes a third. Degraded success has no public flag and no
+diagnostic token. Invalid content and proposals are never persisted. Public
+errors, Provider settings, transport retries, terminal replay, single-commit
+atomicity, and non-Live behavior remain unchanged. The complete candidate scan
+over all string mapping keys and string leaves is unchanged, with no
+public-fact exemption or detector weakening. The whole seven-path candidate
+remains uncommitted and has no successful post-correction Live evidence.
+The earlier generated-public-key correction checkpoint recorded focused pytest
+`37 passed`, the complete affected-module pytest command `490 passed`, and
+`git diff --check` passed; these overlapping historical counts are not a
+unique-test total.
+
+The later Provider-stability schema/contract correction addressed three runtime
+findings without changing the preserved generation and commit bounds: sanitized
+exception boundaries, ordinary finite JSON-float classification, and one named
+submitted-action exclusion authority shared by contract rendering, prompt
+construction, and runtime enforcement. Its first independent focused review
+confirmed that all three runtime fixes were correct and returned changes
+required only for two regression-evidence gaps: recursive malformed outer
+response-envelope coverage through `DeepSeekNarrativeProvider.generate_dynamic`
+and representative ordinary-float coverage at
+`proposed_consequences[0]`, top-level `result`, and nested
+`next_scene.summary`. A bounded single-test-file correction closed both gaps,
+and the final independent focused review approved them with no blocking or
+non-blocking finding and no residual evidence gap in scope.
+The three runtime corrections and both test-evidence corrections are therefore
+independently approved.
+
+The five deterministic schema families and precedence, one-primary-plus-one-
+replacement generation ceiling, zero Provider transport retries, no third
+generation, complete validation/safety/authority/stale/provenance/transactional
+finalization, duplicate suppression, commit atomicity, and absence of a
+deterministic fallback all remain unchanged.
+
+Current correction evidence records `4 passed` for the newly added tests,
+`17 passed` for the relevant correction selection, `427 passed` for the complete
+authorized two-file suite, and canonical Offline verification at `2275 passed,
+182 skipped`; compileall, pip check, Alembic heads/history, internal diff, and
+`git diff --check` also passed. The final focused review separately recorded
+`4 passed` for the two new test symbols, `16 passed` for directly relevant
+preservation, and `git diff --check` passed. This bounded two-document
+synchronization records the independently approved current state and is complete
+as a documentation candidate; it awaits one fresh independent focused review.
+Optional Live remains subject to separate authorization, incomplete, and
+unperformed by this task. Neither Optional Live nor staging or commit is
+authorized here.
 
 ## P4-S1 completion baseline
 

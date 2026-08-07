@@ -20,15 +20,25 @@ from deviation_protocol.api.demo_composition import (
 )
 from deviation_protocol.api.main import create_app
 from deviation_protocol.application.dynamic_narrative_models import (
+    DynamicGeneratedPublicFactKeyGrammar,
     DynamicNarrativeCandidatePayload,
+    DynamicGenerationInstruction,
+    DynamicNarrativeLengthBand,
+    DynamicNarrativeLengthPolicy,
     DynamicNarrativeLength,
     DynamicNarrativeCapacityExhaustedError,
     DynamicNarrativeRequest,
+    DynamicNarrativeResponseCategory,
+    DynamicNarrativeResponseError,
+    DynamicNarrativeSchemaFailureFamily,
     DynamicNextScene,
+    DynamicProviderCandidateContract,
+    DynamicProviderCandidateContractError,
     DynamicPublicFactProposal,
     UntrustedDynamicNarrativeCandidate,
     ValidatedDynamicNarrativeCandidate,
     DynamicNarrativeProvider,
+    DynamicPromptBuilder,
     canonical_json,
 )
 from deviation_protocol.application.dynamic_narrative_orchestrator import (
@@ -40,6 +50,7 @@ from deviation_protocol.application.dynamic_narrative_orchestrator import (
     _FinalizePublicationClass,
     _apply_candidate_slots,
     _canonical_public_reference_bytes,
+    _candidate_strings,
     _catalog_hidden_references,
     _committed_suggestion_texts,
     _hidden_reference_index,
@@ -61,6 +72,7 @@ from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
 from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
     NarrativeProviderMetadata,
+    NarrativeProviderResponseError,
     NarrativeProviderUnavailableError,
 )
 from deviation_protocol.application.narrative_prompt import (
@@ -199,6 +211,15 @@ def _safe_candidate(
     )
 
 
+def _candidate_with_exact_narrative_text(
+    request: DynamicNarrativeRequest, narrative_text: str
+) -> UntrustedDynamicNarrativeCandidate:
+    candidate = _safe_candidate(request)
+    return candidate.model_copy(
+        update={"candidate": candidate.candidate.model_copy(update={"narrative_text": narrative_text})}
+    )
+
+
 def _candidate_payload(**updates):
     payload = {
         "schema_version": "dynamic-narrative-candidate-v1",
@@ -290,6 +311,67 @@ class _GateProvider:
 
     async def aclose(self) -> None:
         self.closed += 1
+
+
+class _ScriptedDynamicTransport:
+    def __init__(self, contents: list[str]) -> None:
+        self.contents = list(contents)
+        self.calls: list[dict[str, object]] = []
+        self.before_response = None
+
+    async def post_json(self, **kwargs):
+        self.calls.append(kwargs)
+        if self.before_response is not None:
+            self.before_response(len(self.calls))
+        content = self.contents.pop(0)
+        envelope = {
+            "id": f"offline-dynamic-{len(self.calls)}",
+            "choices": [
+                {
+                    "finish_reason": "stop",
+                    "message": {"content": content},
+                }
+            ],
+            "usage": {},
+        }
+        return DeepSeekHttpResponse(
+            status_code=200,
+            body_text=json.dumps(envelope, ensure_ascii=False),
+        )
+
+    async def aclose(self) -> None:
+        return None
+
+
+def _offline_deepseek_dynamic_provider(
+    transport: _ScriptedDynamicTransport,
+) -> DeepSeekNarrativeProvider:
+    return DeepSeekNarrativeProvider(
+        DeepSeekSettings(
+            api_key="offline-test-sentinel",
+            max_retries=0,
+            timeout_seconds=5.0,
+            max_tokens=512,
+        ),
+        PromptBuilder(profiles=(default_style_profile(),)),
+        transport=transport,
+    )
+
+
+def _dynamic_provider_content(*, key: str, narrative_length: int) -> str:
+    return json.dumps(
+        _candidate_payload(
+            narrative_text="界" * narrative_length,
+            proposed_public_facts=[
+                {
+                    "key": key,
+                    "value": "A plainly synthetic public observation.",
+                }
+            ],
+        ),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
 
 
 @pytest.mark.asyncio
@@ -534,6 +616,218 @@ def test_dynamic_candidate_rejects_extra_wrong_and_malformed_nested_values(
         )
 
 
+def test_provider_candidate_contract_is_complete_and_matches_strict_model() -> None:
+    authority = DynamicProviderCandidateContract
+    preferred = DynamicNarrativeLength(minimum=350, target=650, maximum=900)
+    contract = authority.document(preferred=preferred)
+    properties = contract["properties"]
+
+    assert contract["root"] == (
+        "exactly-one-complete-JSON-object-with-no-surrounding-content"
+    )
+    assert contract["type"] == "object"
+    assert contract["additional_properties"] is False
+    assert contract["duplicate_object_members"] == "forbidden"
+    assert tuple(contract["required"]) == authority.TOP_LEVEL_FIELDS
+    assert tuple(DynamicNarrativeCandidatePayload.model_fields) == authority.TOP_LEVEL_FIELDS
+    assert set(properties) == set(authority.TOP_LEVEL_FIELDS)
+    assert properties["schema_version"] == {
+        "const": "dynamic-narrative-candidate-v1",
+        "type": "string",
+    }
+    assert tuple(properties["result"]["allowed_literals"]) == tuple(
+        item.value for item in NarrativeOutcomeResult
+    )
+    assert tuple(properties["continuation"]["allowed_literals"]) == (
+        "CONTINUE",
+        "TERMINAL",
+    )
+
+    narrative = properties["narrative_text"]
+    assert (narrative["minimum_length"], narrative["maximum_length"]) == (1, 10_000)
+    assert narrative["provider_accepted_length"] == {"minimum": 350, "maximum": 900}
+    assert narrative["provider_target_length"] == {"minimum": 500, "maximum": 700}
+    consequences = properties["proposed_consequences"]
+    assert (consequences["minimum_items"], consequences["maximum_items"]) == (0, 3)
+    assert (
+        consequences["items"]["minimum_length"],
+        consequences["items"]["maximum_length"],
+        consequences["unique_after_normalization"],
+    ) == (1, 120, "Unicode-casefold")
+
+    public_facts = properties["proposed_public_facts"]
+    assert (public_facts["minimum_items"], public_facts["maximum_items"]) == (0, 3)
+    assert public_facts["unique_keys_after_normalization"] == "Unicode-casefold"
+    public_fact = public_facts["items"]
+    assert public_fact["type"] == "object"
+    assert public_fact["additional_properties"] is False
+    assert tuple(public_fact["required"]) == authority.PUBLIC_FACT_FIELDS
+    key = public_fact["properties"]["key"]
+    assert key == {
+        "ASCII_only": True,
+        "maximum_length": 39,
+        "minimum_length": 14,
+        "pattern": authority.GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT,
+        "safe_example": authority.GENERATED_PUBLIC_FACT_KEY_SAFE_EXAMPLE,
+        "type": "string",
+    }
+    value = public_fact["properties"]["value"]
+    assert (value["minimum_length"], value["maximum_length"]) == (1, 300)
+
+    next_scene = properties["next_scene"]
+    assert next_scene["type"] == "object"
+    assert next_scene["additional_properties"] is False
+    assert tuple(next_scene["required"]) == authority.NEXT_SCENE_FIELDS
+    assert (
+        next_scene["properties"]["title"]["minimum_length"],
+        next_scene["properties"]["title"]["maximum_length"],
+    ) == (1, 80)
+    assert (
+        next_scene["properties"]["summary"]["minimum_length"],
+        next_scene["properties"]["summary"]["maximum_length"],
+    ) == (1, 300)
+    suggestions = properties["suggested_actions"]
+    assert (suggestions["minimum_items"], suggestions["maximum_items"]) == (3, 3)
+    assert (
+        suggestions["items"]["minimum_length"],
+        suggestions["items"]["maximum_length"],
+        suggestions["unique_after_normalization"],
+    ) == (1, 150, "exact")
+    exclusion = authority.SUBMITTED_ACTION_EXCLUSION_RULE
+    assert exclusion.CANDIDATE_FIELD == "suggested_actions[*]"
+    assert exclusion.SUBMITTED_ACTION_REQUEST_FIELD == "player_action.description"
+    assert exclusion.REQUIREMENT == "every-item-must-differ"
+    assert exclusion.COMPARISON == (
+        "exact-after-canonical-dynamic-text-normalization"
+    )
+    assert exclusion.NORMALIZATION == {
+        "unicode": "NFC",
+        "whitespace": "collapse-runs-to-one-ASCII-space-then-strip",
+    }
+    assert suggestions["submitted_action_exclusion"] == exclusion.document()
+    assert exclusion.is_violated(
+        ("Cafe\u0301   inspect.", "Wait.", "Leave."),
+        submitted_action="Caf\u00e9 inspect.",
+    )
+    assert not exclusion.is_violated(
+        ("Inspect elsewhere.", "Wait.", "Leave."),
+        submitted_action="Caf\u00e9 inspect.",
+    )
+
+    for string_contract in (
+        narrative,
+        consequences["items"],
+        value,
+        next_scene["properties"]["title"],
+        next_scene["properties"]["summary"],
+        suggestions["items"],
+    ):
+        assert string_contract["normalization"] == {
+            "unicode": "NFC",
+            "whitespace": "collapse-runs-to-one-ASCII-space-then-strip",
+        }
+        assert tuple(string_contract["prohibited_unicode_general_categories"]) == (
+            "Cc",
+            "Cf",
+            "Cs",
+        )
+
+
+def test_provider_key_contract_has_one_authority_and_internal_grammar_stays_broader() -> None:
+    authority = DynamicProviderCandidateContract
+    grammar = DynamicGeneratedPublicFactKeyGrammar
+    assert grammar.PATTERN is authority.GENERATED_PUBLIC_FACT_KEY_PATTERN
+    assert grammar.PATTERN_TEXT == authority.GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT
+    assert (grammar.MINIMUM_LENGTH, grammar.MAXIMUM_LENGTH) == (
+        authority.GENERATED_PUBLIC_FACT_KEY_MINIMUM_LENGTH,
+        authority.GENERATED_PUBLIC_FACT_KEY_MAXIMUM_LENGTH,
+    ) == (14, 39)
+
+    internal = DynamicPublicFactProposal(
+        key="safe.note", value="A valid persisted public value."
+    )
+    assert internal.key == "safe.note"
+    decoded = _candidate_payload(
+        proposed_public_facts=[{"key": internal.key, "value": internal.value}]
+    )
+    with pytest.raises(DynamicProviderCandidateContractError) as caught:
+        authority.validate_response_json(decoded, json.dumps(decoded))
+    assert (
+        caught.value.family
+        is DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
+    )
+
+
+def test_generated_public_fact_key_grammar_has_exact_safe_boundaries() -> None:
+    grammar = DynamicGeneratedPublicFactKeyGrammar
+    minimum = "public-note-aa"
+    maximum = "public-note-aaaaaa-bbbbbb-cccccc-dddddd"
+
+    assert len(minimum) == grammar.MINIMUM_LENGTH == 14
+    assert len(maximum) == grammar.MAXIMUM_LENGTH == 39
+    assert grammar.validate(minimum) == minimum
+    assert grammar.validate(grammar.SAFE_EXAMPLE) == grammar.SAFE_EXAMPLE
+    assert grammar.validate(maximum) == maximum
+
+    rejected = (
+        "",
+        " ",
+        "public-note-a",
+        "public-note-aaaaaa-bbbbbb-cccccc-ddddddd",
+        "public-note-Ab",
+        "public-note-aa--bb",
+        "public_note_aa",
+        "public.note.aa",
+        "fact.synthetic",
+        "public-note-receipt",
+        "public-note-" + "a" * 48,
+    )
+    assert len(rejected[2]) == grammar.MINIMUM_LENGTH - 1
+    assert len(rejected[3]) == grammar.MAXIMUM_LENGTH + 1
+    for key in rejected:
+        with pytest.raises((TypeError, ValueError)):
+            grammar.validate(key)
+
+    assert "." not in grammar.SAFE_EXAMPLE
+    assert not dynamic_orchestrator_module._INTERNAL_ID_PATTERN.search(
+        grammar.SAFE_EXAMPLE
+    )
+    normalized = dynamic_orchestrator_module._comparison_text(grammar.SAFE_EXAMPLE)
+    assert not any(
+        marker in normalized
+        for marker in dynamic_orchestrator_module._INTERNAL_TEXT_MARKERS
+    )
+    assert not dynamic_orchestrator_module._LONG_SECRET_SHAPE.search(
+        grammar.SAFE_EXAMPLE
+    )
+    assert "." not in grammar.PATTERN_TEXT
+    for marker in dynamic_orchestrator_module._INTERNAL_TEXT_MARKERS:
+        if re.fullmatch(r"[a-z0-9]+", marker):
+            assert len(marker) > 6
+            assert marker not in "public-note-"
+        else:
+            assert "_" in marker or " " in marker
+    assert 6 < 48
+
+
+def test_complete_candidate_string_walk_includes_mapping_keys_and_string_leaves() -> None:
+    assert tuple(
+        _candidate_strings(
+            {
+                "candidate.mapping.key": {
+                    "nested": ["first leaf", {"deep.mapping.key": "second leaf"}]
+                }
+            }
+        )
+    ) == (
+        "candidate.mapping.key",
+        "nested",
+        "first leaf",
+        "deep.mapping.key",
+        "second leaf",
+    )
+
+
 def test_dynamic_candidate_json_parser_rejects_nonfinite_numbers() -> None:
     text = json.dumps(_candidate_payload()).replace(
         '"proposed_consequences": []', '"proposed_consequences": [NaN]'
@@ -567,10 +861,44 @@ def test_exact_350_650_900_request_length_contract(
             DynamicNarrativeLength.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    ("length", "expected"),
+    (
+        (119, DynamicNarrativeLengthBand.BELOW_ABSOLUTE_FLOOR),
+        (120, DynamicNarrativeLengthBand.DEGRADED),
+        (349, DynamicNarrativeLengthBand.DEGRADED),
+        (350, DynamicNarrativeLengthBand.PREFERRED),
+        (900, DynamicNarrativeLengthBand.PREFERRED),
+        (901, DynamicNarrativeLengthBand.ABOVE_CEILING),
+    ),
+)
+def test_dynamic_narrative_length_policy_owns_exact_unicode_bands(
+    length: int, expected: DynamicNarrativeLengthBand
+) -> None:
+    preferred = DynamicNarrativeLength(minimum=350, target=650, maximum=900)
+    text = "界" * length
+
+    assert len(text) == length
+    assert (
+        DynamicNarrativeLengthPolicy.classify(len(text), preferred=preferred)
+        is expected
+    )
+    assert len(
+        DynamicNarrativeCandidatePayload.model_validate_json(
+            json.dumps(_candidate_payload(narrative_text=text))
+        ).narrative_text
+    ) == length
+    assert DynamicNarrativeLengthPolicy.ABSOLUTE_MINIMUM == 120
+    assert DynamicNarrativeLengthPolicy.PROMPT_TARGET_MINIMUM == 500
+    assert DynamicNarrativeLengthPolicy.PROMPT_TARGET_MAXIMUM == 700
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("length", "valid"),
     (
+        (119, False),
+        (120, False),
         (349, False),
         (350, True),
         (649, True),
@@ -633,11 +961,12 @@ def test_finalization_diagnostic_categories_are_distinct() -> None:
     ("category", "fault"),
     (
         (DynamicNarrativeRejectionDiagnostic.PRE_REVALIDATION, "revalidation"),
-        (DynamicNarrativeRejectionDiagnostic.PRE_LENGTH, "length"),
         (DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION, "repeat"),
         (DynamicNarrativeRejectionDiagnostic.PRE_STORAGE_BOUNDARY, "storage"),
         (DynamicNarrativeRejectionDiagnostic.PRE_REFERENCE_INDEX, "reference"),
         (DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER, "marker"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER, "internal_id_key"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER, "secret_value"),
         (DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE, "protected"),
         (DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING, "fact_ring"),
         (DynamicNarrativeRejectionDiagnostic.FINAL_SLOT_BOUNDARY, "slot"),
@@ -666,9 +995,7 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
                 return object()
             candidate = _safe_candidate(request)
             payload = candidate.candidate
-            if fault == "length":
-                payload = payload.model_copy(update={"narrative_text": "x" * 10})
-            elif fault == "repeat":
+            if fault == "repeat":
                 payload = payload.model_copy(
                     update={
                         "suggested_actions": (
@@ -681,6 +1008,20 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
             elif fault == "marker":
                 payload = payload.model_copy(
                     update={"narrative_text": "state_version" + "界" * 350}
+                )
+            elif fault == "internal_id_key":
+                public_fact = payload.proposed_public_facts[0].model_copy(
+                    update={"key": "fact.synthetic"}
+                )
+                payload = payload.model_copy(
+                    update={"proposed_public_facts": (public_fact,)}
+                )
+            elif fault == "secret_value":
+                public_fact = payload.proposed_public_facts[0].model_copy(
+                    update={"value": "a" * 48}
+                )
+                payload = payload.model_copy(
+                    update={"proposed_public_facts": (public_fact,)}
                 )
             elif fault == "protected":
                 payload = payload.model_copy(
@@ -804,7 +1145,10 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
 
             monkeypatch.setattr(dynamic_orchestrator_module, "_apply_candidate_slots", final_value)
 
-        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        view = json.dumps(
+            (await client.get(f"/v1/sessions/{session_id}/view")).json(),
+            sort_keys=True,
+        )
         body = {
             "turn_id": f"diagnostic-{fault}-turn",
             "client_request_id": f"diagnostic-{fault}-request",
@@ -814,7 +1158,8 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
         before = runtime.store.snapshot()
         response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
         assert response.status_code == 503
-        assert response.json() == {
+        response_payload = response.json()
+        assert response_payload == {
             "error": {
                 "error_code": "NARRATIVE_PROPOSAL_REJECTED",
                 "message": "Narrative processing failed",
@@ -822,6 +1167,7 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
         }
         assert category.value not in response.text
         assert emitted == [category]
+        assert all(token.value == category.value for token in emitted)
         after = runtime.store.snapshot()
         assert after.sessions == before.sessions
         assert after.snapshots == before.snapshots
@@ -831,27 +1177,1642 @@ async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
         job = next(iter(after.narrative_jobs.values()))
         assert job.status is NarrativeJobStatus.FAILED_TERMINAL
         assert job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
-        view_after_first_rejection = (
-            await client.get(f"/v1/sessions/{session_id}/view")
-        ).json()
+        if category.value.startswith("DNVS_LIVE_DIAG_PRE_"):
+            assert job.validated_proposal is None
+        view_after_first_rejection = json.dumps(
+            (await client.get(f"/v1/sessions/{session_id}/view")).json(),
+            sort_keys=True,
+        )
         assert view_after_first_rejection == view
         retry = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
         assert retry.status_code == response.status_code
-        assert retry.json() == response.json()
+        retry_payload = retry.json()
+        assert retry_payload == response_payload
         after_retry = runtime.store.snapshot()
         assert after_retry == after
         assert next(iter(after_retry.narrative_jobs.values())).job_id == job.job_id
         assert next(iter(after_retry.narrative_jobs.values())).status is job.status
         assert emitted == [category]
         assert len(emitted) == 1
-        view_after_identical_replay = (
-            await client.get(f"/v1/sessions/{session_id}/view")
-        ).json()
+        view_after_identical_replay = json.dumps(
+            (await client.get(f"/v1/sessions/{session_id}/view")).json(),
+            sort_keys=True,
+        )
         assert view_after_identical_replay == view
         assert view_after_identical_replay == view_after_first_rejection
         assert provider.invocations == 1
     finally:
         dynamic_orchestrator_module._apply_candidate_slots = original_apply
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_submitted_action_exclusion_authority_rejects_normalized_match_without_recovery(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    submitted_action = "Caf\u00e9 submitted phrase 78431"
+    rejected_suggestion = "Cafe\u0301   submitted phrase 78431"
+    rule = DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE
+    rule_calls: list[tuple[tuple[str, ...], str]] = []
+    original_is_violated = rule.is_violated
+
+    def track_rule(
+        suggested_actions: tuple[str, ...], *, submitted_action: str
+    ) -> bool:
+        rule_calls.append((suggested_actions, submitted_action))
+        return original_is_violated(
+            suggested_actions, submitted_action=submitted_action
+        )
+
+    monkeypatch.setattr(rule, "is_violated", staticmethod(track_rule))
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            candidate = _safe_candidate(request)
+            return candidate.model_copy(
+                update={
+                    "candidate": candidate.candidate.model_copy(
+                        update={
+                            "suggested_actions": (
+                                rejected_suggestion,
+                                "Consider a separate safe option.",
+                                "Wait for another safe option.",
+                            )
+                        }
+                    )
+                }
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": "normalized-repeat-turn",
+            "client_request_id": "normalized-repeat-request",
+            "action_type": "CUSTOM",
+            "description": submitted_action,
+        }
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert response.json() == {
+            "error": {
+                "error_code": "NARRATIVE_PROPOSAL_REJECTED",
+                "message": "Narrative processing failed",
+            }
+        }
+        assert len(provider.requests) == 1
+        assert provider.requests[0].generation_instruction is (
+            DynamicGenerationInstruction.ORDINARY
+        )
+        assert len(rule_calls) == 1
+        assert rule_calls[0][1] == submitted_action
+        assert rule_calls[0][0][0] == submitted_action
+        assert rejected_suggestion != rule_calls[0][0][0]
+        assert emitted == [
+            DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION
+        ]
+        assert submitted_action not in response.text
+        assert rejected_suggestion not in response.text
+        assert submitted_action not in repr(emitted)
+        assert rejected_suggestion not in repr(emitted)
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
+        assert job.validated_proposal is None
+        assert job.accepted_narrative_text is None
+        assert rejected_suggestion not in json.dumps(
+            after, default=str, ensure_ascii=False
+        )
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 503
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 1
+        assert len(rule_calls) == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_length_recovery_prompt_is_typed_sanitized_and_not_serialized() -> None:
+    runtime, client, session_id = await _entered_dynamic_client()
+    try:
+        (
+            _orchestrator,
+            _submission,
+            _resolved,
+            _entry,
+            request,
+            _stored,
+        ) = await _prepared_dynamic_attempt(runtime, client, session_id)
+        builder = DynamicPromptBuilder()
+        ordinary = builder.build(request)
+        below = request.with_generation_instruction(
+            DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM
+        )
+        above = request.with_generation_instruction(
+            DynamicGenerationInstruction.REPLACE_ABOVE_MAXIMUM
+        )
+        structural = request.with_generation_instruction(
+            DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID
+        )
+        below_prompt = builder.build(below)
+        above_prompt = builder.build(above)
+        structural_prompt = builder.build(structural)
+
+        assert '"provider_accepted_length":{"maximum":900,"minimum":350}' in ordinary.user
+        assert '"provider_target_length":{"maximum":700,"minimum":500}' in ordinary.user
+        assert "exactly one complete JSON object" in ordinary.system
+        assert "no Markdown fence" in ordinary.system
+        assert "no prose before or after it" in ordinary.system
+        assert "Every field is required" in ordinary.system
+        assert "no extra field is allowed" in ordinary.system
+        assert "partial response or continuation" in ordinary.system
+        contract_text = ordinary.user.split(
+            "\nAuthoritative candidate-output contract:\n", 1
+        )[1]
+        contract = json.loads(contract_text)
+        assert contract == DynamicProviderCandidateContract.document(
+            preferred=request.narrative_length
+        )
+        exclusion = DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE
+        assert contract["properties"]["suggested_actions"][
+            "submitted_action_exclusion"
+        ] == exclusion.document()
+        assert '"requirement":"every-item-must-differ"' in contract_text
+        assert '"submitted_action_request_field":"player_action.description"' in (
+            contract_text
+        )
+        key_grammar = DynamicGeneratedPublicFactKeyGrammar
+        prompt_contract = contract_text
+        assert key_grammar.PATTERN_TEXT in prompt_contract
+        key_contract = contract["properties"]["proposed_public_facts"]["items"][
+            "properties"
+        ]["key"]
+        assert key_contract["safe_example"] == key_grammar.SAFE_EXAMPLE
+        assert (key_contract["minimum_length"], key_contract["maximum_length"]) == (
+            14,
+            39,
+        )
+        assert prompt_contract.count(key_grammar.SAFE_EXAMPLE) == 1
+        assert not dynamic_orchestrator_module._INTERNAL_ID_PATTERN.search(
+            prompt_contract
+        )
+        assert dynamic_orchestrator_module._INTERNAL_ID_PATTERN.pattern not in (
+            ordinary.system + ordinary.user
+        )
+        assert "frame|scenario|phase|decision|fact|clue" not in (
+            ordinary.system + ordinary.user
+        )
+        assert "Recovery instruction:" not in ordinary.user
+        assert below.model_dump(mode="json") == request.model_dump(mode="json")
+        assert structural.model_dump(mode="json") == request.model_dump(mode="json")
+        assert canonical_json(structural.model_dump(mode="json")) == canonical_json(
+            request.model_dump(mode="json")
+        )
+        assert "REPLACE_BELOW_MINIMUM" not in below.model_dump_json()
+        assert "REPLACE_RESPONSE_INVALID" not in structural.model_dump_json()
+        assert "below the allowed range" in below_prompt.user
+        assert "above the allowed range" not in below_prompt.user
+        assert "entirely new complete replacement proposal" in below_prompt.user
+        assert "not continuation text" in below_prompt.user
+        assert "above the allowed range" in above_prompt.user
+        assert "below the allowed range" not in above_prompt.user
+        assert "entirely new complete replacement proposal" in above_prompt.user
+        assert "not continuation text" in above_prompt.user
+        assert "prior response was not one parseable complete JSON object" in (
+            structural_prompt.user
+        )
+        assert "entirely new complete replacement proposal" in structural_prompt.user
+        assert "Do not continue or reuse it" in structural_prompt.user
+        assert "JSON only with no Markdown fences or surrounding prose" in structural_prompt.user
+        assert "authoritative candidate-output contract above" in structural_prompt.user
+        assert "Target narrative_text at 500..700 Unicode characters" in (
+            structural_prompt.user
+        )
+        family_corrections = {
+            DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE: (
+                "required root object and nested object structure"
+            ),
+            DynamicGenerationInstruction.REPLACE_SCHEMA_REQUIRED_OR_EXTRA_FIELDS: (
+                "every required field and nested field with no extra fields"
+            ),
+            DynamicGenerationInstruction.REPLACE_SCHEMA_TYPE_OR_LITERAL: (
+                "every field type and use only the declared literal values"
+            ),
+            DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS: (
+                "declared string and collection bound, normalization and "
+                "prohibited-character rule, and uniqueness rule"
+            ),
+            DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
+                "exact generated public-fact-key ASCII grammar and its 14..39 "
+                "character bounds"
+            ),
+        }
+        for instruction, expected_correction in family_corrections.items():
+            family_request = request.with_generation_instruction(instruction)
+            family_prompt = builder.build(family_request)
+            assert "prior response was valid JSON" in family_prompt.user
+            assert expected_correction in family_prompt.user
+            assert "complete authoritative candidate-output contract above" in (
+                family_prompt.user
+            )
+            assert DynamicProviderCandidateContract.render(
+                preferred=request.narrative_length
+            ) in family_prompt.user
+            assert family_request.model_dump(mode="json") == request.model_dump(
+                mode="json"
+            )
+            assert instruction.value not in family_request.model_dump_json()
+        for hidden_fallback_contract in (
+            "120..349",
+            "absolute floor",
+            "degraded",
+            "fallback",
+        ):
+            assert hidden_fallback_contract not in ordinary.system.casefold()
+            assert hidden_fallback_contract not in ordinary.user.casefold()
+            assert hidden_fallback_contract not in below_prompt.system.casefold()
+            assert hidden_fallback_contract not in below_prompt.user.casefold()
+            assert hidden_fallback_contract not in structural_prompt.system.casefold()
+            assert hidden_fallback_contract not in structural_prompt.user.casefold()
+        for prohibited in (
+            "INERT_RAW_RESPONSE_SENTINEL",
+            "INERT_EXCEPTION_SENTINEL",
+            "INERT_SCHEMA_DETAIL_SENTINEL",
+            "exact length 217",
+            "job.INERT_IDENTIFIER",
+            "hidden.INERT_REFERENCE",
+            "INERT_SECRET_SENTINEL",
+        ):
+            assert prohibited not in structural_prompt.system
+            assert prohibited not in structural_prompt.user
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("first_length", "replacement_length", "instruction"),
+    (
+        (119, 120, DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM),
+        (120, 120, DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM),
+        (349, 349, DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM),
+        (901, 120, DynamicGenerationInstruction.REPLACE_ABOVE_MAXIMUM),
+    ),
+)
+async def test_directional_length_recovery_commits_only_valid_replacement_once(
+    first_length: int,
+    replacement_length: int,
+    instruction: DynamicGenerationInstruction,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_text = "初" * first_length
+    replacement_text = "界" * replacement_length
+    call_jobs = []
+    call_stores = []
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            call_store = runtime.store.snapshot()
+            call_stores.append(call_store)
+            call_jobs.append(next(iter(call_store.narrative_jobs.values())))
+            text = first_text if len(self.requests) == 1 else replacement_text
+            return _candidate_with_exact_narrative_text(request, text)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    authority_loads = 0
+    protected_scans = 0
+    try:
+        orchestrator = runtime.services.turn_orchestrator
+        orchestrator.diagnostic_reporter = emitted.append
+        service = orchestrator.dynamic_session_service
+        service_type = type(service)
+        original_load_authority = service_type._load_dynamic_authority
+        original_hidden_index = dynamic_orchestrator_module._hidden_reference_index
+
+        async def count_authority_load(self, *args, **kwargs):
+            nonlocal authority_loads
+            if self is service:
+                authority_loads += 1
+            return await original_load_authority(self, *args, **kwargs)
+
+        def count_protected_scan(*args, **kwargs):
+            nonlocal protected_scans
+            protected_scans += 1
+            return original_hidden_index(*args, **kwargs)
+
+        monkeypatch.setattr(service_type, "_load_dynamic_authority", count_authority_load)
+        monkeypatch.setattr(
+            dynamic_orchestrator_module, "_hidden_reference_index", count_protected_scan
+        )
+        before = runtime.store.snapshot()
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = {
+            "turn_id": "length-recovery-turn",
+            "client_request_id": "length-recovery-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert response.json()["narrative_text"] == replacement_text
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            instruction,
+        ]
+        assert emitted == []
+        assert tuple(after.sessions) == tuple(before.sessions)
+        assert (
+            after.sessions[session_id].session.state_version
+            == before.sessions[session_id].session.state_version + 1
+        )
+        assert len(after.snapshots) == len(before.snapshots)
+        assert after.snapshots != before.snapshots
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        assert len(call_stores) == 2
+        for call_store in call_stores:
+            assert call_store.sessions == before.sessions
+            assert call_store.snapshots == before.snapshots
+            assert call_store.events == before.events
+            assert call_store.turn_requests == before.turn_requests
+            assert len(call_store.narrative_jobs) == len(before.narrative_jobs) + 1
+            intermediate_job = next(iter(call_store.narrative_jobs.values()))
+            assert intermediate_job.status is NarrativeJobStatus.IN_PROGRESS
+            assert intermediate_job.validated_proposal is None
+            assert intermediate_job.accepted_narrative_text is None
+        assert len(call_jobs) == 2
+        assert call_jobs[0].job_id == call_jobs[1].job_id
+        assert call_jobs[0].lease_token == call_jobs[1].lease_token
+        assert call_jobs[0].lease_owner == call_jobs[1].lease_owner
+        assert call_jobs[0].attempt_count == call_jobs[1].attempt_count == 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.attempt_count == 1
+        assert job.accepted_narrative_text == replacement_text
+        assert job.validated_proposal is not None
+        assert first_text not in json.dumps(after, default=str, ensure_ascii=False)
+        view_after = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        assert view_after["metadata"]["state_version"] == view_before["metadata"]["state_version"] + 1
+        assert view_after != view_before
+        assert protected_scans == 3
+        assert authority_loads >= 2
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == []
+        assert protected_scans == 3
+        assert (await client.get(f"/v1/sessions/{session_id}/view")).json() == view_after
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("length", (350, 900))
+async def test_preferred_first_generation_boundaries_commit_with_one_call(
+    length: int,
+) -> None:
+    narrative_text = "界" * length
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            if len(self.requests) > 1:
+                raise AssertionError("preferred first result must not be replaced")
+            return _candidate_with_exact_narrative_text(request, narrative_text)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": f"preferred-first-{length}-turn",
+            "client_request_id": f"preferred-first-{length}-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert response.json()["narrative_text"] == narrative_text
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY
+        ]
+        assert emitted == []
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.accepted_narrative_text == narrative_text
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200 and replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 1
+        assert emitted == []
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("first_outcome", "replacement_length", "instruction", "expected"),
+    (
+        (
+            "below",
+            119,
+            DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM,
+            DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_BELOW_MINIMUM,
+        ),
+        (
+            "unparseable",
+            119,
+            DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID,
+            DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_BELOW_MINIMUM,
+        ),
+        (
+            "above",
+            901,
+            DynamicGenerationInstruction.REPLACE_ABOVE_MAXIMUM,
+            DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_ABOVE_MAXIMUM,
+        ),
+    ),
+)
+async def test_exhausted_length_recovery_reports_only_final_direction_and_replays(
+    first_outcome: str,
+    replacement_length: int,
+    instruction: DynamicGenerationInstruction,
+    expected: DynamicNarrativeRejectionDiagnostic,
+) -> None:
+    first_text = "初" * (901 if first_outcome == "above" else 349)
+    replacement_text = "界" * replacement_length
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                if first_outcome == "unparseable":
+                    raise DynamicNarrativeResponseError(
+                        DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+                    )
+                return _candidate_with_exact_narrative_text(request, first_text)
+            return _candidate_with_exact_narrative_text(request, replacement_text)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = {
+            "turn_id": "exhausted-length-turn",
+            "client_request_id": "exhausted-length-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert response.json() == {"error": {"error_code": "NARRATIVE_PROPOSAL_REJECTED", "message": "Narrative processing failed"}}
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            instruction,
+        ]
+        assert emitted == [expected]
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.attempt_count == 1
+        assert job.validated_proposal is None
+        assert job.accepted_narrative_text is None
+        serialized_after = json.dumps(after, default=str, ensure_ascii=False)
+        assert replacement_text not in serialized_after
+        if first_outcome != "unparseable":
+            assert first_text not in serialized_after
+        assert view_before == (await client.get(f"/v1/sessions/{session_id}/view")).json()
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == [expected]
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_length_replacement_non_length_rejection_has_no_third_call() -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            text = "初" * 349 if len(self.requests) == 1 else "state_version" + "界" * 107
+            assert len(text) in {120, 349}
+            return _candidate_with_exact_narrative_text(request, text)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": "replacement-non-length-turn",
+            "client_request_id": "replacement-non-length-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert len(provider.requests) == 2
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER]
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        assert next(iter(after.narrative_jobs.values())).validated_proposal is None
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER]
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("category", "replacement_length"),
+    (
+        (DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE, 120),
+        (DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE, 349),
+        (DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE, 350),
+        (DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE, 900),
+    ),
+)
+async def test_structural_recovery_commits_only_complete_replacement_once(
+    category: DynamicNarrativeResponseCategory,
+    replacement_length: int,
+) -> None:
+    replacement_text = "界" * replacement_length
+    intermediate = None
+    call_jobs = []
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            nonlocal intermediate
+            self.requests.append(request)
+            call_jobs.append(next(iter(runtime.store.snapshot().narrative_jobs.values())))
+            if len(self.requests) == 1:
+                raise DynamicNarrativeResponseError(
+                    category,
+                    schema_failure_family=(
+                        DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE
+                        if category
+                        is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+                        else None
+                    ),
+                )
+            intermediate = runtime.store.snapshot()
+            return _candidate_with_exact_narrative_text(request, replacement_text)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = {
+            "turn_id": f"structural-success-{category.value}-turn",
+            "client_request_id": f"structural-success-{category.value}-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert response.json()["narrative_text"] == replacement_text
+        expected_instruction = (
+            DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            if category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+            else DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID
+        )
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            expected_instruction,
+        ]
+        assert provider.requests[0].model_dump(mode="json") == provider.requests[1].model_dump(mode="json")
+        expected_diagnostics = (
+            [
+                DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            ]
+            if category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+            else []
+        )
+        assert emitted == expected_diagnostics
+        assert intermediate is not None
+        assert intermediate.sessions == before.sessions
+        assert intermediate.snapshots == before.snapshots
+        assert intermediate.events == before.events
+        assert intermediate.turn_requests == before.turn_requests
+        assert len(intermediate.narrative_jobs) == len(before.narrative_jobs) + 1
+        intermediate_job = next(iter(intermediate.narrative_jobs.values()))
+        assert intermediate_job.status is NarrativeJobStatus.IN_PROGRESS
+        assert intermediate_job.attempt_count == 1
+        assert intermediate_job.validated_proposal is None
+        assert intermediate_job.accepted_narrative_text is None
+        assert len(call_jobs) == 2
+        assert call_jobs[0].job_id == call_jobs[1].job_id == intermediate_job.job_id
+        assert call_jobs[0].lease_token == call_jobs[1].lease_token == intermediate_job.lease_token
+        assert call_jobs[0].lease_owner == call_jobs[1].lease_owner == intermediate_job.lease_owner
+        assert call_jobs[0].attempt_count == call_jobs[1].attempt_count == 1
+        assert "REPLACE_RESPONSE_INVALID" not in json.dumps(
+            intermediate_job.narrative_request, ensure_ascii=False
+        )
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.job_id == intermediate_job.job_id
+        assert job.lease_token is None
+        assert job.lease_owner is None
+        assert job.attempt_count == 1
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.accepted_narrative_text == replacement_text
+        assert view_before != (await client.get(f"/v1/sessions/{session_id}/view")).json()
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200 and replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == expected_diagnostics
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("family", "instruction", "diagnostic"),
+    (
+        (
+            DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
+            DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE,
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE,
+        ),
+        (
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+            DynamicGenerationInstruction.REPLACE_SCHEMA_REQUIRED_OR_EXTRA_FIELDS,
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS,
+        ),
+        (
+            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+            DynamicGenerationInstruction.REPLACE_SCHEMA_TYPE_OR_LITERAL,
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_TYPE_OR_LITERAL,
+        ),
+        (
+            DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS,
+            DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS,
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS,
+        ),
+        (
+            DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+            DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+        ),
+    ),
+)
+async def test_each_schema_family_replaces_once_commits_once_and_is_locally_auditable(
+    family: DynamicNarrativeSchemaFailureFamily,
+    instruction: DynamicGenerationInstruction,
+    diagnostic: DynamicNarrativeRejectionDiagnostic,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                raise DynamicNarrativeResponseError(
+                    DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+                    schema_failure_family=family,
+                )
+            if len(self.requests) > 2:
+                raise AssertionError("schema recovery must never make a third generation")
+            return _candidate_with_exact_narrative_text(request, "界" * 350)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    protected_scans = 0
+    original_hidden_index = dynamic_orchestrator_module._hidden_reference_index
+
+    def count_protected_scan(*args, **kwargs):
+        nonlocal protected_scans
+        protected_scans += 1
+        return original_hidden_index(*args, **kwargs)
+
+    monkeypatch.setattr(
+        dynamic_orchestrator_module, "_hidden_reference_index", count_protected_scan
+    )
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view["action_affordances"]["suggested_actions"][0]["submission"]
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            instruction,
+        ]
+        assert emitted == [diagnostic]
+        assert diagnostic.value not in response.text
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert (
+            after.sessions[session_id].session.state_version
+            == before.sessions[session_id].session.state_version + 1
+        )
+        assert after.snapshots[session_id].state_version == (
+            before.snapshots[session_id].state_version + 1
+        )
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.attempt_count == 1
+        assert job.validated_proposal is not None
+        assert job.accepted_narrative_text == "界" * 350
+        assert protected_scans == 3
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == [diagnostic]
+        assert protected_scans == 3
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement_valid", (True, False))
+async def test_valid_json_float_uses_type_replacement_once_without_a_third_generation(
+    replacement_valid: bool,
+) -> None:
+    float_content = json.dumps(
+        _candidate_payload(proposed_consequences=[1.5]),
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    replacement_content = (
+        _dynamic_provider_content(
+            key=DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE,
+            narrative_length=350,
+        )
+        if replacement_valid
+        else float_content
+    )
+    transport = _ScriptedDynamicTransport([float_content, replacement_content])
+    runtime = build_dynamic_demo_runtime(
+        provider=_offline_deepseek_dynamic_provider(transport), environ={}
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view_before["action_affordances"]["suggested_actions"][0]["submission"]
+        before = runtime.store.snapshot()
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert len(transport.calls) == 2
+        assert transport.contents == []
+        assert all(
+            call["payload"]["response_format"] == {"type": "json_object"}
+            for call in transport.calls
+        )
+        second_prompt = transport.calls[1]["payload"]["messages"][1]["content"]
+        assert "prior response was valid JSON" in second_prompt
+        assert "Correct every field type" in second_prompt
+        assert "only the declared literal values" in second_prompt
+        assert "1.5" not in second_prompt
+        assert emitted[0] is (
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_TYPE_OR_LITERAL
+        )
+        if replacement_valid:
+            assert response.status_code == 200, response.text
+            assert emitted == [
+                DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_TYPE_OR_LITERAL
+            ]
+            assert len(after.events) == len(before.events) + 1
+            assert len(after.turn_requests) == len(before.turn_requests) + 1
+            assert (
+                after.sessions[session_id].session.state_version
+                == before.sessions[session_id].session.state_version + 1
+            )
+            assert (
+                after.snapshots[session_id].state_version
+                == before.snapshots[session_id].state_version + 1
+            )
+            job = next(iter(after.narrative_jobs.values()))
+            assert job.status is NarrativeJobStatus.COMMITTED
+            assert job.validated_proposal is not None
+            assert job.accepted_narrative_text == "界" * 350
+        else:
+            assert response.status_code == 503
+            assert response.json() == {
+                "error": {
+                    "error_code": "NARRATIVE_PROVIDER_RESPONSE_INVALID",
+                    "message": "Narrative processing failed",
+                }
+            }
+            assert emitted == [
+                DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_TYPE_OR_LITERAL,
+                DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID,
+                DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_TYPE_OR_LITERAL,
+            ]
+            assert after.sessions == before.sessions
+            assert after.snapshots == before.snapshots
+            assert after.events == before.events
+            assert after.turn_requests == before.turn_requests
+            job = next(iter(after.narrative_jobs.values()))
+            assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+            assert job.error_code == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+            assert job.validated_proposal is None
+            assert job.accepted_narrative_text is None
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == response.status_code
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(transport.calls) == 2
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_malformed_response_canary_is_absent_from_recovery_and_durable_surfaces() -> None:
+    canary = "INERT-SENSITIVE-MALFORMED-RESPONSE-CANARY-63814"
+    transport = _ScriptedDynamicTransport(
+        [
+            '{"rejected":"' + canary + '"',
+            _dynamic_provider_content(
+                key=DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE,
+                narrative_length=350,
+            ),
+        ]
+    )
+    runtime = build_dynamic_demo_runtime(
+        provider=_offline_deepseek_dynamic_provider(transport), environ={}
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view["action_affordances"]["suggested_actions"][0]["submission"]
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert len(transport.calls) == 2
+        assert transport.contents == []
+        replacement_prompt = transport.calls[1]["payload"]["messages"][1]["content"]
+        assert "prior response was not one parseable complete JSON object" in (
+            replacement_prompt
+        )
+        assert canary not in replacement_prompt
+        assert canary not in response.text
+        assert canary not in repr(emitted)
+        assert canary not in json.dumps(after, default=str, ensure_ascii=False)
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.validated_proposal is not None
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(transport.calls) == 2
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_safe_provider_key_preferred_first_response_commits_once_and_replays() -> None:
+    safe_key = DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE
+    transport = _ScriptedDynamicTransport(
+        [_dynamic_provider_content(key=safe_key, narrative_length=350)]
+    )
+    runtime = build_dynamic_demo_runtime(
+        provider=_offline_deepseek_dynamic_provider(transport), environ={}
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view["action_affordances"]["suggested_actions"][0]["submission"]
+        before = runtime.store.snapshot()
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert response.json()["result_code"] == "DYNAMIC_NARRATIVE_COMMITTED"
+        assert response.json()["narrative_text"] == "界" * 350
+        assert len(transport.calls) == 1
+        assert transport.contents == []
+        assert emitted == []
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        assert after.sessions[session_id].session.state_version == 1
+        assert after.snapshots[session_id].state_version == 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.validated_proposal is not None
+        assert job.validated_proposal["candidate"]["proposed_public_facts"] == (
+            {
+                "key": safe_key,
+                "value": "A plainly synthetic public observation.",
+            },
+        )
+        dynamic_facts = after.snapshots[session_id].state["scenario_runtime"][
+            "dynamic_facts"
+        ]
+        assert any(
+            isinstance(value, dict) and value.get("key") == safe_key
+            for value in dynamic_facts.values()
+        )
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(transport.calls) == 1
+        assert emitted == []
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("replacement_length", (120, 350))
+async def test_invalid_provider_key_uses_one_safe_structural_replacement(
+    replacement_length: int,
+) -> None:
+    safe_key = DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE
+    transport = _ScriptedDynamicTransport(
+        [
+            _dynamic_provider_content(key="fact.synthetic", narrative_length=350),
+            _dynamic_provider_content(
+                key=safe_key, narrative_length=replacement_length
+            ),
+        ]
+    )
+    runtime = build_dynamic_demo_runtime(
+        provider=_offline_deepseek_dynamic_provider(transport), environ={}
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    intermediate = None
+
+    def capture_second_call(call_count: int) -> None:
+        nonlocal intermediate
+        if call_count == 2:
+            intermediate = runtime.store.snapshot()
+
+    transport.before_response = capture_second_call
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view["action_affordances"]["suggested_actions"][0]["submission"]
+        before = runtime.store.snapshot()
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 200, response.text
+        assert response.json()["result_code"] == "DYNAMIC_NARRATIVE_COMMITTED"
+        assert response.json()["narrative_text"] == "界" * replacement_length
+        assert len(transport.calls) == 2
+        assert transport.contents == []
+        assert emitted == [
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
+        ]
+        assert intermediate is not None
+        intermediate_job = next(iter(intermediate.narrative_jobs.values()))
+        assert intermediate_job.status is NarrativeJobStatus.IN_PROGRESS
+        assert intermediate_job.validated_proposal is None
+        assert intermediate_job.accepted_narrative_text is None
+        assert intermediate.sessions == before.sessions
+        assert intermediate.snapshots == before.snapshots
+        assert intermediate.events == before.events
+        assert intermediate.turn_requests == before.turn_requests
+        second_prompt = transport.calls[1]["payload"]["messages"][1]["content"]
+        assert "prior response was valid JSON" in second_prompt
+        assert "exact generated public-fact-key ASCII grammar" in second_prompt
+        assert "fact.synthetic" not in second_prompt
+        assert DynamicGeneratedPublicFactKeyGrammar.PATTERN_TEXT in second_prompt
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.validated_proposal is not None
+        serialized = canonical_json(job.validated_proposal)
+        assert safe_key in serialized
+        assert "fact.synthetic" not in serialized
+        assert len(after.events) == len(before.events) + 1
+        assert len(after.turn_requests) == len(before.turn_requests) + 1
+        assert after.sessions[session_id].session.state_version == 1
+        assert after.snapshots[session_id].state_version == 1
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 200
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(transport.calls) == 2
+        assert emitted == [
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
+        ]
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_invalid_provider_key_replacement_terminalizes_without_third_generation() -> None:
+    transport = _ScriptedDynamicTransport(
+        [
+            _dynamic_provider_content(key="fact.synthetic", narrative_length=350),
+            _dynamic_provider_content(key="public-note-receipt", narrative_length=350),
+        ]
+    )
+    runtime = build_dynamic_demo_runtime(
+        provider=_offline_deepseek_dynamic_provider(transport), environ={}
+    )
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = view_before["action_affordances"]["suggested_actions"][0]["submission"]
+        before = runtime.store.snapshot()
+
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert response.json() == {
+            "error": {
+                "error_code": "NARRATIVE_PROVIDER_RESPONSE_INVALID",
+                "message": "Narrative processing failed",
+            }
+        }
+        assert len(transport.calls) == 2
+        assert transport.contents == []
+        assert emitted == [
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID,
+            DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+        ]
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+        assert job.validated_proposal is None
+        assert job.accepted_narrative_text is None
+        assert (await client.get(f"/v1/sessions/{session_id}/view")).json() == view_before
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 503
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(transport.calls) == 2
+        assert emitted == [
+            DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID,
+            DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+        ]
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("first_category", "final_category", "expected"),
+    (
+        (
+            DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE,
+            DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_UNPARSEABLE,
+        ),
+        (
+            DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+            DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID,
+        ),
+        (
+            DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE,
+            DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_SCHEMA_INVALID,
+        ),
+    ),
+)
+async def test_exhausted_structural_recovery_reports_safe_recovery_and_final_evidence(
+    first_category: DynamicNarrativeResponseCategory,
+    final_category: DynamicNarrativeResponseCategory,
+    expected: DynamicNarrativeRejectionDiagnostic,
+) -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            category = first_category if len(self.requests) == 1 else final_category
+            raise DynamicNarrativeResponseError(
+                category,
+                schema_failure_family=(
+                    DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE
+                    if category
+                    is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+                    else None
+                ),
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = {
+            "turn_id": "structural-exhausted-turn",
+            "client_request_id": "structural-exhausted-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert response.json() == {
+            "error": {
+                "error_code": "NARRATIVE_PROVIDER_RESPONSE_INVALID",
+                "message": "Narrative processing failed",
+            }
+        }
+        replacement_instruction = (
+            DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            if first_category
+            is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
+            else DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID
+        )
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            replacement_instruction,
+        ]
+        expected_diagnostics = []
+        if first_category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE:
+            expected_diagnostics.append(
+                DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            )
+        expected_diagnostics.append(expected)
+        if final_category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE:
+            expected_diagnostics.append(
+                DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            )
+        assert emitted == expected_diagnostics
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+        assert job.attempt_count == 1
+        assert job.validated_proposal is None
+        assert job.accepted_narrative_text is None
+        assert view_before == (await client.get(f"/v1/sessions/{session_id}/view")).json()
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 503 and replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == expected_diagnostics
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("first", "final", "expected_code", "expected_status", "expected_token"),
+    (
+        (
+            "below",
+            "unparseable",
+            "NARRATIVE_PROVIDER_RESPONSE_INVALID",
+            NarrativeJobStatus.FAILED_TERMINAL,
+            DynamicNarrativeRejectionDiagnostic.PRE_RESPONSE_UNPARSEABLE,
+        ),
+        (
+            "unparseable",
+            "floor",
+            "NARRATIVE_PROPOSAL_REJECTED",
+            NarrativeJobStatus.FAILED_TERMINAL,
+            DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_BELOW_MINIMUM,
+        ),
+        (
+            "schema",
+            "above",
+            "NARRATIVE_PROPOSAL_REJECTED",
+            NarrativeJobStatus.FAILED_TERMINAL,
+            DynamicNarrativeRejectionDiagnostic.PRE_LENGTH_ABOVE_MAXIMUM,
+        ),
+        (
+            "unparseable",
+            "provider",
+            "NARRATIVE_OUTCOME_UNKNOWN",
+            NarrativeJobStatus.OUTCOME_UNKNOWN,
+            None,
+        ),
+    ),
+)
+async def test_shared_replacement_budget_uses_only_final_cross_layer_outcome(
+    first: str,
+    final: str,
+    expected_code: str,
+    expected_status: NarrativeJobStatus,
+    expected_token: DynamicNarrativeRejectionDiagnostic | None,
+) -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            outcome = first if len(self.requests) == 1 else final
+            if outcome == "unparseable":
+                raise DynamicNarrativeResponseError(
+                    DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+                )
+            if outcome == "schema":
+                raise DynamicNarrativeResponseError(
+                    DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+                    schema_failure_family=(
+                        DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE
+                    ),
+                )
+            if outcome == "provider":
+                raise NarrativeProviderUnavailableError()
+            if outcome == "below":
+                return _candidate_with_exact_narrative_text(request, "界" * 349)
+            if outcome == "floor":
+                return _candidate_with_exact_narrative_text(request, "界" * 119)
+            if outcome == "above":
+                return _candidate_with_exact_narrative_text(request, "界" * 901)
+            raise AssertionError(outcome)
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": f"cross-{first}-{final}-turn",
+            "client_request_id": f"cross-{first}-{final}-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        expected_http = 409 if expected_status is NarrativeJobStatus.OUTCOME_UNKNOWN else 503
+        assert response.status_code == expected_http
+        assert response.json()["error"]["error_code"] == expected_code
+        expected_instruction = (
+            DynamicGenerationInstruction.REPLACE_BELOW_MINIMUM
+            if first == "below"
+            else DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            if first == "schema"
+            else DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID
+        )
+        assert [request.generation_instruction for request in provider.requests] == [
+            DynamicGenerationInstruction.ORDINARY,
+            expected_instruction,
+        ]
+        expected_diagnostics = (
+            [
+                DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE
+            ]
+            if first == "schema"
+            else []
+        )
+        if expected_token is not None:
+            expected_diagnostics.append(expected_token)
+        assert emitted == expected_diagnostics
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is expected_status
+        assert job.error_code == expected_code
+        assert job.attempt_count == 1
+        assert job.validated_proposal is None
+        assert job.accepted_narrative_text is None
+
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == expected_http and replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == expected_diagnostics
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_structural_replacement_protected_reference_rejects_without_third_call() -> None:
+    hidden_value: str | None = None
+
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            if len(self.requests) == 1:
+                raise DynamicNarrativeResponseError(
+                    DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+                )
+            assert hidden_value is not None
+            replacement_text = hidden_value + "界" * (120 - len(hidden_value))
+            assert len(replacement_text) == 120
+            return _candidate_with_exact_narrative_text(
+                request, replacement_text
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        probe = ActionSubmission(
+            session_id=session_id,
+            **view["action_affordances"]["suggested_actions"][0]["submission"],
+        )
+        resolved = await runtime.services.turn_orchestrator._resolve_attempt(probe)
+        hidden_value = next(
+            record.original
+            for record in _hidden_reference_index(
+                resolved, None, runtime.services.turn_orchestrator.catalog
+            )
+            if ".locations[1].title" in record.source_key and len(record.original) <= 120
+        )
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": "structural-protected-turn",
+            "client_request_id": "structural-protected-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+
+        assert response.status_code == 503
+        assert response.json()["error"]["error_code"] == "NARRATIVE_PROPOSAL_REJECTED"
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE]
+        assert len(provider.requests) == 2
+        assert next(iter(after.narrative_jobs.values())).validated_proposal is None
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 2
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE]
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_initial_generic_provider_response_failure_remains_nonrecoverable() -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            raise NarrativeProviderResponseError()
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        body = {
+            "turn_id": "generic-provider-response-turn",
+            "client_request_id": "generic-provider-response-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+        assert response.status_code == 503
+        assert response.json()["error"]["error_code"] == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+        assert len(provider.requests) == 1
+        assert emitted == []
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_initial_non_length_semantic_rejection_remains_nonrecoverable() -> None:
+    class Provider:
+        def __init__(self) -> None:
+            self.requests: list[DynamicNarrativeRequest] = []
+
+        async def generate_dynamic(self, request):
+            self.requests.append(request)
+            candidate = _safe_candidate(request)
+            return candidate.model_copy(
+                update={
+                    "candidate": candidate.candidate.model_copy(
+                        update={
+                            "suggested_actions": (
+                                request.player_action.description,
+                                "观察公开环境。",
+                                "谨慎继续前进。",
+                            )
+                        }
+                    )
+                }
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        body = {
+            "turn_id": "non-length-semantic-turn",
+            "client_request_id": "non-length-semantic-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after = runtime.store.snapshot()
+        assert response.status_code == 503
+        assert response.json()["error"]["error_code"] == "NARRATIVE_PROPOSAL_REJECTED"
+        assert len(provider.requests) == 1
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION]
+        assert next(iter(after.narrative_jobs.values())).validated_proposal is None
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.json() == response.json()
+        assert runtime.store.snapshot() == after
+        assert len(provider.requests) == 1
+    finally:
         await client.aclose()
         await runtime.aclose()
 
@@ -1777,7 +3738,9 @@ async def test_public_reference_records_retain_owner_field_frame_original_and_no
         orchestrator = runtime.services.turn_orchestrator
         resolved = await orchestrator._resolve_attempt(submission)
         request = orchestrator._build_request(resolved, submission)
-        records = _public_reference_records(request, resolved)
+        records = _public_reference_records(
+            request, resolved, runtime.services.turn_orchestrator.catalog
+        )
         assert records
         assert all(
             record.classification == "STRUCTURED_PUBLIC_REFERENCE"
@@ -1792,6 +3755,36 @@ async def test_public_reference_records_retain_owner_field_frame_original_and_no
         assert any(
             record.owner_key.startswith("scenario-role:") for record in records
         )
+        assert {
+            (record.owner_key, record.field_path)
+            for record in records
+            if record.field_path
+            in {
+                "ScenarioDefinition.public_client.title",
+                "ScenarioDefinition.public_client.hook",
+                "CharacterDefinition.display_name",
+                "PublicPlayableCharacter.description",
+            }
+        } == {
+            (
+                f"scenario-public-projection:{resolved.authority.definition.scenario_id}:"
+                f"{resolved.authority.definition.content_version}",
+                "ScenarioDefinition.public_client.title",
+            ),
+            (
+                f"scenario-public-projection:{resolved.authority.definition.scenario_id}:"
+                f"{resolved.authority.definition.content_version}",
+                "ScenarioDefinition.public_client.hook",
+            ),
+            (
+                f"scenario-role:{resolved.authority.state.player.character_definition_id}",
+                "CharacterDefinition.display_name",
+            ),
+            (
+                f"scenario-role:{resolved.authority.state.player.character_definition_id}",
+                "PublicPlayableCharacter.description",
+            ),
+        }
         assert any(
             record.field_path.startswith("canonical_facts[") for record in records
         )
@@ -1818,8 +3811,8 @@ async def test_finalize_rejects_equal_values_when_public_provenance_binding_move
         ) = await _prepared_dynamic_attempt(runtime, client, session_id)
         original = _public_reference_records
 
-        def moved_records(request, current_resolved):
-            records = original(request, current_resolved)
+        def moved_records(request, current_resolved, catalog):
+            records = original(request, current_resolved, catalog)
             return (replace(records[0], owner_key=records[0].owner_key + ":moved"), *records[1:])
 
         monkeypatch.setattr(
@@ -2478,14 +4471,18 @@ async def test_provider_failure_preserves_byte_identical_last_committed_view() -
 
 
 @pytest.mark.asyncio
-async def test_public_role_exact_value_is_declassified_but_public_title_is_not() -> None:
-    def role_candidate(request):
+async def test_authoritative_public_premise_and_role_values_are_declassified() -> None:
+    def public_candidate(request):
         return _safe_candidate(
             request,
-            narrative_text=(request.scenario_role.display_name + " 保持公开可见。") * 80,
+            narrative_text=(
+                f"{request.scenario_premise.title}。{request.scenario_premise.hook}。"
+                f"{request.scenario_role.display_name}。{request.scenario_role.description}。"
+                + "公开叙述继续推进。" * 55
+            ),
         )
 
-    allowed_provider = _GateProvider(candidate_factory=role_candidate)
+    allowed_provider = _GateProvider(candidate_factory=public_candidate)
     allowed_provider.release.set()
     allowed_runtime = build_dynamic_demo_runtime(provider=allowed_provider, environ={})
     allowed_runtime, allowed_client, allowed_session = await _entered_dynamic_client(
@@ -2498,45 +4495,13 @@ async def test_public_role_exact_value_is_declassified_but_public_title_is_not()
                 "turn_id": "free-public-turn",
                 "client_request_id": "free-public-request",
                 "action_type": "CUSTOM",
-                "description": "Use the public role only.",
+                "description": "Use authoritative public prose only.",
             },
         )
         assert response.status_code == 200, response.text
     finally:
         await allowed_client.aclose()
         await allowed_runtime.aclose()
-
-    def title_candidate(request):
-        return _safe_candidate(
-            request,
-            narrative_text=(request.scenario_premise.title + "。") * 80,
-        )
-
-    rejected_provider = _GateProvider(candidate_factory=title_candidate)
-    rejected_provider.release.set()
-    rejected_runtime = build_dynamic_demo_runtime(provider=rejected_provider, environ={})
-    rejected_runtime, rejected_client, rejected_session = await _entered_dynamic_client(
-        rejected_runtime
-    )
-    try:
-        response = await rejected_client.post(
-            f"/v1/sessions/{rejected_session}/actions",
-            json={
-                "turn_id": "free-hidden-turn",
-                "client_request_id": "free-hidden-request",
-                "action_type": "CUSTOM",
-                "description": "Try public prose without reference authority.",
-            },
-        )
-        assert response.status_code == 503
-        assert response.json()["error"]["error_code"] == "NARRATIVE_PROPOSAL_REJECTED"
-        assert (
-            await rejected_client.get(f"/v1/sessions/{rejected_session}/view")
-        ).json()["metadata"]["state_version"] == 0
-    finally:
-        await rejected_client.aclose()
-        await rejected_runtime.aclose()
-
 
 @pytest.mark.asyncio
 async def test_fact_ring_rolls_over_in_exact_twelve_slot_order() -> None:
@@ -2611,7 +4576,8 @@ async def test_finite_hidden_extractor_records_scenario_catalog_runtime_run_and_
         for family in (
             "hidden:FactEqualsCondition:scenario.",
             "hidden:DecisionWindowDefinition:scenario.decision_windows",
-            "hidden:NarrativeIntentMatcher:scenario.narrative_outcome_rules",
+            "hidden:NarrativeOutcomeRuleDefinition:scenario.narrative_outcome_rules",
+            "hidden:NarrativeOutcomeEffectTemplate:scenario.narrative_outcome_rules",
             "hidden:ContentCatalog:catalog.content_version",
             "hidden:CharacterDefinition:catalog.characters",
             "hidden:NpcDefinition:catalog.npcs",
@@ -2625,6 +4591,25 @@ async def test_finite_hidden_extractor_records_scenario_catalog_runtime_run_and_
         assert not any(".schema_version" in key for key in keys)
         assert not any("dynamic_facts" in key for key in keys)
         assert not any("narrative_request" in key for key in keys)
+        for removed in (
+            ".intent.required_any_terms",
+            ".intent.required_action_terms",
+            ".intent.forbidden_terms",
+            ".effects[0].required_prose_any_terms",
+            "scenario.public_client.actions[0].label",
+        ):
+            assert not any(removed in key for key in keys), removed
+        for retained in (
+            ".safe_description",
+            ".fixed_public_narrative_text",
+            ".player_alive_acknowledgement_public_text",
+            ".forbidden_prose_terms",
+            ".locations[1].title",
+            "hidden:ScenarioDefinition:scenario.scenario_id",
+            "hidden:NarrativeJob:job.job_id",
+            "hidden:CanonicalRun:run.run_id",
+        ):
+            assert any(retained in key for key in keys), retained
     finally:
         await client.aclose()
         await runtime.aclose()
@@ -2647,6 +4632,154 @@ def test_finite_hidden_extractor_traverses_all_six_catalog_collections() -> None
         "hidden:ResourceModifierEffectDefinition:catalog.effects",
     ):
         assert any(key.startswith(family) for key in keys), family
+
+
+@pytest.mark.asyncio
+async def test_control_vocabulary_from_real_scenario_is_not_a_protected_reference() -> None:
+    control_values: tuple[str, str, str] | None = None
+
+    def control_candidate(request):
+        assert control_values is not None
+        return _safe_candidate(
+            request,
+            narrative_text=("。".join(control_values) + "。公开叙述继续推进。" * 60),
+        )
+
+    provider = _GateProvider(candidate_factory=control_candidate)
+    provider.release.set()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        probe = ActionSubmission(
+            session_id=session_id,
+            **view["action_affordances"]["suggested_actions"][0]["submission"],
+        )
+        definition = (
+            await runtime.services.turn_orchestrator._resolve_attempt(probe)
+        ).authority.definition
+        public = definition.public_client
+        assert public is not None
+        control_values = (
+            public.actions[0].label,
+            definition.narrative_outcome_rules[0].intent.required_any_terms[0],
+            definition.narrative_outcome_rules[0].effects[0].required_prose_any_terms[0],
+        )
+        response = await client.post(
+            f"/v1/sessions/{session_id}/actions",
+            json={
+                "turn_id": "control-vocabulary-turn",
+                "client_request_id": "control-vocabulary-request",
+                "action_type": "CUSTOM",
+                "description": "Use ordinary public control vocabulary.",
+            },
+        )
+        assert response.status_code == 200, response.text
+        assert provider.invocations == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_retained_hidden_reference_rejects_once_and_identical_replay_is_terminal() -> None:
+    hidden_value: str | None = None
+
+    def hidden_candidate(request):
+        assert hidden_value is not None
+        return _safe_candidate(
+            request,
+            narrative_text=hidden_value + "。公开叙述继续推进。" * 60,
+        )
+
+    provider = _GateProvider(candidate_factory=hidden_candidate)
+    provider.release.set()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        snapshot_before = runtime.store.snapshot()
+        submission = ActionSubmission(
+            session_id=session_id,
+            **view_before["action_affordances"]["suggested_actions"][0]["submission"],
+        )
+        resolved = await runtime.services.turn_orchestrator._resolve_attempt(submission)
+        records = _hidden_reference_index(
+            resolved, None, runtime.services.turn_orchestrator.catalog
+        )
+        hidden_value = next(
+            record.original for record in records if ".safe_description" in record.source_key
+        )
+        runtime.services.turn_orchestrator.diagnostic_reporter = emitted.append
+        body = submission.model_dump(mode="json", exclude={"session_id"})
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        snapshot_after = runtime.store.snapshot()
+        assert response.status_code == 503
+        assert response.json() == {"error": {"error_code": "NARRATIVE_PROPOSAL_REJECTED", "message": "Narrative processing failed"}}
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE]
+        assert provider.invocations == 1
+        assert snapshot_after.sessions == snapshot_before.sessions
+        assert snapshot_after.snapshots == snapshot_before.snapshots
+        assert snapshot_after.events == snapshot_before.events
+        assert snapshot_after.turn_requests == snapshot_before.turn_requests
+        assert len(snapshot_after.narrative_jobs) == len(snapshot_before.narrative_jobs) + 1
+        job = next(iter(snapshot_after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
+        assert job.attempt_count == 1
+        assert (await client.get(f"/v1/sessions/{session_id}/view")).json() == view_before
+        replay = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert replay.status_code == 503 and replay.json() == response.json()
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE]
+        assert provider.invocations == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_player_action_description_cannot_declassify_a_hidden_reference() -> None:
+    hidden_value: str | None = None
+
+    def hidden_candidate(request):
+        assert hidden_value is not None
+        return _safe_candidate(request, narrative_text=hidden_value + "。公开叙述继续推进。" * 60)
+
+    provider = _GateProvider(candidate_factory=hidden_candidate)
+    provider.release.set()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        probe = ActionSubmission(
+            session_id=session_id,
+            **view["action_affordances"]["suggested_actions"][0]["submission"],
+        )
+        resolved = await runtime.services.turn_orchestrator._resolve_attempt(probe)
+        hidden_value = next(
+            record.original
+            for record in _hidden_reference_index(
+                resolved, None, runtime.services.turn_orchestrator.catalog
+            )
+            if ".locations[1].title" in record.source_key and len(record.original) <= 150
+        )
+        response = await client.post(
+            f"/v1/sessions/{session_id}/actions",
+            json={
+                "turn_id": "untrusted-hidden-turn",
+                "client_request_id": "untrusted-hidden-request",
+                "action_type": "CUSTOM",
+                "description": hidden_value,
+            },
+        )
+        assert response.status_code == 503
+        assert response.json()["error"]["error_code"] == "NARRATIVE_PROPOSAL_REJECTED"
+        assert provider.invocations == 1
+        assert runtime.store.snapshot().snapshots[session_id].state_version == 0
+    finally:
+        await client.aclose()
+        await runtime.aclose()
 
 
 @pytest.mark.asyncio

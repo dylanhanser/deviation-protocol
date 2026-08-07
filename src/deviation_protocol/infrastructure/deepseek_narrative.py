@@ -12,8 +12,11 @@ import httpx
 from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 
 from deviation_protocol.application.dynamic_narrative_models import (
-    DynamicNarrativeCandidatePayload,
     DynamicNarrativeRequest,
+    DynamicNarrativeResponseCategory,
+    DynamicNarrativeResponseError,
+    DynamicProviderCandidateContract,
+    DynamicProviderCandidateContractError,
     DynamicPromptBuilder,
     UntrustedDynamicNarrativeCandidate,
 )
@@ -359,10 +362,13 @@ class DeepSeekNarrativeProvider:
             raise NarrativeProviderUnavailableError()
         if self._settings.max_retries != 0:
             raise NarrativeProviderRequestError()
+        prompt_failed = False
         try:
             prompt = self._dynamic_prompt_builder.build(request)
         except (TypeError, ValueError):
-            raise NarrativeProviderRequestError() from None
+            prompt_failed = True
+        if prompt_failed:
+            raise NarrativeProviderRequestError()
         payload: dict[str, Any] = {
             "model": self._settings.model,
             "messages": [
@@ -380,6 +386,7 @@ class DeepSeekNarrativeProvider:
             "Accept": "application/json",
         }
         started = self._clock()
+        transport_failure: Literal["response", "unavailable"] | None = None
         try:
             response = await self._get_transport().post_json(
                 url=OFFICIAL_DEEPSEEK_CHAT_COMPLETIONS_URL,
@@ -388,13 +395,17 @@ class DeepSeekNarrativeProvider:
                 timeout_seconds=self._settings.timeout_seconds,
             )
         except (DeepSeekTransportTimeout, DeepSeekTransportConnectionError):
-            raise NarrativeProviderUnavailableError() from None
+            transport_failure = "unavailable"
         except DeepSeekTransportResponseError:
-            raise NarrativeProviderResponseError() from None
+            transport_failure = "response"
         except asyncio.CancelledError:
             raise
         except Exception:
-            raise NarrativeProviderUnavailableError() from None
+            transport_failure = "unavailable"
+        if transport_failure == "response":
+            raise NarrativeProviderResponseError()
+        if transport_failure == "unavailable":
+            raise NarrativeProviderUnavailableError()
 
         if response.status_code != 200:
             self._raise_status(response.status_code)
@@ -404,18 +415,37 @@ class DeepSeekNarrativeProvider:
         finish_reason, content = _choice_content(envelope)
         if finish_reason == "length":
             raise NarrativeProviderTruncatedError()
-        if finish_reason != "stop" or not isinstance(content, str) or not content.strip():
+        if finish_reason != "stop":
             raise NarrativeProviderResponseError()
+        if not isinstance(content, str) or not content.strip():
+            raise DynamicNarrativeResponseError(
+                DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+            )
+        decoding_failed = False
         try:
-            json.loads(
+            _decoded = json.loads(
                 content,
-                parse_float=_reject_float,
                 parse_constant=_reject_constant,
                 object_pairs_hook=_reject_duplicate_object_keys,
             )
-            candidate = DynamicNarrativeCandidatePayload.model_validate_json(content)
         except (UnicodeError, json.JSONDecodeError, TypeError, ValueError):
-            raise NarrativeProviderResponseError() from None
+            decoding_failed = True
+        if decoding_failed:
+            raise DynamicNarrativeResponseError(
+                DynamicNarrativeResponseCategory.UNPARSEABLE_RESPONSE
+            )
+        contract_failure_family = None
+        try:
+            candidate = DynamicProviderCandidateContract.validate_response_json(
+                _decoded, content
+            )
+        except DynamicProviderCandidateContractError as exc:
+            contract_failure_family = exc.family
+        if contract_failure_family is not None:
+            raise DynamicNarrativeResponseError(
+                DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE,
+                schema_failure_family=contract_failure_family,
+            )
         elapsed_ms = max(0, int((self._clock() - started) * 1_000))
         body_request_id = envelope.get("id")
         request_id = (
@@ -483,6 +513,7 @@ class DeepSeekNarrativeProvider:
 
 
 def _parse_envelope(body_text: str) -> dict[str, Any]:
+    parsing_failed = False
     try:
         parsed = json.loads(
             body_text,
@@ -490,7 +521,9 @@ def _parse_envelope(body_text: str) -> dict[str, Any]:
             object_pairs_hook=_reject_duplicate_object_keys,
         )
     except (UnicodeError, json.JSONDecodeError, TypeError, ValueError):
-        raise NarrativeProviderResponseError() from None
+        parsing_failed = True
+    if parsing_failed:
+        raise NarrativeProviderResponseError()
     if not isinstance(parsed, dict):
         raise NarrativeProviderResponseError()
     return parsed
