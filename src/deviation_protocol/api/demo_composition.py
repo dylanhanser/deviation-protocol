@@ -20,6 +20,7 @@ from deviation_protocol.application.dynamic_narrative_models import (
     canonical_json,
 )
 from deviation_protocol.application.dynamic_narrative_orchestrator import (
+    DynamicNarrativeRejectionDiagnostic,
     DynamicNarrativeOrchestrator,
     DynamicSessionService,
 )
@@ -214,6 +215,12 @@ class DynamicDemoShutdownError(RuntimeError):
 
     def __init__(self) -> None:
         super().__init__(self.code)
+
+
+def _report_live_rejection_diagnostic(
+    token: DynamicNarrativeRejectionDiagnostic,
+) -> None:
+    print(token.value, flush=True)
 
 
 class _DynamicFakeProvider:
@@ -737,6 +744,11 @@ def build_dynamic_demo_runtime(
         job_id_generator=runtime_generators.job_id,
         lease_token_generator=runtime_generators.lease_token,
         worker_id_generator=runtime_generators.worker_id,
+        **(
+            {"diagnostic_reporter": _report_live_rejection_diagnostic}
+            if provider is None and selector == "live"
+            else {}
+        ),
     )
     session_service.narrative_terminal_uncertainty_probe = (
         orchestrator.request_is_terminal_uncertain

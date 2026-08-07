@@ -50,6 +50,14 @@ and the overall project remain incomplete. Completing the spike would not
 establish production Provider distribution. The completed automated Live smoke
 does not constitute browser evidence or production Provider distribution.
 
+DNVS remains closed as an evidence lifecycle and Phase 6 remains paused. Three
+separately authorized Optional Live requests reached proposal rejection without
+a state commit; their precise historical rejection category is unrecoverable
+because the stopped process retained only the public error. A sanitized local
+Live diagnostic implementation candidate is pending independent review. This
+implementation authorizes no further Optional Live call; the next lifecycle
+action is independent review of this exact candidate.
+
 ## P4-S1 completion baseline
 
 - Exact completed boundary: [P4-S1 implementation plan](docs/structured_player_character_p4_s1_implementation_plan.md).

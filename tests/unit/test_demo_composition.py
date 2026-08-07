@@ -25,6 +25,7 @@ from deviation_protocol.api.demo_composition import (
 )
 from deviation_protocol.api.main import create_app
 from deviation_protocol.application.narrative_models import NarrativeRequest
+from deviation_protocol.application.dynamic_narrative_models import DynamicPromptBuilder
 from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
 )
@@ -3643,6 +3644,288 @@ async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries
         assert capsys.readouterr().out == ""
     finally:
         await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_rejection_console_reporter_is_live_selection_only(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class InjectedProvider:
+        async def generate_dynamic(self, request):  # pragma: no cover - no call
+            del request
+            raise AssertionError("diagnostic isolation must not invoke Provider")
+
+        async def aclose(self) -> None:
+            return None
+
+    class LocalLiveProvider(demo_composition_module._DynamicFakeProvider):
+        def __init__(self, _settings) -> None:
+            super().__init__()
+            self.provider_body = (
+                "INERT_PROVIDER_BODY_SENTINEL INERT_BASE_URL_SENTINEL "
+                "INERT_FULL_RUNTIME_IDENTIFIER_SENTINEL"
+            )
+            self.base_url = _settings.base_url
+            self.runtime_identifier = _settings.model
+            self.captured_prompt = ""
+
+        async def generate_dynamic(self, request):
+            self.captured_prompt = DynamicPromptBuilder().build(request).user
+            generated = await super().generate_dynamic(request)
+            payload = generated.candidate
+            fact = payload.proposed_public_facts[0].model_copy(
+                update={"value": "INERT_PROTECTED_HIDDEN_VALUE_SENTINEL"}
+            )
+            return generated.model_copy(
+                update={
+                    "candidate": payload.model_copy(
+                        update={
+                            "narrative_text": "INERT_CANDIDATE_NARRATIVE_SENTINEL" + "界" * 350,
+                            "proposed_consequences": ("INERT_INTERNAL_MARKER_SENTINEL",),
+                            "proposed_public_facts": (fact,),
+                            "next_scene": payload.next_scene.model_copy(
+                                update={"title": "INERT_INTERNAL_IDENTIFIER_SENTINEL"}
+                            ),
+                            "suggested_actions": (
+                                "INERT_SUGGESTED_ACTION_SENTINEL",
+                                "Safe beta.",
+                                "Safe gamma.",
+                            ),
+                        }
+                    ),
+                    "provider_metadata": generated.provider_metadata.model_copy(
+                        update={"request_id": self.provider_body}
+                    ),
+                }
+            )
+
+    fake = build_dynamic_demo_runtime(environ={})
+    injected = build_dynamic_demo_runtime(provider=InjectedProvider(), environ={})
+    local_live: LocalLiveProvider | None = None
+
+    def local_factory(settings, _prompt_builder):
+        nonlocal local_live
+        local_live = LocalLiveProvider(settings)
+        return local_live
+
+    monkeypatch.setattr(
+        demo_composition_module, "DeepSeekNarrativeProvider", local_factory
+    )
+    live = build_dynamic_demo_runtime(
+        environ={
+            "DEVIATION_DEMO_DYNAMIC_PROVIDER": "live",
+            "DEEPSEEK_API_KEY": "INERT_CREDENTIAL_SHAPED_SENTINEL",
+            "DEEPSEEK_MAX_RETRIES": "0",
+        }
+    )
+    try:
+        from deviation_protocol.application.dynamic_narrative_orchestrator import (
+            DynamicNarrativeRejectionDiagnostic,
+        )
+
+        for runtime in (fake, injected):
+            runtime.services.turn_orchestrator._report_rejection(
+                DynamicNarrativeRejectionDiagnostic.PRE_LENGTH
+            )
+        assert capsys.readouterr().out == ""
+        app = create_app(services=live.services)
+        app.state.api_services = live.services
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://inert.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "Inert.Diagnostics.Create"},
+                json={
+                    "contract_version": "structured-player-character/v1",
+                    "character_core": {},
+                    "narration_preferences": {},
+                },
+            )
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "Inert.Diagnostics.Entry"},
+                json={
+                    "player_character_id": created.json()["player_character_id"]["value"],
+                    "expected_record_revision": 1,
+                    "scenario_id": "death_certificate",
+                },
+            )
+            assert created.status_code == entered.status_code == 200
+            session_id = entered.json()["session_id"]
+            import deviation_protocol.application.dynamic_narrative_orchestrator as orchestrator_module
+
+            original_index = orchestrator_module._hidden_reference_index
+            monkeypatch.setattr(
+                orchestrator_module,
+                "_hidden_reference_index",
+                lambda *args, **kwargs: (
+                    (_ for _ in ()).throw(
+                        ValueError("INERT_ORIGINAL_REJECTION_EXCEPTION_SENTINEL")
+                    )
+                    if local_live is not None and local_live.invocation_count
+                    else original_index(*args, **kwargs)
+                ),
+            )
+            rejected = await client.post(
+                f"/v1/sessions/{session_id}/actions",
+                json={
+                    "turn_id": "INERT_INTERNAL_IDENTIFIER_SENTINEL",
+                    "client_request_id": "INERT_RUNTIME_IDENTIFIER_SENTINEL",
+                    "action_type": "CUSTOM",
+                    "description": "INERT_SUBMITTED_ACTION_SENTINEL INERT_PROMPT_FRAGMENT_SENTINEL",
+                },
+            )
+            assert rejected.status_code == 503
+            assert rejected.json() == {
+                "error": {
+                    "error_code": "NARRATIVE_PROPOSAL_REJECTED",
+                    "message": "Narrative processing failed",
+                }
+            }
+            assert "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX" not in rejected.text
+        captured = capsys.readouterr()
+        assert captured.out == "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX\n"
+        assert captured.err == ""
+        output = captured.out + captured.err
+        for sentinel in (
+            "INERT_SUBMITTED_ACTION_SENTINEL",
+            "INERT_CANDIDATE_NARRATIVE_SENTINEL",
+            "INERT_SUGGESTED_ACTION_SENTINEL",
+            "INERT_PROMPT_FRAGMENT_SENTINEL",
+            "INERT_PROTECTED_HIDDEN_VALUE_SENTINEL",
+            "INERT_INTERNAL_MARKER_SENTINEL",
+            "INERT_INTERNAL_IDENTIFIER_SENTINEL",
+            "INERT_PROVIDER_BODY_SENTINEL",
+            "INERT_BASE_URL_SENTINEL",
+            "INERT_CREDENTIAL_SHAPED_SENTINEL",
+            "INERT_FULL_RUNTIME_IDENTIFIER_SENTINEL",
+            "INERT_ORIGINAL_REJECTION_EXCEPTION_SENTINEL",
+            "ValueError",
+            "Traceback",
+        ):
+            assert sentinel not in output
+        assert local_live is not None and local_live.invocation_count == 1
+        assert "INERT_PROMPT_FRAGMENT_SENTINEL" in local_live.captured_prompt
+        assert local_live.base_url
+        assert local_live.runtime_identifier
+    finally:
+        await fake.aclose()
+        await injected.aclose()
+        await live.aclose()
+
+
+@pytest.mark.asyncio
+async def test_deterministic_demo_rejection_remains_console_silent(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    provider = RejectingProvider()
+    runtime = build_demo_runtime(provider=provider)
+    app = create_app(services=runtime.services)
+    app.state.api_services = runtime.services
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://inert.test"
+        ) as client:
+            session_id = await _create_default_demo_session(client, identity="silent-demo")
+            response = await client.post(
+                f"/v1/sessions/{session_id}/actions",
+                json={
+                    "turn_id": "silent-demo-turn",
+                    "client_request_id": "silent-demo-request",
+                    "action_type": "CONTINUE",
+                },
+            )
+        assert response.status_code == 200
+        assert provider.calls == 0
+        captured = capsys.readouterr()
+        assert captured.out == captured.err == ""
+        assert "DNVS_LIVE_DIAG_" not in captured.out + captured.err
+    finally:
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_ordinary_dynamic_fake_rejection_remains_console_silent(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class OrdinaryProvider(demo_composition_module._DynamicFakeProvider):
+        async def generate_dynamic(self, request):
+            generated = await super().generate_dynamic(request)
+            return generated.model_copy(
+                update={
+                    "candidate": generated.candidate.model_copy(
+                        update={"narrative_text": "state_version" + "界" * 350}
+                    )
+                }
+            )
+
+    provider = OrdinaryProvider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    app = create_app(services=runtime.services)
+    app.state.api_services = runtime.services
+    try:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app), base_url="http://inert.test"
+        ) as client:
+            created = await client.post(
+                "/v1/player-characters",
+                headers={"Idempotency-Key": "ordinary-silent-create"},
+                json={"contract_version": "structured-player-character/v1", "character_core": {}, "narration_preferences": {}},
+            )
+            entered = await client.post(
+                "/v1/runs",
+                headers={"Idempotency-Key": "ordinary-silent-entry"},
+                json={"player_character_id": created.json()["player_character_id"]["value"], "expected_record_revision": 1, "scenario_id": "death_certificate"},
+            )
+            response = await client.post(
+                f"/v1/sessions/{entered.json()['session_id']}/actions",
+                json={"turn_id": "ordinary-silent-turn", "client_request_id": "ordinary-silent-request", "action_type": "CUSTOM", "description": "ordinary inert action"},
+            )
+        assert response.status_code == 503
+        assert provider.invocation_count == 1
+        captured = capsys.readouterr()
+        assert captured.out == captured.err == ""
+        assert "DNVS_LIVE_DIAG_" not in captured.out + captured.err
+        assert "DNVS_LIVE_DIAG_" not in response.text
+    finally:
+        await runtime.aclose()
+
+
+def test_injected_provider_with_live_selector_fails_closed_without_output(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class InjectedProvider:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def generate_dynamic(self, request):  # pragma: no cover - configuration rejects first
+            del request
+            self.calls += 1
+            raise AssertionError("injected Provider must not run")
+
+    provider = InjectedProvider()
+    factory_calls: list[str] = []
+    monkeypatch.setattr(
+        demo_composition_module,
+        "DeepSeekNarrativeProvider",
+        lambda *_args, **_kwargs: factory_calls.append("factory"),
+    )
+    with pytest.raises(DynamicDemoConfigurationError):
+        build_dynamic_demo_runtime(
+            provider=provider,
+            environ={
+                "DEVIATION_DEMO_DYNAMIC_PROVIDER": "live",
+                "DEEPSEEK_API_KEY": "INERT_CREDENTIAL_SHAPED_SENTINEL",
+                "DEEPSEEK_MAX_RETRIES": "0",
+            },
+        )
+    captured = capsys.readouterr()
+    assert factory_calls == []
+    assert provider.calls == 0
+    assert captured.out == captured.err == ""
 
 
 @pytest.mark.asyncio

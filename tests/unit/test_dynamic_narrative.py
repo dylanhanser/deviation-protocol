@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import httpx
 import pytest
 
+import deviation_protocol.application.dynamic_narrative_orchestrator as dynamic_orchestrator_module
 from deviation_protocol.api.demo_composition import (
     _DynamicFakeProvider,
     build_dynamic_demo_runtime,
@@ -49,6 +50,7 @@ from deviation_protocol.application.dynamic_narrative_orchestrator import (
     _project_dynamic_facts,
     _submission_fingerprint,
     DynamicNarrativeOrchestrator,
+    DynamicNarrativeRejectionDiagnostic,
 )
 from deviation_protocol.application.errors import (
     NarrativeJobStaleError,
@@ -618,6 +620,343 @@ async def test_candidate_prose_uses_exact_unicode_code_point_measurement(
         await client.aclose()
         await runtime.aclose()
 
+
+def test_finalization_diagnostic_categories_are_distinct() -> None:
+    malformed = {DYNAMIC_FACT_SLOTS[0]: {"wrong": "shape"}}
+    with pytest.raises(Exception) as captured:
+        _apply_candidate_slots(malformed, _validated_slot_candidate(()), successor_state_version=1)
+    assert captured.value.token is DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("category", "fault"),
+    (
+        (DynamicNarrativeRejectionDiagnostic.PRE_REVALIDATION, "revalidation"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_LENGTH, "length"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION, "repeat"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_STORAGE_BOUNDARY, "storage"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_REFERENCE_INDEX, "reference"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER, "marker"),
+        (DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE, "protected"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING, "fact_ring"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_SLOT_BOUNDARY, "slot"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_MUTATION, "mutation"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_STATE, "state"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_VALUE, "value_error"),
+        (DynamicNarrativeRejectionDiagnostic.FINAL_VALUE, "proposal_error"),
+    ),
+)
+async def test_rejected_action_diagnostic_is_single_terminal_token_and_atomic(
+    category: DynamicNarrativeRejectionDiagnostic,
+    fault: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Each production rejection owner emits one token without changing its contract."""
+
+    submitted_action = "INERT_SUBMITTED_ACTION_SENTINEL"
+
+    class Provider:
+        def __init__(self) -> None:
+            self.invocations = 0
+
+        async def generate_dynamic(self, request):
+            self.invocations += 1
+            if fault == "revalidation":
+                return object()
+            candidate = _safe_candidate(request)
+            payload = candidate.candidate
+            if fault == "length":
+                payload = payload.model_copy(update={"narrative_text": "x" * 10})
+            elif fault == "repeat":
+                payload = payload.model_copy(
+                    update={
+                        "suggested_actions": (
+                            submitted_action,
+                            "Safe beta.",
+                            "Safe gamma.",
+                        )
+                    }
+                )
+            elif fault == "marker":
+                payload = payload.model_copy(
+                    update={"narrative_text": "state_version" + "界" * 350}
+                )
+            elif fault == "protected":
+                payload = payload.model_copy(
+                    update={"narrative_text": "INERT_HIDDEN_SENTINEL" + "界" * 350}
+                )
+            return candidate.model_copy(update={"candidate": payload})
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = Provider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    original_apply = dynamic_orchestrator_module._apply_candidate_slots
+    try:
+        orchestrator = runtime.services.turn_orchestrator
+        orchestrator.diagnostic_reporter = emitted.append
+        if fault == "storage":
+            original_json = dynamic_orchestrator_module.canonical_json
+            monkeypatch.setattr(
+                dynamic_orchestrator_module,
+                "canonical_json",
+                lambda value: (
+                    "x" * 501
+                    if provider.invocations
+                    and any(frame.function == "_validate_candidate" for frame in inspect.stack())
+                    else original_json(value)
+                ),
+            )
+        elif fault == "reference":
+            original_index = dynamic_orchestrator_module._hidden_reference_index
+            monkeypatch.setattr(
+                dynamic_orchestrator_module,
+                "_hidden_reference_index",
+                lambda *args, **kwargs: (
+                    (_ for _ in ()).throw(ValueError())
+                    if provider.invocations
+                    else original_index(*args, **kwargs)
+                ),
+            )
+        elif fault == "protected":
+            monkeypatch.setattr(
+                dynamic_orchestrator_module,
+                "_hidden_reference_index",
+                lambda *_args, **_kwargs: (
+                    _ProtectedReference(
+                        "test", "INERT_HIDDEN_SENTINEL", "inert_hidden_sentinel", False
+                    ),
+                ),
+            )
+        elif fault == "fact_ring":
+            def final_boundary(*_args, **_kwargs):
+                raise dynamic_orchestrator_module._FinalizationDiagnosticError(category)
+
+            monkeypatch.setattr(dynamic_orchestrator_module, "_apply_candidate_slots", final_boundary)
+        elif fault == "slot":
+            original_json = dynamic_orchestrator_module.canonical_json
+
+            def final_slot_boundary_json(value):
+                if (
+                    provider.invocations
+                    and not isinstance(value, dict)
+                    and any(
+                        frame.function == "_apply_candidate_slots"
+                        for frame in inspect.stack()
+                    )
+                ):
+                    return '"' + "x" * 499 + '"'
+                return original_json(value)
+
+            monkeypatch.setattr(
+                dynamic_orchestrator_module, "canonical_json", final_slot_boundary_json
+            )
+        elif fault == "state":
+            service = orchestrator.dynamic_session_service
+            service_type = type(service)
+            original_load_authority = service_type._load_dynamic_authority
+            finalization_started = False
+            orchestrator_type = type(orchestrator)
+            original_store_validated = orchestrator_type._store_validated
+
+            async def mark_finalization(self, *args, **kwargs):
+                nonlocal finalization_started
+                stored = await original_store_validated(self, *args, **kwargs)
+                if self is orchestrator:
+                    finalization_started = True
+                return stored
+
+            async def finalization_authority(self, *args, **kwargs):
+                authority = await original_load_authority(self, *args, **kwargs)
+                if self is not service:
+                    return authority
+                if not finalization_started:
+                    return authority
+                return replace(
+                    authority,
+                    definition=authority.definition.model_copy(
+                        update={"dynamic_fact_limit": 1}
+                    ),
+                )
+
+            monkeypatch.setattr(
+                service_type, "_load_dynamic_authority", finalization_authority
+            )
+            monkeypatch.setattr(orchestrator_type, "_store_validated", mark_finalization)
+        elif fault == "mutation":
+            def reject_mutation(*_args, **_kwargs):
+                raise dynamic_orchestrator_module.StoryMutationError()
+
+            monkeypatch.setattr(
+                dynamic_orchestrator_module.StoryMutationValidator,
+                "validate",
+                reject_mutation,
+            )
+        elif fault in {"value_error", "proposal_error"}:
+            error = ValueError() if fault == "value_error" else NarrativeProposalRejectedError()
+
+            def final_value(*_args, **_kwargs):
+                raise error
+
+            monkeypatch.setattr(dynamic_orchestrator_module, "_apply_candidate_slots", final_value)
+
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        body = {
+            "turn_id": f"diagnostic-{fault}-turn",
+            "client_request_id": f"diagnostic-{fault}-request",
+            "action_type": "CUSTOM",
+            "description": submitted_action,
+        }
+        before = runtime.store.snapshot()
+        response = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert response.status_code == 503
+        assert response.json() == {
+            "error": {
+                "error_code": "NARRATIVE_PROPOSAL_REJECTED",
+                "message": "Narrative processing failed",
+            }
+        }
+        assert category.value not in response.text
+        assert emitted == [category]
+        after = runtime.store.snapshot()
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
+        view_after_first_rejection = (
+            await client.get(f"/v1/sessions/{session_id}/view")
+        ).json()
+        assert view_after_first_rejection == view
+        retry = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        assert retry.status_code == response.status_code
+        assert retry.json() == response.json()
+        after_retry = runtime.store.snapshot()
+        assert after_retry == after
+        assert next(iter(after_retry.narrative_jobs.values())).job_id == job.job_id
+        assert next(iter(after_retry.narrative_jobs.values())).status is job.status
+        assert emitted == [category]
+        assert len(emitted) == 1
+        view_after_identical_replay = (
+            await client.get(f"/v1/sessions/{session_id}/view")
+        ).json()
+        assert view_after_identical_replay == view
+        assert view_after_identical_replay == view_after_first_rejection
+        assert provider.invocations == 1
+    finally:
+        dynamic_orchestrator_module._apply_candidate_slots = original_apply
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_reporter_baseexception_cannot_replace_terminal_rejection(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    class ReporterEscape(BaseException):
+        pass
+
+    class RejectingProvider:
+        def __init__(self) -> None:
+            self.invocation_count = 0
+
+        async def generate_dynamic(self, request):
+            self.invocation_count += 1
+            candidate = _safe_candidate(request)
+            return candidate.model_copy(
+                update={
+                    "candidate": candidate.candidate.model_copy(
+                        update={"narrative_text": "state_version" + "界" * 350}
+                    )
+                }
+            )
+
+        async def aclose(self) -> None:
+            return None
+
+    provider = RejectingProvider()
+    runtime = build_dynamic_demo_runtime(provider=provider, environ={})
+    runtime, client, session_id = await _entered_dynamic_client(runtime)
+    reporter_message = "INERT_REPORTER_BASEEXCEPTION_SENTINEL"
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    try:
+        orchestrator = runtime.services.turn_orchestrator
+
+        def exploding_reporter(token: DynamicNarrativeRejectionDiagnostic) -> None:
+            emitted.append(token)
+            raise ReporterEscape(reporter_message)
+
+        orchestrator.diagnostic_reporter = exploding_reporter
+        view_before = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        before = runtime.store.snapshot()
+        body = {
+            "turn_id": "reporter-escape-turn",
+            "client_request_id": "reporter-escape-request",
+            "action_type": "CUSTOM",
+            "description": "ordinary submitted action",
+        }
+        response = await client.post(
+            f"/v1/sessions/{session_id}/actions",
+            json=body,
+        )
+        after = runtime.store.snapshot()
+        assert response.status_code == 503
+        assert response.json() == {
+            "error": {
+                "error_code": "NARRATIVE_PROPOSAL_REJECTED",
+                "message": "Narrative processing failed",
+            }
+        }
+        assert response.json()["error"]["error_code"] == "NARRATIVE_PROPOSAL_REJECTED"
+        assert "ReporterEscape" not in response.text
+        assert reporter_message not in response.text
+        assert DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER.value not in response.text
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER]
+        view_after_first_rejection = (
+            await client.get(f"/v1/sessions/{session_id}/view")
+        ).json()
+        assert view_after_first_rejection == view_before
+        assert after.sessions == before.sessions
+        assert after.snapshots == before.snapshots
+        assert after.events == before.events
+        assert after.turn_requests == before.turn_requests
+        assert len(after.narrative_jobs) == len(before.narrative_jobs) + 1
+        job = next(iter(after.narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.FAILED_TERMINAL
+        assert job.error_code == "NARRATIVE_PROPOSAL_REJECTED"
+        assert provider.invocation_count == 1
+        retry = await client.post(f"/v1/sessions/{session_id}/actions", json=body)
+        after_retry = runtime.store.snapshot()
+        assert retry.status_code == response.status_code
+        assert retry.json() == response.json()
+        assert after_retry == after
+        assert next(iter(after_retry.narrative_jobs.values())).job_id == job.job_id
+        assert emitted == [DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER]
+        view_after_identical_replay = (
+            await client.get(f"/v1/sessions/{session_id}/view")
+        ).json()
+        assert (
+            view_before
+            == view_after_first_rejection
+            == view_after_identical_replay
+        )
+        assert provider.invocation_count == 1
+        captured = capsys.readouterr()
+        assert captured.out == captured.err == ""
+        combined = captured.out + captured.err
+        assert reporter_message not in combined
+        assert "Traceback" not in combined
+        assert DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER.value not in combined
+    finally:
+        await client.aclose()
+        await runtime.aclose()
 
 @pytest.mark.asyncio
 async def test_dynamic_capacity_attempt_512_proceeds_and_next_distinct_rejects() -> None:

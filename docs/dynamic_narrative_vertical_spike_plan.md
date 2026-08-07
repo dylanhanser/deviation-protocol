@@ -34,6 +34,19 @@ change. The separately authorized Manual Fake browser walkthrough completed
 with `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`; Optional Live
 browser evidence remains incomplete and optional.**
 
+### Current sanitized Optional Live diagnostic candidate
+
+The completed DNVS evidence lifecycle remains closed. Three separately
+authorized Optional Live requests returned proposal rejection without a state
+commit. Their precise historical category is unrecoverable because the stopped
+process retained only the public error. This uncommitted implementation
+candidate adds only a local, fixed-token, sanitized rejection diagnostic for a
+separately authorized future Live request. It changes no narrative rule,
+Prompt behavior, Provider behavior, public error, or evidence status. No
+Provider call was made during implementation or automated verification. Another
+Live request remains separately authorized and pending; this candidate awaits
+independent review.
+
 Approval-and-freeze record:
 
 | Record field | Exact value |

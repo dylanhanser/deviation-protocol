@@ -962,6 +962,33 @@ class DynamicActionPolicy:
         return description
 
 
+class DynamicNarrativeRejectionDiagnostic(StrEnum):
+    """Closed, sanitized local-only proposal-rejection classifications."""
+
+    PRE_REVALIDATION = "DNVS_LIVE_DIAG_PRE_REVALIDATION"
+    PRE_LENGTH = "DNVS_LIVE_DIAG_PRE_LENGTH"
+    PRE_REPEAT_SUBMITTED_ACTION = "DNVS_LIVE_DIAG_PRE_REPEAT_SUBMITTED_ACTION"
+    PRE_STORAGE_BOUNDARY = "DNVS_LIVE_DIAG_PRE_STORAGE_BOUNDARY"
+    PRE_REFERENCE_INDEX = "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX"
+    PRE_INTERNAL_MARKER = "DNVS_LIVE_DIAG_PRE_INTERNAL_MARKER"
+    PRE_PROTECTED_REFERENCE = "DNVS_LIVE_DIAG_PRE_PROTECTED_REFERENCE"
+    FINAL_FACT_RING = "DNVS_LIVE_DIAG_FINAL_FACT_RING"
+    FINAL_SLOT_BOUNDARY = "DNVS_LIVE_DIAG_FINAL_SLOT_BOUNDARY"
+    FINAL_MUTATION = "DNVS_LIVE_DIAG_FINAL_MUTATION"
+    FINAL_STATE = "DNVS_LIVE_DIAG_FINAL_STATE"
+    FINAL_VALUE = "DNVS_LIVE_DIAG_FINAL_VALUE"
+
+
+def _noop_rejection_diagnostic(_token: DynamicNarrativeRejectionDiagnostic) -> None:
+    return None
+
+
+class _FinalizationDiagnosticError(NarrativeProposalRejectedError):
+    def __init__(self, token: DynamicNarrativeRejectionDiagnostic) -> None:
+        super().__init__()
+        self.token = token
+
+
 @dataclass(slots=True)
 class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
     """One-owner dynamic prepare/call/finalize coordinator with a 512 ledger."""
@@ -977,6 +1004,9 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
     worker_id_generator: Any = lambda: str(uuid4())
     lease_duration: timedelta = timedelta(minutes=2)
     action_policy: DynamicActionPolicy = field(default_factory=DynamicActionPolicy)
+    diagnostic_reporter: Callable[[DynamicNarrativeRejectionDiagnostic], None] = (
+        _noop_rejection_diagnostic
+    )
     _buckets: dict[str, _SessionAttemptBucket] = field(default_factory=dict, init=False)
     _bucket_lock: asyncio.Lock = field(default_factory=asyncio.Lock, init=False)
 
@@ -990,6 +1020,16 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             raise ValueError("dynamic orchestration requires its provider and Session service")
         if self.lease_duration <= timedelta(0) or self.lease_duration > timedelta(minutes=10):
             raise ValueError("dynamic narrative lease duration is outside the safe bound")
+
+    def _report_rejection(
+        self, token: DynamicNarrativeRejectionDiagnostic
+    ) -> None:
+        """Best-effort local diagnostic seam; reporting is never authoritative."""
+
+        try:
+            self.diagnostic_reporter(token)
+        except BaseException:
+            pass
 
     async def handle(self, submission: ActionSubmission) -> TurnResponse:
         existing = await self._existing_reservation(submission)
@@ -1318,7 +1358,24 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 stored, NarrativeJobStatus.STALE, "NARRATIVE_JOB_STALE"
             )
             raise
-        except (CandidateStateInvalidError, NarrativeProposalRejectedError, ValueError):
+        except CandidateStateInvalidError:
+            self._report_rejection(DynamicNarrativeRejectionDiagnostic.FINAL_STATE)
+            await self._record_terminal_job(
+                stored,
+                NarrativeJobStatus.FAILED_TERMINAL,
+                "NARRATIVE_PROPOSAL_REJECTED",
+            )
+            raise NarrativeProposalRejectedError() from None
+        except _FinalizationDiagnosticError as exc:
+            self._report_rejection(exc.token)
+            await self._record_terminal_job(
+                stored,
+                NarrativeJobStatus.FAILED_TERMINAL,
+                "NARRATIVE_PROPOSAL_REJECTED",
+            )
+            raise NarrativeProposalRejectedError() from None
+        except (NarrativeProposalRejectedError, ValueError):
+            self._report_rejection(DynamicNarrativeRejectionDiagnostic.FINAL_VALUE)
             await self._record_terminal_job(
                 stored,
                 NarrativeJobStatus.FAILED_TERMINAL,
@@ -1652,25 +1709,39 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             detached = UntrustedDynamicNarrativeCandidate.model_validate_json(
                 untrusted.model_dump_json()
             )
-            candidate = detached.candidate
-            if not request.narrative_length.minimum <= len(candidate.narrative_text) <= request.narrative_length.maximum:
-                raise ValueError("dynamic prose length is invalid")
-            submitted = request.player_action.description
-            if submitted in candidate.suggested_actions:
-                raise ValueError("dynamic suggestion repeats the submitted action")
-            for value in (
-                candidate.next_scene.title,
-                candidate.next_scene.summary,
-                candidate.result.value,
-                list(candidate.proposed_consequences),
-                *candidate.suggested_actions,
-                candidate.continuation,
-            ):
-                if len(canonical_json(value)) > 500:
-                    raise ValueError("dynamic slot exceeds the storage boundary")
-            for item in candidate.proposed_public_facts:
-                if len(canonical_json({"key": item.key, "value": item.value})) > 500:
-                    raise ValueError("dynamic fact wrapper exceeds the storage boundary")
+        except (AttributeError, TypeError, ValueError, ValidationError):
+            self._report_rejection(DynamicNarrativeRejectionDiagnostic.PRE_REVALIDATION)
+            raise NarrativeProposalRejectedError() from None
+        candidate = detached.candidate
+        if not request.narrative_length.minimum <= len(candidate.narrative_text) <= request.narrative_length.maximum:
+            self._report_rejection(DynamicNarrativeRejectionDiagnostic.PRE_LENGTH)
+            raise NarrativeProposalRejectedError()
+        submitted = request.player_action.description
+        if submitted in candidate.suggested_actions:
+            self._report_rejection(
+                DynamicNarrativeRejectionDiagnostic.PRE_REPEAT_SUBMITTED_ACTION
+            )
+            raise NarrativeProposalRejectedError()
+        for value in (
+            candidate.next_scene.title,
+            candidate.next_scene.summary,
+            candidate.result.value,
+            list(candidate.proposed_consequences),
+            *candidate.suggested_actions,
+            candidate.continuation,
+        ):
+            if len(canonical_json(value)) > 500:
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_STORAGE_BOUNDARY
+                )
+                raise NarrativeProposalRejectedError()
+        for item in candidate.proposed_public_facts:
+            if len(canonical_json({"key": item.key, "value": item.value})) > 500:
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_STORAGE_BOUNDARY
+                )
+                raise NarrativeProposalRejectedError()
+        try:
             hidden = _hidden_reference_index(
                 resolved,
                 job,
@@ -1690,22 +1761,29 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             hidden_values = tuple(
                 sorted(hidden_by_value, key=lambda value: (-len(value), value))
             )
-            for leaf in _candidate_strings(candidate.model_dump(mode="json")):
-                normalized = _comparison_text(leaf)
-                if (
-                    any(marker in normalized for marker in _INTERNAL_TEXT_MARKERS)
-                    or _INTERNAL_ID_PATTERN.search(leaf)
-                    or _LONG_SECRET_SHAPE.search(leaf)
-                ):
-                    raise ValueError("dynamic candidate contains an internal marker")
-                for protected_value in hidden_values:
-                    if any(
-                        record.matches(normalized)
-                        for record in hidden_by_value[protected_value]
-                    ):
-                        raise ValueError("dynamic candidate contains a protected reference")
         except (AttributeError, TypeError, ValueError, ValidationError):
+            self._report_rejection(DynamicNarrativeRejectionDiagnostic.PRE_REFERENCE_INDEX)
             raise NarrativeProposalRejectedError() from None
+        for leaf in _candidate_strings(candidate.model_dump(mode="json")):
+            normalized = _comparison_text(leaf)
+            if (
+                any(marker in normalized for marker in _INTERNAL_TEXT_MARKERS)
+                or _INTERNAL_ID_PATTERN.search(leaf)
+                or _LONG_SECRET_SHAPE.search(leaf)
+            ):
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.PRE_INTERNAL_MARKER
+                )
+                raise NarrativeProposalRejectedError()
+            for protected_value in hidden_values:
+                if any(
+                    record.matches(normalized)
+                    for record in hidden_by_value[protected_value]
+                ):
+                    self._report_rejection(
+                        DynamicNarrativeRejectionDiagnostic.PRE_PROTECTED_REFERENCE
+                    )
+                    raise NarrativeProposalRejectedError()
         return ValidatedDynamicNarrativeCandidate(
             candidate=detached.candidate,
             provider_metadata=detached.provider_metadata,
@@ -2811,12 +2889,21 @@ def _apply_candidate_slots(
         if value is None:
             continue
         if not isinstance(value, Mapping) or set(value) != {"key", "value"}:
-            raise NarrativeProposalRejectedError()
-        key = _normalize_public_text(value["key"], maximum=80)
-        statement = _normalize_public_text(value["value"], maximum=300)
+            raise _FinalizationDiagnosticError(
+                DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING
+            )
+        try:
+            key = _normalize_public_text(value["key"], maximum=80)
+            statement = _normalize_public_text(value["value"], maximum=300)
+        except (KeyError, TypeError, ValueError):
+            raise _FinalizationDiagnosticError(
+                DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING
+            ) from None
         folded = _normalized_fact_semantic_key(key)
         if folded in key_slot:
-            raise NarrativeProposalRejectedError()
+            raise _FinalizationDiagnosticError(
+                DynamicNarrativeRejectionDiagnostic.FINAL_FACT_RING
+            )
         key_slot[folded] = slot
         ring[slot] = (key, statement)
     survivors: list[tuple[str, str]] = []
@@ -2853,10 +2940,14 @@ def _apply_candidate_slots(
     slots[DYNAMIC_CONSEQUENCES] = list(candidate.proposed_consequences)
     slots[DYNAMIC_CONTINUATION] = candidate.continuation
     if set(slots) != DYNAMIC_ALL_SLOTS and set(slots) - DYNAMIC_ALL_SLOTS:
-        raise NarrativeProposalRejectedError()
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_SLOT_BOUNDARY
+        )
     for value in slots.values():
         if len(canonical_json(value)) > 500:
-            raise NarrativeProposalRejectedError()
+            raise _FinalizationDiagnosticError(
+                DynamicNarrativeRejectionDiagnostic.FINAL_SLOT_BOUNDARY
+            )
     mutation_validator = StoryMutationValidator()
     validated_slots: dict[str, Any] = {}
     ordered_slots = (
@@ -2884,7 +2975,9 @@ def _apply_candidate_slots(
             )
             validated_slots[key] = fact
     except StoryMutationError:
-        raise NarrativeProposalRejectedError() from None
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_MUTATION
+        ) from None
     return slots
 
 
