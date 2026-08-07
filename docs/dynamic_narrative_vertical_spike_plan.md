@@ -10,14 +10,17 @@ Manual-Fake authority-reconciliation task identity:
 `DYNAMIC_NARRATIVE_VERTICAL_SPIKE_MANUAL_FAKE_BROWSER_AUTHORITY_RECONCILIATION_AUTHORING`.
 
 Status: **Experimental vertical spike. The implementation was published at
-`0eba2fd192b05c9455c73803a95a846c27307be9`, and the automated Live-smoke
-correction was published at `e2678e6bba8497ed77bc5ba8c21b1ce8d001b2b9`.
+`0eba2fd192b05c9455c73803a95a846c27307be9`, the automated Live-smoke
+correction was published at `e2678e6bba8497ed77bc5ba8c21b1ce8d001b2b9`, and
+the exact seven-path Manual Fake implementation was committed and published at
+`d84a0528febb6c270494f35e2843e7e350fbd040`
+(`feat(narrative): implement manual fake evidence mode`).
 All unaffected approved and frozen authority remains in force. Section 14.5's
 Manual Fake browser execution contract and its directly dependent Fake failure,
 observation, continuity-witness, and focused-test requirements have passed
 independent review and are approved and frozen as documentation authority. The
-exact seven-path implementation has started and produced a complete
-implementation candidate. Its required implementation verification passed:
+exact seven-path implementation completed its required implementation
+verification:
 focused backend pytest `277 passed`; focused React test `39 passed, 1 skipped`;
 compileall passed; Offline verification `2165 passed, 182 skipped`; and
 `git diff --check` passed. These overlapping command totals are not a unique-test
@@ -26,12 +29,10 @@ only for stale lifecycle documentation and weakened production Live-provider
 construction coverage; it found no runtime correctness defect. P2 was corrected
 and accepted; the remaining Section 9 P1 wording was corrected and received
 final independent approval. No implementation, P1, or P2 finding remains. The
-exact seven-path implementation is approved for its single closure commit: the
-containing commit is the designated implementation closure commit, publication
-is established when it is present on `origin/main`, and that committed and
-published seven-path change closes this Manual Fake implementation lifecycle.
-Manual Fake browser evidence remains incomplete and unexecuted as a later
-separate task. Optional Live browser evidence remains incomplete and optional.**
+implementation lifecycle is closed by that committed and published seven-path
+change. The separately authorized Manual Fake browser walkthrough completed
+with `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`; Optional Live
+browser evidence remains incomplete and optional.**
 
 Approval-and-freeze record:
 
@@ -2520,7 +2521,7 @@ without the unstaged candidate, the historical pre-candidate implementation
 compared the configured value with
 `(SHA-256(canonical request) prefix mod 10) + 1`. That request-bucket behavior
 is a confirmed historical implementation defect and is not intended authority.
-The current unstaged exact-seven-path implementation candidate supersedes it and
+The later committed exact-seven-path implementation superseded it and
 uses only `ordinal == configured_failure_ordinal`, where `ordinal` is the
 Provider-instance cumulative invocation ordinal defined in section 14.5.3. With
 the canonical configured ordinal 5, invocation 5 fails exactly once, the ordinal
@@ -2552,21 +2553,21 @@ The bounded fake is a private local Demo evidence adapter in the existing
 version/action, implements the exact application
 `DynamicNarrativeProvider.generate_dynamic(DynamicNarrativeRequest) ->
 UntrustedDynamicNarrativeCandidate` contract from section 6.2, creates no
-transport, and reads no secret. The current unstaged candidate implements the
+transport, and reads no secret. The committed implementation implements the
 ordinal behavior above, raises the sanitized failure exactly once before
 candidate acceptance, and exposes only the narrow sanitized launcher
 observation from section 14.5.4. Successful candidate content may remain
 deterministically derived from the complete committed request; no request
 digest, suggestion content, or free-form text may select failure. The Fake is
 not another vendor, production fallback, or selectable public Provider. The
-candidate has completed implementation and required verification. P2 was
+implementation completed its required verification. P2 was
 corrected and accepted; the remaining Section 9 P1 wording received final
 independent approval, and no implementation, P1, or P2 finding remains. The
-exact seven-path implementation is approved for its single designated closure
-commit; publication is established when that commit is present on `origin/main`,
-closing only this Manual Fake implementation lifecycle. Manual Fake browser
-evidence remains incomplete and unexecuted. Optional Live browser evidence
-remains incomplete and optional.
+exact seven-path implementation was committed and published at
+`d84a0528febb6c270494f35e2843e7e350fbd040`, closing only this Manual Fake
+implementation lifecycle. The separately authorized Manual Fake browser
+walkthrough is complete. Optional Live browser evidence remains incomplete and
+optional.
 
 That dynamic application Protocol contains exactly `async
 generate_dynamic(self, request: DynamicNarrativeRequest) ->
@@ -3064,8 +3065,10 @@ The original implementation's frozen total was **24 unique paths: 9
 production/runtime paths, 8 test paths, and 7 documentation paths; exactly 3
 new and 21 modified**. That inventory describes the implementation published at
 `0eba2fd192b05c9455c73803a95a846c27307be9` and remains historical authority;
-it is not the path budget for the pending Manual Fake correction. The exact
-future correction budget is separately delimited in section 14.5.6.
+it is not the historical seven-path Manual Fake implementation scope committed
+and published at `d84a0528febb6c270494f35e2843e7e350fbd040`
+(`feat(narrative): implement manual fake evidence mode`), which is separately
+delimited in section 14.5.6.
 
 ### 13.1 Production/runtime paths (9)
 
@@ -3281,22 +3284,49 @@ approved and frozen documentation authority. Its accepted independent review
 returned the exact operative success verdict
 `DYNAMIC_NARRATIVE_VERTICAL_SPIKE_MANUAL_FAKE_BROWSER_AUTHORITY_RECONCILIATION_FRESH_INDEPENDENT_REVIEW_APPROVED`.
 No further documentation-authority review or approval-token correction is
-required. The exact seven-path implementation candidate is complete and passed
+required. The exact seven-path implementation passed
 its required verification as recorded in the status above; its first independent
 implementation review returned changes required only for stale lifecycle
 documentation and weakened production Live-provider construction coverage, with
 no runtime correctness defect. P2 was corrected and accepted; the remaining
 Section 9 P1 wording was corrected and received final independent approval, so
 no implementation, P1, or P2 finding remains. The exact seven-path
-implementation is approved for its single designated closure commit; publication
-is established when that commit is present on `origin/main`, closing only this
-Manual Fake implementation lifecycle. Manual Fake browser evidence remains
-incomplete and unexecuted, and the current runtime must not be used for this
-walkthrough until that later separately authorized browser-evidence task. All
-other approved and frozen DNVS authority remains unchanged.
+implementation was committed and published at
+`d84a0528febb6c270494f35e2843e7e350fbd040`
+(`feat(narrative): implement manual fake evidence mode`), closing only this
+Manual Fake implementation lifecycle. The separately authorized Manual Fake
+browser walkthrough has completed successfully; all other approved and frozen
+DNVS authority remains unchanged.
+
+#### 14.5.0 Completed execution record
+
+The separately authorized walkthrough completed with verdict
+`DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`. The user manually ran
+the Fake launcher and performed all browser actions, including the one reload
+and shutdown; Codex coordinated the frozen sequence and performed only
+permitted read-only checks. The report records no Codex browser control or
+direct browser inspection, screenshot, persisted-log, evidence-file, or
+direct-API evidence.
+
+The earlier hidden-console startup failure was not reused; it contributed
+exactly 0 browser actions, 0 narrative submissions, 0 Fake invocations, and 0
+evidence executions, with no Codex-controlled console interaction.
+
+It recorded 8 narrative submissions, 7 committed transitions, 1 intentional
+failure only at Fake ordinal 5, and 8 consecutive Fake invocations (`1..8`).
+Versions progressed `0,1,2,3,4,4,5,6,7`: item 5 returned HTTP `409`
+`NARRATIVE_OUTCOME_UNKNOWN`, committed no transition, retained the complete
+version-4 View, and was never retried or replayed. One same-tab full-page reload
+recovered that View without a new Fake invocation or narrative replay; items
+6–8 then committed through final version 7. The final continuity summary was
+`The visible amber marker established earlier now identifies the route forward.`
+There were 0 automatic retries, 0 manual retries, 0 ninth submissions, 0 real
+Provider constructions/invocations, and 0 external Provider HTTP requests.
+Ctrl+C shut down the launcher and both child services cleanly; the evidence task
+changed 0 repository files. Guardrail impact: **None**.
 
 With this authority published and the separately authorized implementation
-complete, a later separately authorized walkthrough uses one local Fake-only Demo
+complete, the completed separately authorized walkthrough used one local Fake-only Demo
 startup, one browser tab, one new Player Character, one new Run, and one
 sequential Session. It has exactly eight evidence-bearing submissions, seven
 committed transitions, one intentional failure, exactly eight Fake Provider
@@ -3435,7 +3465,7 @@ constructs no Live Provider and makes no external Provider HTTP request.
 
 #### 14.5.4 Minimal Fake observation contract
 
-The approved future seam is a **sanitized launcher log emitted only by the
+The implemented seam is a **sanitized launcher log emitted only by the
 private Demo `_DynamicFakeProvider` when a Fake failure ordinal is configured**.
 It is not an API response field, browser payload, production endpoint, general
 debug endpoint, file, metric, or Live-mode facility. The existing launcher
@@ -3458,8 +3488,9 @@ DNVS_FAKE_EVIDENCE event=invocation ordinal=<positive-decimal> outcome=<SUCCESS|
 Here `SUCCESS` means that the Fake invocation returned its candidate; it does
 not assert the candidate's separate `NarrativeOutcomeResult` literal.
 
-The later browser-evidence task reads those lines from the task-owned launcher
-console without editing a file or making a submission. The reset line proves a
+The completed Manual Fake browser-evidence task used those lines as its
+accepted observation source from the task-owned launcher console without
+editing a file or making a submission. The reset line proves a
 new observation lifetime; the ordered invocation lines prove cumulative
 ordinals and Provider outcomes. For the canonical task there must be one reset
 line and eight invocation lines, ordinals `1..8` without gaps or duplicates,
@@ -3486,14 +3517,14 @@ composition, and React tests named in section 14.5.6. It is not a step, launch,
 submission, or acceptance check inside the Fake-only browser walkthrough, and
 the Manual Fake task must not stop Fake mode and start deterministic mode.
 
-The completed implementation candidate recorded the focused non-browser
-`DNVS-MF-D01` result in its required verification before any separately
-authorized Manual Fake evidence task may begin. The invariant is not deleted and
+The committed implementation recorded the focused non-browser `DNVS-MF-D01`
+result in its required verification before the separately authorized Manual Fake
+evidence task began. The invariant is not deleted and
 Optional Live browser evidence cannot satisfy it.
 
 #### 14.5.6 Exact implementation path and verification inventory
 
-The complete implementation candidate uses **7 unique paths: 1 Demo-only runtime
+The committed implementation uses **7 unique paths: 1 Demo-only runtime
 path, 4 test paths, and 2 documentation status paths**. No production
 application, orchestrator, public API, schema, Web runtime, configuration,
 dependency, database, or migration path changed. The required implementation
@@ -3505,9 +3536,9 @@ no runtime correctness defect and returned changes required only for stale
 lifecycle documentation and weakened production Live-provider construction
 coverage. P2 was corrected and accepted; the remaining Section 9 P1 wording
 received final independent approval, and no implementation, P1, or P2 finding
-remains. The exact seven-path implementation is approved for its single
-designated closure commit, whose publication on `origin/main` closes only this
-Manual Fake implementation lifecycle.
+remains. The exact seven-path implementation was committed and published at
+`d84a0528febb6c270494f35e2843e7e350fbd040`, closing only this Manual Fake
+implementation lifecycle.
 
 | Exact path | Layer and reason | Exact contract and focused obligation |
 | --- | --- | --- |
@@ -3516,8 +3547,8 @@ Manual Fake implementation lifecycle.
 | `tests/unit/test_demo_composition.py` | Composition and ownership verification | Prove each new Fake runtime starts observation at zero, owns one Fake instance, and an exact Fake selection with inherited credential sentinels never calls Live settings, Live Provider construction, transport construction, or external HTTP; prove deterministic and Live runtimes emit no Fake evidence token; retain existing shutdown ownership. |
 | `tests/unit/test_demo_scripts.py` | Launcher/static verification | Prove the exact Manual command passes `fake` and failure ordinal 5 only to the backend child, child console output remains inherited/unredirected so sanitized tokens are observable, no token or selector enters `VITE_*`, no credential is inspected or printed, and prerequisite `DNVS-MF-D01` preserves default deterministic launch. The launcher script itself does not need to change. |
 | `web/src/App.action-loop.test.tsx` | Browser-UI regression; no Web runtime change | Exercise the canonical eight POST bodies/ordinals/literals, make POST 5 return the exact sanitized 409 once, remount with the same recovery record to perform GET-only recovery, prove no replay/duplicate POST, preserve version 4, continue items 6–8 to version 7, render the exact continuity summary, and retain the independent deterministic warning/sequence regression for `DNVS-MF-D01`. |
-| `docs/dynamic_narrative_vertical_spike_plan.md` | Canonical correction/evidence status owner | Synchronize only approval/implementation/test status before independent implementation re-review; update later Manual evidence status only in its separately authorized task; do not alter completed Offline/Live evidence or unrelated frozen authority. |
-| `PLANS.md` | Project status owner | Synchronize only the narrow correction lifecycle before independent implementation re-review while preserving published DNVS, Phase 8/P8-S6, and incomplete Phase 6/7 status. |
+| `docs/dynamic_narrative_vertical_spike_plan.md` | Canonical correction/evidence status owner | The implementation synchronized approval/implementation/test status before its independent re-review; the later separately authorized task synchronizes Manual evidence status without altering completed Offline/Live evidence or unrelated frozen authority. |
+| `PLANS.md` | Project status owner | The implementation synchronized the narrow correction lifecycle before its independent re-review while preserving published DNVS, Phase 8/P8-S6, and incomplete Phase 6/7 status. |
 
 The focused test inventory is exact:
 
@@ -3559,8 +3590,10 @@ Future focused verification must run the exact affected backend test paths with
 the repository venv, the exact affected React test path, the repository-required
 full Offline/compile/static checks, and `git diff --check`; it must not run the
 automated Live smoke again, start the Demo, use a browser, or execute Manual or
-Optional Live evidence during correction implementation. A later, separately
-authorized browser-evidence task alone executes sections 14.5.1–14.5.4.
+Optional Live evidence during correction implementation. The separately
+authorized Manual Fake browser-evidence task completed sections 14.5.1–14.5.4;
+verification and evidence execution remain separate authorities, and no repeat
+execution is pending or authorized.
 
 Manual notes record only the exact safe counts, status/error codes, fixed
 observation tokens, state versions, and paraphrases. They must not copy raw
@@ -3609,7 +3642,7 @@ Every report must keep these four activities in separate rows:
 | --- | --- | --- | --- |
 | Automated Offline longevity | Exactly 510 submitted turns; exactly 510 injected deterministic Fake invocations; active state version 510; exactly 20 story slots | **Complete; preserved by this correction** | Automated, network-free, non-browser, non-manual, secret-free and unpaid; never browser evidence |
 | Automated live smoke | Exactly 1 smoke execution, 1 real Provider invocation, 1 Provider HTTP request, 0 retries; strict schema validation passed | **Complete; preserved by this correction** | Separately and explicitly authorized; automated, non-browser, not part of Offline or either browser activity |
-| Manual Fake browser walkthrough | Exactly 8 submitted dynamic actions; exactly 8 Fake invocations; explicit Fake; exactly 0 real Provider constructions/invocations; exactly 0 external Provider HTTP requests; exactly 0 automatic or manual retries | **Incomplete and unexecuted; a later separately authorized browser-evidence task** | Manual browser evidence only; separate from automated Offline; uses the one canonical matrix and no ninth submission |
+| Manual Fake browser walkthrough | Exactly 8 submitted dynamic actions; exactly 8 Fake invocations; explicit Fake; exactly 0 real Provider constructions/invocations; exactly 0 external Provider HTTP requests; exactly 0 automatic or manual retries | **Complete; `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`** | Manual browser evidence only; separate from automated Offline; used the one canonical matrix and no ninth submission |
 | Optional Live browser evaluation | If separately authorized and performed, exactly 8 submitted dynamic actions and exactly 8 real Provider requests; exactly 0 automatic retries | **Incomplete and optional** | Manual browser evidence; exact explicit Live selection; separate from automated live smoke and automated Offline; optional and potentially paid |
 
 Only the automated Offline row owns the exact 510-turn claim. Both browser rows
@@ -3781,15 +3814,17 @@ published implementation as unstaged.
     automatic retries, is non-browser and separate from Offline and Optional
     Live browser evidence, and reports only safe model/latency/schema/failure
     evidence;
-31. Manual Fake browser evidence remains incomplete and unexecuted. The exact
+31. Manual Fake browser evidence is complete with
+    `DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`. The exact
     seven-path implementation completed the selector/observation work and
     required verification; P2 is accepted, the remaining Section 9 P1 correction
     received final independent approval, and no implementation finding remains.
-    Its containing commit is the designated implementation closure commit, while
-    prerequisite `DNVS-MF-D01` retains its recorded non-browser result, and a later
-    separately authorized browser task follows the one exact
-    setup and canonical eight-row matrix, ends with state version 7 and exactly
-    8 Fake invocations, has only ordinal 5 fail, makes exactly 0 real Provider
+    It was committed and published at `d84a0528febb6c270494f35e2843e7e350fbd040`,
+    closing its implementation lifecycle. Prerequisite `DNVS-MF-D01` retains its
+    recorded non-browser result. The completed manually performed browser
+    walkthrough followed the one exact setup and canonical eight-row matrix,
+    ended with state version 7 and exactly 8 Fake invocations, had only ordinal
+    5 fail with no commit and retained version 4, made exactly 0 real Provider
     constructions/invocations and 0 external Provider HTTP requests, performs
     exactly 0 automatic or manual retries, and remains separate from automated
     Offline longevity;
@@ -3799,22 +3834,23 @@ published implementation as unstaged.
     `-DynamicProvider Live`, remains separate from automated live smoke and
     automated Offline longevity, and remains outside implementation and required
     acceptance gates;
-33. documentation synchronization is complete, Guardrail impact is assessed,
-    completed 510-turn Offline and one-call Live evidence remain valid, Manual
-    Fake and Optional Live browser evidence remain incomplete, Phase 8 and
+33. documentation synchronization records the completed Manual Fake browser
+    evidence and assesses Guardrail impact as None; completed 510-turn Offline
+    and one-call Live evidence remain valid, Optional Live browser evidence
+    remains incomplete and optional, Phase 8 and
     P8-S6 remain complete, no P8-S7 exists, Phase 6/7 remain incomplete, and
     DNVS remains experimental outside Phase 8; and
 34. the approved and frozen Manual Fake authority-reconciliation documentation
     is limited to this file and `PLANS.md`, neither modifies nor reclassifies the
     published implementation, and records the exact seven-path implementation
-    as complete, verified, and approved for its single closure commit; publication
-    is established when that commit is present on `origin/main`, closing only this
-    Manual Fake implementation lifecycle.
+    as complete, verified, committed, and published at
+    `d84a0528febb6c270494f35e2843e7e350fbd040`, closing only this Manual Fake
+    implementation lifecycle.
 
 ## 16. Review, Git, publication, and rollback boundaries
 
 The original planning verification and published implementation history remain
-recorded above. This correction task did not satisfy its own gate. The exact
+recorded above. The historical correction task did not satisfy its own gate. The exact
 two-document Manual Fake authority candidate received the required fresh
 independent read-only review whose sole operative success verdict is
 `DYNAMIC_NARRATIVE_VERTICAL_SPIKE_MANUAL_FAKE_BROWSER_AUTHORITY_RECONCILIATION_FRESH_INDEPENDENT_REVIEW_APPROVED`.
@@ -3830,13 +3866,13 @@ returned changes required only for stale lifecycle documentation and weakened
 production Live-provider construction coverage, with no runtime correctness
 defect. P2 was corrected and accepted; the remaining Section 9 P1 wording was
 corrected and received final independent approval, leaving no implementation,
-P1, or P2 finding. The exact seven-path implementation is approved for its
-single closure commit. That containing commit is the designated implementation
-closure commit; publication is established when it is present on `origin/main`,
-and the single committed and published seven-path change then closes this Manual
-Fake implementation lifecycle. A later separate Manual Fake evidence
-authorization remains distinct. The completed Offline and automated Live
-evidence must not be rerun or reclassified for this transition.
+P1, or P2 finding. The exact seven-path implementation was committed and
+published at `d84a0528febb6c270494f35e2843e7e350fbd040`, closing this Manual
+Fake implementation lifecycle. The later separately authorized Manual Fake
+browser walkthrough completed with
+`DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`. The completed Offline
+and automated Live evidence must not be rerun or reclassified for this
+transition.
 
 Do not stage or commit without explicit authorization for that exact action.
 Codex must never push. The user performs publication. A clean aligned-ref
@@ -3982,11 +4018,12 @@ are bounded to this Manual Fake plan/runtime seam and receive exact future
 regression ownership in section 14.5.6; they do not establish or change a
 reusable repository-wide engineering or safety rule.
 
-## 19. Exact next action after implementation approval
+## 19. Exact next action after Manual Fake evidence-status authoring
 
-Create the single designated closure commit containing the approved exact
-seven-path implementation and this lifecycle synchronization. Publication is
-established when that commit is present on `origin/main`; then this Manual Fake
-implementation lifecycle is closed. Do not begin Manual Fake browser evidence,
-Optional Live evidence, or any further implementation/P1/P2 review as part of
-that closure.
+Return the exact two-document unstaged candidate and its hashes to the
+coordinating ChatGPT conversation for a separate independent read-only review.
+Do not stage, commit, push, execute Optional Live, or repeat Manual Fake
+evidence. No staging or commit is authorized. Optional Live remains separate,
+incomplete, optional, and requires new explicit authorization. No further
+Manual Fake execution, implementation review, P1/P2 review, Demo run, or
+Provider evaluation belongs to this authoring task.

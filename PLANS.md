@@ -18,40 +18,30 @@ documents.
 The separate experimental Dynamic Narrative Vertical Spike implementation was
 published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated
 Live-smoke correction was published at
-`e2678e6bba8497ed77bc5ba8c21b1ce8d001b2b9`. Its detailed canonical
-authority remains the [DNVS plan](docs/dynamic_narrative_vertical_spike_plan.md).
-The original plan approval/freeze at
-`66af1361370be7dd2dfc2a3be8dbf1b5d13f4564` and its successful focused
-seven-finding verification remain historical authority.
-All unaffected approved and frozen authority remains in force. The Manual Fake
-browser execution contract and its directly dependent Fake failure, observation,
-continuity-witness, and focused-test requirements have passed independent review
-and are approved and frozen as documentation authority. The exact seven-path
-implementation has started and produced a complete implementation candidate.
-Its required implementation verification passed: focused backend pytest
-`277 passed`; focused React test `39 passed, 1 skipped`; compileall passed;
-Offline verification `2165 passed, 182 skipped`; and `git diff --check` passed.
-These overlapping command totals are not a unique-test total. Its first
-independent implementation review returned changes required only for stale
-lifecycle documentation and weakened production Live-provider construction
-coverage; it found no runtime correctness defect. P2 was corrected and
-accepted; the remaining Section 9 P1 wording was corrected and received final
-independent approval. No implementation, P1, or P2 finding remains. The exact
-seven-path implementation is approved for its single closure commit: the
-containing commit is the designated implementation closure commit, publication
-is established when it is present on `origin/main`, and that committed and
-published seven-path change closes this Manual Fake implementation lifecycle.
-Manual Fake browser evidence remains incomplete and unexecuted as a later
-separately authorized browser-evidence task.
+`e2678e6bba8497ed77bc5ba8c21b1ce8d001b2b9`. Its detailed canonical authority
+remains the [DNVS plan](docs/dynamic_narrative_vertical_spike_plan.md). The
+exact seven-path Manual Fake implementation was committed and published at
+`d84a0528febb6c270494f35e2843e7e350fbd040`
+(`feat(narrative): implement manual fake evidence mode`), closing its
+implementation lifecycle.
+
+The required Manual Fake browser walkthrough completed with
+`DNVS_MANUAL_FAKE_BROWSER_EVIDENCE_EXECUTION_COMPLETE`: 8 submissions, 7
+committed transitions, 1 intentional failure only at Fake ordinal 5, final
+version 7, 8 consecutive Fake invocations, 1 reload, 0 retries, 0 ninth
+submissions, 0 real Provider constructions/invocations, and 0 external Provider
+HTTP requests. Item 5 retained version 4 and was never replayed; one reload
+recovered it and items 6–8 completed successfully. The final continuity summary
+was `The visible amber marker established earlier now identifies the route forward.`
+The evidence task changed no repository file.
 Automated Offline longevity evidence remains complete at exactly 510 turns,
 510 Fake invocations, active state version 510, and 20 story slots. Automated
 Live smoke evidence remains complete at one smoke execution, one real Provider
 invocation, one Provider HTTP request, zero retries, and successful strict
-schema validation. Manual Fake browser evidence and Optional Live browser
-evidence remain incomplete; Optional Live remains optional. The next lifecycle
-step is the designated closure commit and its publication, not browser evidence
-execution. The spike does not reopen completed Phase 8 and is neither Phase 6
-nor Phase 7.
+schema validation. Optional Live browser evidence remains incomplete and
+optional. This documentation candidate awaits separate independent review and
+is not authorized for staging or commit. The spike does not reopen completed
+Phase 8 and is neither Phase 6 nor Phase 7.
 P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
