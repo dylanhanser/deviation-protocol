@@ -15,6 +15,19 @@ documents.
 
 ## Dynamic Narrative Vertical Spike planning
 
+A new bounded Provider reliability remediation is registered at
+[Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md).
+Its status is `PLAN_DRAFT`: it is not approved, committed, published, or
+implemented. It is drafted against the unchanged published implementation at
+`eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`
+(`fix(dynamic-narrative): harden provider schema contract`). The completed 36
+real-request, non-persistent diagnostics are diagnostic evidence only and are
+distinct from gameplay Optional Live; prior gameplay evidence remains
+`OPTIONAL_LIVE_INCOMPLETE`. The only current next step is a fresh focused
+independent read-only re-review of the corrected exact two-path plan candidate.
+No implementation, real-Provider gate, staging, commit, or push is authorized
+by this draft.
+
 The separate experimental Dynamic Narrative Vertical Spike implementation was
 published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated
 Live-smoke correction was published at
@@ -39,9 +52,14 @@ Automated Offline longevity evidence remains complete at exactly 510 turns,
 Live smoke evidence remains complete at one smoke execution, one real Provider
 invocation, one Provider HTTP request, zero retries, and successful strict
 schema validation. Optional Live browser evidence remains incomplete and
-optional. This current two-document synchronization candidate awaits separate
-independent review and is not authorized for staging or commit. The spike does
-not reopen completed Phase 8 and is neither Phase 6 nor Phase 7.
+optional. At the historical prepublication checkpoint, the two-document
+synchronization candidate awaited separate independent review and had no
+staging or commit authorization. That synchronization and the seven-path
+correction described below were subsequently completed, independently reviewed,
+and published together at `eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`.
+The following prepublication candidate descriptions are retained only as
+historical evidence, not as current work sequencing. The spike does not reopen
+completed Phase 8 and is neither Phase 6 nor Phase 7.
 P8-S6 and Phase 8 are
 complete at the published aligned baseline
 `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
@@ -58,9 +76,10 @@ change. It
 proved only a structurally parseable narrative shorter than the unchanged hard
 350..900 Unicode-character range; the rejected text and exact length remain
 unknown, and validation stopped before protected-reference scanning. The
-resulting five-path uncommitted candidate added the buffered 500..700
-Unicode-character prompt target and at most one length-triggered complete
-replacement generation. The next new-process/new-browser-Session action was
+resulting five-path candidate was then uncommitted and added the buffered
+500..700 Unicode-character prompt target and at most one length-triggered
+complete replacement generation. At that historical checkpoint, the next
+new-process/new-browser-Session Action was
 submitted once and returned HTTP 503
 `NARRATIVE_PROVIDER_RESPONSE_INVALID` / `Narrative processing failed`, emitted
 no `DNVS_LIVE_DIAG` token, was not repeated, and stopped before length and
@@ -99,10 +118,11 @@ disclosure of a real protected or authoritative identifier. It does not
 establish the exact cause of unrecoverable historical Live failures. No
 transition committed, and the diagnostic changed no repository file.
 
-The uncommitted correction candidate preserves the protected-reference source
-taxonomy and makes `DynamicPromptBuilder` the sole hardened single-object prompt
-authority. It distinguishes only sanitized unparseable-response and
-schema-invalid-response categories at the real dynamic response boundary and
+The then-uncommitted correction candidate preserved the protected-reference
+source taxonomy and made `DynamicPromptBuilder` the sole hardened single-object
+Prompt authority. The published implementation retains that design: it
+distinguishes only sanitized unparseable-response and schema-invalid-response
+categories at the real dynamic response boundary and
 shares one application replacement allowance across those categories and
 below-preferred and above-maximum outcomes. The Provider-visible preferred
 output contract remains 350..900 inclusive with a 500..700 target and never
@@ -126,8 +146,11 @@ diagnostic token. Invalid content and proposals are never persisted. Public
 errors, Provider settings, transport retries, terminal replay, single-commit
 atomicity, and non-Live behavior remain unchanged. The complete candidate scan
 over all string mapping keys and string leaves is unchanged, with no
-public-fact exemption or detector weakening. The whole seven-path candidate
-remains uncommitted and has no successful post-correction Live evidence.
+public-fact exemption or detector weakening. At that historical checkpoint, the
+whole seven-path candidate remained uncommitted and had no successful
+post-correction Live evidence. It was subsequently completed and published at
+`eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`; this publication did not create
+post-correction gameplay Optional Live evidence.
 The earlier generated-public-key correction checkpoint recorded focused pytest
 `37 passed`, the complete affected-module pytest command `490 passed`, and
 `git diff --check` passed; these overlapping historical counts are not a
@@ -155,18 +178,22 @@ generation, complete validation/safety/authority/stale/provenance/transactional
 finalization, duplicate suppression, commit atomicity, and absence of a
 deterministic fallback all remain unchanged.
 
-Current correction evidence records `4 passed` for the newly added tests,
+Historical final correction evidence recorded `4 passed` for the newly added
+tests,
 `17 passed` for the relevant correction selection, `427 passed` for the complete
 authorized two-file suite, and canonical Offline verification at `2275 passed,
 182 skipped`; compileall, pip check, Alembic heads/history, internal diff, and
 `git diff --check` also passed. The final focused review separately recorded
 `4 passed` for the two new test symbols, `16 passed` for directly relevant
-preservation, and `git diff --check` passed. This bounded two-document
-synchronization records the independently approved current state and is complete
-as a documentation candidate; it awaits one fresh independent focused review.
-Optional Live remains subject to separate authorization, incomplete, and
-unperformed by this task. Neither Optional Live nor staging or commit is
-authorized here.
+preservation, and `git diff --check` passed. At that prepublication checkpoint,
+the bounded two-document synchronization recorded the independently approved
+implementation state and was complete as a documentation candidate awaiting one
+fresh independent focused review. That historical review and publication were
+subsequently completed at
+`eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`. Gameplay Optional Live remains
+subject to separate authorization and `OPTIONAL_LIVE_INCOMPLETE`; it was not
+performed by that documentation task. That historical synchronization did not
+itself authorize Optional Live, staging, or commit.
 
 ## P4-S1 completion baseline
 
