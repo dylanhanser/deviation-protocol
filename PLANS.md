@@ -15,18 +15,130 @@ documents.
 
 ## Dynamic Narrative Vertical Spike planning
 
-A new bounded Provider reliability remediation is registered at
-[Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md).
-Its status is `PLAN_DRAFT`: it is not approved, committed, published, or
-implemented. It is drafted against the unchanged published implementation at
-`eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`
-(`fix(dynamic-narrative): harden provider schema contract`). The completed 36
-real-request, non-persistent diagnostics are diagnostic evidence only and are
-distinct from gameplay Optional Live; prior gameplay evidence remains
-`OPTIONAL_LIVE_INCOMPLETE`. The only current next step is a fresh focused
-independent read-only re-review of the corrected exact two-path plan candidate.
-No implementation, real-Provider gate, staging, commit, or push is authorized
-by this draft.
+The bounded
+[Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md)
+now contains the independently approved and published `DN-DKO-006`-corrected
+deterministic generated-public-fact-key ownership amendment with status
+`PLAN_AMENDMENT_PUBLISHED`. Historically, the focused independent review closed
+`DN-DKO-004` and found `DN-DKO-005` not fully closed solely because of the
+maximum-current-version and deterministic-regression gap identified as
+`DN-DKO-006`. The bounded correction addressed only `DN-DKO-006`. A fresh
+delta-focused independent review of the exact corrected two-document amendment
+completed successfully and returned
+`DYNAMIC_NARRATIVE_DETERMINISTIC_KEY_OWNERSHIP_PLAN_AMENDMENT_INDEPENDENT_REVIEW_APPROVED`.
+That review fully closed `DN-DKO-006`; `DN-DKO-005` is therefore fully closed.
+All amendment findings `DN-DKO-001` through `DN-DKO-006` are closed, and no
+material finding remains within the approved review scope. The fresh review,
+not the earlier authoring correction, supplied approval. The published
+amendment remains the base key-allocation authority. For that amendment, the
+strict candidate-v2/keyless compatibility edit for `_DynamicFakeProvider` in
+`src/deviation_protocol/api/demo_composition.py` assigned values and order to
+Fake/Provider output and keys to the orchestrator/server. Successor versions use
+non-truncating minimum-width-six decimal encoding that preserves every digit
+above `999999` through `9223372036854775807`. After current authority is locked
+and before any successor addition, the plan now requires the locked current version to be in
+`0..9223372036854775806`; it then computes the successor exactly once, validates
+it in `1..9223372036854775807`, and reuses that validated value for allocation
+and finalization. A maximum locked current version fails before calculation,
+allocation, detached mutation, fact-ring mutation, story publication, or
+commit, at only the existing sanitized failure boundary.
+
+The original D1-D5 Live diagnostic is closed as failed/incomplete. It stopped
+after historical D1 (Run A, suggested ordinal `0`) returned HTTP `200` and
+normally committed revision `0 -> 1`, one new story segment, and three
+suggestions. The official DeepSeek Dashboard delta and Provider-generation
+count were both `1`; there was no authorized application replacement, transport
+retry, or third generation. The exact newly committed public-fact count is
+`UNKNOWN`, so D1 is incomplete, not passed, not reconstructable, and not
+retroactively reinterpretable or repeatable within that procedure. D2-D5 were
+never started, and the procedure may never resume at D2 or be rewritten as
+successful.
+
+The missing browser-visible committed fact-count evidence is confirmed. The
+completed read-only analysis, with verdict
+`DYNAMIC_NARRATIVE_D1_NEW_PUBLIC_FACTS_EVIDENCE_REMEDIATION_PLAN_COMPLETE`,
+selected a privacy-safe bounded integer `public_fact_count` in the committed
+Dynamic Narrative response's existing `feedback_parameters`. The React action
+loop must retain that committed response across the authoritative View refresh
+and render a Session- and revision-associated post-Action summary. It must not
+reconstruct the count from the View, long-term-memory categories, prose,
+Provider requests or proposals, fact-ring size, keys, or values.
+
+The first independent review of the exact four-document authority-correction
+candidate returned
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REVIEW_CHANGES_REQUIRED`.
+Its two blocking findings were the non-executable clean-baseline lifecycle and
+the committed-scalar derivation timing. This bounded four-document correction
+addresses only those findings. It is complete only as an unstaged documentation
+candidate and has not yet received the required independent re-review or
+approval.
+
+The current complete worktree inventory remains exactly nine unstaged paths:
+
+1. `PLANS.md`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
+3. `docs/public_client_contract.md`;
+4. `docs/engineering/codex_workflow.md`;
+5. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+6. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+7. `src/deviation_protocol/api/demo_composition.py`;
+8. `tests/unit/test_dynamic_narrative.py`; and
+9. `tests/unit/test_narrative_provider.py`.
+
+The first four are the authority-document candidate. The last five are the
+intentionally preserved existing runtime/test candidate. The post-correction
+per-path hashes and complete nine-path diff size/hash are the proposed manifest
+for the next independent re-review; they are not approved or locked merely by
+this correction.
+
+If and only if that re-review approves, the resulting exact nine-path dirty
+state is locked as the authorized pre-implementation manifest under the narrow
+manifest-locked dirty aggregate-candidate exception in the Codex workflow. It
+is not a Git-clean baseline. The four documents are not separately staged,
+committed, or pushed because that would leave the protected implementation
+candidate dirty, while committing all nine paths would prematurely bypass the
+remaining evidence and review gates. The ordinary published-clean-baseline rule
+continues to apply outside this exact aggregate candidate.
+
+The future implementation delta remains exactly four paths:
+
+1. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`
+   (application runtime);
+2. `tests/unit/test_dynamic_narrative.py` (backend deterministic tests);
+3. `web/src/App.tsx` (Web runtime); and
+4. `web/src/App.action-loop.test.tsx` (Web deterministic tests).
+
+That four-path list is a delta budget, not the complete candidate inventory.
+The orchestrator and backend test are already dirty in the nine-path baseline
+and may receive only the separately authorized implementation changes. The two
+Web paths are currently clean and may become newly modified. After a successful
+implementation, the complete aggregate worktree would ordinarily contain
+exactly eleven unstaged paths: the original nine plus those two Web paths. The
+four authority documents must remain exact at their approved hashes, as must
+`dynamic_narrative_models.py`, `demo_composition.py`, and
+`test_narrative_provider.py`; only the two already-dirty implementation paths
+may change from the nine-path baseline, and no path outside the eleven-path
+inventory may appear. The final eleven-path per-path hashes and complete-diff
+size/hash must be recorded and verified.
+
+The executable lifecycle is: four-document authority candidate; independent
+read-only review; this bounded four-document correction; independent
+new-session read-only re-review; if and only if approved, exact nine-path
+manifest lock without separate document staging/commit/push; separately
+authorized four-path implementation delta; deterministic local verification;
+separately authorized E1-E5 Live diagnostic epoch; candidate freeze; formal
+Gate; independent implementation review; complete aggregate staging; one
+intentional aggregate commit; manual user push; and only then publication
+confirmation or another separately authorized phase. Every later task must
+verify the applicable manifest and stop on unexplained identity, path, hash, or
+inventory drift. A manifest alone authorizes none of those later actions.
+
+No implementation, deterministic verification, future Live diagnostic,
+candidate freeze, formal Gate, implementation review, staging, commit, manual
+push, publication, or later phase is complete or authorized by this correction.
+The prior independent review was not approved. The unique current next task is:
+
+> An independent new-session read-only re-review of the corrected four-document authority candidate against the two prior independent-review findings.
 
 The separate experimental Dynamic Narrative Vertical Spike implementation was
 published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated
@@ -130,8 +242,10 @@ discloses the 120-character fallback. It defines the exact real-Provider
 generated public-fact-key grammar
 `^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$` and enforces that one
 authority in both the prompt and the real DeepSeek proposal-schema boundary.
-Existing deterministic Fake and persisted key conventions remain compatible
-without a migration. A first result below 350 or above 900 consumes the sole
+At that published v1 boundary, the deterministic Fake and persisted key
+conventions remained compatible without a migration; that historical fact does
+not remove the future Fake candidate-v2/keyless edit recorded above. A first
+result below 350 or above 900 consumes the sole
 complete-replacement allowance and never commits. Only a replacement in the
 120..349 degraded band may become eligible, and it still traverses the complete
 schema, semantic, marker/secret, protected-reference, player-isolation,

@@ -131,6 +131,60 @@ correction task is not the approval review. Do not commit before approval, or
 implement before the documentation is pushed and the new clean baseline is
 confirmed.
 
+### Manifest-locked dirty aggregate-candidate exception
+
+The clean-published-baseline sequence above remains the ordinary rule. One
+narrow exception is available only for an authority correction layered over an
+already-existing implementation candidate that must be intentionally preserved
+unstaged. It is not available merely because a worktree is dirty.
+
+The exception applies only when a specific authority records all of these
+preconditions:
+
+1. cleanup, discard, restore, stash, premature staging, and premature
+   implementation commit are prohibited because the existing implementation
+   candidate must remain byte-exact;
+2. the authority correction must be layered over that same aggregate candidate;
+3. committing only the authority documents cannot create a clean worktree, and
+   committing the aggregate candidate would bypass named deterministic,
+   separately authorized Live, freeze, Gate, and independent-review boundaries;
+4. repository and branch identity, `HEAD`, local `origin/main`, ahead/behind,
+   the exact dirty-path inventory, every dirty path's SHA-256, complete-diff
+   byte size and SHA-256, empty index, absence of untracked paths and conflicts,
+   and absence of active Git operations identify the complete starting state;
+5. an exact authority-document budget, protected-path hashes, allowed
+   implementation-delta paths, allowed inventory transitions, and final
+   aggregate inventory are explicit; and
+6. the authority correction receives its own fresh independent read-only
+   approval before implementation.
+
+When all preconditions hold, the approved starting manifest is a narrowly
+authorized substitute for the ordinary pre-implementation documentation-
+publication and clean-baseline gate for that exact aggregate candidate only. It
+is not a Git-clean baseline and creates no general permission to implement in a
+dirty worktree. The authority documents are not separately staged, committed,
+or pushed. A correction that receives findings is corrected within its exact
+document budget and independently re-reviewed; only an approving re-review may
+lock the resulting complete dirty-candidate manifest.
+
+Before every later task, verify the applicable starting or successor manifest,
+including all Git identities, path inventories, per-path hashes, complete-diff
+size/hash, index, untracked/conflict state, and active-operation state. Verify
+that protected paths remain exact and that each changed or newly dirty path is
+an expressly allowed transition. Any unexplained identity, path, hash, or
+inventory drift blocks the task; it must not be normalized through cleanup or
+absorbed as unrelated work. The manifest itself authorizes no implementation,
+validation, Live traffic, staging, commit, push, or unrelated edit.
+
+After independent authority approval, the remaining sequence is: separately
+authorize the exact implementation delta; complete deterministic verification;
+separately authorize any required Live evidence; freeze the complete aggregate
+candidate; complete every formal Gate and independent implementation review;
+then, and only under separate authorization, stage the complete approved
+aggregate candidate and create one intentional aggregate commit. The user
+performs the manual push. This exception waives none of those downstream gates
+and permits no unrelated dirty-worktree expansion.
+
 ## Environment startup
 
 On Windows:
@@ -197,6 +251,26 @@ Never ask the user to paste a key into chat.
 
 Never print Authorization headers, keys, complete Provider responses containing
 sensitive data, or complete database URLs.
+
+## Live-evidence preflight
+
+Before any manually operated, networked, paid, quota-consuming, or non-repeatable
+Live diagnostic begins, the responsible task must:
+
+1. enumerate every datum required for pass/fail adjudication;
+2. identify each datum's authoritative source;
+3. identify the privacy-safe evidence surface through which each datum will be
+   collected;
+4. prove with deterministic fake/offline evidence that zero, absence, invalid
+   data, and ordinary nonzero values are distinguishable where applicable;
+5. confirm that the operator can actually access every required evidence
+   surface before paid traffic begins; and
+6. stop before Live traffic if any required datum lacks an authorized observable
+   surface.
+
+Do not substitute an unrelated UI total, narrative inference, raw protected log,
+secret-bearing output, Provider request count for an application-result field,
+manual guess, or retrospective reconstruction after a non-repeatable action.
 
 ## Baseline and final verification
 

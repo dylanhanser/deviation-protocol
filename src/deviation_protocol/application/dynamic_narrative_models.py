@@ -20,8 +20,8 @@ from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 
 
-DYNAMIC_PROMPT_SCHEMA_VERSION = "dynamic-narrative-prompt-v1"
-DYNAMIC_CANDIDATE_SCHEMA_VERSION = "dynamic-narrative-candidate-v1"
+DYNAMIC_PROMPT_SCHEMA_VERSION = "dynamic-narrative-prompt-v2"
+DYNAMIC_CANDIDATE_SCHEMA_VERSION = "dynamic-narrative-candidate-v2"
 DYNAMIC_ACCEPTED_OUTCOME_RULE_ID = "dynamic.narrative.accepted"
 DYNAMIC_FACT_KEY_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 MAX_DYNAMIC_REQUEST_CHARACTERS = 16_000
@@ -35,7 +35,6 @@ class DynamicNarrativeSchemaFailureFamily(StrEnum):
     REQUIRED_OR_EXTRA_FIELDS = "REQUIRED_OR_EXTRA_FIELDS"
     TYPE_OR_LITERAL = "TYPE_OR_LITERAL"
     BOUNDS_OR_UNIQUENESS = "BOUNDS_OR_UNIQUENESS"
-    GENERATED_PUBLIC_FACT_KEY_CONTRACT = "GENERATED_PUBLIC_FACT_KEY_CONTRACT"
 
 
 class DynamicProviderCandidateContractError(ValueError):
@@ -92,7 +91,7 @@ class DynamicProviderCandidateContract:
         "suggested_actions",
         "continuation",
     )
-    PUBLIC_FACT_FIELDS = ("key", "value")
+    PUBLIC_FACT_FIELDS = ("value",)
     NEXT_SCENE_FIELDS = ("title", "summary")
     SCHEMA_VERSION = DYNAMIC_CANDIDATE_SCHEMA_VERSION
     RESULT_LITERALS = tuple(item.value for item in NarrativeOutcomeResult)
@@ -105,15 +104,6 @@ class DynamicProviderCandidateContract:
     CONSEQUENCE_ITEM_MAXIMUM_LENGTH = 120
     PUBLIC_FACT_MINIMUM_COUNT = 0
     PUBLIC_FACT_MAXIMUM_COUNT = 3
-    GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT = (
-        r"^public-note-[a-z0-9]{2,6}(?:-[a-z0-9]{2,6}){0,3}$"
-    )
-    GENERATED_PUBLIC_FACT_KEY_PATTERN = re.compile(
-        GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT
-    )
-    GENERATED_PUBLIC_FACT_KEY_MINIMUM_LENGTH = 14
-    GENERATED_PUBLIC_FACT_KEY_MAXIMUM_LENGTH = 39
-    GENERATED_PUBLIC_FACT_KEY_SAFE_EXAMPLE = "public-note-amber-path"
     PUBLIC_FACT_VALUE_MINIMUM_LENGTH = 1
     PUBLIC_FACT_VALUE_MAXIMUM_LENGTH = 300
     NEXT_SCENE_TITLE_MINIMUM_LENGTH = 1
@@ -129,7 +119,6 @@ class DynamicProviderCandidateContract:
         DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
         DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
         DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
-        DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
         DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS,
     )
     _ROOT_OR_OBJECT_ERROR_TYPES = frozenset({"model_type", "dict_type"})
@@ -151,39 +140,6 @@ class DynamicProviderCandidateContract:
     )
 
     @classmethod
-    def validate_generated_public_fact_key(cls, value: object) -> str:
-        if not isinstance(value, str):
-            raise TypeError("generated public fact key must be a string")
-        if not (
-            cls.GENERATED_PUBLIC_FACT_KEY_MINIMUM_LENGTH
-            <= len(value)
-            <= cls.GENERATED_PUBLIC_FACT_KEY_MAXIMUM_LENGTH
-        ):
-            raise ValueError("generated public fact key is outside its length boundary")
-        if cls.GENERATED_PUBLIC_FACT_KEY_PATTERN.fullmatch(value) is None:
-            raise ValueError("generated public fact key does not match its grammar")
-        return value
-
-    @classmethod
-    def _has_generated_public_fact_key_failure(cls, value: object) -> bool:
-        if not isinstance(value, Mapping):
-            return False
-        public_facts = value.get("proposed_public_facts")
-        if not isinstance(public_facts, list):
-            return False
-        for public_fact in public_facts:
-            if not isinstance(public_fact, Mapping) or "key" not in public_fact:
-                continue
-            key = public_fact["key"]
-            if not isinstance(key, str):
-                continue
-            try:
-                cls.validate_generated_public_fact_key(key)
-            except ValueError:
-                return True
-        return False
-
-    @classmethod
     def classify_schema_failure(
         cls, value: object, *, validation_error_types: tuple[str, ...]
     ) -> DynamicNarrativeSchemaFailureFamily:
@@ -203,10 +159,6 @@ class DynamicProviderCandidateContract:
                 families.add(DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL)
             else:
                 families.add(DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS)
-        if cls._has_generated_public_fact_key_failure(value):
-            families.add(
-                DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
-            )
         if not families:
             families.add(DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS)
         return next(family for family in cls.SCHEMA_FAILURE_PRECEDENCE if family in families)
@@ -215,7 +167,7 @@ class DynamicProviderCandidateContract:
     def validate_response_json(
         cls, decoded: object, response_json: str
     ) -> DynamicNarrativeCandidatePayload:
-        """Run the strict candidate model, then the narrower external-key rule."""
+        """Run the strict complete keyless external candidate model."""
 
         validation_error_types: tuple[str, ...] | None = None
         try:
@@ -234,10 +186,6 @@ class DynamicProviderCandidateContract:
                 decoded, validation_error_types=validation_error_types
             )
             raise DynamicProviderCandidateContractError(family)
-        if cls._has_generated_public_fact_key_failure(decoded):
-            raise DynamicProviderCandidateContractError(
-                DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
-            )
         return candidate
 
     @classmethod
@@ -314,20 +262,6 @@ class DynamicProviderCandidateContract:
                     "items": {
                         "additional_properties": False,
                         "properties": {
-                            "key": {
-                                "ASCII_only": True,
-                                "maximum_length": (
-                                    cls.GENERATED_PUBLIC_FACT_KEY_MAXIMUM_LENGTH
-                                ),
-                                "minimum_length": (
-                                    cls.GENERATED_PUBLIC_FACT_KEY_MINIMUM_LENGTH
-                                ),
-                                "pattern": cls.GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT,
-                                "safe_example": (
-                                    cls.GENERATED_PUBLIC_FACT_KEY_SAFE_EXAMPLE
-                                ),
-                                "type": "string",
-                            },
                             "value": string_boundary(
                                 cls.PUBLIC_FACT_VALUE_MINIMUM_LENGTH,
                                 cls.PUBLIC_FACT_VALUE_MAXIMUM_LENGTH,
@@ -339,7 +273,7 @@ class DynamicProviderCandidateContract:
                     "maximum_items": cls.PUBLIC_FACT_MAXIMUM_COUNT,
                     "minimum_items": cls.PUBLIC_FACT_MINIMUM_COUNT,
                     "type": "array",
-                    "unique_keys_after_normalization": "Unicode-casefold",
+                    "unique_values_after_normalization": "Unicode-casefold",
                 },
                 "result": {
                     "allowed_literals": list(cls.RESULT_LITERALS),
@@ -374,43 +308,69 @@ class DynamicProviderCandidateContract:
 
 
 class DynamicGeneratedPublicFactKeyGrammar:
-    """Exact safe grammar for public-fact keys emitted by an external Provider."""
+    """Narrow structural and semantic validation for server-produced fact keys."""
 
-    PATTERN_TEXT = DynamicProviderCandidateContract.GENERATED_PUBLIC_FACT_KEY_PATTERN_TEXT
-    PATTERN = DynamicProviderCandidateContract.GENERATED_PUBLIC_FACT_KEY_PATTERN
-    MINIMUM_LENGTH = (
-        DynamicProviderCandidateContract.GENERATED_PUBLIC_FACT_KEY_MINIMUM_LENGTH
-    )
-    MAXIMUM_LENGTH = (
-        DynamicProviderCandidateContract.GENERATED_PUBLIC_FACT_KEY_MAXIMUM_LENGTH
-    )
-    SAFE_EXAMPLE = DynamicProviderCandidateContract.GENERATED_PUBLIC_FACT_KEY_SAFE_EXAMPLE
+    PATTERN_TEXT = r"^public-note-(?:[0-9]{6}|[1-9][0-9]{6,18})-[0-9]{2}-[0-9]{3}$"
+    PATTERN = re.compile(PATTERN_TEXT)
+    MINIMUM_LENGTH = 25
+    MAXIMUM_LENGTH = 38
+    MINIMUM_SUCCESSOR_STATE_VERSION = 1
+    MAXIMUM_SUCCESSOR_STATE_VERSION = 9_223_372_036_854_775_807
+
+    @classmethod
+    def validate_structure(cls, value: object) -> str:
+        if not isinstance(value, str):
+            raise TypeError("generated public fact key must be a string")
+        if not cls.MINIMUM_LENGTH <= len(value) <= cls.MAXIMUM_LENGTH:
+            raise ValueError("generated public fact key is outside its length boundary")
+        if cls.PATTERN.fullmatch(value) is None:
+            raise ValueError("generated public fact key does not match its grammar")
+        return value
+
+    @classmethod
+    def validate_successor_state_version(cls, value: object) -> int:
+        if type(value) is not int or not (
+            cls.MINIMUM_SUCCESSOR_STATE_VERSION
+            <= value
+            <= cls.MAXIMUM_SUCCESSOR_STATE_VERSION
+        ):
+            raise ValueError("generated public fact successor is outside its range")
+        return value
 
     @classmethod
     def validate(cls, value: object) -> str:
-        return DynamicProviderCandidateContract.validate_generated_public_fact_key(value)
+        structured = cls.validate_structure(value)
+        _prefix, _note, successor, ordinal, probe = structured.split("-")
+        cls.validate_successor_state_version(int(successor))
+        if not 0 <= int(ordinal) <= 2 or not 0 <= int(probe) <= 999:
+            raise ValueError("generated public fact key has invalid allocation fields")
+        return structured
+
+
+class DynamicGeneratedPublicFactKeyAllocator:
+    """Pure deterministic server-side allocation over locked scalar authority."""
 
     @classmethod
-    def validate_proposal_document(cls, value: object) -> None:
-        if not isinstance(value, Mapping):
-            raise TypeError("generated proposal must be an object")
-        public_facts = value.get("proposed_public_facts")
-        if not isinstance(public_facts, list):
-            raise TypeError("generated public facts must be an array")
-        for public_fact in public_facts:
-            if not isinstance(public_fact, Mapping):
-                raise TypeError("generated public fact must be an object")
-            cls.validate(public_fact.get("key"))
-
-    @classmethod
-    def prompt_contract(cls) -> str:
-        return (
-            "Every proposed_public_facts key must match the exact ASCII grammar "
-            f"{cls.PATTERN_TEXT}: use the literal public-note- prefix followed by "
-            "one to four lowercase ASCII letter-or-digit tokens, each 2..6 "
-            "characters, separated by single hyphens. "
-            "The key shown in the exact response schema is the one safe synthetic example."
+    def allocate(
+        cls,
+        *,
+        successor_state_version: int,
+        proposal_ordinal: int,
+        unavailable_identifiers: set[str],
+    ) -> str:
+        successor = DynamicGeneratedPublicFactKeyGrammar.validate_successor_state_version(
+            successor_state_version
         )
+        if type(proposal_ordinal) is not int or not 0 <= proposal_ordinal <= 2:
+            raise ValueError("generated public fact ordinal is outside its range")
+        version_token = str(successor).zfill(6)
+        for probe in range(1_000):
+            key = f"public-note-{version_token}-{proposal_ordinal:02d}-{probe:03d}"
+            DynamicGeneratedPublicFactKeyGrammar.validate(key)
+            if key not in unavailable_identifiers:
+                unavailable_identifiers.add(key)
+                return key
+        raise ValueError("generated public fact key allocation is exhausted")
 
 
 def normalize_dynamic_text(value: str) -> str:
@@ -580,9 +540,6 @@ class DynamicGenerationInstruction(StrEnum):
     )
     REPLACE_SCHEMA_TYPE_OR_LITERAL = "REPLACE_SCHEMA_TYPE_OR_LITERAL"
     REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS = "REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS"
-    REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT = (
-        "REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT"
-    )
     REPLACE_BELOW_MINIMUM = "REPLACE_BELOW_MINIMUM"
     REPLACE_ABOVE_MAXIMUM = "REPLACE_ABOVE_MAXIMUM"
 
@@ -613,7 +570,7 @@ class DynamicNarrativeResponseError(NarrativeProviderResponseError):
 
 
 class DynamicNarrativeRequest(NarrativeBoundaryModel):
-    schema_version: Literal["dynamic-narrative-prompt-v1"] = DYNAMIC_PROMPT_SCHEMA_VERSION
+    schema_version: Literal["dynamic-narrative-prompt-v2"] = DYNAMIC_PROMPT_SCHEMA_VERSION
     language: Literal["zh-CN"] = "zh-CN"
     scenario_premise: DynamicScenarioPremise
     selected_player_character: DynamicSelectedPlayerCharacter
@@ -675,6 +632,24 @@ class DynamicNarrativeRequest(NarrativeBoundaryModel):
 
 
 class DynamicPublicFactProposal(NarrativeBoundaryModel):
+    value: Annotated[
+        str,
+        Field(
+            strict=True,
+            min_length=DynamicProviderCandidateContract.PUBLIC_FACT_VALUE_MINIMUM_LENGTH,
+            max_length=DynamicProviderCandidateContract.PUBLIC_FACT_VALUE_MAXIMUM_LENGTH,
+        ),
+    ]
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def normalize_value(cls, value: object) -> object:
+        return normalize_dynamic_text(value) if isinstance(value, str) else value
+
+
+class DynamicAllocatedPublicFact(NarrativeBoundaryModel):
+    """Server-internal fact wrapper created only after candidate validation."""
+
     key: Annotated[
         str,
         Field(
@@ -805,9 +780,9 @@ class DynamicNarrativeCandidatePayload(NarrativeBoundaryModel):
         consequences = tuple(item.casefold() for item in self.proposed_consequences)
         if len(consequences) != len(set(consequences)):
             raise ValueError("dynamic candidate repeats a consequence")
-        fact_keys = tuple(item.key.casefold() for item in self.proposed_public_facts)
-        if len(fact_keys) != len(set(fact_keys)):
-            raise ValueError("dynamic candidate repeats a public fact key")
+        fact_values = tuple(item.value.casefold() for item in self.proposed_public_facts)
+        if len(fact_values) != len(set(fact_values)):
+            raise ValueError("dynamic candidate repeats a public fact value")
         if len(self.suggested_actions) != len(set(self.suggested_actions)):
             raise ValueError("dynamic candidate repeats a suggested action")
         return self
@@ -857,6 +832,136 @@ class DynamicPromptBuilder:
         "before or after it. Every field is required, no extra field is allowed, and the "
         "object must be a complete proposal rather than a partial response or continuation."
     )
+    _PUBLIC_FACT_OWNERSHIP_INSTRUCTION = (
+        "Public-fact ownership instruction: proposed_public_facts contains only "
+        "semantic value statements. The server alone assigns public-fact keys after "
+        "validation; do not emit keys, identifiers, namespaces, allocation details, "
+        "or protected/internal shapes. Request canonical_facts are pre-existing public "
+        "facts, while private facts are unavailable and must not be copied or inferred."
+    )
+    _DECODED_STRING_CONTROL_INSTRUCTION = (
+        "Decoded-string control instruction: Every decoded JSON string must contain "
+        "no Unicode Cc, Cf, or Cs character. JSON string values must contain no "
+        "escaped \\r, \\n, or \\t. Use ordinary spaces instead of line-break or tab "
+        "controls."
+    )
+    _EXAMPLE_NARRATIVE_TEXT = (
+        "你放慢脚步观察眼前的公开痕迹，微弱光线在旧墙和封闭门框之间移动，灰尘被经过的气流推向走廊一侧。"
+        "你没有急于断言真相，而是先比较地面的新旧擦痕，又留意到门把附近残存着不一致的清洁痕迹。"
+        "值守人员保持谨慎，只确认自己亲眼见过的部分，并把无法核实的传闻明确留在结论之外。"
+        "你重新整理刚才取得的公开信息，发现时间顺序仍有一处空白，但现有证据足以支持继续调查。"
+        "当你换到侧面观察时，一道原本被阴影遮住的浅色印记显现出来，它说明这里不久前有人停留。"
+        "这项发现没有证明任何隐藏结论，却让此前互相冲突的说法出现了可以公开复核的交点。"
+        "你将观察结果清楚告知在场者，没有夸大意义，也没有把候选解释写成已经发生的固定事实。"
+        "短暂沉默后，众人的注意力转向相邻区域，下一步可以从可见痕迹、公开证词或周围环境中选择。"
+        "你沿着门框逐段核对痕迹的方向，确认其中几处来自日常通行，另一些则需要新的公开证据解释。"
+        "走廊另一端传来轻微响动，但你只记录可以共同听见的变化，没有把模糊声音当成身份或意图的证明。"
+        "你把先后顺序写得清楚，让每项观察都能被重新检查，也为不同结果保留合理而有限的可能。"
+        "现场没有立即给出最终答案，不过调查已经从猜测转向可验证的细节，新的场景因此自然展开。"
+    )
+    _EXAMPLE_SUGGESTION_POOL = (
+        "检查门框附近仍可见的擦痕。",
+        "询问现场人员刚才听见了什么。",
+        "退后一步比较走廊两侧的光线。",
+        "记录地面上公开可见的足迹方向。",
+        "观察封闭入口周围是否有新变化。",
+        "暂时停下并整理已确认的公开线索。",
+    )
+
+    @classmethod
+    def _example_suggestions(cls, *, submitted_action: str) -> tuple[str, ...]:
+        exclusion = DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE
+        eligible = tuple(
+            suggestion
+            for suggestion in cls._EXAMPLE_SUGGESTION_POOL
+            if not exclusion.is_violated(
+                (suggestion,), submitted_action=submitted_action
+            )
+        )
+        required = DynamicProviderCandidateContract.SUGGESTED_ACTION_COUNT
+        if len(eligible) < required:
+            raise ValueError(
+                "dynamic prompt cannot select three eligible synthetic suggestions"
+            )
+        selected = eligible[:required]
+        if len(selected) != required:
+            raise ValueError(
+                "dynamic prompt cannot select three eligible synthetic suggestions"
+            )
+        return selected
+
+    @staticmethod
+    def _require_exact_fields(
+        value: object, *, fields: tuple[str, ...], boundary: str
+    ) -> Mapping[str, Any]:
+        if (
+            not isinstance(value, Mapping)
+            or len(value) != len(fields)
+            or set(value) != set(fields)
+        ):
+            raise ValueError(
+                f"dynamic synthetic example has invalid {boundary} fields"
+            )
+        return value
+
+    @classmethod
+    def _example_json(cls, request: DynamicNarrativeRequest) -> str:
+        narrative_text = cls._EXAMPLE_NARRATIVE_TEXT
+        if not (
+            DynamicNarrativeLengthPolicy.PROMPT_TARGET_MINIMUM
+            <= len(narrative_text)
+            <= DynamicNarrativeLengthPolicy.PROMPT_TARGET_MAXIMUM
+            and request.narrative_length.minimum
+            <= len(narrative_text)
+            <= request.narrative_length.maximum
+        ):
+            raise ValueError("dynamic synthetic example is outside narrative boundaries")
+        example = DynamicNarrativeCandidatePayload(
+            schema_version=DYNAMIC_CANDIDATE_SCHEMA_VERSION,
+            narrative_text=narrative_text,
+            result=NarrativeOutcomeResult.AMBIGUOUS,
+            proposed_consequences=("一项公开可见的痕迹得到记录。",),
+            proposed_public_facts=(
+                DynamicPublicFactProposal(
+                    value="现场出现了一项仍需复核的公开观察。",
+                ),
+            ),
+            next_scene=DynamicNextScene(
+                title="相邻走廊",
+                summary="调查转向能够公开复核的新痕迹与证词。",
+            ),
+            suggested_actions=cls._example_suggestions(
+                submitted_action=request.player_action.description
+            ),
+            continuation=DynamicProviderCandidateContract.CONTINUATION_LITERALS[0],
+        )
+        response_json = canonical_json(example.model_dump(mode="json"))
+        decoded = json.loads(response_json)
+        validated = DynamicProviderCandidateContract.validate_response_json(
+            decoded, response_json
+        )
+        top_level = cls._require_exact_fields(
+            decoded,
+            fields=DynamicProviderCandidateContract.TOP_LEVEL_FIELDS,
+            boundary="top-level",
+        )
+        public_facts = top_level.get("proposed_public_facts")
+        if not isinstance(public_facts, list):
+            raise ValueError("dynamic synthetic example has invalid public facts")
+        for public_fact in public_facts:
+            cls._require_exact_fields(
+                public_fact,
+                fields=DynamicProviderCandidateContract.PUBLIC_FACT_FIELDS,
+                boundary="public-fact",
+            )
+        cls._require_exact_fields(
+            top_level.get("next_scene"),
+            fields=DynamicProviderCandidateContract.NEXT_SCENE_FIELDS,
+            boundary="next-scene",
+        )
+        if validated != example:
+            raise ValueError("dynamic synthetic example changed during validation")
+        return response_json
 
     def build(self, request: DynamicNarrativeRequest) -> DynamicPrompt:
         request_json = canonical_json(request.model_dump(mode="json"))
@@ -864,6 +969,7 @@ class DynamicPromptBuilder:
         target_minimum = DynamicNarrativeLengthPolicy.PROMPT_TARGET_MINIMUM
         target_maximum = DynamicNarrativeLengthPolicy.PROMPT_TARGET_MAXIMUM
         contract = DynamicProviderCandidateContract.render(preferred=preferred)
+        example_json = self._example_json(request)
         recovery = ""
         if request.generation_instruction is DynamicGenerationInstruction.REPLACE_RESPONSE_INVALID:
             recovery = (
@@ -879,7 +985,6 @@ class DynamicPromptBuilder:
             DynamicGenerationInstruction.REPLACE_SCHEMA_REQUIRED_OR_EXTRA_FIELDS,
             DynamicGenerationInstruction.REPLACE_SCHEMA_TYPE_OR_LITERAL,
             DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS,
-            DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT,
         }:
             correction = {
                 DynamicGenerationInstruction.REPLACE_SCHEMA_ROOT_OR_OBJECT_SHAPE: (
@@ -894,10 +999,6 @@ class DynamicPromptBuilder:
                 DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS: (
                     "Obey every declared string and collection bound, normalization and "
                     "prohibited-character rule, and uniqueness rule."
-                ),
-                DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
-                    "Obey the exact generated public-fact-key ASCII grammar and its 14..39 "
-                    "character bounds."
                 ),
             }[request.generation_instruction]
             recovery = (
@@ -926,8 +1027,15 @@ class DynamicPromptBuilder:
         user = (
             "Public dynamic narrative request:\n"
             + request_json
+            + "\n"
+            + self._PUBLIC_FACT_OWNERSHIP_INSTRUCTION
+            + "\n"
+            + self._DECODED_STRING_CONTROL_INSTRUCTION
             + "\nAuthoritative candidate-output contract:\n"
+            + "Return every required field and nested field with no extra fields.\n"
             + contract
+            + "\nComplete contract-valid synthetic output example:\n"
+            + example_json
             + recovery
         )
         if len(self._SYSTEM) > 12_000 or len(self._SYSTEM) + len(user) > 32_000:

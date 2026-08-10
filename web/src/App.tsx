@@ -8,6 +8,7 @@ import {
   minimalPlayerCharacterCreationRequestSchema,
   runEntryRequestSchema,
   sessionPathIdSchema,
+  type ActionResponse,
   type ActionRequest,
   type MinimalPlayerCharacterCreationRequest,
   type PlayerSessionView,
@@ -81,6 +82,13 @@ interface LoadedSession {
   sessionId: string;
   view: PlayerSessionView;
   stale: ViewStaleState | null;
+}
+
+interface DynamicNarrativeActionEvidence {
+  revision: number;
+  newStorySegments: number;
+  suggestions: number;
+  publicFactCount: number;
 }
 
 interface ForegroundOperation {
@@ -176,6 +184,66 @@ const DOCUMENTED_MUTATION_ERRORS: Readonly<
     message: "Scenario definition is not available",
   },
 };
+
+function dynamicNarrativeActionEvidence(
+  response: ActionResponse | null,
+  loaded: LoadedSession,
+): DynamicNarrativeActionEvidence | null {
+  if (
+    response === null ||
+    response.session_id !== loaded.sessionId ||
+    response.session_id !== loaded.view.metadata.session_id ||
+    response.resulting_state_version !== loaded.view.metadata.state_version ||
+    response.resolution_kind !== "NARRATIVE_COMMITTED" ||
+    response.result_code !== "DYNAMIC_NARRATIVE_COMMITTED" ||
+    response.feedback_code !== "DYNAMIC_NARRATIVE_COMMITTED" ||
+    !response.state_changed ||
+    !response.narrative_required ||
+    response.narrative_pending ||
+    response.narrative_status !== "COMMITTED" ||
+    response.narrative_text === null
+  ) {
+    return null;
+  }
+  const publicFactCount = response.feedback_parameters["public_fact_count"];
+  if (
+    typeof publicFactCount !== "number" ||
+    !Number.isFinite(publicFactCount) ||
+    !Number.isInteger(publicFactCount) ||
+    publicFactCount < 0 ||
+    publicFactCount > 3
+  ) {
+    return null;
+  }
+  return {
+    revision: response.resulting_state_version,
+    newStorySegments: 1,
+    suggestions: loaded.view.action_affordances.suggested_actions?.length ?? 0,
+    publicFactCount,
+  };
+}
+
+function DynamicNarrativeEvidenceSummary({
+  response,
+  loaded,
+}: {
+  response: ActionResponse | null;
+  loaded: LoadedSession;
+}) {
+  const evidence = dynamicNarrativeActionEvidence(response, loaded);
+  if (evidence === null) {
+    return null;
+  }
+  return (
+    <section className="panel" aria-labelledby="dynamic-narrative-evidence-heading">
+      <h2 id="dynamic-narrative-evidence-heading">Dynamic Narrative action evidence</h2>
+      <p>REVISION={evidence.revision}</p>
+      <p>NEW_STORY_SEGMENTS={evidence.newStorySegments}</p>
+      <p>SUGGESTIONS={evidence.suggestions}</p>
+      <p>NEW_PUBLIC_FACTS={evidence.publicFactCount}</p>
+    </section>
+  );
+}
 
 function newOpaqueId(): string {
   return globalThis.crypto.randomUUID();
@@ -646,6 +714,8 @@ export default function App({
     );
   const [manualSessionId, setManualSessionId] = useState("");
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
+  const [committedActionResponse, setCommittedActionResponse] =
+    useState<ActionResponse | null>(null);
   const [createdSessionWithoutView, setCreatedSessionWithoutView] = useState<
     string | null
   >(null);
@@ -703,6 +773,7 @@ export default function App({
   const clearSessionUiState = useCallback(() => {
     loadedSessionRef.current = null;
     setLoadedSession(null);
+    setCommittedActionResponse(null);
     setCreatedSessionWithoutView(null);
     setManualSessionId("");
     setOperationError(null);
@@ -747,6 +818,7 @@ export default function App({
     setRecoveryRecord(null);
     loadedSessionRef.current = null;
     setLoadedSession(null);
+    setCommittedActionResponse(null);
     setRecoveryStorageFailure(null);
     return true;
   }, [enterRecoveryStorageFailure]);
@@ -838,6 +910,7 @@ export default function App({
       invalidateForegroundOperation();
       loadedSessionRef.current = null;
       setLoadedSession(null);
+      setCommittedActionResponse(null);
       setCreatedSessionWithoutView(null);
       setOperationError(null);
       setRecoveryInterruption(null);
@@ -887,7 +960,9 @@ export default function App({
       }
     };
 
-    const readAndCommitAuthoritativeView = async () => {
+    const readAndCommitAuthoritativeView = async (
+      response: ActionResponse | null = null,
+    ) => {
       transition("refreshing");
       const restoredView = await client.getSessionView(
         record.session_id,
@@ -909,6 +984,13 @@ export default function App({
       };
       loadedSessionRef.current = next;
       setLoadedSession(next);
+      setCommittedActionResponse(
+        response !== null &&
+          response.session_id === record.session_id &&
+          response.resulting_state_version === restoredView.metadata.state_version
+          ? response
+          : null,
+      );
     };
 
     void (async () => {
@@ -918,6 +1000,7 @@ export default function App({
       }
       loadedSessionRef.current = null;
       setLoadedSession(null);
+      setCommittedActionResponse(null);
       setCreatedSessionWithoutView(null);
       setOperationError(null);
       setRecoveryInterruption(null);
@@ -944,7 +1027,11 @@ export default function App({
               );
               continue;
             }
-            await readAndCommitAuthoritativeView();
+            await readAndCommitAuthoritativeView(
+              requestStatus.status === "COMMITTED"
+                ? requestStatus.response
+                : null,
+            );
             return;
           }
           return;
@@ -1018,20 +1105,29 @@ export default function App({
   function commitLoadedSession(
     sessionId: string,
     view: PlayerSessionView,
+    response: ActionResponse | null = null,
   ) {
     const next = { sessionId, view, stale: null };
     loadedSessionRef.current = next;
     setLoadedSession(next);
+    setCommittedActionResponse(
+      response !== null &&
+        response.session_id === sessionId &&
+        response.resulting_state_version === view.metadata.state_version
+        ? response
+        : null,
+    );
   }
 
   function persistAndCommitLoadedSession(
     sessionId: string,
     view: PlayerSessionView,
+    response: ActionResponse | null = null,
   ): boolean {
     if (!persistRecoveryRecord(sessionId)) {
       return false;
     }
-    commitLoadedSession(sessionId, view);
+    commitLoadedSession(sessionId, view, response);
     return true;
   }
 
@@ -1105,6 +1201,7 @@ export default function App({
   async function readAndCommitCurrentView(
     operation: ForegroundOperation,
     sessionId: string,
+    response: ActionResponse | null = null,
   ) {
     const restoredView = await client.getSessionView(
       sessionId,
@@ -1117,7 +1214,7 @@ export default function App({
     if (current === null || current.sessionId !== sessionId) {
       return;
     }
-    persistAndCommitLoadedSession(sessionId, restoredView);
+    persistAndCommitLoadedSession(sessionId, restoredView, response);
   }
 
   function clearMutationAttempt(generation: number): boolean {
@@ -1646,6 +1743,7 @@ export default function App({
     if (operation === null) {
       return;
     }
+    setCommittedActionResponse(null);
     let stage: "building" | "posting" | "polling" | "refreshing" =
       "building";
     try {
@@ -1663,7 +1761,11 @@ export default function App({
       if (submitted.status === 200) {
         stage = "refreshing";
         transitionForegroundOperation(operation, "refreshing");
-        await readAndCommitCurrentView(operation, current.sessionId);
+        await readAndCommitCurrentView(
+          operation,
+          current.sessionId,
+          submitted.response,
+        );
         return;
       }
 
@@ -1693,10 +1795,17 @@ export default function App({
           );
           continue;
         }
-        if (
-          requestStatus.status === "COMMITTED" ||
-          requestStatus.status === "STALE"
-        ) {
+        if (requestStatus.status === "COMMITTED") {
+          stage = "refreshing";
+          transitionForegroundOperation(operation, "refreshing");
+          await readAndCommitCurrentView(
+            operation,
+            current.sessionId,
+            requestStatus.response,
+          );
+          return;
+        }
+        if (requestStatus.status === "STALE") {
           stage = "refreshing";
           transitionForegroundOperation(operation, "refreshing");
           await readAndCommitCurrentView(operation, current.sessionId);
@@ -2113,6 +2222,13 @@ export default function App({
 
       {recoveryStorageFailure !== null || loadedSession === null ? null : (
         <ViewSummary loaded={loadedSession} />
+      )}
+
+      {recoveryStorageFailure !== null || loadedSession === null ? null : (
+        <DynamicNarrativeEvidenceSummary
+          response={committedActionResponse}
+          loaded={loadedSession}
+        />
       )}
 
       {recoveryStorageFailure !== null || loadedSession === null ? null : (

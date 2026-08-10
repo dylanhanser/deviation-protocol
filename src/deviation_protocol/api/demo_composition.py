@@ -276,16 +276,14 @@ class _DynamicFakeProvider:
         if len(narrative) < request.narrative_length.minimum:
             narrative += "琥珀微光轻颤。" * 50
             narrative = narrative[: request.narrative_length.minimum]
-        anchor_key = "manual.continuity.anchor"
         anchor_value = "A visible amber marker appears beside the sealed doorway."
         has_anchor = any(
-            fact.key == anchor_key and fact.value == anchor_value
-            for fact in request.canonical_facts
+            fact.value == anchor_value for fact in request.canonical_facts
         )
         if not has_anchor:
             narrative = (anchor_value + narrative)[: request.narrative_length.maximum]
             proposed_public_facts = (
-                DynamicPublicFactProposal(key=anchor_key, value=anchor_value),
+                DynamicPublicFactProposal(value=anchor_value),
             )
             next_scene = DynamicNextScene(
                 title=f"Dynamic scene {stable_label}",
@@ -294,7 +292,6 @@ class _DynamicFakeProvider:
         else:
             proposed_public_facts = (
                 DynamicPublicFactProposal(
-                    key=f"note.{stable_label}",
                     value=f"Visible change {stable_label}.",
                 ),
             )
@@ -309,7 +306,7 @@ class _DynamicFakeProvider:
         )
         return UntrustedDynamicNarrativeCandidate(
             candidate=DynamicNarrativeCandidatePayload(
-                schema_version="dynamic-narrative-candidate-v1",
+                schema_version="dynamic-narrative-candidate-v2",
                 narrative_text=narrative,
                 result=result,
                 proposed_consequences=("The atmosphere shifts.",),

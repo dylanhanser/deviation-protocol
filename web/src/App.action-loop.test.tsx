@@ -16,6 +16,7 @@ import {
   type PublicActionSubmissionResult,
 } from "./api/client";
 import type {
+  ActionResponse,
   EligiblePlayerCharacterCollection,
   NarrativeRequestStatusResponse,
   PlayerSessionView,
@@ -172,6 +173,23 @@ function withSessionId(
     ...view,
     metadata: { ...view.metadata, session_id: sessionId },
     player_state: { ...view.player_state, session_id: sessionId },
+  };
+}
+
+function dynamicCommittedActionResponse({
+  clientRequestId,
+  stateVersion,
+  feedbackParameters,
+}: {
+  clientRequestId: string;
+  stateVersion: number;
+  feedbackParameters: ActionResponse["feedback_parameters"];
+}): ActionResponse {
+  return {
+    ...committedActionResponseFixture(clientRequestId, stateVersion),
+    result_code: "DYNAMIC_NARRATIVE_COMMITTED",
+    feedback_code: "DYNAMIC_NARRATIVE_COMMITTED",
+    feedback_parameters: feedbackParameters,
   };
 }
 
@@ -2170,6 +2188,205 @@ describe("action_affordances and synchronous lifecycle", () => {
     expect(actionPosts).toBe(1);
     expect(viewReads).toBe(2);
   });
+});
+
+describe("committed Dynamic Narrative action evidence", () => {
+  function installDirectEvidenceHandlers(
+    feedbackParameters: ActionResponse["feedback_parameters"],
+    responseUpdate: Partial<ActionResponse> = {},
+  ) {
+    let viewReads = 0;
+    const submission = dynamicSuggestionSubmission(
+      0,
+      0,
+      initialNoNpcSuggestionTexts[0],
+    );
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const stateVersion = viewReads;
+          viewReads += 1;
+          return HttpResponse.json(
+            dynamicSuggestionViewFixture({
+              stateVersion,
+              suggestionTexts: initialNoNpcSuggestionTexts,
+            }),
+          );
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json({
+            ...dynamicCommittedActionResponse({
+              clientRequestId: submission.client_request_id,
+              stateVersion: 1,
+              feedbackParameters,
+            }),
+            ...responseUpdate,
+          }),
+      ),
+    );
+    return { submission, viewReads: () => viewReads };
+  }
+
+  it("retains a direct committed response through refresh and renders numeric zero", async () => {
+    const { viewReads } = installDirectEvidenceHandlers({
+      outcome_result: "SUCCESS",
+      public_fact_count: 0,
+    });
+    const user = userEvent.setup();
+    const rendered = renderActionApp();
+    await loadSession(user);
+
+    expect(screen.queryByText(/^NEW_PUBLIC_FACTS=/)).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await waitFor(() => expect(viewReads()).toBe(2));
+
+    const evidence = screen.getByRole("region", {
+      name: "Dynamic Narrative action evidence",
+    });
+    expect(within(evidence).getByText("REVISION=1")).toBeVisible();
+    expect(within(evidence).getByText("NEW_STORY_SEGMENTS=1")).toBeVisible();
+    expect(within(evidence).getByText("SUGGESTIONS=3")).toBeVisible();
+    expect(within(evidence).getByText("NEW_PUBLIC_FACTS=0")).toBeVisible();
+    expect(rendered.container).not.toHaveTextContent("public-note-");
+    expect(rendered.container).not.toHaveTextContent("allocated public fact");
+  });
+
+  it("renders the exact nonzero count from a 202-to-COMMITTED stored response", async () => {
+    let viewReads = 0;
+    let statusReads = 0;
+    const submission = dynamicSuggestionSubmission(
+      0,
+      0,
+      initialNoNpcSuggestionTexts[0],
+    );
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const stateVersion = viewReads;
+          viewReads += 1;
+          return HttpResponse.json(
+            dynamicSuggestionViewFixture({
+              stateVersion,
+              suggestionTexts: initialNoNpcSuggestionTexts,
+            }),
+          );
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        () =>
+          HttpResponse.json(
+            pendingActionResponseFixture(submission.client_request_id),
+            { status: 202 },
+          ),
+      ),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/${submission.client_request_id}`,
+        () => {
+          statusReads += 1;
+          return HttpResponse.json({
+            session_id: "session-public-1",
+            client_request_id: submission.client_request_id,
+            status: "COMMITTED",
+            client_action: "RESPONSE_AVAILABLE",
+            error_code: null,
+            retry_after_seconds: null,
+            response: dynamicCommittedActionResponse({
+              clientRequestId: submission.client_request_id,
+              stateVersion: 1,
+              feedbackParameters: {
+                outcome_result: "SUCCESS",
+                public_fact_count: 3,
+              },
+            }),
+          });
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    renderActionApp();
+    await loadSession(user);
+
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    expect(await screen.findByText("NEW_PUBLIC_FACTS=3")).toBeVisible();
+    expect(screen.getByText("REVISION=1")).toBeVisible();
+    expect(screen.getByText("NEW_STORY_SEGMENTS=1")).toBeVisible();
+    expect(screen.getByText("SUGGESTIONS=3")).toBeVisible();
+    expect(viewReads).toBe(2);
+    expect(statusReads).toBe(1);
+  });
+
+  it.each(
+    [
+      ["missing", { outcome_result: "SUCCESS" }],
+      ["null", { outcome_result: "SUCCESS", public_fact_count: null }],
+      ["string", { outcome_result: "SUCCESS", public_fact_count: "1" }],
+      ["boolean", { outcome_result: "SUCCESS", public_fact_count: true }],
+      ["fractional", { outcome_result: "SUCCESS", public_fact_count: 1.5 }],
+      ["negative", { outcome_result: "SUCCESS", public_fact_count: -1 }],
+      ["above maximum", { outcome_result: "SUCCESS", public_fact_count: 4 }],
+    ] satisfies ReadonlyArray<
+      readonly [string, ActionResponse["feedback_parameters"]]
+    >,
+  )("fails closed for %s public_fact_count feedback", async (_case, feedback) => {
+    const { viewReads } = installDirectEvidenceHandlers(feedback);
+    const user = userEvent.setup();
+    renderActionApp();
+    await loadSession(user);
+
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await waitFor(() => expect(viewReads()).toBe(2));
+
+    expect(
+      screen.queryByRole("region", {
+        name: "Dynamic Narrative action evidence",
+      }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/^NEW_PUBLIC_FACTS=/)).not.toBeInTheDocument();
+    expect(screen.queryByText("NEW_PUBLIC_FACTS=0")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["wrong revision", { resulting_state_version: 2 }],
+    [
+      "wrong lifecycle",
+      {
+        result_code: "NARRATIVE_OUTCOME_COMMITTED",
+        feedback_code: "NARRATIVE_COMMITTED",
+      },
+    ],
+  ] satisfies ReadonlyArray<readonly [string, Partial<ActionResponse>]>) (
+    "fails closed for a committed response with %s association",
+    async (_case, responseUpdate) => {
+      const { viewReads } = installDirectEvidenceHandlers(
+        { outcome_result: "SUCCESS", public_fact_count: 2 },
+        responseUpdate,
+      );
+      const user = userEvent.setup();
+      renderActionApp();
+      await loadSession(user);
+
+      await user.click(
+        screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+      );
+      await waitFor(() => expect(viewReads()).toBe(2));
+
+      expect(screen.queryByText(/^NEW_PUBLIC_FACTS=/)).not.toBeInTheDocument();
+    },
+  );
 });
 
 describe("HTTP 202 request-status lifecycle", () => {

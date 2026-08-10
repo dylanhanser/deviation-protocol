@@ -19,10 +19,13 @@ from deviation_protocol.application.action_gateway import ActionRoute
 from deviation_protocol.application.dynamic_narrative_models import (
     DYNAMIC_ACCEPTED_OUTCOME_RULE_ID,
     DYNAMIC_PROMPT_SCHEMA_VERSION,
+    DynamicAllocatedPublicFact,
     DynamicCanonicalFact,
     DynamicCurrentScene,
     DynamicNarrativeCapacityExhaustedError,
     DynamicGenerationInstruction,
+    DynamicGeneratedPublicFactKeyAllocator,
+    DynamicGeneratedPublicFactKeyGrammar,
     DynamicNarrativeLengthBand,
     DynamicNarrativeLengthPolicy,
     DynamicNarrativeLength,
@@ -52,6 +55,7 @@ from deviation_protocol.application.errors import (
     SnapshotNotFoundError,
     SnapshotSessionMismatchError,
     SnapshotStateVersionMismatchError,
+    StoredTurnResponseInvalidError,
 )
 from deviation_protocol.application.identity import RequestPrincipal
 from deviation_protocol.application.narrative_jobs import NarrativeJob, NarrativeJobStatus
@@ -67,6 +71,7 @@ from deviation_protocol.application.narrative_models import (
     NarrativeProviderUnavailableError,
     NarrativeRequestRejectedError,
 )
+from deviation_protocol.application.ports import PersistedTurnRequest, UnitOfWork
 from deviation_protocol.application.resolution import (
     PlayerFeedback,
     ResolutionResult,
@@ -987,9 +992,6 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS = (
         "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS"
     )
-    RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT = (
-        "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT"
-    )
     FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE = (
         "DNVS_LIVE_DIAG_FINAL_SCHEMA_ROOT_OR_OBJECT_SHAPE"
     )
@@ -999,9 +1001,6 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     FINAL_SCHEMA_TYPE_OR_LITERAL = "DNVS_LIVE_DIAG_FINAL_SCHEMA_TYPE_OR_LITERAL"
     FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS = (
         "DNVS_LIVE_DIAG_FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS"
-    )
-    FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT = (
-        "DNVS_LIVE_DIAG_FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT"
     )
     PRE_LENGTH = "DNVS_LIVE_DIAG_PRE_LENGTH"
     PRE_LENGTH_BELOW_MINIMUM = "DNVS_LIVE_DIAG_PRE_LENGTH_BELOW_MINIMUM"
@@ -1016,6 +1015,9 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     FINAL_MUTATION = "DNVS_LIVE_DIAG_FINAL_MUTATION"
     FINAL_STATE = "DNVS_LIVE_DIAG_FINAL_STATE"
     FINAL_VALUE = "DNVS_LIVE_DIAG_FINAL_VALUE"
+    FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION = (
+        "DNVS_LIVE_DIAG_FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION"
+    )
 
 
 _SCHEMA_RECOVERY_INSTRUCTION = {
@@ -1030,9 +1032,6 @@ _SCHEMA_RECOVERY_INSTRUCTION = {
     ),
     DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
         DynamicGenerationInstruction.REPLACE_SCHEMA_BOUNDS_OR_UNIQUENESS
-    ),
-    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
-        DynamicGenerationInstruction.REPLACE_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
     ),
 }
 
@@ -1049,9 +1048,6 @@ _SCHEMA_RECOVERY_DIAGNOSTIC = {
     DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
         DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_BOUNDS_OR_UNIQUENESS
     ),
-    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
-        DynamicNarrativeRejectionDiagnostic.RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
-    ),
 }
 
 _SCHEMA_FINAL_DIAGNOSTIC = {
@@ -1066,9 +1062,6 @@ _SCHEMA_FINAL_DIAGNOSTIC = {
     ),
     DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS: (
         DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_BOUNDS_OR_UNIQUENESS
-    ),
-    DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT: (
-        DynamicNarrativeRejectionDiagnostic.FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT
     ),
 }
 
@@ -1132,6 +1125,19 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             self.diagnostic_reporter(token)
         except BaseException:
             pass
+
+    @staticmethod
+    def _replay_response(
+        stored: PersistedTurnRequest,
+        submission: ActionSubmission,
+    ) -> TurnResponse:
+        response = FirstPhaseTurnOrchestrator._replay_response(stored, submission)
+        if response.resolution_kind is ResolutionStatus.NARRATIVE_COMMITTED:
+            try:
+                _committed_public_fact_count(response)
+            except (TypeError, ValueError):
+                raise StoredTurnResponseInvalidError(submission.session_id) from None
+        return response
 
     async def handle(self, submission: ActionSubmission) -> TurnResponse:
         existing = await self._existing_reservation(submission)
@@ -1242,6 +1248,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         self, submission: ActionSubmission
     ) -> _ResolvedAttempt | TurnResponse:
         assert self.dynamic_session_service is not None
+        known_job: NarrativeJob | None = None
         async with self.uow_factory() as uow:
             if not await uow.sessions.lock_for_turn(submission.session_id):
                 raise SessionNotFoundError(submission.session_id)
@@ -1251,25 +1258,29 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             if stored is not None:
                 return self._replay_response(stored, submission)
             job = await uow.narrative_jobs.get_by_client_request_id(
-                submission.session_id, submission.client_request_id
+                submission.session_id,
+                submission.client_request_id,
+                for_update=True,
             )
             if job is not None:
-                self._validate_known_job(job, submission)
-                return self._known_job_result(job)
-            authority = await self.dynamic_session_service._load_dynamic_authority(
-                uow, submission.session_id
-            )
-            recent = await uow.narrative_jobs.recent_committed_texts(
-                submission.session_id, limit=6
-            )
-            try:
-                view = self.dynamic_session_service._build_dynamic_view(
-                    authority, recent=recent
+                known_job = await self._recover_known_job(uow, job, submission)
+            else:
+                authority = await self.dynamic_session_service._load_dynamic_authority(
+                    uow, submission.session_id
                 )
-            except SnapshotInvalidError:
-                raise
-            except (KeyError, TypeError, ValueError):
-                raise SnapshotInvalidError(submission.session_id) from None
+                recent = await uow.narrative_jobs.recent_committed_texts(
+                    submission.session_id, limit=6
+                )
+                try:
+                    view = self.dynamic_session_service._build_dynamic_view(
+                        authority, recent=recent
+                    )
+                except SnapshotInvalidError:
+                    raise
+                except (KeyError, TypeError, ValueError):
+                    raise SnapshotInvalidError(submission.session_id) from None
+        if known_job is not None:
+            return self._known_job_result(known_job)
         matched: PublicSuggestedAction | None = None
         suggestions = view.action_affordances.suggested_actions or ()
         if submission.client_request_id.startswith("dsr."):
@@ -1949,7 +1960,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 )
                 raise NarrativeProposalRejectedError()
         for item in candidate.proposed_public_facts:
-            if len(canonical_json({"key": item.key, "value": item.value})) > 500:
+            if len(canonical_json({"value": item.value})) > 500:
                 self._report_rejection(
                     DynamicNarrativeRejectionDiagnostic.PRE_STORAGE_BOUNDARY
                 )
@@ -2080,14 +2091,13 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                     identity=resolved.identity,
                 )
                 try:
-                    current_hidden_digest = _hidden_reference_digest(
-                        _hidden_reference_index(
-                            current_resolved,
-                            None,
-                            self.catalog,
-                            live_provider_references=self.live_provider_references,
-                        )
+                    current_hidden = _hidden_reference_index(
+                        current_resolved,
+                        None,
+                        self.catalog,
+                        live_provider_references=self.live_provider_references,
                     )
+                    current_hidden_digest = _hidden_reference_digest(current_hidden)
                     current_request = self._build_request(current_resolved, submission)
                 except (NarrativeBoundaryError, TypeError, ValueError):
                     raise NarrativeJobStaleError(submission.session_id) from None
@@ -2125,6 +2135,15 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 )
                 if _digest(current.validated_proposal) != current.validated_proposal_digest:
                     raise NarrativeJobStaleError(submission.session_id)
+                successor_state_version = _validated_successor_state_version(
+                    authority.persisted.session.state_version
+                )
+                allocated_public_facts = _allocate_public_facts(
+                    validated,
+                    successor_state_version=successor_state_version,
+                    view=view,
+                    hidden_references=current_hidden,
+                )
                 candidate_state = GameState.model_validate_json(
                     authority.state.model_dump_json()
                 )
@@ -2134,7 +2153,8 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 slots = _apply_candidate_slots(
                     runtime.dynamic_facts,
                     validated,
-                    successor_state_version=job.prepared_state_version + 1,
+                    successor_state_version=successor_state_version,
+                    allocated_public_facts=allocated_public_facts,
                 )
                 candidate_state.scenario_runtime = runtime.model_copy(
                     update={"dynamic_facts": slots}
@@ -2146,6 +2166,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                     )
                 except (DomainRuleViolation, TypeError, ValueError):
                     raise CandidateStateInvalidError(submission.session_id) from None
+                public_fact_count = len(allocated_public_facts)
                 payload_digest = _digest(validated.candidate.model_dump(mode="json"))
                 result = ResolutionResult(
                     status=ResolutionStatus.RESOLVED_LOCAL,
@@ -2158,9 +2179,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                             "DynamicNarrativeTurnCommitted",
                             {
                                 "result": validated.candidate.result.value,
-                                "public_fact_count": len(
-                                    validated.candidate.proposed_public_facts
-                                ),
+                                "public_fact_count": public_fact_count,
                                 "consequence_count": len(
                                     validated.candidate.proposed_consequences
                                 ),
@@ -2170,7 +2189,10 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                     ),
                     feedback=PlayerFeedback(
                         "DYNAMIC_NARRATIVE_COMMITTED",
-                        {"outcome_result": validated.candidate.result.value},
+                        {
+                            "outcome_result": validated.candidate.result.value,
+                            "public_fact_count": public_fact_count,
+                        },
                     ),
                 )
                 candidate_state = await self._persist_state_change(
@@ -2186,7 +2208,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                     authority,
                     recent=successor_recent,
                     state_override=candidate_state,
-                    state_version_override=job.prepared_state_version + 1,
+                    state_version_override=successor_state_version,
                 )
                 response = TurnResponse(
                     session_id=submission.session_id,
@@ -2196,9 +2218,10 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                     result_code="DYNAMIC_NARRATIVE_COMMITTED",
                     feedback_code="DYNAMIC_NARRATIVE_COMMITTED",
                     feedback_parameters={
-                        "outcome_result": validated.candidate.result.value
+                        "outcome_result": validated.candidate.result.value,
+                        "public_fact_count": public_fact_count,
                     },
-                    resulting_state_version=job.prepared_state_version + 1,
+                    resulting_state_version=successor_state_version,
                     state_changed=True,
                     narrative_required=True,
                     narrative_pending=False,
@@ -2370,6 +2393,26 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         )
         if _digest(job.validated_proposal) != job.validated_proposal_digest:
             raise ValueError("finalize expectation proposal digest differs")
+        if (
+            resolved.authority.persisted.session.state_version
+            != job.prepared_state_version
+        ):
+            raise ValueError("finalize expectation state version differs")
+        successor_state_version = _validated_successor_state_version(
+            resolved.authority.persisted.session.state_version
+        )
+        hidden_references = _hidden_reference_index(
+            resolved,
+            None,
+            self.catalog,
+            live_provider_references=self.live_provider_references,
+        )
+        allocated_public_facts = _allocate_public_facts(
+            validated,
+            successor_state_version=successor_state_version,
+            view=resolved.view,
+            hidden_references=hidden_references,
+        )
         candidate_state = GameState.model_validate_json(
             resolved.authority.state.model_dump_json()
         )
@@ -2379,7 +2422,8 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         slots = _apply_candidate_slots(
             runtime.dynamic_facts,
             validated,
-            successor_state_version=job.prepared_state_version + 1,
+            successor_state_version=successor_state_version,
+            allocated_public_facts=allocated_public_facts,
         )
         candidate_state.scenario_runtime = runtime.model_copy(
             update={"dynamic_facts": slots}
@@ -2388,13 +2432,14 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         candidate_state.scenario_runtime.validate_against(
             resolved.authority.definition
         )
+        public_fact_count = len(allocated_public_facts)
         old_recent = tuple(resolved.view.recent_narrative_texts)
         successor_recent = (*old_recent, validated.candidate.narrative_text)[-6:]
         successor_view = self.dynamic_session_service._build_dynamic_view(
             resolved.authority,
             recent=successor_recent,
             state_override=candidate_state,
-            state_version_override=job.prepared_state_version + 1,
+            state_version_override=successor_state_version,
         )
         response = TurnResponse(
             session_id=submission.session_id,
@@ -2404,9 +2449,10 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             result_code="DYNAMIC_NARRATIVE_COMMITTED",
             feedback_code="DYNAMIC_NARRATIVE_COMMITTED",
             feedback_parameters={
-                "outcome_result": validated.candidate.result.value
+                "outcome_result": validated.candidate.result.value,
+                "public_fact_count": public_fact_count,
             },
-            resulting_state_version=job.prepared_state_version + 1,
+            resulting_state_version=successor_state_version,
             state_changed=True,
             narrative_required=True,
             narrative_pending=False,
@@ -2424,9 +2470,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             successor_recent=successor_recent,
             successor_event_payload={
                 "result": validated.candidate.result.value,
-                "public_fact_count": len(
-                    validated.candidate.proposed_public_facts
-                ),
+                "public_fact_count": public_fact_count,
                 "consequence_count": len(
                     validated.candidate.proposed_consequences
                 ),
@@ -2752,6 +2796,7 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         return await self._authoritative_replay(entry.submission)
 
     async def _authoritative_replay(self, submission: ActionSubmission) -> TurnResponse:
+        known_job: NarrativeJob | None = None
         async with self.uow_factory() as uow:
             stored = await uow.turn_requests.get_by_client_request_id(
                 submission.session_id, submission.client_request_id
@@ -2759,12 +2804,15 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             if stored is not None:
                 return self._replay_response(stored, submission)
             job = await uow.narrative_jobs.get_by_client_request_id(
-                submission.session_id, submission.client_request_id
+                submission.session_id,
+                submission.client_request_id,
+                for_update=True,
             )
             if job is None:
                 raise NarrativeOutcomeUnknownError(submission.session_id)
-            self._validate_known_job(job, submission)
-            return self._known_job_result(job)
+            known_job = await self._recover_known_job(uow, job, submission)
+        assert known_job is not None
+        return self._known_job_result(known_job)
 
     async def _terminal(
         self,
@@ -2978,6 +3026,44 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         balance()
         return task.result(), cancellation_requested
 
+    async def _recover_known_job(
+        self,
+        uow: UnitOfWork,
+        job: NarrativeJob,
+        submission: ActionSubmission,
+    ) -> NarrativeJob:
+        """Durably stale incompatible pre-commit work before public mapping."""
+
+        self._validate_known_job(job, submission)
+        if (
+            job.status
+            not in {
+                NarrativeJobStatus.PREPARED,
+                NarrativeJobStatus.IN_PROGRESS,
+                NarrativeJobStatus.PROPOSAL_VALIDATED,
+            }
+            or job.prompt_schema_version == DYNAMIC_PROMPT_SCHEMA_VERSION
+        ):
+            return job
+        stale = self._transition_job(
+            job,
+            status=NarrativeJobStatus.STALE,
+            lease_token=None,
+            lease_owner=None,
+            lease_expires_at=None,
+            error_code="NARRATIVE_JOB_STALE",
+            updated_at=self._now(),
+        )
+        if not await uow.narrative_jobs.replace(
+            stale,
+            expected_status=job.status,
+            expected_lease_token=job.lease_token,
+            expected_lease_owner=job.lease_owner,
+        ):
+            raise NarrativeOutcomeUnknownError(job.session_id)
+        await uow.commit()
+        return stale
+
     def _known_job_result(self, job: NarrativeJob) -> TurnResponse:
         if job.status in {
             NarrativeJobStatus.PREPARED,
@@ -3085,11 +3171,83 @@ def _view_presentation_digest(view: PlayerSessionView) -> str:
     )
 
 
+def _validated_successor_state_version(current_state_version: object) -> int:
+    """Guard the signed-BIGINT committed domain before the one successor addition."""
+
+    maximum = DynamicGeneratedPublicFactKeyGrammar.MAXIMUM_SUCCESSOR_STATE_VERSION
+    if type(current_state_version) is not int or not 0 <= current_state_version <= maximum:
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION
+        )
+    if current_state_version == maximum:
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION
+        )
+    successor = current_state_version + 1
+    try:
+        return DynamicGeneratedPublicFactKeyGrammar.validate_successor_state_version(
+            successor
+        )
+    except (TypeError, ValueError):
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION
+        ) from None
+
+
+def _allocate_public_facts(
+    validated: ValidatedDynamicNarrativeCandidate,
+    *,
+    successor_state_version: int,
+    view: PlayerSessionView,
+    hidden_references: tuple[_ProtectedReference, ...],
+) -> tuple[DynamicAllocatedPublicFact, ...]:
+    unavailable_identifiers = {
+        fact.fact_id
+        for fact in (
+            *view.narrative_frame.must_render_facts,
+            *view.narrative_frame.may_render_facts,
+        )
+    }
+    unavailable_identifiers.update(
+        record.original for record in hidden_references if record.identifier
+    )
+    allocated: list[DynamicAllocatedPublicFact] = []
+    try:
+        for ordinal, proposal in enumerate(validated.candidate.proposed_public_facts):
+            key = DynamicGeneratedPublicFactKeyAllocator.allocate(
+                successor_state_version=successor_state_version,
+                proposal_ordinal=ordinal,
+                unavailable_identifiers=unavailable_identifiers,
+            )
+            DynamicGeneratedPublicFactKeyGrammar.validate(key)
+            _normalized_fact_semantic_key(key)
+            if (
+                any(marker in _comparison_text(key) for marker in _INTERNAL_TEXT_MARKERS)
+                or _INTERNAL_ID_PATTERN.search(key)
+                or _LONG_SECRET_SHAPE.search(key)
+            ):
+                raise ValueError("generated public fact key has an unavailable shape")
+            allocated.append(DynamicAllocatedPublicFact(key=key, value=proposal.value))
+    except (TypeError, ValueError):
+        raise _FinalizationDiagnosticError(
+            DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION
+        ) from None
+    return tuple(allocated)
+
+
+def _committed_public_fact_count(response: TurnResponse) -> int:
+    value = response.feedback_parameters.get("public_fact_count")
+    if type(value) is not int or not 0 <= value <= 3:
+        raise ValueError("committed public fact count is invalid")
+    return value
+
+
 def _apply_candidate_slots(
     current: Mapping[str, Any],
     validated: ValidatedDynamicNarrativeCandidate,
     *,
     successor_state_version: int,
+    allocated_public_facts: tuple[DynamicAllocatedPublicFact, ...] = (),
 ) -> dict[str, Any]:
     # Runtime JSON values are deliberately frozen; canonical serialization is
     # the detached-copy seam for the candidate state.
@@ -3119,20 +3277,9 @@ def _apply_candidate_slots(
             )
         key_slot[folded] = slot
         ring[slot] = (key, statement)
-    survivors: list[tuple[str, str]] = []
-    for fact in candidate.proposed_public_facts:
-        folded = _normalized_fact_semantic_key(fact.key)
-        existing_slot = key_slot.get(folded)
-        if existing_slot is not None and tuple(
-            _fact_ring_comparison_text(item) for item in ring[existing_slot]
-        ) == (
-            _fact_ring_comparison_text(fact.key),
-            _fact_ring_comparison_text(fact.value),
-        ):
-            continue
-        survivors.append((fact.key, fact.value))
     base = successor_state_version % 12
-    for offset, (key, value) in enumerate(survivors):
+    for offset, fact in enumerate(allocated_public_facts):
+        key, value = fact.key, fact.value
         folded = _normalized_fact_semantic_key(key)
         old = key_slot.get(folded)
         if old is not None:

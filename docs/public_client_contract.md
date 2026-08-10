@@ -1316,3 +1316,67 @@ client never retries an action automatically.
 This additive extension belongs only to the experimental implementation
 candidate awaiting independent review. It does not complete production or
 evidence work and does not alter Phase 6, Phase 7, or completed Phase 8.
+
+### Committed Dynamic Narrative public-fact count
+
+The D1 evidence authority correction makes the smallest compatible extension
+to the existing `feedback_parameters` object. An exact committed Dynamic
+Narrative Action response includes an object equivalent to this canonical JSON
+excerpt:
+
+```json
+{"feedback_parameters":{"outcome_result":"SUCCESS","public_fact_count":0}}
+```
+
+`public_fact_count` is required for every newly amended exact
+`DYNAMIC_NARRATIVE_COMMITTED` success result. It is an integer from `0` through
+`3`; integer `0` must be serialized and preserved and is not semantically
+equivalent to a missing member. The value represents only the public facts
+newly accepted and committed by that Action.
+
+The server-owned atomic finalization seam calculates the scalar prospectively as
+`len(allocated_public_facts)`. The source is the final allocated public-fact
+tuple of the final complete validated candidate, after any authorized
+application replacement has selected that candidate. Before the normal UoW
+commit, the same derived value is included consistently in the private event,
+stored `TurnResponse`, replay material, committed request-status response
+material, and direct response material. Only the final candidate contributes;
+rejected, failed, superseded, or non-published generations contribute zero and
+are not double-counted.
+
+Until normal UoW commit succeeds, that prospectively derived value is staged
+candidate material only: it has no authoritative committed or publicly
+claimable meaning. Commit success gives the event, stored response, replay,
+committed request-status projection, and direct committed response the same
+meaning atomically. Failure or rollback must not publish or preserve a claimed
+committed count.
+
+The `COMPLETE_NEW` path prospectively constructs the expected response and event
+from the same final allocated tuple and the same derivation rule, then uses the
+existing reconciliation seam to compare that expectation with authoritative
+existing committed state. The scalar becomes authoritative and publicly
+claimable through that path only when reconciliation establishes
+`COMPLETE_NEW`, converging on the same result as normal commit success. It does
+not mutate an already committed response.
+
+The same committed value is preserved in a direct HTTP `200` response, stored
+response/replay, and a committed request-status response. Browser presentation
+may claim the value only from a committed Dynamic Narrative result bound to the
+current Session and the exact resulting authoritative revision. Missing,
+malformed, out-of-range, wrong-lifecycle, wrong-Session, or wrong-revision data
+fails closed and cannot produce a browser-visible claimed count.
+
+The scalar exposes no fact value, generated key, allocation information, slot,
+collision input, hidden reference, or Provider data. It adds no top-level Action
+field, does not change the `PlayerSessionView` schema, and does not create a
+general debug or observability contract. Non-Dynamic-Narrative outcomes remain
+unchanged unless their existing authority already specifies otherwise. The
+scalar is not first derived after commit, requires no post-commit response
+mutation or second database write, and is never reconstructed from the
+successor View, fact-ring net growth, logs, UI totals, memory categories,
+Provider responses, or generated keys. Missing, malformed, or out-of-range data
+is invalid, not zero.
+
+This contract amendment is an unimplemented bounded authority-correction
+candidate pending independent new-session re-review after a prior
+`CHANGES_REQUIRED` verdict; it authorizes no implementation or Live activity.

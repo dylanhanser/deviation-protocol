@@ -17,7 +17,6 @@ from pydantic import ValidationError
 
 from deviation_protocol.application.dynamic_narrative_models import (
     DynamicCurrentScene,
-    DynamicGeneratedPublicFactKeyGrammar,
     DynamicNarrativeLength,
     DynamicNarrativeRequest,
     DynamicNarrativeResponseCategory,
@@ -26,6 +25,7 @@ from deviation_protocol.application.dynamic_narrative_models import (
     DynamicPlayerAction,
     DynamicProviderCandidateContract,
     DynamicProviderCandidateContractError,
+    DynamicPromptBuilder,
     DynamicScenarioPremise,
     DynamicScenarioRole,
     DynamicSelectedPlayerCharacter,
@@ -1715,7 +1715,7 @@ async def test_fake_provider_is_stable_and_satisfies_vendor_neutral_boundary() -
 
 def _dynamic_candidate_payload() -> dict[str, object]:
     return {
-        "schema_version": "dynamic-narrative-candidate-v1",
+        "schema_version": "dynamic-narrative-candidate-v2",
         "narrative_text": "叙" * 350,
         "result": "SUCCESS",
         "proposed_consequences": [],
@@ -1758,7 +1758,7 @@ def _assert_exception_surface_excludes_canary(
 
 
 @pytest.mark.asyncio
-async def test_dynamic_deepseek_contract_parses_once_without_retry() -> None:
+async def test_dynamic_v2_deepseek_boundary_preserves_keyless_prompt_transport_and_zero_retry() -> None:
     dynamic_payload = _dynamic_candidate_payload()
     transport = FakeTransport(
         [_response(content=json.dumps(dynamic_payload, ensure_ascii=False))]
@@ -1772,6 +1772,111 @@ async def test_dynamic_deepseek_contract_parses_once_without_retry() -> None:
     assert result.candidate.next_scene.title == "下一幕"
     assert result.provider_metadata.attempts == 1
     assert len(transport.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_dynamic_combined_default_preserves_transport_contract_and_zero_retry(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    request = _dynamic_request()
+    expected_prompt = DynamicPromptBuilder().build(request)
+    dynamic_payload = _dynamic_candidate_payload()
+    response_content = json.dumps(dynamic_payload, ensure_ascii=False)
+    transport = FakeTransport(
+        [_response(content=response_content)]
+    )
+    authority = DynamicProviderCandidateContract
+    original_validate = authority.validate_response_json
+    validation_calls: list[tuple[object, str]] = []
+
+    def track_validation(decoded: object, response_json: str):
+        validation_calls.append((decoded, response_json))
+        return original_validate(decoded, response_json)
+
+    monkeypatch.setattr(
+        authority,
+        "validate_response_json",
+        classmethod(
+            lambda _cls, decoded, response_json: track_validation(
+                decoded, response_json
+            )
+        ),
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=transport
+    )
+
+    result = await provider.generate_dynamic(request)
+
+    assert result.candidate.model_dump(mode="json") == dynamic_payload
+    assert result.provider_metadata.attempts == 1
+    assert len(validation_calls) == 2
+    example_validation, response_validation = validation_calls
+    assert example_validation[1] in expected_prompt.user
+    assert response_validation == (dynamic_payload, response_content)
+    assert sum(
+        response_json == response_content
+        for _decoded, response_json in validation_calls
+    ) == 1
+    assert len(transport.calls) == 1
+    call = transport.calls[0]
+    assert call["url"] == OFFICIAL_DEEPSEEK_CHAT_COMPLETIONS_URL
+    assert call["timeout_seconds"] == 5.0
+    assert call["header_names"] == ("Accept", "Authorization", "Content-Type")
+    assert call["authorization_present"] is True
+    payload = call["payload"]
+    assert set(payload) == {
+        "model",
+        "messages",
+        "thinking",
+        "stream",
+        "response_format",
+        "max_tokens",
+    }
+    assert payload["model"] == "deepseek-v4-flash"
+    assert payload["messages"] == [
+        {"role": "system", "content": expected_prompt.system},
+        {"role": "user", "content": expected_prompt.user},
+    ]
+    user_prompt = payload["messages"][1]["content"]
+    assert "Public-fact ownership instruction:" in user_prompt
+    assert (
+        "proposed_public_facts contains only semantic value statements"
+        in user_prompt
+    )
+    assert "server alone assigns public-fact keys after validation" in user_prompt
+    assert "do not emit keys, identifiers, namespaces, allocation details" in user_prompt
+    assert "Namespace instruction:" not in user_prompt
+    assert "proposed_public_facts[*].key" not in user_prompt
+    assert "public-note-" not in user_prompt
+    assert "Complete contract-valid synthetic output example:" in user_prompt
+    assert payload["thinking"] == {"type": "disabled"}
+    assert payload["stream"] is False
+    assert payload["response_format"] == {"type": "json_object"}
+    assert payload["max_tokens"] == 512
+    assert "temperature" not in payload
+    assert "tools" not in payload
+    assert "tool_choice" not in payload
+
+    failure_transport = FakeTransport(
+        [
+            DeepSeekTransportTimeout(),
+            _response(content=response_content),
+        ]
+    )
+    failing_provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0), _builder(), transport=failure_transport
+    )
+    with pytest.raises(NarrativeProviderUnavailableError):
+        await failing_provider.generate_dynamic(request)
+    assert len(failure_transport.calls) == 1
+    assert len(failure_transport.scripted) == 1
+    assert len(validation_calls) == 3
+    assert validation_calls[-1][1] in expected_prompt.user
+    assert sum(
+        response_json == response_content
+        for _decoded, response_json in validation_calls
+    ) == 1
 
 
 @pytest.mark.asyncio
@@ -1833,7 +1938,7 @@ async def test_dynamic_sanitized_boundary_severs_raw_exception_chains(
         content = json.dumps(payload, ensure_ascii=False)
         expected_category = DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
         expected_family = (
-            DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS
         )
 
     if failure_kind != "decoder":
@@ -1879,20 +1984,11 @@ async def test_dynamic_sanitized_boundary_severs_raw_exception_chains(
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize(
-    "key",
-    (
-        "public-note-aa",
-        DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE,
-        "public-note-aaaaaa-bbbbbb-cccccc-dddddd",
-    ),
-)
-async def test_dynamic_deepseek_schema_accepts_exact_public_fact_key_grammar(
-    key: str,
+async def test_dynamic_v2_provider_contract_accepts_keyless_facts_and_rejects_legacy_key(
 ) -> None:
     payload = _dynamic_candidate_payload()
     payload["proposed_public_facts"] = [
-        {"key": key, "value": "A plainly synthetic public observation."}
+        {"value": "A plainly synthetic public observation."}
     ]
     transport = FakeTransport(
         [_response(content=json.dumps(payload, ensure_ascii=False))]
@@ -1903,8 +1999,18 @@ async def test_dynamic_deepseek_schema_accepts_exact_public_fact_key_grammar(
 
     result = await provider.generate_dynamic(_dynamic_request())
 
-    assert result.candidate.proposed_public_facts[0].key == key
+    assert result.candidate.proposed_public_facts[0].value == "A plainly synthetic public observation."
     assert len(transport.calls) == 1
+    payload["proposed_public_facts"] = [
+        {"key": "public-note-000001-00-000", "value": "A plainly synthetic public observation."}
+    ]
+    with pytest.raises(DynamicNarrativeResponseError) as caught:
+        await DeepSeekNarrativeProvider(
+            _settings(max_retries=0),
+            _builder(),
+            transport=FakeTransport([_response(content=json.dumps(payload, ensure_ascii=False))]),
+        ).generate_dynamic(_dynamic_request())
+    assert caught.value.schema_failure_family is DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS
 
 
 @pytest.mark.asyncio
@@ -1996,48 +2102,6 @@ async def test_dynamic_deepseek_routes_standard_json_float_positions_to_type_fam
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "key",
-    (
-        "",
-        "public-note-a",
-        "public-note-aaaaaa-bbbbbb-cccccc-ddddddd",
-        "fact.synthetic",
-        "public-note-receipt",
-        "public-note-" + "a" * 48,
-        "public-note-aa--bb",
-        " public-note-aa ",
-    ),
-)
-async def test_dynamic_deepseek_schema_rejects_unsafe_public_fact_keys(
-    key: str,
-) -> None:
-    payload = _dynamic_candidate_payload()
-    payload["proposed_public_facts"] = [
-        {"key": key, "value": "A plainly synthetic public observation."}
-    ]
-    transport = FakeTransport(
-        [_response(content=json.dumps(payload, ensure_ascii=False))]
-    )
-    provider = DeepSeekNarrativeProvider(
-        _settings(max_retries=0), _builder(), transport=transport
-    )
-
-    with pytest.raises(DynamicNarrativeResponseError) as error:
-        await provider.generate_dynamic(_dynamic_request())
-
-    assert error.value.category is DynamicNarrativeResponseCategory.SCHEMA_INVALID_RESPONSE
-    assert (
-        error.value.schema_failure_family
-        is DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT
-    )
-    assert str(error.value) == "NARRATIVE_PROVIDER_RESPONSE_INVALID"
-    if key:
-        assert key not in str(error.value)
-    assert len(transport.calls) == 1
-
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize(
     "missing",
     (
         ("schema_version",),
@@ -2091,6 +2155,10 @@ async def test_dynamic_deepseek_requires_every_candidate_field_without_defaults(
         ),
         (
             {"proposed_public_facts": [{"key": "safe", "value": 1}]},
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
+        ),
+        (
+            {"proposed_public_facts": [{"value": 1}]},
             DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
         ),
         (
@@ -2187,16 +2255,16 @@ async def test_dynamic_deepseek_classifies_decoded_non_schema_values_as_schema_i
             DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
         ),
         (
-            "required_over_type_key_bounds",
+            "required_over_type_extra",
             DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
         ),
         (
-            "type_over_key_bounds",
-            DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
+            "extra_over_type",
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
         ),
         (
-            "key_over_bounds",
-            DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
+            "extra_over_bounds",
+            DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
         ),
         (
             "bounds",
@@ -2204,7 +2272,7 @@ async def test_dynamic_deepseek_classifies_decoded_non_schema_values_as_schema_i
         ),
     ),
 )
-async def test_dynamic_schema_failure_families_have_deterministic_precedence(
+async def test_dynamic_v2_schema_families_remove_generated_key_family_with_deterministic_precedence(
     case: str,
     expected_family: DynamicNarrativeSchemaFailureFamily,
 ) -> None:
@@ -2215,9 +2283,9 @@ async def test_dynamic_schema_failure_families_have_deterministic_precedence(
         assert isinstance(payload, dict)
         payload["suggested_actions"] = ["same", "same", "third"]
         if case in {
-            "required_over_type_key_bounds",
-            "type_over_key_bounds",
-            "key_over_bounds",
+            "required_over_type_extra",
+            "extra_over_type",
+            "extra_over_bounds",
         }:
             payload["proposed_public_facts"] = [
                 {
@@ -2225,9 +2293,9 @@ async def test_dynamic_schema_failure_families_have_deterministic_precedence(
                     "value": "INERT_REJECTED_FIELD_VALUE",
                 }
             ]
-        if case in {"required_over_type_key_bounds", "type_over_key_bounds"}:
+        if case in {"required_over_type_extra", "extra_over_type"}:
             payload["result"] = 7
-        if case == "required_over_type_key_bounds":
+        if case == "required_over_type_extra":
             del payload["schema_version"]
     transport = FakeTransport(
         [_response(content=json.dumps(payload, ensure_ascii=False))]
@@ -2246,7 +2314,6 @@ async def test_dynamic_schema_failure_families_have_deterministic_precedence(
         DynamicNarrativeSchemaFailureFamily.ROOT_OR_OBJECT_SHAPE,
         DynamicNarrativeSchemaFailureFamily.REQUIRED_OR_EXTRA_FIELDS,
         DynamicNarrativeSchemaFailureFamily.TYPE_OR_LITERAL,
-        DynamicNarrativeSchemaFailureFamily.GENERATED_PUBLIC_FACT_KEY_CONTRACT,
         DynamicNarrativeSchemaFailureFamily.BOUNDS_OR_UNIQUENESS,
     )
     safe_exception_surface = str(error) + repr(error) + repr(vars(error))

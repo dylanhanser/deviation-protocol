@@ -1,914 +1,1240 @@
 # Dynamic Narrative Provider Reliability Remediation Plan
 
-## 1. Status and authority
+## 1. Amendment status and authority
 
-Status: `PLAN_DRAFT`.
+Base key-ownership status: `PLAN_AMENDMENT_PUBLISHED`.
 
-This document is a review-ready plan candidate only. It is not approved,
-committed, published, implemented, or authorized for implementation. It does
-not establish `PLAN_APPROVED`, `PLAN_PUBLISHED`, implementation completion,
-implementation approval, `OPTIONAL_LIVE_PASSED`, phase completion, or
-production readiness.
+D1 evidence correction status:
+`AUTHORITY_CORRECTION_BOUNDED_CORRECTION_CANDIDATE_AWAITING_INDEPENDENT_REREVIEW`.
 
-The sole operative success verdict for the next independent plan-review gate
-is:
+This document is the independently approved and published `DN-DKO-006`-
+corrected deterministic generated-public-fact-key ownership amendment to the
+published Prompt-only remediation plan.
+The first candidate was authored after `PRE_REVIEW_LIVE_CANDIDATE_GATE_FAILED`
+and `DYNAMIC_NARRATIVE_PROVIDER_FAILURE_DIAGNOSIS_COMPLETE`. Its first fresh
+independent review returned
+`DYNAMIC_NARRATIVE_DETERMINISTIC_KEY_OWNERSHIP_PLAN_AMENDMENT_INDEPENDENT_REVIEW_CHANGES_REQUIRED`
+with findings `DN-DKO-001`, `DN-DKO-002`, and `DN-DKO-003`; the first bounded
+two-document correction closed all three. A later fresh independent review
+confirmed that `DN-DKO-001`, `DN-DKO-002`, and `DN-DKO-003` remain closed and
+returned the same `CHANGES_REQUIRED` verdict only for `DN-DKO-004` and
+`DN-DKO-005`. The subsequent focused independent review closed `DN-DKO-004`
+and found `DN-DKO-005` not fully closed solely because of the remaining
+maximum-current-version and deterministic-regression gap identified as
+`DN-DKO-006`. This bounded two-document correction addressed only `DN-DKO-006`.
+A fresh delta-focused independent review of the exact corrected two-document
+amendment completed successfully and returned:
 
-`DYNAMIC_NARRATIVE_PROVIDER_REMEDIATION_PLAN_APPROVED`
+`DYNAMIC_NARRATIVE_DETERMINISTIC_KEY_OWNERSHIP_PLAN_AMENDMENT_INDEPENDENT_REVIEW_APPROVED`
 
-That verdict may approve only the exact complete two-document plan candidate
-reviewed. Any material correction requires new candidate identities and a fresh
-independent read-only plan review. Historical verdicts, implementation-review
-verdicts, manual-gate verdicts, and failure tokens cannot satisfy this gate.
+That review fully closed `DN-DKO-006`; `DN-DKO-005` is therefore fully closed.
+All amendment findings `DN-DKO-001` through `DN-DKO-006` are closed, and no
+material finding remains within the approved review scope. The fresh review,
+not the earlier authoring correction, supplied the sole operative approval. The
+corrected key-ownership amendment is independently approved and published and
+remains the base allocation authority. The current four-document D1 evidence
+correction is a separate unapproved candidate. Its first independent review
+returned
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REVIEW_CHANGES_REQUIRED`
+for exactly two blocking findings: the non-executable lifecycle over the
+protected dirty candidate and the committed-scalar derivation timing. This
+bounded correction addresses only those findings, is complete only as an
+unstaged documentation candidate, and has not yet been independently
+re-reviewed. No implementation completion, deterministic verification
+completion, future Live diagnostic, candidate freeze, formal Gate,
+implementation review, staging, commit, push, publication, production
+readiness, or phase completion is claimed for that correction.
 
-The plan was drafted against this read-only local baseline without fetch or
-pull:
+The token above applies only to the exact approved technical amendment.
+Historical plan-review, implementation-review, Live-Gate, failure,
+`CHANGES_REQUIRED`, `BLOCKED_BASELINE_MISMATCH`, and `INCOMPLETE` verdicts are
+non-operative for this approval. This bounded publication records the approved
+key-ownership lifecycle result without approving the current evidence
+correction. The sole operative success verdict for the current exact
+four-document candidate is
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REREVIEW_APPROVED`.
+The authoring results
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_CANDIDATE_COMPLETE` and
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_BOUNDED_CORRECTION_CANDIDATE_COMPLETE`,
+and all historical, superseded, example, prohibited, failure,
+`CHANGES_REQUIRED`, `BLOCKED`, and `INCOMPLETE` verdicts are non-operative for
+its approval. Any byte change requires new hashes and a fresh independent
+review. This correction does not authorize implementation, validation, Live
+activity, or Git handoff.
+
+This `DN-DKO-006` correction was authored against the following read-only local
+identity, without fetch or pull:
 
 | Check | Required and observed value |
 | --- | --- |
 | Repository root | `D:/deviation-protocol` |
 | Branch | `main` |
-| `HEAD` | `eb1bb92b0c21639ad29fc9fdf1ffac537799e06b` |
-| Local `origin/main` | `eb1bb92b0c21639ad29fc9fdf1ffac537799e06b` |
-| Subject | `fix(dynamic-narrative): harden provider schema contract` |
+| `HEAD` and local `origin/main` | `8af790cc280f78102fa2e736806362527043424e` |
+| Subject | `docs(dynamic-narrative): publish provider reliability remediation plan` |
 | Ahead/behind | `0/0` |
-| Worktree/index before authoring | clean/clean |
-| Untracked paths, conflicts, active Git operations | `0/0/0` |
+| Index, untracked paths, conflicts, active Git operations | empty/none/none/none |
 
-Repository specifications and contracts govern this remediation. Diagnostic
-evidence informs the selected bounded change but cannot weaken or override
-those authorities. Applicable authority, in descending specificity for this
-candidate, is:
+The initial unstaged inventory for this `DN-DKO-006` correction was exactly:
+
+1. `PLANS.md`, SHA-256
+   `bbdee6f3267748908fe30ca78da9a429fededa6a507e6efd9fbd2b7083ac8ef7`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`, SHA-256
+   `7bbfffa00d669f3191d1c12cb3ec7be370dddf8f706d5838b523d9be52c5467e`;
+3. `src/deviation_protocol/application/dynamic_narrative_models.py`, SHA-256
+   `97a5306e9e40ee28873c45a3069b7b8e11621e1585af8624f9430daea30f766e`;
+4. `tests/unit/test_dynamic_narrative.py`, SHA-256
+   `db6c001b1d5766d29ef8a5c92bf4492026db31230a283607e0ba9f7b494ccd59`;
+5. `tests/unit/test_narrative_provider.py`, SHA-256
+   `ad5922d77c397993bc8c97de511cb06d62089f85d80fbbb078d20748599c2329`.
+
+The runtime/test diff was exactly 29,177 bytes with SHA-256
+`5d42807e250a6ac69793f12ac76f202b707a4e3932c52f0c2de5ed7f02495c68`;
+the documentation-only diff was exactly 116,538 bytes with SHA-256
+`610e5c6b3602362dd166a6a8b98c74fc3046e7031674955d0ed785239336e935`;
+and the complete five-path diff was exactly 145,715 bytes with SHA-256
+`85d2360b805b3e6b7cfedc3c86f4448415bd6aaeac1d3982fad4c99e35bf8890`.
+
+The published Prompt-only operative instruction bundle was 42,865 UTF-8/LF
+bytes with SHA-256
+`50f251e70cdf0ddf0087e5aedcec7b8311b7669b9f1ff5a59a6658a74ca74291`.
+That bundle and its prior Gate are superseded for future implementation and
+acceptance by this amendment. They remain historical evidence and are not
+retroactively reinterpreted as having passed.
+
+Applicable authority, in descending specificity for this correction, is:
 
 1. `AGENTS.md`;
-2. `docs/engineering/guardrails.md`, especially `MODEL-001`, `MODEL-002`,
-   `AUTH-001`, `AUTH-002`, `STATE-001`, and `API-001`;
+2. `docs/engineering/guardrails.md`, especially `AUTH-001`, `MODEL-001`,
+   `MODEL-002`, `STATE-001`, `API-001`, and `ENV-002`;
 3. `docs/engineering/codex_workflow.md`;
-4. this plan, only after its exact candidate is independently approved,
-   committed, pushed by the user, and confirmed as the clean implementation
-   baseline;
-5. `docs/dynamic_narrative_vertical_spike_plan.md`;
-6. `docs/architecture.md`, `docs/narrative_provider.md`, and
-   `docs/public_client_contract.md`;
-7. current application contracts, runtime implementation, composition, and
-   direct regressions.
+4. this document's current D1 evidence correction, if and only if independently
+   approved and its exact aggregate manifest is locked under the workflow's
+   narrow dirty aggregate-candidate exception, layered over the published
+   key-ownership amendment;
+5. the matching amendment in `docs/public_client_contract.md`;
+6. `docs/dynamic_narrative_vertical_spike_plan.md`;
+7. `docs/narrative_provider.md` and `docs/architecture.md`;
+8. the inspected application contracts, finalization implementation, and direct
+   regressions.
 
-The current published implementation identity remains
-`eb1bb92b0c21639ad29fc9fdf1ffac537799e06b`. A relevant baseline change before
-plan review, approval, publication, implementation, manual gating, review,
-staging, or commit triggers the pending-plan baseline-invalidation rules. A
-stale candidate identity or approval must not be preserved.
+A relevant baseline change before review, implementation, deterministic
+validation, either real-Provider stage, implementation review, staging, or
+commit invokes the pending-plan baseline invalidation and approval-token
+consistency rules. This correction authorizes none of those later steps.
 
-After an exact successful plan review, plan publication is a separate gate:
-obtain explicit authorization for one exact local two-document commit, verify
-the reviewed bytes and empty unrelated scope, create only that authorized local
-commit, and let the user push it manually. Implementation starts only in a
-fresh session after the user-pushed clean baseline is confirmed. This paragraph
-does not authorize any of those later actions.
+## 2. Established failure evidence
 
-## 2. Problem statement
+### 2.1 Formal Gate Case 1 is a separate unresolved failure family
 
-The published boundary already rejects malformed or contract-invalid Provider
-output safely. Real-model sampling nevertheless shows that normal DeepSeek
-JSON-object mode frequently returns standard JSON that fails the stricter local
-application contract. The resulting failures are safe but make gameplay
-unreliable.
+The formal pre-review Gate stopped during fresh Case 1 after exactly one
+suggested ordinal `0` submission. The public result was HTTP `409` with
+`NARRATIVE_OUTCOME_UNKNOWN`; state version remained `0`; no new story segment
+appeared; and the official DeepSeek request-count delta was `0`.
 
-The selected remediation improves the presentation of the unchanged output
-contract to the model. It does not make any invalid output acceptable. It adds
-one complete, contract-valid synthetic output example and puts the existing
-key grammar, namespace distinctions, and decoded-string control rule directly
-beside the authoritative rendered contract.
+The completed read-only diagnosis established all of the following:
 
-## 3. Corrected failure terminology
+- absent `DEEPSEEK_API_KEY` prevents Live startup and therefore does not directly
+  explain an Action-time HTTP `409`;
+- the exact underlying cause of this Gate failure remains unresolved;
+- the strongest inference is a Codex-owned launcher encountering sandbox or
+  network availability failure before DeepSeek recorded a request; and
+- a Codex sandbox or network failure does not prove that the configured Provider
+  or key is invalid.
 
-`GENERATED_PUBLIC_FACT_KEY_CONTRACT` is a closed sanitized diagnostic family.
-It does not name a response field called `generated_public_fact_key`.
+This environment/transport/publication family remains separate from the schema
+defect below. The deterministic-key correction does not claim to resolve that
+earlier HTTP `409`, and the earlier result does not prove a generated-key defect.
 
-The demonstrated location was `proposed_public_facts[*].key`. The recurrent
-sampled defect was principally malformed newly generated `public-note-*` key
-grammar, including tokens outside the required 2..6-character token bounds.
-This plan does not relabel that evidence as a proven cross-field-reference
-failure. The current repository separately enforces protected-reference and
-authority rules, but the 36-call evidence does not prove a distinct
-cross-field relationship defect.
+### 2.2 Real-Provider generated-key reliability defect is proven
 
-## 4. Empirical evidence from 36 non-persistent calls
+Later user-operated Live play was launched from a PowerShell process that had
+Provider configuration before launcher startup. It produced both successful
+HTTP `200` narrative commits and HTTP `503` failures carrying these sanitized
+diagnostics:
 
-The evidence below was produced by two bounded diagnostics. It contains no
-gameplay commit, persistence, repository mutation, raw response, protected
-identifier, or secret. It is reliability evidence, not a replacement for
-strict local validation and not gameplay Optional Live evidence.
+- `DNVS_LIVE_DIAG_RECOVERY_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT`;
+- `DNVS_LIVE_DIAG_PRE_RESPONSE_SCHEMA_INVALID`; and
+- `DNVS_LIVE_DIAG_FINAL_SCHEMA_GENERATED_PUBLIC_FACT_KEY_CONTRACT`.
 
-### 4.1 First diagnostic: 16 calls
+The completed diagnosis established that initial and replacement generations
+can both violate the generated public-fact key contract; normal `json_object`
+mode enforces JSON syntax rather than the key regex; the current
+`COMBINED_DEFAULT` Prompt-only candidate is probabilistically improved but not
+reliable; and its prior candidate-selection evidence was only `6/8`
+strict-valid. Prompt-only compliance cannot guarantee four consecutive Gate
+passes.
 
-| Group | Requests | Strict-schema success |
-| --- | ---: | ---: |
-| Exact production baseline | 8 | 3/8 |
-| Plain-language key clarity | 4 | 0/4 |
-| Complete valid JSON example | 4 | 2/4 |
+The defect is an ownership error: authority-sensitive public-fact identifier
+syntax was assigned to the LLM. A third generation, additional retry, relaxed
+validation, post-failure salvage, key repair/normalization, or weakening the
+protected/internal detector would preserve or expand the wrong authority
+boundary and is prohibited.
 
-The configuration was DeepSeek `deepseek-v4-flash` at the official endpoint,
-normal `json_object` response mode, thinking disabled, streaming disabled,
-maximum output 1,200 tokens, temperature omitted, zero transport retries, and
-no application replacement. All 16 responses were usable standard JSON; 11
-failed the strict application contract.
+### 2.3 Historical D1 evidence disposition
 
-Observed failure families included invalid grammar at
-`proposed_public_facts[*].key`, prohibited decoded control characters
-(especially line-break-shaped controls in `narrative_text`), bounds/length
-failures, one extra nested field, and multiple simultaneous violations. The
-complete-example variant was directionally better but did not establish
-stability. Plain-language key clarification alone did not improve compliance.
-Normal Provider JSON-object mode enforced JSON syntax, not the full local
-application contract.
+The original D1-D5 implementation diagnostic is closed as failed/incomplete.
+Only historical D1 ran:
 
-### 4.2 Comparative diagnostic: 20 additional calls
-
-| Fixture | Configuration | Strict schema | Complete pre-commit |
-| --- | --- | ---: | ---: |
-| First | Combined Prompt, default temperature | 4/4 | 2/4 confirmed; 1 additional result indeterminate |
-| First | Production Prompt, `temperature=0.2` | 2/4 | 0/4 |
-| First | Combined Prompt, `temperature=0.2` | 2/4 | 1/4 |
-| Second | Production baseline | 1/4 | 1/4 |
-| Second | Combined Prompt, default temperature | 2/4 | 2/4 |
-
-Two combined-plus-lower-temperature requests failed at transport with zero
-retries. One combined-default result and one temperature-only result lost part
-of their sanitized local classification after raw responses had already been
-discarded; they were not repeated. Those one-off memory-only diagnostic losses
-are not production defects.
-
-The second fixture included canonical public facts, private facts,
-protected-reference pressure, valid Action affordances, and generated-key
-namespace pressure. Across its eight responses, observed copies were:
-
-| Observation | Count |
-| --- | ---: |
-| Canonical-key copies | 0 |
-| Private-key copies | 0 |
-| Protected-reference copies | 0 |
-| Unrelated namespaces | 0 |
-| Collisions or duplicates | 0 |
-| Intended generated namespace with invalid token grammar | 2 |
-
-This proves only that copying was not observed in those eight samples. It does
-not prove that copying cannot occur.
-
-Across the complete lifetime evidence there were exactly 36 real requests.
-The comparison does not establish a stable success rate, statistical
-significance, production quality, availability, cost, or safety without local
-validation. It supports only the bounded selection of `COMBINED_DEFAULT` for a
-candidate gate.
-
-## 5. Goals and non-goals
-
-Goals:
-
-1. present one complete strict-valid synthetic output example;
-2. place the existing generated-key grammar immediately before the existing
-   authoritative output contract;
-3. state the decoded-string control restriction explicitly, including escaped
-   `\r`, `\n`, and `\t`;
-4. distinguish generated public-note keys, existing canonical public facts,
-   private facts, and protected/internal namespaces;
-5. keep contract fields, types, literals, counts, bounds, validators, parsing,
-   replacement ceilings, transport behavior, and state authority unchanged;
-6. prove the Prompt/example through direct deterministic tests; and
-7. require a bounded user-operated real-Provider candidate gate before
-   independent implementation review.
-
-Non-goals:
-
-- accepting, repairing, truncating, salvaging, or partially committing invalid
-  Provider output;
-- adding `temperature=0.2` or any temperature member;
-- changing model, endpoint, timeout authority, output ceiling, thinking,
-  streaming, or normal JSON-object mode;
-- adding Beta strict tool calls, `/beta`, function-tool parsing, a new
-  Provider, SDK, dependency, fallback, or Provider architecture;
-- changing diagnostic precedence, adding secondary-failure reporting, or
-  exposing response details;
-- changing persistence, ORM, database, migration, API, composition, scenario,
-  frontend, browser code, or public contracts;
-- changing safety, hidden/protected-reference, Action, authority, transaction,
-  revision, replay, follower, cancellation, or stale-state behavior;
-- rerunning historical diagnostics as implementation validation; or
-- claiming Optional Live, production readiness, phase completion, or Provider
-  stability from a four-case candidate gate.
-
-## 6. Exact implementation path budget
-
-The later implementation candidate has an aggregate budget of exactly **5
-paths: 1 production path, 2 test paths, and 2 documentation/status paths; all
-5 are modified and 0 are new**.
-
-| Layer | Exact path | Exact responsibility |
-| --- | --- | --- |
-| Production | `src/deviation_protocol/application/dynamic_narrative_models.py` | Build and render the combined Prompt/example from existing contract authorities |
-| Test | `tests/unit/test_dynamic_narrative.py` | Direct Prompt, example, strict-contract, control, namespace, Action-exclusion, and validator-preservation regressions |
-| Test | `tests/unit/test_narrative_provider.py` | Direct adapter-boundary proof that only message content changes and Provider request configuration/parsing stays unchanged |
-| Documentation | `docs/dynamic_narrative_provider_reliability_remediation_plan.md` | After and only after all four manual cases pass, participate in the one bounded documentation synchronization that records sanitized implementation and gate evidence, exact identities/counts, status, and independent implementation review as the next external step without changing normative scope or later copying the review verdict into the repository |
-| Documentation | `PLANS.md` | Participate in that same one bounded post-gate synchronization, preserving published implementation and prior evidence classifications while recording only the sanitized current status and next external review step |
-
-No implementation edit is authorized in:
-
-- `src/deviation_protocol/infrastructure/deepseek_narrative.py`;
-- `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
-- `src/deviation_protocol/api/demo_composition.py` or other composition/config;
-- any Provider setting, endpoint, model, transport, parser, or response model;
-- any database, ORM, repository, migration, scenario, API, frontend, browser,
-  dependency, frozen-plan, architecture, public-contract, or guardrail path.
-
-The Provider adapter remains unchanged. The inspected implementation already
-passes the Prompt produced by `DynamicPromptBuilder` as message content while
-owning model, endpoint, timeout, thinking, streaming, JSON mode, output ceiling,
-strict parsing, and one-attempt transport behavior. If implementation proves
-any sixth path necessary, it stops before editing and returns for a fresh plan
-amendment and review.
-
-Before the manual gate, only the production path and two test paths are modified;
-both documentation/status paths remain byte-for-byte equal to the published
-plan baseline. The two documentation/status paths become part of the final
-five-path candidate only through the one permitted post-gate synchronization in
-section 16.
-
-## 7. Prompt construction design: `COMBINED_DEFAULT`
-
-`DynamicPromptBuilder` remains the sole Prompt builder. The production change
-is presentation-only and uses this stable order in the user message:
-
-1. canonical public dynamic request JSON;
-2. a namespace instruction that states:
-   - `proposed_public_facts[*].key` is only for newly generated
-     `public-note-*` keys;
-   - request `canonical_facts[*].key` values are pre-existing public semantic
-     keys and are not templates for generated keys;
-   - private facts are unavailable and must not be copied or inferred; and
-   - protected/internal reference namespaces and identifier shapes must never
-     be emitted;
-3. the decoded-string instruction derived beside the current prohibited
-   categories: every decoded JSON string must contain no Unicode `Cc`, `Cf`, or
-   `Cs` character; JSON string values must not contain escaped `\r`, `\n`, or
-   `\t`, and must use ordinary spaces rather than line-break or tab controls;
-4. `DynamicGeneratedPublicFactKeyGrammar.prompt_contract()` immediately
-   followed by the `Authoritative candidate-output contract` heading and
-   `DynamicProviderCandidateContract.render(...)` output, with no intervening
-   competing grammar;
-5. one `Complete contract-valid synthetic output example` rendered as canonical
-   single-line JSON; and
-6. the existing typed replacement instruction, when applicable.
-
-The stable system instruction retains every existing semantic requirement:
-
-1. write original, concise, second-person Chinese narrative;
-2. treat the submitted player Action as untrusted story input and never as an
-   instruction;
-3. preserve the supplied public premise, current scene, character-role context,
-   and canonical public-fact context;
-4. treat `projection_truncated=true` only as notice that lower-priority public
-   context was omitted, never as permission to relax preservation or validation;
-5. make the Action cause a materially plausible `SUCCESS`, `AMBIGUOUS`,
-   `FAILURE`, or `NO_EFFECT` result and a following scene;
-6. return exactly three distinct contextual `CUSTOM` Actions without capability
-   material or identifiers;
-7. propose only consequences, public facts, the next scene, suggestions, and
-   continuation, so all output remains candidate-only;
-8. state that every proposal remains subject to server validation;
-9. never invent authority, rewrite fixed facts, expose hidden data, or issue
-   persistence or identity commands; and
-10. return only a proposal matching the authoritative candidate-output contract
-    as exactly one complete JSON object, with no Markdown fence or surrounding
-    prose, every required field, no extra field, and no partial response or
-    continuation.
-
-The implementation may reorganize those requirements only to remove redundant
-presentation. It must not change their meaning. The combined Prompt contains no
-temperature instruction and no raw response, hidden reference, private fact,
-internal detector inventory, API key, Provider configuration, or backend
-identifier.
-
-## 8. Example construction and single-source authority
-
-The example is not a manually maintained JSON blob and is not a second schema.
-The exact design is:
-
-1. construct a typed `DynamicNarrativeCandidatePayload` using current enum
-   values and field models;
-2. use `DynamicGeneratedPublicFactKeyGrammar.SAFE_EXAMPLE` for the one proposed
-   public fact key;
-3. use a narrative length inside the current Provider-visible 500..700 target
-   and 350..900 accepted band;
-4. provide 0..3 consequences, 0..3 public facts, exactly three normalized-
-   distinct suggested Actions, and current literal values through existing
-   model authorities;
-5. choose the example's three suggestions from a fixed bounded pool through
-   `DynamicProviderCandidateContract.SUBMITTED_ACTION_EXCLUSION_RULE`, so the
-   rendered example can never repeat the current submitted Action after the
-   unchanged normalization; failure to obtain exactly three causes Prompt
-   construction to fail before transport;
-6. serialize with existing `canonical_json`, then pass the serialized example
-   through `DynamicProviderCandidateContract.validate_response_json(...)` on
-   every Prompt construction;
-7. require the resulting top-level key set/count to equal
-   `DynamicProviderCandidateContract.TOP_LEVEL_FIELDS`, nested fact key
-   set/count to equal `PUBLIC_FACT_FIELDS`, nested scene key set/count to equal
-   `NEXT_SCENE_FIELDS`, and no extra field to exist; and
-8. have direct tests enumerate all example mapping keys and string leaves and
-   apply the existing orchestrator safety detectors for protected/internal and
-   secret shapes. Production models must not import the orchestrator or copy
-   its detector inventory; Prompt construction itself uses the existing
-   contract, grammar, normalization, and canonical-JSON control checks.
-
-The example contains every required field, no extra field, exact current
-types/literals/counts, valid `public-note-*` grammar, no protected/internal
-identifier shape, no submitted-Action repeat, and no literal or decoded escaped
-CR, LF, tab, or other prohibited control. JSON string values use ordinary
-spaces. Because construction and rendering consume the strict model, contract
-renderer, grammar authority, normalization rule, literal enums, and canonical
-serializer directly, a future contract change makes construction or tests fail
-rather than leaving a drifting example accepted.
-
-The example is illustrative data only. The runtime contract remains
-`DynamicProviderCandidateContract`; the strict Pydantic models and application
-semantic validators remain enforcement authority.
-
-## 9. Unchanged validator and Provider boundaries
-
-The remediation freezes all of these published boundaries unchanged:
-
-- recursive sanitized Provider-response exception graphs;
-- standard JSON decoding, duplicate-member rejection, and rejection of
-  `NaN`, `Infinity`, and `-Infinity`;
-- strict candidate field/type/literal/count/bound validation;
-- generated key grammar enforcement at `proposed_public_facts[*].key`;
-- decoded prohibited-character rejection;
-- complete mapping-key and string-leaf safety/protected-reference scanning;
-- submitted-Action exclusion as terminal `PRE_REPEAT_SUBMITTED_ACTION` before
-  commit and without replacement;
-- invalid extra fields, invalid types/literals/counts/references, and invalid
-  keys remain rejected;
-- normal success uses one application generation;
-- an eligible first structural or length failure permits at most one complete
-  application replacement;
-- maximum application generations per gameplay Action is exactly 2;
-- maximum application replacements per gameplay Action is exactly 1;
-- Provider transport retries are exactly 0 in dynamic Live composition;
-- no deterministic fallback and no third generation;
-- model `deepseek-v4-flash` by current default authority;
-- official `https://api.deepseek.com/chat/completions` endpoint;
-- thinking disabled, streaming `false`, normal `json_object` response mode,
-  current strict response parsing, current timeout authority, and maximum
-  output 1,200 tokens by current default authority;
-- `temperature` remains omitted from the request payload;
-- complete safety, reference, authority reload, transaction, revision, replay,
-  follower, cancellation, and stale-state finalization; and
-- successful dynamic View reconstruction returns exactly 3 suggested Actions.
-
-## 10. Diagnostic-precedence decision
-
-The current implementation and its direct test are unambiguous. The runtime
-authority `DynamicProviderCandidateContract.SCHEMA_FAILURE_PRECEDENCE` is:
-
-1. `ROOT_OR_OBJECT_SHAPE`;
-2. `REQUIRED_OR_EXTRA_FIELDS`;
-3. `TYPE_OR_LITERAL`;
-4. `GENERATED_PUBLIC_FACT_KEY_CONTRACT`;
-5. `BOUNDS_OR_UNIQUENESS`.
-
-`tests/unit/test_narrative_provider.py::test_dynamic_schema_failure_families_have_deterministic_precedence`
-directly proves that order, including generated-key precedence over a
-simultaneous general bounds/uniqueness failure. The frozen spike plan currently
-lists the last two families in the opposite order.
-
-Classification: **2. documentation-only ambiguity**. More precisely, the
-published runtime and direct regression intentionally define one deterministic
-primary failure, while one frozen-plan sentence is stale/inconsistent. There
-is no demonstrated runtime nondeterminism and no Prompt-remediation need to
-change primary selection. This Slice preserves the current runtime/test order
-byte-for-byte and adds no secondary-failure report.
-
-Reconciling that one frozen-plan sentence is a separate non-blocking
-documentation follow-up requiring its own authorization. It is excluded from
-the five-path implementation budget. The temporary N01/N05 loss of some
-memory-only diagnostic classification after raw responses were discarded is
-also not a published gameplay defect and is not remediated here.
-
-## 11. Deterministic regression matrix
-
-The implementation adds exactly five new direct regressions, with no sixth
-regression and no additional test owner. Every changed exported or
-contract-rendering boundary has one of these direct tests.
-
-| Exact direct test | Required proof |
+| Datum | Historical result |
 | --- | --- |
-| `tests/unit/test_dynamic_narrative.py::test_combined_default_example_is_complete_and_strictly_contract_valid` | Example parses as standard JSON; passes unchanged `validate_response_json`; contains every required field and no extra field; matches exact nested fields, counts, types, literals, bounds, valid generated grammar, and target/accepted narrative length |
-| `tests/unit/test_dynamic_narrative.py::test_combined_default_example_avoids_submitted_action_controls_and_protected_shapes` | Parameterized submitted Actions cannot collide with the three example Actions; no decoded prohibited control, escaped CR/LF/tab, internal/protected identifier shape, long secret shape, or private/canonical namespace copy appears |
-| `tests/unit/test_dynamic_narrative.py::test_combined_default_contract_still_rejects_escaped_and_decoded_controls` | Strict parsing continues to reject decoded CR, LF, tab, representative `Cf`/`Cs`, and their escaped JSON spellings in every representative string family; no Prompt example or instruction relaxes the validator |
-| `tests/unit/test_dynamic_narrative.py::test_combined_default_prompt_renders_shared_contract_grammar_namespaces_and_controls` | Canonical request remains data; every system-instruction semantic enumerated in section 7 is asserted directly; authoritative grammar occurs immediately before the one rendered output contract; generated/canonical/private/protected namespaces are distinguished; explicit decoded-control and escaped `\\r`/`\\n`/`\\t` prohibitions occur; exactly one complete canonical synthetic example occurs; renderer uses shared contract/grammar/Action authorities rather than duplicated limits or schema text |
-| `tests/unit/test_narrative_provider.py::test_dynamic_combined_default_preserves_transport_contract_and_zero_retry` | Injected transport sees only changed message content; exact official URL, current model, thinking disabled, stream false, normal JSON-object mode, current max tokens and timeout remain; `temperature` and tools are absent; strict parsing succeeds once; one transport failure remains one call with zero retry |
+| Original procedure case / Run alias | D1 / Run A |
+| Action | Suggested ordinal `0` |
+| Authoritative revision | `0 -> 1` |
+| HTTP / lifecycle result | `200` / normally committed |
+| New story segments / suggestions | `1` / `3` |
+| Official DeepSeek Dashboard delta / Provider generations | `1` / `1` |
+| Authorized application replacement / transport retries / third generation | none / `0` / none |
+| Exact newly committed public-fact count | `UNKNOWN` |
 
-For the fourth regression, direct preservation proof means building the rendered
-`COMBINED_DEFAULT` Prompt and making deterministic assertions that detect loss
-of each section 7 requirement: language/style; submitted-Action distrust;
-public-premise, current-scene, role, and canonical-public-fact context;
-`projection_truncated` semantics; plausible result and following scene; exactly
-three distinct contextual `CUSTOM` Actions without capabilities or identifiers;
-candidate-only fields; server validation; fixed-fact, hidden-data, authority,
-persistence, and identity-command boundaries; and the complete-object,
-required-field, no-extra-field, no-fence, no-surrounding-prose, and non-partial
-output rules. The same test also directly proves that the generated-key grammar
-comes from its authoritative shared owner, generated/canonical/private/protected
-namespaces remain distinct, decoded `Cc`/`Cf`/`Cs` and escaped CR/LF/tab are
-prohibited, the grammar is immediately adjacent to the single rendered output
-contract, and exactly one complete synthetic example follows it. It compares
-the schema and grammar with the existing shared runtime authorities; it must not
-introduce a second manually maintained copy of the complete Prompt or runtime
-schema.
+Historical D1 is incomplete, not passed, not reconstructable, not
+retroactively reinterpretable, and not repeatable within the original
+procedure. Its fact count must not be inferred from long-term-memory category
+totals, narrative prose, Provider proposal count, Dashboard request count,
+fact-ring size, generated keys, logs, or later runtime evidence. D2-D5 were
+never started. The original procedure may never resume at D2, replace or retry
+D1, merge later evidence into D1, or be rewritten as successful.
 
-The direct and complete affected-file runs must also preserve these existing
-regression responsibilities:
+The accepted read-only failure analysis returned
+`DYNAMIC_NARRATIVE_D1_NEW_PUBLIC_FACTS_EVIDENCE_REMEDIATION_PLAN_COMPLETE`. It
+confirmed that the Action API preserves a committed response's
+`feedback_parameters`, but the React action loop discards that response before
+rendering the refreshed View, and the View cannot safely reconstruct the exact
+per-Action fact count. The selected correction is the bounded committed scalar
+and associated browser evidence surface defined below; its implementation is
+blocked until this exact authority correction receives its operative
+independent-review approval.
 
-- `test_provider_candidate_contract_is_complete_and_matches_strict_model`;
-- `test_provider_key_contract_has_one_authority_and_internal_grammar_stays_broader`;
-- `test_generated_public_fact_key_grammar_has_exact_safe_boundaries`;
-- `test_submitted_action_exclusion_authority_rejects_normalized_match_without_recovery`;
-- `test_each_schema_family_replaces_once_commits_once_and_is_locally_auditable`;
-- `test_invalid_provider_key_uses_one_safe_structural_replacement`;
-- `test_invalid_provider_key_replacement_terminalizes_without_third_generation`;
-- `test_shared_replacement_budget_uses_only_final_cross_layer_outcome`;
-- `test_structural_replacement_protected_reference_rejects_without_third_call`;
-- `test_dynamic_deepseek_contract_parses_once_without_retry`;
-- `test_dynamic_sanitized_boundary_severs_raw_exception_chains`;
-- `test_dynamic_deepseek_schema_rejects_unsafe_public_fact_keys`;
-- `test_dynamic_deepseek_requires_every_candidate_field_without_defaults`;
-- `test_dynamic_deepseek_rejects_extra_wrong_and_malformed_candidate_fields`;
-- `test_dynamic_schema_failure_families_have_deterministic_precedence`;
-- `test_dynamic_deepseek_transport_uncertainty_is_never_retried`;
-- `test_dynamic_deepseek_keeps_duplicates_and_nonstandard_numbers_unparseable`;
-- `test_dynamic_deepseek_refuses_retry_configuration_before_transport`; and
-- `test_dynamic_deepseek_propagates_cancellation_without_second_call`.
+## 3. Normative amendment decision and frozen boundaries
 
-The complete two test files remain responsible for invalid keys, escaped and
-decoded controls, extra fields, invalid types/literals/references/counts,
-Action repetition, two-generation/one-replacement ceilings, zero transport
-retry, safety/protected scanning, authority reload, transaction/revision,
-replay/follower, cancellation, stale-state, and no-partial-commit behavior.
-No validator is relaxed or rewritten to make the example pass.
+Generated public-fact keys are server-owned and deterministically allocated at
+the application finalization boundary. The LLM may author bounded semantic
+public-fact statements, but it must not invent, propose, select, repair,
+normalize, transform, or receive an authority-bearing public-fact key.
 
-## 12. Exact deterministic validation sequence
+This is a revised Provider/application contract boundary, not repair or salvage
+of an invalid Provider response. The application first accepts or rejects the
+complete keyless candidate under the strict Provider contract. Only a complete,
+otherwise-valid candidate can reach server allocation. The application then
+constructs new server data from locked current authority; it does not reinterpret
+or edit a rejected Provider field.
 
-All commands run from `D:\deviation-protocol` in PowerShell 7+ with
-`RUN_LIVE_DEEPSEEK_TEST` disabled. The repository venv is mandatory.
+The following boundaries remain frozen:
 
-1. Run only the five new direct tests:
+- strict local validation is authoritative;
+- every Provider field remains untrusted and candidate-only;
+- the global protected/internal identifier and secret-shape detectors remain
+  complete and are not weakened or given a public-fact exemption;
+- Provider output is not normalized into validity, repaired, salvaged,
+  truncated, or partially accepted;
+- dynamic Live composition has exactly zero Provider transport retries;
+- one Action has one initial application generation and at most one complete
+  application replacement, for at most two Provider generations total;
+- there is no third generation and no deterministic narrative fallback;
+- uncertain delivery or publication is never automatically resent;
+- duplicate submission does not create another job, call, allocation, or
+  commit;
+- finalization is atomic and terminal failure leaves public state unchanged;
+- no raw Provider request/response, prompt, secret, protected identifier, or
+  internal state enters public evidence;
+- current public error sanitization remains unchanged;
+- the Action DTO gains no top-level field and non-Dynamic-Narrative outcomes
+  remain unchanged; and
+- the authoritative View contract remains unchanged.
 
-   ```powershell
-   .\.venv\Scripts\python.exe -m pytest tests/unit/test_dynamic_narrative.py::test_combined_default_example_is_complete_and_strictly_contract_valid tests/unit/test_dynamic_narrative.py::test_combined_default_example_avoids_submitted_action_controls_and_protected_shapes tests/unit/test_dynamic_narrative.py::test_combined_default_contract_still_rejects_escaped_and_decoded_controls tests/unit/test_dynamic_narrative.py::test_combined_default_prompt_renders_shared_contract_grammar_namespaces_and_controls tests/unit/test_narrative_provider.py::test_dynamic_combined_default_preserves_transport_contract_and_zero_retry -q
-   ```
+A server-created key is not permission to accept an otherwise-invalid
+candidate. Every other schema, length, semantic, safety, protected-reference,
+authority, provenance, stale-state, transaction, and cancellation failure keeps
+the existing replacement eligibility or terminal behavior.
 
-2. Run the exact directly relevant preservation selection:
+## 4. Revised Provider candidate contract
 
-   ```powershell
-   .\.venv\Scripts\python.exe -m pytest tests/unit/test_dynamic_narrative.py::test_provider_candidate_contract_is_complete_and_matches_strict_model tests/unit/test_dynamic_narrative.py::test_provider_key_contract_has_one_authority_and_internal_grammar_stays_broader tests/unit/test_dynamic_narrative.py::test_generated_public_fact_key_grammar_has_exact_safe_boundaries tests/unit/test_dynamic_narrative.py::test_submitted_action_exclusion_authority_rejects_normalized_match_without_recovery tests/unit/test_dynamic_narrative.py::test_each_schema_family_replaces_once_commits_once_and_is_locally_auditable tests/unit/test_dynamic_narrative.py::test_invalid_provider_key_uses_one_safe_structural_replacement tests/unit/test_dynamic_narrative.py::test_invalid_provider_key_replacement_terminalizes_without_third_generation tests/unit/test_dynamic_narrative.py::test_shared_replacement_budget_uses_only_final_cross_layer_outcome tests/unit/test_dynamic_narrative.py::test_structural_replacement_protected_reference_rejects_without_third_call tests/unit/test_narrative_provider.py::test_dynamic_deepseek_contract_parses_once_without_retry tests/unit/test_narrative_provider.py::test_dynamic_sanitized_boundary_severs_raw_exception_chains tests/unit/test_narrative_provider.py::test_dynamic_deepseek_schema_rejects_unsafe_public_fact_keys tests/unit/test_narrative_provider.py::test_dynamic_deepseek_requires_every_candidate_field_without_defaults tests/unit/test_narrative_provider.py::test_dynamic_deepseek_rejects_extra_wrong_and_malformed_candidate_fields tests/unit/test_narrative_provider.py::test_dynamic_schema_failure_families_have_deterministic_precedence tests/unit/test_narrative_provider.py::test_dynamic_deepseek_transport_uncertainty_is_never_retried tests/unit/test_narrative_provider.py::test_dynamic_deepseek_keeps_duplicates_and_nonstandard_numbers_unparseable tests/unit/test_narrative_provider.py::test_dynamic_deepseek_refuses_retry_configuration_before_transport tests/unit/test_narrative_provider.py::test_dynamic_deepseek_propagates_cancellation_without_second_call -q
-   ```
+### 4.1 Version and exact shape
 
-3. Run both complete directly affected test files:
+The later implementation changes both application-owned wire versions:
 
-   ```powershell
-   .\.venv\Scripts\python.exe -m pytest tests/unit/test_dynamic_narrative.py tests/unit/test_narrative_provider.py -q
-   ```
+- `DYNAMIC_PROMPT_SCHEMA_VERSION` becomes `dynamic-narrative-prompt-v2`;
+- `DYNAMIC_CANDIDATE_SCHEMA_VERSION` becomes
+  `dynamic-narrative-candidate-v2`.
 
-4. Run compilation and static repository checks:
+The Prompt version bump binds prepared work to the new candidate contract. The
+candidate version bump prevents a v1 response from being accepted under v2
+semantics. A previously committed response remains replayable from its stored
+`TurnResponse`; a non-committed v1 prepared or validated job becomes stale
+without another Provider call or story commit.
 
-   ```powershell
-   .\.venv\Scripts\python.exe -m compileall -q src tests alembic
-   .\.venv\Scripts\python.exe -m pip check
-   .\.venv\Scripts\python.exe -m alembic heads
-   .\.venv\Scripts\python.exe -m alembic history
-   git diff --check
-   ```
+The Provider-visible public-fact item is exactly:
 
-5. Run the repository-required sanitized canonical gate:
+```text
+DynamicPublicFactProposal
+  value: normalized public statement, 1..300 Unicode characters
+```
 
-   ```powershell
-   .\scripts\verify.ps1 -Mode Offline
-   ```
+`proposed_public_facts` remains an ordered tuple containing exactly zero, one,
+two, or three such objects. Each object has the one required field `value` and
+`additional_properties=false`. A `key`, `id`, `identifier`, `name`, legacy v1
+field, or any other member is an extra forbidden field. It is classified by the
+existing `REQUIRED_OR_EXTRA_FIELDS` schema family and is eligible only for the
+same single complete replacement allowance as another first schema-invalid
+candidate.
 
-Offline verification is required even though it repeats broader checks because
-`AGENTS.md` makes it the canonical no-database/no-Provider boundary. It launches
-a sanitized child with database, Provider, and live-test variables absent.
+Normalized fact values must be pairwise distinct under the existing NFC,
+collapsed-whitespace, trim, and Unicode-casefold comparison. A duplicate value
+is `BOUNDS_OR_UNIQUENESS`; it is not assigned two identities by order.
 
-MySQL is excluded because no database model, repository, transaction topology,
-or migration changes. Frontend and browser automation are excluded because no
-public schema or Web path changes. Real-Provider calls are excluded from all
-automated validation; they occur only in the later user-operated gate. Full or
-MySQL verification must not be substituted for Offline.
+The model continues to author only these semantic candidate fields:
 
-At later implementation time, this sequence runs against the exact three-path
-executable candidate before the manual gate. The two documentation/status paths
-are still the published baseline bytes at that point. After the one permitted
-post-gate documentation synchronization, run documentation validation against
-the complete final five-path diff: inspect both documentation changes, run
-`git diff --check`, verify UTF-8/LF and final newlines directly, reconfirm the
-exact five-path inventory and empty index, and prove that no unexpected
-untracked path entered the candidate. These documentation-only checks do not
-replace or weaken the pre-gate deterministic sequence.
+1. `narrative_text`;
+2. `result`;
+3. zero to three `proposed_consequences` strings;
+4. zero to three ordered `proposed_public_facts[*].value` statements;
+5. `next_scene.title` and `next_scene.summary`;
+6. exactly three `suggested_actions`; and
+7. `continuation`.
 
-## 13. Pre-gate executable candidate identity
+The model owns no public-fact key or identifier field. The rendered schema,
+Prompt instructions, and typed example must contain no instruction, grammar,
+safe example, or recovery text asking the model to create one.
 
-Before the manual real-Provider gate, the executable candidate consists of
-exactly these three modified runtime/test paths:
+### 4.2 Schema-family disposition
 
-1. `src/deviation_protocol/application/dynamic_narrative_models.py`;
-2. `tests/unit/test_dynamic_narrative.py`; and
-3. `tests/unit/test_narrative_provider.py`.
+`GENERATED_PUBLIC_FACT_KEY_CONTRACT` ceases to be a Provider-response schema
+family because the v2 Provider candidate contains no key. Remove it from
+`DynamicNarrativeSchemaFailureFamily`, schema precedence, generation
+instructions, recovery/final diagnostic mappings, and Prompt recovery text.
+The exact historical diagnostic strings remain documentation evidence only and
+must be unreachable in the new runtime.
 
-Both documentation/status owners remain byte-for-byte equal to the published
-parent at this stage. After every deterministic command in section 12 passes
-and before any Live launch, record one sanitized pre-gate manifest containing:
+The generated-key grammar remains authoritative for server-produced public
+state. `DynamicGeneratedPublicFactKeyGrammar` is retained and rewritten as the
+single validator for an allocated key; its Provider-specific validation and
+`prompt_contract()` responsibilities are removed. The contract-level helper
+that scans decoded Provider documents for generated keys is removed. A legacy
+key reaches ordinary extra-field rejection rather than a special key grammar
+path.
 
-1. branch and exact parent `HEAD`;
-2. the exact three-path runtime/test inventory and absence of every unexpected
-   modified or untracked path;
-3. a per-path SHA-256 manifest, in ascending Unicode code-point path order, for
-   exactly those three paths;
-4. the complete runtime/test diff bytes and a SHA-256 digest of that complete
-   diff as its exact identity;
-5. the complete deterministic command/evidence record;
-6. an empty index, no conflict, and no active Git operation;
-7. the exact published plan commit and SHA-256 identity of
-   `docs/dynamic_narrative_provider_reliability_remediation_plan.md`; and
-8. the SHA-256 identity of the operative manual-gate instruction bundle.
+## 5. Deterministic server allocation and fact-ring lifecycle
 
-The operative manual-gate instruction bundle is the exact UTF-8/LF byte range
-of the published plan beginning with `## 5. Goals and non-goals` and ending
-immediately before `## 20. Completion criteria and residual uncertainty`. This
-range binds the implementation/path budget, Prompt and validator boundaries,
-deterministic validation, pre-gate identity, manual cases, counts, evidence,
-success rules, stop conditions, post-gate synchronization, correction rules,
-and commit rules. Record its exact bytes and SHA-256; do not reconstruct it from
-a summary.
+### 5.1 Narrow application abstraction
 
-The manual gate binds to the exact three-path executable candidate and that
-exact published instruction bundle. It does not require the later sanitized
-gate-result documentation bytes to exist before the gate occurs. Record hashes
-without staging or committing.
+The implementation introduces exactly one narrow pure application abstraction,
+`DynamicGeneratedPublicFactKeyAllocator`, in
+`src/deviation_protocol/application/dynamic_narrative_models.py`. Its only
+responsibility is to allocate and validate a collision-free public semantic key
+from already authoritative scalar inputs. It performs no Provider call, prompt
+work, repository read, state mutation, persistence, hashing, randomness, UUID
+generation, clock read, normalization of Provider output, or storage-slot
+selection.
 
-Immediately before and after every manual case, `git status --short`, the three
-per-path hashes, complete runtime/test diff identity, published-plan identity,
-and operative instruction-bundle identity must equal the pre-gate manifest.
-Any repository change during the gate stops the complete gate.
+The server-internal `DynamicAllocatedPublicFact` contains exactly `key` and
+`value`. It is constructed only after a keyless `DynamicPublicFactProposal` has
+passed the complete candidate boundary. It never appears in Provider input or
+output.
 
-## 14. `PRE_REVIEW_LIVE_CANDIDATE_GATE`
+### 5.2 Exact key algorithm
 
-This is a user-authorized pre-review candidate gate. It is not
-`OPTIONAL_LIVE_PASSED`, implementation approval, publication, production
-readiness, or a phase-completion gate.
+Only after finalization has locked current authority and freshly rebuilt and
+revalidated both public and protected-reference records, the orchestrator
+constructs one authoritative `unavailable_identifiers` application input. Its
+contents are the union of:
 
-The sequence is exact:
+1. every exact current public-fact `fact_id` exposed by the freshly rebuilt
+   authoritative Frame, including declared public facts and all validated
+   committed fact-ring entries;
+2. `record.original` for every identifier-class record (`record.identifier is
+   True`) in the exact freshly recomputed
+   `_hidden_reference_index(current_resolved, None, self.catalog,
+   live_provider_references=self.live_provider_references)` tuple; this is the
+   repository's finite protected-reference collection from the same locked
+   `ScenarioDefinition`, catalog, restored runtime, Session, Run, participation,
+   Player Character binding, and applicable Live settings, and specifically
+   includes each hidden `FactDefinition.fact_id` plus every other protected
+   identifier capable of exactly equalling a generated public-fact key; and
+3. every key selected for an earlier proposal in the same final candidate.
 
-1. implementation produces the unstaged, uncommitted three-path executable
-   candidate while both documentation/status paths remain at their published
-   parent bytes;
-2. all deterministic validation in section 12 passes against that executable
+Human-text protected records do not become identifiers merely because they are
+present in that tuple. The collection in item 2 is recomputed from the locked
+authority and revalidated through the existing hidden-reference digest binding;
+it is neither a pre-lock snapshot nor a Provider-derived collection. The
+orchestrator passes the complete set as deterministic application input. The
+allocator performs no repository read, dependency injection, persistence, or
+independent state lookup.
+
+The maximum-current precondition and successor handoff are authoritative. After
+current authority is locked and revalidated, but before evaluating any
+expression equivalent to `current_version + 1`, finalization validates that the
+locked current version has a representable committed successor. The exact valid
+locked-current range with a successor is `0..9223372036854775806`. A locked
+current version of `9223372036854775807` is a valid committed current version
+but fails closed before addition: the implementation does not construct
+`9223372036854775808`, allocate a generated public-fact key, begin detached
+successor-state mutation, mutate the fact ring, append or publish a story
+segment, or commit. It must not rely on later model validation, database
+overflow, or persistence failure, and it exposes only the existing sanitized
+allocation/finalization failure boundary required by this plan.
+
+For a representable successor, finalization performs this order exactly:
+
+1. validate the locked current-version precondition;
+2. compute the successor exactly once using ordinary integer addition;
+3. validate that the computed successor is in
+   `1..9223372036854775807`; and
+4. use that same validated successor as the authoritative allocator and
+   finalization input.
+
+For each proposed fact, the allocator receives:
+
+1. `successor_state_version`, the already validated authoritative successor
+   computed exactly once by the locked finalization lifecycle only after its
+   maximum-current precondition passes;
+2. `proposal_ordinal`, the zero-based original tuple position `0`, `1`, or `2`;
+3. the authoritative `unavailable_identifiers` set above, including any keys
+   allocated earlier in the same candidate.
+
+It enumerates collision probes in ascending decimal order from `000` through
+`999`. The successor-version token uses this exact minimum-width decimal
+encoding:
+
+1. render the authoritative successor in ordinary base-10 decimal;
+2. left-pad a value with fewer than six decimal digits using ASCII `0` until
+   the token contains exactly six digits;
+3. preserve a value with exactly six digits byte-for-byte;
+4. preserve every decimal digit of a value with more than six digits;
+5. perform no truncation, wraparound, modulo reduction, hashing, scientific
+   notation, sign rewriting, or other normalization; and
+6. keep the proposal ordinal and collision probe at fixed widths of two and
+   three decimal digits respectively.
+
+The complete constructed key is exactly:
+
+```text
+public-note-{minimum-width-six successor decimal}-{two-digit proposal ordinal}-{three-digit collision probe}
+```
+
+The following version-token examples are normative: successor version `1`
+renders as `000001`, successor version `999999` renders as `999999`, successor
+version `1000000` renders as `1000000`, and successor version
+`9223372036854775807` is preserved in full as `9223372036854775807` and is
+accepted. Proposal ordinal `0` at probe `000` therefore produces
+`public-note-000001-00-000` for version `1`,
+`public-note-999999-00-000` for version `999999`,
+`public-note-1000000-00-000` for version `1000000`, and
+`public-note-9223372036854775807-00-000` for version
+`9223372036854775807`. The first constructed key
+absent from the
+`unavailable_identifiers` set under exact identifier equality is selected. There
+is no casefolding, compatibility folding, whitespace normalization, rewriting, or other
+normalization in this collision comparison. A collision with a current public
+identifier, hidden/protected identifier, or earlier same-candidate allocation
+advances monotonically to the next probe. The selected key is added to the same
+unavailable set before the next proposal.
+
+This scheme is reconciled with current repository bounds:
+
+- `GameSessionRow.state_version` and `GameSnapshotRow.state_version` in
+  `src/deviation_protocol/infrastructure/orm_models.py` use SQLAlchemy signed
+  `BigInteger`; `src/deviation_protocol/application/session_service.py`
+  explicitly revalidates authoritative Game Session state versions in the
+  inclusive range `0..9223372036854775807` (`0..2**63 - 1`). The exact valid
+  locked-current range with a committed successor is
+  `0..9223372036854775806`, and the complete persistable authoritative
+  successor range is exactly `1..9223372036854775807`. A locked current version
+  of `9223372036854775807` follows the pre-addition failure above and is not
+  truncated, wrapped, or reduced;
+- the narrow server-generated public-fact-key structural grammar becomes
+  `^public-note-(?:[0-9]{6}|[1-9][0-9]{6,18})-[0-9]{2}-[0-9]{3}$`, paired with
+  separate semantic validation that the decoded successor is in the exact range
+  above, the ordinal is `0..2`, and the probe is `0..999`; structural grammar
+  acceptance does not imply semantic numeric-range acceptance. This accepts the
+  complete repository-supported successor range while semantic validation
+  rejects zero, negative successors, and values above `9223372036854775807`,
+  without accepting a sign, leading zero on a token wider than six digits,
+  truncation, or alternate numeric notation;
+- generated keys are 25..38 ASCII characters. The maximum comes from the
+  19-decimal-digit signed-`BIGINT` maximum and remains within the existing
+  1..80 committed public-fact semantic-key boundary and its broader
+  `^[A-Za-z0-9][A-Za-z0-9_.:-]*$` validator;
+- the existing process-local 512-attempt ledger remains a runtime capacity
+  boundary only; it does not narrow the authoritative persistence or grammar
+  range;
+- a scenario has at most 256 declared facts and the dynamic ring has exactly 12
+  fact slots, so the public portion of the collision domain has at most 268
+  identifiers; protected identifiers are also authoritative unavailable inputs,
+  so the design does not assume that one of the 1,000 probes must be free; and
+- the format contains no Session, Run, Player Character, job, lease, receipt,
+  storage slot, event, Provider request, secret, hash, random value, UUID, clock,
+  or protected/internal identifier.
+
+No numeric ring slot is encoded in the public key. The existing slot ordinal is
+intentionally private and cannot be reused as the public identity. The public
+successor state version is already part of the Action/View contract, while the
+proposal ordinal and collision probe carry only bounded allocation order.
+`DynamicGeneratedPublicFactKeyGrammar.validate(...)` remains a narrow local
+server-output validator in
+`src/deviation_protocol/application/dynamic_narrative_models.py`; widening only
+its successor-version component does not weaken unrelated public identifier
+validation or the global protected/internal identifier detector. Provider
+candidates remain strictly keyless, and a Provider-authored key remains an
+extra forbidden field even if its text would match the server grammar.
+
+The maximum-current precondition failure, an invalid successor version, invalid
+proposal ordinal, impossible exhaustion of all 1,000 probes across the complete
+public/protected/same-candidate domain, malformed current public-fact identity,
+malformed committed ring, or failure of
+`DynamicGeneratedPublicFactKeyGrammar.validate(...)` emits
+only the new closed local
+`DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION`
+token
+`DNVS_LIVE_DIAG_FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION`. Public behavior
+remains the existing HTTP `503` envelope with
+`NARRATIVE_PROPOSAL_REJECTED` / `Narrative processing failed`. The failure
+produces no Provider replacement or third generation, exposes no candidate
+value or conflicting protected identifier, and leaves public state unchanged.
+
+For any ordinal, exhaustion means that every probe from `000` through `999` is
+present in the complete unavailable set. It fails closed before detached
+successor mutation or authoritative commit. No partial allocation becomes
+public; public state, Session/story revision, story segments, and public facts
+remain exact. It introduces no additional Provider generation, replacement,
+transport retry, or third request. The existing sanitized allocation/finalization
+failure boundary remains authoritative, and no conflicting protected identifier
+may enter a public response, diagnostic, log evidence, or review evidence.
+
+### 5.3 Exact application stage and ordering
+
+Allocation occurs inside `DynamicNarrativeOrchestrator._finalize` in this exact
+sequence:
+
+1. the final initial-or-replacement Provider candidate passes the existing
+   strict v2 keyless schema plus length, submitted-Action, storage, complete
+   string-leaf, internal/secret, protected-reference, and semantic validation;
+2. finalization locks Session then job and obtains complete current authority;
+3. stale authority, Session/snapshot, Run, participation, Player Character and
+   revision, dynamic story revision, View/frame, suggestion, request, public and
+   protected-reference records/digests, fenced lease, and validated-proposal
+   bytes/digest are freshly revalidated, and the authoritative Frame and
+   committed fact ring are freshly reconstructed and validated;
+4. before evaluating any expression equivalent to `current_version + 1`, the
+   orchestrator validates that the locked current version is in the exact
+   successor-bearing range `0..9223372036854775806`; a locked current version of
+   `9223372036854775807` fails at the existing sanitized boundary before
+   successor calculation, allocation, detached mutation, fact-ring mutation,
+   story publication, or commit;
+5. after that precondition passes, the orchestrator computes the successor
+   exactly once using ordinary integer addition;
+6. the orchestrator validates that the computed successor is in
+   `1..9223372036854775807` and uses that same validated value as the
+   authoritative allocator and finalization input;
+7. the orchestrator derives the complete authoritative
+   `unavailable_identifiers` set from that same locked and revalidated state;
+8. the allocator evaluates proposals in stable zero-based original list order;
+9. each proposal begins at probe `000`;
+10. exact collision with a current public identifier, hidden/protected identifier,
+   or earlier same-candidate allocation advances monotonically through `001` to
+   `999`;
+11. each selected key is added to the same-candidate unavailable set before the
+    next proposal;
+12. every selected server-produced key passes the existing local
+    `DynamicGeneratedPublicFactKeyGrammar` validator and committed semantic-key
+    validators; and
+13. only the complete successfully allocated collection proceeds to
+    `_apply_candidate_slots` and complete successor-candidate validation;
+14. finalization prospectively derives `public_fact_count` exactly once as
+    `len(allocated_public_facts)` from that final allocated tuple; and
+15. before normal UoW commit, that same scalar is included in the private event
+    and the `TurnResponse` material staged for persistence, direct return,
+    replay, and committed request-status projection, together with the complete
+    successor publication set.
+
+No key is allocated for a rejected initial generation; only the final complete
+strictly valid candidate can reach step 2. Allocation completes before any
+event, response, accepted prose, or job transition is added to the UoW and
+before the final commit begins. `_expected_finalize_publication` uses the same
+pre-addition maximum-current guard, exactly-once ordinary successor calculation,
+successor range validation, pure allocation, and exact unavailable-identifier
+input established from the authority proven equal during locked finalization;
+it does not calculate a successor before the guard, independently read a stale
+repository, or introduce a persistence boundary. Identical proven authority and
+candidate bytes therefore produce byte-identical expected keys during
+commit-uncertainty reconciliation.
+
+Zero proposed facts performs zero allocations and zero ring writes. For one,
+two, or three facts, original Provider tuple order is authoritative only as
+proposal order: ordinals are assigned before allocation and never sorted by
+value, JSON key order, provider metadata, dictionary order, storage slot, or
+generated key. Every proposal represents a new public observation. With no
+model-owned identifier, it cannot select or revise an existing semantic fact.
+Candidate-local duplicate normalized values reject earlier; equality with an
+already committed value does not grant replacement authority and does not
+change allocation order.
+
+After allocation, the existing fact-ring storage algorithm is reused exactly
+for capacity and rollover:
+
+1. ring size remains 12 with storage slots `.00` through `.11`;
+2. `base_slot = successor_state_version modulo 12`;
+3. allocated fact ordinal `i` writes to `(base_slot + i) modulo 12`;
+4. writes occur in ascending proposal ordinal;
+5. an unrelated entry at a destination is evicted; and
+6. the strict `{"key": ..., "value": ...}` wrapper remains the committed slot
+   shape.
+
+The old model-key no-op and same-key replacement branches are removed for new
+v2 candidates because a Provider no longer owns semantic identity. Legacy
+committed v1 ring entries remain valid input to reconstruction, collision
+checking, rollover, later projection, and eviction; no storage migration is
+required.
+
+Every allocated key is revalidated by
+`DynamicGeneratedPublicFactKeyGrammar`, the broader committed semantic-key
+validator, and the fixed internal/protected-shape assertions before it becomes
+candidate state. Only committed, well-shaped values in the 12 exact fact slots
+enter later Frame and Prompt context. Storage keys and slot ordinals remain
+unprojected.
+
+### 5.4 Atomicity, replay, stale authority, and failure
+
+Allocation does not advance authority. The accepted allocated facts become
+public only in the existing one atomic finalization commit containing the
+successor snapshot/state, fact ring and non-fact slots, event, response/receipt,
+accepted prose/presentation, committed job, three suggestions, next View/frame,
+and one successor Session version.
+
+The following behavior is exact:
+
+- a locked current version of `9223372036854775807` fails before successor
+  calculation and allocation and leaves detached state, fact ring, story,
+  version, and commit state exact;
+- an otherwise-invalid initial candidate follows its existing one-replacement
+  eligibility; an otherwise-invalid replacement terminalizes without a third
+  generation;
+- a legacy Provider `key` field is a complete schema failure, never stripped or
+  reused;
+- a server-allocation failure is finalization failure, not Provider failure, and
+  never spends a replacement allowance;
+- a stale revision or any other authority mismatch rejects before allocation is
+  published and leaves every story artifact unchanged;
+- two different same-View submissions may both call the Provider lock-free, but
+  Session serialization allows at most one matching finalizer to allocate and
+  commit the successor; the loser is stale with no losing fact;
+- an exact concurrent duplicate has one owner, one job, one final key set, and
+  one commit; the follower performs no allocation or Provider work;
+- an exact post-completion replay returns the stored response and committed View
+  without allocating, mutating, reserving, or calling the Provider;
+- finalization retry for an already validated proposal under the existing fenced
+  authority recomputes the same key set and does not call the Provider;
+- commit failure or proven `COMPLETE_OLD` leaves the prior ring, version,
+  response, prose, event, and View exact;
+- `COMPLETE_NEW` requires the exact server-allocated successor keys as part of
+  the expected ring and preserves the committed result; and
+- `PARTIAL`, `IMPOSSIBLE`, or `UNKNOWN` keeps the existing sanitized
+  `NARRATIVE_OUTCOME_UNKNOWN` behavior and never resends the Provider request.
+
+### 5.5 Exact committed fact-count evidence
+
+`NEW_PUBLIC_FACTS` means only the exact number of public facts newly accepted
+and committed by the current Action. Its server-owned source is
+`len(allocated_public_facts)`, where `allocated_public_facts` is the final
+allocated fact tuple produced by `_allocate_public_facts` for the final complete
+validated candidate. Providers propose zero to three keyless values, and the
+complete candidate is deterministically accepted or rejected; there is no
+partial per-fact filtering.
+
+After any authorized application replacement decision has selected the final
+candidate, allocation produces its final tuple. During the same atomic
+finalization, before staging the event, stored response, committed request-
+status material, or direct response and before normal UoW commit, finalization
+prospectively derives the scalar from that tuple. The same prospective scalar
+is carried in the private event and in the one `TurnResponse` that is stored and
+later projected by direct success, replay, and committed request status. There
+is no separate request-status write.
+
+Before normal UoW commit succeeds, the derived value is staged candidate
+material only. It is not yet an authoritative committed result and must not be
+publicly claimed as committed. Normal commit success gives the event, stored
+response, replay/status projection, and direct committed response the same
+authoritative meaning atomically. Commit failure or rollback publishes and
+preserves no claimed committed count.
+
+`_expected_finalize_publication` constructs the expected `COMPLETE_NEW` event,
+response, and successor publication prospectively from the same final validated
+candidate, final allocated tuple, and `len(allocated_public_facts)` derivation.
+The existing reconciliation seam compares that expected result with the
+authoritative existing committed state. The scalar becomes authoritative and
+publicly claimable through this path only when the complete reconciliation
+establishes `COMPLETE_NEW`; reconciliation does not mutate an already committed
+response. Normal commit success and `COMPLETE_NEW` therefore converge on the
+same committed result.
+
+Only the final successfully committed or reconciled candidate contributes.
+Rejected, failed, superseded, and non-published generations contribute zero and
+are never added to or double-counted with the final tuple. An authorized
+application replacement contributes only its final selected candidate.
+
+The committed response's exact Dynamic Narrative feedback semantics are:
+
+```text
+feedback_parameters={
+  "outcome_result": <validated result>,
+  "public_fact_count": <integer 0..3>
+}
+```
+
+This rule explicitly supersedes the older exact map in
+`docs/dynamic_narrative_vertical_spike_plan.md` that fixed committed Dynamic
+Narrative feedback to only
+`{"outcome_result": <validated result>}`. The existing `outcome_result` remains
+required and the new `public_fact_count` is also required for an exact
+`DYNAMIC_NARRATIVE_COMMITTED` result. Zero is explicitly serialized as integer
+`0`; missing, null, boolean, non-integer, or out-of-range data is invalid and is
+not interpreted as zero.
+
+The same count is recorded by the private `DynamicNarrativeTurnCommitted`
+event's `public_fact_count` and must agree with the normal response, stored
+response/replay, committed request-status projection, and expected committed
+response proven by `COMPLETE_NEW` reconciliation. A normal direct HTTP `200`
+response and a `202` request that later projects `COMMITTED` therefore expose
+the same stored committed value. No new top-level Action DTO field, API schema
+or route, or `PlayerSessionView` field is introduced.
+
+The scalar is not derived for the first time after commit and requires no post-
+commit response mutation or second database write. It is not reconstructed from
+the successor View, fact-ring net growth, logs, UI totals, memory categories,
+Provider responses or raw proposal counts, generated keys, total Run facts,
+narrative count, or suggestion count. It publishes no fact value, generated
+key, storage slot, collision input, allocation detail, hidden identifier,
+prompt, response, header, credential, exception body, or Provider metadata.
+
+### 5.6 Browser-visible post-Action evidence
+
+After an exact committed Dynamic Narrative Action and its immediate
+authoritative View refresh, the browser retains the validated committed Action
+response and may render this privacy-safe summary:
+
+```text
+REVISION=1
+NEW_STORY_SEGMENTS=1
+SUGGESTIONS=3
+NEW_PUBLIC_FACTS=0
+```
+
+The evidence sources are exact:
+
+- `REVISION` is the committed Action result's
+  `resulting_state_version`—the resulting authoritative revision;
+- `NEW_STORY_SEGMENTS` is the exact accepted narrative-addition count in that
+  committed Dynamic Narrative result;
+- `SUGGESTIONS` is the executable dynamic suggestion count in the successor
+  View for the same Session and exact revision; and
+- `NEW_PUBLIC_FACTS` is the committed response's
+  `feedback_parameters.public_fact_count`.
+
+The summary remains available after the immediate authoritative View refresh
+and is retained from the committed response rather than reconstructed from the
+View. It renders only when the response and successor View have the exact same
+Session and revision association. Zero remains visibly distinct from missing.
+Missing, malformed, out-of-range, wrong-lifecycle, wrong-Session, or
+wrong-revision data fails closed and renders no claimed summary. The UI must not
+render protected content, fact values, generated keys, allocation details,
+hidden identifiers, or Provider material.
+
+## 6. Historical disposition of the Prompt-only candidate
+
+The three-path Prompt-only diff recorded when the published key-ownership
+amendment was authored is historical. Its disposition remains design rationale;
+it is not the current evidence-remediation budget and requires no edit in the
+future four-path implementation:
+
+| Historical material | Published key-ownership disposition |
+| --- | --- |
+| `COMBINED_DEFAULT` ordering, explicit decoded-control instruction, canonical request-as-data boundary, complete-object requirement, and no-fence/no-extra-field presentation | Retained as non-authoritative defense in depth, with the key-ownership text rewritten for the v2 keyless contract |
+| Typed, canonical, strict-valid synthetic example and bounded suggestion-pool/Action-exclusion construction | Retained as non-authoritative defense in depth, but rewritten so each public-fact item contains only `value` and no generated key example |
+| Namespace instruction requiring `proposed_public_facts[*].key` and the model to invent a `public-note-*` key | Removed; replaced by an instruction that facts contain semantic public statements only and that identifiers are server-owned and must not be emitted |
+| `DynamicGeneratedPublicFactKeyGrammar.prompt_contract()` in the Prompt | Removed from the Prompt and from Provider ownership |
+| Adapter/schema validation of model-generated key syntax | Removed; v2 validates the one-field fact object and rejects a legacy `key` as an extra field |
+| `GENERATED_PUBLIC_FACT_KEY_CONTRACT`, its typed replacement instruction, and recovery/final diagnostic maps | Removed from live Provider classification; historical tokens remain documentation evidence only |
+| `DynamicGeneratedPublicFactKeyGrammar` pattern and validator | Retained and rewritten as independently valid server-produced public-state validation |
+| Direct Prompt/example tests for JSON completeness, controls, protected shapes, Action exclusion, and exact transport configuration | Retained but rewritten around the keyless example and absence of model-owned key instructions |
+| Direct generated-key schema, recovery, precedence, and final diagnostic-family tests | Removed or rewritten to prove legacy-key extra-field rejection, obsolete-family unreachability, deterministic server allocation, and no extra generation |
+| Existing tests for all other schema families, complete candidate scanning, protected/internal rejection, two-generation ceiling, zero transport retry, stale authority, replay, concurrency, atomic finalization, and public error sanitization | Retained unchanged where assertions remain contract-correct; revised only where candidate v2 fixtures must become keyless or expected committed keys become server-allocated |
+| `_DynamicFakeProvider` in `src/deviation_protocol/api/demo_composition.py` constructing keyed `DynamicPublicFactProposal` values and a literal v1 candidate at that checkpoint | Minimally updated to emit the same strict candidate v2/keyless public-fact contract as the real Provider boundary while preserving its deterministic Fake/Demo schedule, request-derived semantics, failure ordinal, observation tokens, metadata, and lifecycle role |
+
+No Prompt-only code or test is retained if it contradicts server key ownership.
+
+## 7. Exact current inventory, future implementation delta, and aggregate manifest
+
+Before and after this documentation-only bounded correction, the complete
+worktree inventory is exactly these nine unstaged paths:
+
+1. `PLANS.md`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
+3. `docs/public_client_contract.md`;
+4. `docs/engineering/codex_workflow.md`;
+5. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+6. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+7. `src/deviation_protocol/api/demo_composition.py`;
+8. `tests/unit/test_dynamic_narrative.py`; and
+9. `tests/unit/test_narrative_provider.py`.
+
+The first four paths are the authority correction. The last five are the
+protected existing runtime/test candidate and must retain their correction-
+entry SHA-256 values throughout this task. The correction handoff records all
+nine resulting per-path hashes and the complete nine-path diff byte size and
+SHA-256. Those resulting values are the proposed baseline for the independent
+re-review; this authoring task does not approve or lock them.
+
+The later evidence-remediation implementation budget is exactly a **four
+tracked-path delta with zero newly created files**:
+
+| Exact path | Starting state | Exact responsibility |
+| --- | --- | --- |
+| `src/deviation_protocol/application/dynamic_narrative_orchestrator.py` | Already dirty in the nine-path candidate; hash may change only during separately authorized implementation | Derive the bounded count prospectively from the final allocated tuple at the common finalization seam and preserve it through committed response, replay/status, private event, and `COMPLETE_NEW` expectation/reconciliation. |
+| `tests/unit/test_dynamic_narrative.py` | Already dirty in the nine-path candidate; hash may change only during separately authorized implementation | Prove exact count, final-candidate, replay/reconciliation, event agreement, failure, and privacy semantics. |
+| `web/src/App.tsx` | Currently clean; permitted to become modified only during separately authorized implementation | Retain and validate the committed Action response through the authoritative View refresh and render the exact Session/revision-associated evidence summary. |
+| `web/src/App.action-loop.test.tsx` | Currently clean; permitted to become modified only during separately authorized implementation | Prove direct-200, 202-to-`COMMITTED`, refresh retention, association, fail-closed, privacy, and preserved action-loop behavior. |
+
+This four-path list is the technical implementation delta, not the complete
+synchronized candidate. After successful implementation, the complete
+aggregate worktree would ordinarily contain exactly eleven unstaged paths: all
+nine paths above plus the two Web paths. It is not eleven newly implemented
+paths. The four authority documents remain byte-exact at their independently
+approved hashes during implementation. The three excluded existing code/test
+paths—`dynamic_narrative_models.py`, `demo_composition.py`, and
+`test_narrative_provider.py`—also remain hash-protected. Only the two already-
+dirty implementation paths may change from the approved nine-path manifest,
+and only the two named clean Web paths may join the dirty inventory. No path
+outside the resulting eleven-path inventory may appear.
+
+Implementation does not require and must not modify:
+
+- `src/deviation_protocol/application/dynamic_narrative_models.py`;
+- `src/deviation_protocol/api/demo_composition.py`;
+- API schemas or routes;
+- Session/View projection;
+- Web schema/client modules;
+- fixtures;
+- database models or migrations;
+- the Provider adapter; or
+- `tests/unit/test_narrative_provider.py`.
+
+A need for any other path stops implementation and requires a new authority
+correction and independent review before that path is edited. This
+documentation task does not authorize implementation.
+
+### 7.1 Manifest lock and allowed transition
+
+The independent re-review must freshly record and verify the repository root
+and branch, `HEAD`, local `origin/main`, ahead/behind, exact nine-path inventory,
+SHA-256 of every dirty path, complete nine-path diff byte size and SHA-256,
+empty index, no untracked paths, no conflicts, and no active Git operation. If
+and only if the re-review returns the operative approval verdict, that exact
+resulting nine-path manifest becomes the authorized pre-implementation baseline
+for this aggregate candidate under the workflow's manifest-locked dirty
+aggregate-candidate exception. It is explicitly not a Git-clean baseline.
+
+Before implementation and every later task, the applicable manifest must be
+reverified. The allowed nine-to-eleven transition is exact: the four authority
+paths and three excluded existing code/test paths remain at their approved
+protected hashes; the orchestrator and backend test are the only already-dirty
+paths whose hashes may change; the two named Web paths are the only clean paths
+that may become modified. The implementation handoff records every final dirty
+path's SHA-256 plus the complete final eleven-path diff byte size and SHA-256.
+Any unexplained repository identity, path, hash, Git-state, or inventory drift
+blocks the task.
+
+The approved manifest is a substitute only for the ordinary pre-implementation
+documentation publication and clean-baseline gate for this exact candidate.
+The four authority paths are not separately staged, committed, or pushed. The
+manifest authorizes no implementation, deterministic verification, Live
+traffic, freeze, Gate, review, staging, commit, push, or unrelated edit; each
+later action retains its separate authorization and evidence boundary.
+
+### 7.2 Deterministic implementation responsibilities
+
+The four-path implementation must prove all of the following with fake,
+scripted, or synthetic inputs and no Provider or network request:
+
+1. zero committed facts reports integer `0`;
+2. one, two, and three committed facts report their exact counts;
+3. zero is neither omitted nor converted to null or unknown;
+4. the count comes from the final allocated tuple, not raw Provider proposals;
+5. rejected candidates do not inflate it;
+6. an authorized application replacement reports only the final accepted
    candidate;
-3. section 13 pre-gate identities, exact published instructions, and
-   clean-index evidence are recorded;
-4. each real-Provider Demo starts only from that exact executable candidate and
-   exact instruction bundle;
-5. the user, not Codex, operates the browser and submits the Action;
-6. repository, runtime/test, and instruction identities are reconfirmed after
-   every case; and
-7. only four passing cases permit the one bounded post-gate documentation
-   synchronization, final five-path freeze, and independent implementation
-   review in section 16.
+7. normal response, stored replay, request-status completion, private event, and
+   `COMPLETE_NEW` reconciliation agree;
+8. browser direct-`200` rendering works;
+9. browser `202`-to-`COMMITTED` rendering works;
+10. the summary survives the authoritative View refresh;
+11. Session and exact revision association are enforced;
+12. invalid or missing feedback fails closed;
+13. fact values, `public-note-*` keys, hidden identifiers, Provider material,
+    prompts, headers, credentials, raw exceptions, and allocation details are
+    not rendered;
+14. stale, uncertain, failed, refresh, action-lock, single-submit, and
+    no-manual-replay behavior remains unchanged; and
+15. every test remains deterministic, unpaid, and offline.
 
-Codex must not operate the browser, select a suggested Action, type the custom
-Action, click submit, refresh, or otherwise execute the cases for the user.
+No fixture, integration, API-schema, Provider-adapter, database, or migration
+test path is added. Existing broader tests may be run for verification, but the
+implementation edit budget remains the four exact paths above.
 
-Each case uses a fresh task-owned Dynamic Narrative Live launcher process, a
-fresh browser Session, a fresh Run, and a fresh eligible default investigator
-Player Character. Each process is shut down before the next case. Each case
-starts from state version 0 with Action count 0, retrieves exactly one current
-View, submits exactly one gameplay Action, performs no refresh, double-click,
-manual replay, or second Action, and then shuts down.
+## 8. Exact deterministic validation before Live traffic
 
-Every initial View must expose exactly 3 server-provided suggested Actions with
-ordinals `0`, `1`, and `2`. Any other count/order stops the gate; the matrix is
-not adapted informally.
+All commands run from `D:\deviation-protocol` in PowerShell 7+ with the
+repository venv. `RUN_LIVE_DEEPSEEK_TEST` remains disabled. No database or
+Provider variable is inherited by the canonical Offline gate.
 
-### 14.1 Exact four-case matrix
+The future implementation verification set is mandatory and ordered:
+
+1. run the focused backend test node IDs covering every responsibility in
+   section 7.2 and record those exact node IDs;
+2. run the complete relevant Dynamic Narrative backend files:
+
+```powershell
+.\.venv\Scripts\python.exe -m pytest tests/unit/test_dynamic_narrative.py tests/unit/test_narrative_provider.py -q
+```
+
+3. run the focused Web action-loop file:
+
+```powershell
+npm --prefix web run test:run -- src/App.action-loop.test.tsx
+```
+
+4. run the complete Web test suite, typecheck, lint, and build:
+
+```powershell
+npm --prefix web run test:run
+npm --prefix web run typecheck
+npm --prefix web run lint
+npm --prefix web run build
+```
+
+5. run compilation, package, migration, and diff checks:
+
+```powershell
+.\.venv\Scripts\python.exe -m compileall -q src tests alembic
+.\.venv\Scripts\python.exe -m pip check
+.\.venv\Scripts\python.exe -m alembic heads
+.\.venv\Scripts\python.exe -m alembic history
+git diff --check
+```
+
+6. run the complete required sanitized Offline verification:
+
+```powershell
+.\scripts\verify.ps1 -Mode Offline
+```
+
+No Live traffic may start until every command passes against one unchanged
+four-path implementation-delta identity within one unchanged eleven-path
+complete aggregate identity. Full or MySQL verification is not a substitute for
+Offline. CI is not a substitute for any relevant local verification above.
+
+Before Live traffic, freeze a sanitized successor manifest containing exact
+repository and branch identity, parent `HEAD`, local `origin/main`,
+ahead/behind, the approved nine-path starting manifest, the exact allowed
+nine-to-eleven transition, all eleven dirty paths and their SHA-256 values, the
+complete eleven-path diff byte size and SHA-256, deterministic command evidence,
+approved-authority identity, empty index, no untracked path, no conflict, and no
+active operation. The four-path delta identity is recorded within that complete
+aggregate manifest; it does not replace it.
+
+## 9. Future separately authorized user-operated real-Provider validation
+
+Mocks, fixtures, source inspection, and deterministic tests are necessary but
+not sufficient for a later Live claim. No Live execution is authorized by this
+documentation correction. Only after the authority is independently approved
+and its exact nine-path baseline is manifest-locked, the separately authorized
+four-path implementation and complete local verification pass, and the Live-
+evidence preflight in
+`docs/engineering/codex_workflow.md` passes may a separate authorization permit
+the two real-Provider stages below.
+The user launches every Live process from a fresh PowerShell process in which
+Provider configuration is present before launcher startup, and performs every
+browser operation. Codex must never receive or inspect the API key, operate the
+browser, issue a direct Provider/API substitute call, launch a network-restricted
+process as authoritative Live evidence, or inspect raw Provider requests or
+responses.
+
+The exact launcher command for every case is:
+
+```powershell
+pwsh -File .\scripts\start-demo.ps1 -Mode DynamicNarrative -DynamicProvider Live
+```
+
+`DEEPSEEK_MAX_RETRIES` must be `0` in the launching process. The user confirms
+that the official dashboard filter corresponds to the same configured key,
+without recording the key, its label, or an absolute usage total.
+
+For both stages, each case uses a fresh launcher process, browser Session, Run,
+and eligible default investigator; begins at state version `0`; retrieves one
+current View; submits one Action exactly once; performs no refresh, replay,
+duplicate click, second Action, or unplanned Action; has no concurrent DeepSeek
+activity; and shuts down before the next case. Only sanitized public results,
+closed-set local diagnostic families, and the official per-case request-count
+delta may be recorded.
+
+### 9.1 New diagnostic epoch E1-E5: exactly 5 cases, maximum 10 requests
+
+This is a new diagnostic epoch after a material runtime/evidence change. It is
+not a continuation, repair, retry, replacement, or reinterpretation of
+historical D1-D5. Historical D1 remains permanently incomplete, and no
+historical result is combined with this epoch. The fixed matrix is:
 
 | Case | Fresh Run | Exact one Action |
 | --- | --- | --- |
-| 1 | A | Submit the first server-provided suggested Action, ordinal `0`, exactly once using its complete nested payload unchanged |
-| 2 | B | Submit free `CUSTOM` text `Examine the sealed intake room for visible evidence that the death record is wrong.` exactly once |
-| 3 | C | Submit the second server-provided suggested Action, ordinal `1`, exactly once using its complete nested payload unchanged |
-| 4 | D | Submit the third server-provided suggested Action, ordinal `2`, exactly once using its complete nested payload unchanged |
+| E1 | A | Submit suggested ordinal `0` with its complete nested payload unchanged |
+| E2 | B | Submit custom text `Examine the sealed intake room for visible evidence that the death record is wrong.` |
+| E3 | C | **Fixed zero-proposed-fact case, third in order:** submit suggested ordinal `1` with its complete nested payload unchanged |
+| E4 | D | Submit suggested ordinal `2` with its complete nested payload unchanged |
+| E5 | E | **Fixed non-empty allocation case:** submit custom text `Record the most concrete new public observation from the visible scene and continue cautiously.` |
 
-The custom Action is exactly 83 Unicode code points. It satisfies the current
-1..150 public/application input bounds, is consistent with the public scenario
-title, hook, initial sealed intake-room presentation, and investigator role,
-and contains no secret, identifier, prompt injection, abusive content, or
-backend-only request. It is second so the less constrained input path fails
-early.
+The diagnostic contains exactly 5 gameplay Action submissions: 3 suggested and
+2 custom. Every case permits one initial generation and at most one complete
+replacement, exactly zero transport retries, and no third request. Its exact
+maximum total Provider-request budget is 10.
 
-Across the complete gate there are exactly 4 gameplay Action submissions: 3
-suggested and 1 custom. Each case allows at most 2 Provider generation requests
-(1 initial plus at most 1 application replacement), exactly 0 Provider
-transport retries, and no third request. The four-case maximum is exactly 8 real
-Provider requests, with at most 4 application replacements total. The expected
-successful successor View contains exactly 3 new suggested Actions.
+E1 may exercise the same published scenario/action responsibility as historical
+D1, but it is evidence only for epoch E1-E5. All five cases require fresh
+launchers, browser Sessions, Runs, and eligible default investigators. The epoch
+requires its own separately authorized Provider-generation budget. Historical
+generations remain recorded, but do not consume or satisfy any part of the new
+maximum-ten budget.
 
-### 14.2 Per-case evidence
+For each case record:
 
-For every case record only the following safe evidence:
+1. unchanged repository, approved authority, four-path implementation-delta,
+   complete eleven-path aggregate, and complete-diff identities before and
+   after;
+2. selected ordinal or exact approved custom text;
+3. public state version before and after;
+4. HTTP status and sanitized public result/error;
+5. the one final closed-set diagnostic family, if emitted;
+6. the complete browser-visible post-Action evidence summary retained from the
+   committed response and exact successor View:
 
-- exact published plan commit identity and parent implementation-candidate
-  `HEAD`;
-- exact three-path runtime/test manifest, complete runtime/test diff identity,
-  and operative manual-gate instruction-bundle identity;
-- confirmation that application process, Session, Run, and eligible character
-  are fresh, without recording their protected identifiers;
-- selected suggested ordinal, or the exact approved custom Action;
-- Action count before submission: exactly `0`;
-- public revision/state version before submission: exactly `0`;
-- final HTTP status and public error, if any;
-- only allowed closed-set local diagnostics;
-- public revision/state version after final response;
-- whether exactly one new story segment appeared;
-- whether exactly 3 new suggested Actions appeared;
-- whether public clocks remained unchanged as required by the current dynamic
-  transition and other public state changed consistently with one commit;
-- whether recent accepted prose gained the one committed segment;
-- whether any invalid internal/protected information appeared;
-- confirmation of no refresh, duplicate submission, retry, replay, or second
-  Action;
-- exact Provider-request count for the case, `1` or `2`; and
-- task-owned launcher shutdown confirmation.
+   ```text
+   REVISION=1
+   NEW_STORY_SEGMENTS=1
+   SUGGESTIONS=3
+   NEW_PUBLIC_FACTS=<integer 0..3>
+   ```
 
-Provider-request count must be confirmed from the official DeepSeek account's
-request-activity count for the isolated case window, without recording request
-content or identifiers. If that count-only view is unavailable or the exact
-count cannot be isolated, the gate is
-`PRE_REVIEW_LIVE_CANDIDATE_GATE_INCOMPLETE`; code-path inference alone must not
-fabricate the count.
+7. confirmation that response and View share the exact Session and revision,
+   zero is distinct from missing, and no fact value, key, allocation detail,
+   hidden identifier, or Provider material is rendered; and
+8. the official per-case Provider-request delta, exactly `1` or `2` for a
+   complete Provider case.
 
-Do not request, capture, or report an API key, Authorization header, raw
-Provider response, complete Prompt, full internal state, protected identifier,
-private fact, internal reference index, or Provider request identifier.
+E3 is permanently designated before execution as the one successful zero-fact
+case. Its Action remains exactly the third-case, fresh-Run-C suggested ordinal
+`1` complete nested payload; it is not selected or changed after seeing output.
+E3 passes this responsibility only if it returns a successful committed
+narrative result, the summary reports revision `1`, one new story segment, three
+suggestions, and integer `NEW_PUBLIC_FACTS=0`, and the official request delta is
+exactly `1` or `2`. Existing declared public facts in the View are unrelated to
+this per-Action count and cannot replace the committed scalar. Missing or
+invalid count evidence makes E3 and the complete epoch incomplete.
 
-## 15. Manual gate success and stop conditions
+E5 passes its fixed ownership-path responsibility only if its successful
+committed response reports `NEW_PUBLIC_FACTS` in `1..3` through the exact
+privacy-safe summary and the official request delta is exactly `1` or `2`.
+Neither the browser nor the evidence record exposes a fact value, generated
+key, allocation detail, hidden identifier, or Provider material. An E5 result
+with integer `0`, missing or invalid count evidence, or wrong Session/revision
+association makes E5 and the complete epoch incomplete.
 
-A case passes only when:
+The diagnostic epoch passes only if all 5 fixed cases return complete HTTP `200`
+commits, each advances version exactly once from `0` to `1`, each adds exactly
+one story segment and three suggestions, renders an exact associated summary,
+emits no obsolete generated-key Provider diagnostic or other
+schema/safety/authority/finalization family, binds every official delta exactly,
+and satisfies both fixed responsibilities: E3 reports integer `0`, and E5
+reports an integer in `1..3`. If either responsibility or any privacy/association
+condition is absent, the complete epoch is incomplete and progression to
+candidate freeze and the formal Gate stops.
 
-1. exactly one Action was submitted;
-2. the final result is HTTP 200 with `result_code` and `feedback_code` both
-   `DYNAMIC_NARRATIVE_COMMITTED`, `state_changed=true`,
-   `narrative_required=true`, `narrative_pending=false`, and
-   `narrative_status=COMMITTED` under the current public contract;
-3. public revision/state version changes exactly once from 0 to 1;
-4. exactly one valid new story segment appears;
-5. exactly 3 new suggested Actions appear;
-6. public clocks remain consistent with the unchanged dynamic transition;
-7. no schema, safety, protected-reference, state, replay, or transaction failure
-   occurs;
-8. no duplicate or uncertain commit occurs;
-9. no secret/internal content is exposed; and
-10. the exact Provider request count is confirmed as 1 or 2 with zero transport
-    retries.
+Do not add a sixth case, replace an Action after observing output, refresh,
+replay, duplicate-click, substitute an Action, or rerun until a favorable zero-
+fact or non-empty sample appears. Another Provider schema family,
+protected/internal material, official request-count mismatch, transport or
+publication uncertainty, HTTP `409` `NARRATIVE_OUTCOME_UNKNOWN` with official
+delta `0`, or any attempt to exceed the fixed request budget retains its
+existing stop behavior. No diagnostic failure is hidden by restarting the
+epoch or importing historical evidence. Absence of an obsolete generated-key
+Provider diagnostic in these five stochastic samples is not proof of
+unreachability; that guarantee remains owned
+by the strict keyless schema, deterministic server allocation, and Offline
+regressions.
 
-Stop the complete gate immediately on HTTP 503, Provider transport failure,
-schema-contract diagnostic, timeout, uncertain result, missing or unexpected
-revision, no new story, wrong suggested-Action count, protected/internal
-disclosure, duplicate Action, unexpected repository change, refresh, accidental
-second submission, or inability to prove the request count. Do not retry the
-failed case in the same Session or Run and do not continue to a later case.
+### 9.2 Formal acceptance Gate: exactly 4 cases, maximum 8 requests
 
-The only gate verdicts are:
+After the five-case diagnostic passes and the executable candidate identity is
+frozen again, run a fresh Gate from Case 1:
 
-- success: `PRE_REVIEW_LIVE_CANDIDATE_GATE_PASSED`;
-- failure: `PRE_REVIEW_LIVE_CANDIDATE_GATE_FAILED`; and
-- incomplete: `PRE_REVIEW_LIVE_CANDIDATE_GATE_INCOMPLETE`.
+| Case | Fresh Run | Exact one Action |
+| --- | --- | --- |
+| 1 | A | Submit suggested ordinal `0` with its complete nested payload unchanged |
+| 2 | B | Submit custom text `Examine the sealed intake room for visible evidence that the death record is wrong.` |
+| 3 | C | Submit suggested ordinal `1` with its complete nested payload unchanged |
+| 4 | D | Submit suggested ordinal `2` with its complete nested payload unchanged |
 
-All 4 cases must pass for the success verdict. Failure or incompleteness returns
-the candidate to bounded diagnosis/correction before independent implementation
-review.
+The Gate contains exactly 4 gameplay Action submissions: exactly 3 suggested
+and 1 custom. Every case permits one initial generation and at most one complete
+replacement, exactly zero transport retries, and no third request. The exact
+maximum total Provider-request budget is 8.
 
-## 16. Post-gate synchronization, final identity, and implementation review
+All 4 consecutive cases must satisfy the current complete HTTP `200`
+`DYNAMIC_NARRATIVE_COMMITTED` public success contract, advance version exactly
+once from `0` to `1`, add exactly one story segment and three suggestions,
+publish no protected/internal material, produce no duplicate or uncertain
+commit, and have an official per-case request delta of exactly `1` or `2`.
+Repository, approved-authority, instruction, four-path implementation-delta,
+complete eleven-path aggregate, and complete-diff identities must remain
+unchanged before and after every isolated case.
 
-### 16.1 One permitted post-gate documentation synchronization
+An official-count mismatch, unavailable count view, or inability to bind the
+count filter safely makes the case incomplete. An HTTP `409`
+`NARRATIVE_OUTCOME_UNKNOWN` with official delta `0` requires separate
+environment/transport/publication diagnosis and does not prove a generated-key
+defect. A generated-key Provider schema failure after implementation means the
+ownership correction is incomplete. Another schema family is a separate
+reliability defect. A Codex sandbox/network failure does not prove Provider or
+key invalidity. None authorizes a blind retry.
 
-If and only if all four cases pass and the verdict is
-`PRE_REVIEW_LIVE_CANDIDATE_GATE_PASSED`, perform exactly one bounded
-documentation/status synchronization touching exactly these two already
-budgeted paths:
+Any runtime or test byte change after either Live stage invalidates all later
+Live evidence. Repeat the complete deterministic sequence and freeze a new
+exact identity. Historical D1 is never repeated or reclassified. If epoch E1-E5
+has already begun, the changed candidate requires a new separately named and
+separately authorized five-case diagnostic epoch with the same fixed case
+responsibilities; no result is carried across epochs. The formal Gate restarts
+at Case 1 only after that complete new epoch passes.
 
-1. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`; and
-2. `PLANS.md`.
+## 10. Post-task lifecycle and publication boundaries
 
-Within this plan the synchronization is confined to non-normative sanitized
-implementation-evidence/status text in section 20; within `PLANS.md` it is
-confined to the current Dynamic Narrative status block. It may record only
-sanitized implementation and deterministic-validation evidence, sanitized gate
-evidence, exact counts, the pre-gate candidate identity, the passed gate status,
-the resulting documentation status, and fresh independent implementation review
-as the next required external step.
+The published `DN-DKO-006` key-ownership correction and its operative approval
+record remain historical completed steps. The current D1 evidence correction
+does not inherit that approval. Its exact lifecycle keeps these stages
+separate:
 
-The synchronization must not change any of the three runtime/test paths or
-their hashes, Prompt behavior, schema behavior, Provider behavior, validation
-behavior, manual-gate case definitions, manual-gate success rules,
-manual-gate stop conditions, evidence requirements, gate budgets, safety rules,
-or authority rules. It must not add a completion, approval, Optional Live,
-publication, production-readiness, or phase-completion claim.
+1. author the exact four-document authority-correction candidate;
+2. conduct an independent new-session read-only review;
+3. when that review returns findings, perform a bounded correction in the same
+   exact four-document budget;
+4. conduct an independent new-session read-only re-review of the corrected
+   four-document candidate;
+5. if and only if that re-review returns the operative approval verdict, lock
+   the resulting exact nine-path dirty baseline by repository/branch identity,
+   `HEAD`, local `origin/main`, ahead/behind, path inventory, every per-path
+   SHA-256, complete-diff byte size/SHA-256, empty index, no untracked path, no
+   conflict, and no active Git operation; do not separately stage, commit, or
+   push the four authority documents;
+6. separately authorize the exact four-path implementation delta;
+7. perform complete deterministic/local verification;
+8. separately authorize and, only then, run the future E1-E5 Live diagnostic
+   epoch;
+9. freeze the exact complete executable candidate after the diagnostic passes;
+10. separately authorize and run the unchanged formal Gate from Case 1;
+11. conduct a fresh independent implementation review;
+12. under separate authorization, stage the complete approved aggregate
+    candidate;
+13. under separate exact authorization, create one intentional aggregate local
+    commit;
+14. have the user perform the manual push; and
+15. confirm publication or separately authorize status synchronization or any
+    later phase.
 
-Before final freeze, record an explicit pre/post comparison proving:
+Stages 1 and 2 occurred, and stage 2 returned `CHANGES_REQUIRED` rather than
+approval. This task completes stage 3 only as an unstaged documentation
+candidate. Stage 4 is the unique next task. No implementation or Live activity
+is authorized.
 
-1. every three-path runtime/test hash and the complete runtime/test diff identity
-   are unchanged from the pre-gate manifest;
-2. the exact operative instruction-bundle bytes and SHA-256 are unchanged;
-3. exactly the two designated documentation/status paths changed after the
-   passed gate; and
-4. every changed documentation byte is within the evidence/status responsibility
-   above.
+The ordinary repository rule still requires independently approved authority
+documentation to be staged, committed, manually pushed, and confirmed as a new
+clean baseline before implementation. This candidate qualifies for the
+workflow's narrow manifest-locked dirty aggregate-candidate exception because
+the intentionally preserved implementation candidate is already dirty in five
+runtime/test paths while the correction occupies four documentation paths. A
+four-document commit would not create a clean worktree; an aggregate nine-path
+commit now would prematurely publish implementation before deterministic
+verification, separately authorized Live evidence, freeze, formal Gate, and
+independent implementation review. Cleanup, discard, stash, premature staging,
+and either premature commit are prohibited.
 
-This exact, narrowly defined evidence synchronization does not invalidate the
-passed gate. It is not permission for arbitrary post-gate documentation edits
-and cannot be repeated as routine status editing.
+If stage 4 approves, its exact nine-path manifest is therefore the authorized
+substitute for the ordinary pre-implementation publication/clean-baseline gate
+for this aggregate candidate only. It must never be described as Git-clean and
+does not create permission to implement on an arbitrary dirty worktree. Every
+later task verifies that manifest and the exact allowed transition in section
+7.1 and stops on unexplained drift. Aggregate staging and the one aggregate
+commit remain deferred until every named downstream gate has passed.
 
-### 16.2 Final five-path candidate identity
+The implementation session must not review itself. The later implementation-
+review approval binds exact candidate bytes and does not authorize a repository
+edit merely to record that later verdict. Codex never pushes this repository.
 
-After that synchronization and its documentation validation, freeze the final
-unstaged, uncommitted candidate identity. Record:
+## 11. Stop conditions
 
-1. the exact final five-path inventory: one production path, two test paths,
-   and the two documentation/status paths;
-2. final per-path SHA-256 identities for all five paths in ascending Unicode
-   code-point path order;
-3. the complete final five-path diff and a SHA-256 digest of that diff;
-4. exact parent `HEAD` and branch;
-5. an empty index, no unexpected untracked path, no conflict, and no active Git
-   operation;
-6. the complete deterministic evidence bound to the unchanged three-path
-   runtime/test manifest;
-7. the sanitized four-case evidence and passed gate verdict; and
-8. the pre/post proof that the runtime/test manifest and operative manual-gate
-   instruction bundle remained exact while only designated evidence/status text
-   was synchronized.
+Stop without informal adaptation if:
 
-This is the sole complete identity eligible for independent implementation
-review. No earlier three-path or pre-synchronization identity can satisfy that
-review.
+- baseline or candidate identity differs;
+- the separately authorized implementation does not begin from the exact
+  independently approved nine-path manifest-locked baseline;
+- any implementation path outside the exact four-path budget appears necessary;
+- the scalar would not be derived prospectively from the final allocated tuple
+  at the common finalization seam before publication material is staged, would
+  require post-commit mutation, a second write, View/log reconstruction, or
+  would treat missing/invalid data as zero;
+- a Provider key/identifier field would remain or be reintroduced;
+- an invalid response would be stripped, repaired, normalized, salvaged, or
+  partially accepted;
+- the protected/internal detector, strict validation, two-generation ceiling,
+  zero-retry rule, stale binding, replay, or atomic finalization would weaken;
+- any deterministic command or Offline verification fails;
+- either Live matrix, request budget, evidence rule, or stop rule cannot be
+  followed exactly;
+- historical D1 would be retried, replaced, resumed at D2, reclassified, or
+  combined with a future epoch;
+- Live traffic would begin without separate authorization or without the
+  complete Live-evidence preflight;
+- a request count cannot be bound safely;
+- a raw response, secret, key label, protected identifier, or internal state
+  would need to be captured;
+- either Live stage fails or is incomplete; or
+- an unexplained Git identity, path, per-path hash, complete-diff identity,
+  staged change, conflict, active Git operation, untracked path, or inventory
+  transition differs from the applicable manifest.
 
-### 16.3 Independent implementation review
+No reset, restore, checkout, clean, unapproved retry, stage, commit, or push is
+authorized as a remedy.
 
-Only `PRE_REVIEW_LIVE_CANDIDATE_GATE_PASSED`, the completed synchronization in
-section 16.1, and the frozen final identity in section 16.2 permit a fresh
-independent implementation review. The sole operative implementation-review
-success verdict is:
+## 12. Completion criteria and residual uncertainty
 
-`DYNAMIC_NARRATIVE_PROVIDER_REMEDIATION_IMPLEMENTATION_REVIEW_APPROVED`
+This bounded four-document correction task is complete as an unstaged
+documentation candidate only when
+`PLANS.md`, this plan, `docs/public_client_contract.md`, and
+`docs/engineering/codex_workflow.md` are the only paths changed by this task;
+all protected pre-existing runtime/test bytes remain exact; the index remains
+empty; the complete worktree identity is recorded; and all authorized read-only
+documentation and hygiene checks pass. Candidate completion is not independent
+approval. The prior review was not approved; this candidate addresses its two
+findings but has not yet been independently re-reviewed. No later stage is
+complete or authorized.
 
-The reviewer must inspect:
+Even a later passed new diagnostic epoch and Gate prove only the exact bounded
+candidate and nine consecutive user-operated cases. They do not prove long-run
+Provider availability, schema reliability outside the observed matrix, billing behavior,
+quality, moderation, production distribution, or production readiness. Strict
+local validation remains mandatory and Provider output remains untrusted.
 
-1. the complete exact final five-path diff and per-path/diff identities;
-2. the pre-gate three-path manifest, final five-path manifest, parent baseline,
-   and exact instruction-bundle comparison;
-3. all deterministic validation and documentation-validation evidence;
-4. all four manual case records and the passed gate verdict;
-5. Prompt/example single-source construction and authority compliance;
-6. unchanged validator, Provider, retry, state, safety, and transaction
-   boundaries;
-7. the documentation-only diagnostic-precedence decision; and
-8. the absence of any sixth path, staged path, secret, raw Provider material,
-   unsupported completion claim, or post-gate normative change.
+Guardrail impact: **None**. The narrow reusable manifest-locked dirty aggregate-
+candidate exception belongs in the Codex workflow and adds or changes no
+engineering guardrail ID.
 
-The review report and its verdict remain external to the repository and bind the
-exact final five-path identities reviewed. The implementation session must not
-review itself. A fresh context performs the read-only review at the highest
-appropriate reasoning strength. Review approval without a requested candidate
-change must not cause a repository edit merely to copy the verdict or change a
-status line.
+The unique current next task is:
 
-## 17. Corrections and gate repetition
+> An independent new-session read-only re-review of the corrected four-document authority candidate against the two prior independent-review findings.
 
-Any change to one or more of the three runtime/test paths changes the executable
-identity and invalidates the previous deterministic validation, manual gate, and
-implementation-review identity. The required order after such a change is:
-
-1. make the bounded correction;
-2. rerun the complete deterministic sequence;
-3. record a new exact pre-gate three-path manifest and instruction identity;
-4. repeat all 4 manual cases from case 1 with fresh processes/Sessions/Runs;
-5. obtain `PRE_REVIEW_LIVE_CANDIDATE_GATE_PASSED`; and
-6. perform the one permitted evidence synchronization, freeze the new final
-   five-path identity, and obtain the required fresh independent implementation
-   review.
-
-Any substantive change to the manual-gate instructions, cases, counts, evidence,
-success conditions, stop conditions, safety/authority rules, or budgets changes
-the operative instruction-bundle identity, invalidates the previous manual gate,
-and requires that same complete deterministic-validation, four-case-gate,
-final-freeze, and independent-review sequence.
-
-A documentation-only correction after the gate does not require repeating the
-real-Provider gate only when it leaves all three runtime/test identities
-unchanged, leaves all substantive manual-gate instructions unchanged, does not
-revise or reinterpret a runtime fact, does not alter gate evidence materially,
-passes required documentation validation, is included in a newly frozen final
-five-path identity, and receives a fresh focused independent implementation
-review before commit. This is a bounded correction path after a rejected
-candidate, not permission to repeat the routine evidence synchronization in
-section 16.1. Uncertainty requires repeating the complete gate.
-
-A failed or incomplete gate cannot proceed to independent implementation
-review. Review approval itself must not trigger a documentation edit before the
-exact reviewed candidate is committed.
-
-## 18. Commit and user-push sequence
-
-After the external implementation review approves the exact final five-path
-identity and no candidate byte changes:
-
-1. request separate user authorization for one exact local commit;
-2. revalidate parent baseline, final five-path inventory and hashes, complete
-   diff identity, empty index, and no unexpected untracked path;
-3. stage exactly the 5 reviewed paths only after that explicit authorization;
-4. inspect the staged diff, run `git diff --cached --check`, verify the staged
-   manifest and complete staged diff equal the externally approved reviewed
-   identity, and create only the explicitly authorized local commit;
-5. verify the committed five path bytes equal the approved reviewed bytes; the
-   external approval verdict is not copied into either documentation path;
-6. Codex does not push; the user performs every push manually; and
-7. confirm the user-pushed clean aligned baseline before treating the
-   remediation implementation lifecycle as published.
-
-Do not automatically repeat the same four-case gate after publication when the
-exact gated/reviewed five-path candidate was committed unchanged. A separate
-post-publication confirmation requires a higher repository authority or new
-explicit authorization.
-
-## 19. Stop conditions
-
-Stop before implementation or later workflow progression if:
-
-- repository identity, cleanliness, or intended baseline differs materially;
-- this plan is not independently approved and user-published on a clean
-  baseline;
-- any sixth implementation path appears necessary;
-- the adapter, Provider configuration, endpoint/model, timeout, output ceiling,
-  normal JSON mode, parser, or retry behavior would need to change;
-- a validator would need relaxation or an invalid output would become accepted;
-- deterministic validation fails or Offline verification is unavailable;
-- the pre-gate modified inventory is not exactly the three runtime/test paths,
-  either documentation/status path differs from the published parent before the
-  gate, or the index is not empty;
-- an unexpected untracked path, conflict, active Git operation, or executable or
-  instruction identity change appears before or during the gate;
-- any manual case fails or is incomplete;
-- exact request count cannot be confirmed safely;
-- documentation synchronization begins before all four cases pass, touches a
-  path outside the two documentation/status owners, changes a runtime/test byte,
-  or changes any operative manual-gate instruction;
-- the final five-path identity cannot be frozen exactly after the permitted
-  synchronization;
-- a raw response, secret, protected identifier, or internal state would need to
-  be exposed; or
-- independent review does not return its exact operative success verdict, or
-  the exact externally reviewed bytes cannot be committed unchanged.
-
-No reset, restore, clean, checkout, overwrite, fallback, informal matrix
-adaptation, unapproved retry, stage, commit, or push is authorized as a remedy.
-
-## 20. Completion criteria and residual uncertainty
-
-This planning candidate is complete for independent review only when exactly
-this new plan and the minimal `PLANS.md` registration are the sole worktree
-changes, the index is empty, the complete diff is inspected, and documentation
-checks pass. Its status remains `PLAN_DRAFT`. The only next step is a fresh
-focused independent read-only re-review of the corrected exact two-path plan
-candidate; implementation is not yet authorized.
-
-The later implementation candidate is eligible for commit authorization only
-after the approved/published plan baseline, exact three-path executable
-implementation, complete deterministic validation, passed four-case gate, one
-bounded two-document evidence/status synchronization, frozen final five-path
-identity, and fresh external independent implementation approval all agree. No
-candidate byte changes after review approval; the committed bytes must equal
-the approved reviewed bytes.
-
-Even a passed and published remediation proves only that the exact bounded
-candidate passed deterministic regressions and four user-operated samples. It
-does not prove long-run Provider compliance, statistical reliability,
-availability, billing behavior, quality, moderation, production distribution,
-or production readiness. Strict local validation remains mandatory, and
-Provider output remains untrusted.
-
-The completed 36-call diagnostics remain non-persistent diagnostic evidence.
-They are distinct from prior gameplay Optional Live, whose status remains
-`OPTIONAL_LIVE_INCOMPLETE`. This remediation-specific pre-review gate does not
-amend the general workflow for unrelated tasks.
-
-Guardrail impact: **None**. No confirmed new reusable engineering or safety
-rule is established; the selected change and its regressions apply the existing
-Provider, validation, authority, and workflow guardrails.
+Implementation is not the immediate next task and remains unauthorized unless
+that re-review returns the exact operative approval verdict and verifies the
+resulting nine-path manifest.
