@@ -17,10 +17,20 @@ documents.
 
 ### 2026-08-10 bounded autonomous improvement candidate
 
-**Implemented, unstaged, and awaiting independent review.** A user-authorized
-bounded autonomous loop superseded the prior manual E1-E5 work sequencing for
-this candidate only. It did not erase or reinterpret the earlier samples,
-approval records, hashes, or published commits below.
+**Approved, committed, published, and closed.** The implementation and bounded
+corrections are complete, all required independent reviews are complete, and
+the final diagnostic-terminology review returned
+`DNVS_AUTONOMOUS_IMPROVEMENT_DIAGNOSTIC_TERMINOLOGY_REVIEW_APPROVED`. The exact
+reviewed 14-path aggregate was committed as
+`f7905d7524fb7dbc3dd728a4cf5f9dcfb0d8aa2c`
+(`feat(narrative): harden autonomous dynamic generation`) and pushed to
+`origin/main`; local `main` and local `origin/main` were synchronized at that
+commit at publication. No additional review, correction, staging, local
+commit, push, or publication remains for this aggregate.
+
+The user-authorized bounded autonomous loop superseded the prior manual E1-E5
+work sequencing for this candidate only. It did not erase or reinterpret the
+earlier samples, approval records, hashes, or published commits below.
 
 The preserved historical Live evidence is:
 
@@ -58,20 +68,33 @@ and every inspected player-facing action affordance was Simplified Chinese;
 stable protocol identifiers and literals remained English.
 
 The first autonomous-improvement final review returned four bounded findings.
-This corrected candidate makes Live wrapper-attempt evidence observational and
-concurrency-safe, synchronizes current DNVS action authority to the exact
+The resulting corrections made Live wrapper-attempt evidence observational and
+concurrency-safe, synchronized current DNVS action authority to the exact
 server-authored Chinese literals while preserving old English walkthrough data
-as superseded history, documents the limited CJK-evidence/no-ASCII-letter
+as superseded history, documented the limited CJK-evidence/no-ASCII-letter
 validator separately from the desired natural Simplified-Chinese output, and
-adds the missing direct `generate_dynamic()` length-termination regression.
-These corrections require a focused independent re-review; they do not replace
-that review or authorize staging or commit.
+added the missing direct `generate_dynamic()` length-termination regression. A
+focused re-review then found that the instrumentation failure-isolation handler
+caught `BaseException`; the correction preserved ordinary evidence-output
+failure isolation while allowing process-control exceptions to propagate
+normally and prevent pre-delegation dispatch. The following focused review
+identified misleading Provider-generation terminology for a counter that
+measures accepted wrapper attempts. The final correction aligned the counter
+and diagnostic to that wrapper-attempt boundary. The approving final review
+confirmed that no material diagnostic-terminology finding remained,
+Corrections 2–4 remained accepted, MODEL-002 is enforced, and MODEL-003 is
+unaffected.
 
-This is an improvement candidate, not a guarantee of first-generation schema
-success and not a production-readiness or phase-completion claim. The smallest
-next step is a focused independent re-review of the corrected complete unstaged
-aggregate, followed by a local commit only if the user separately authorizes
-that exact operation.
+Observational instrumentation counts accepted wrapper attempts, not genuine
+Provider generations; its counter and diagnostic do not establish Provider
+dispatch or generation completion. The bounded application policy still
+permits at most two genuine Provider generations—one ordinary generation and
+one eligible replacement—with zero transport retries. Terminal truncation
+remains terminal, and the server-authoritative Chinese affordances remain in
+force. This closeout does not claim first-generation schema reliability,
+general production readiness, or completion of any new phase. The
+autonomous-improvement work item is closed. The next development work item must
+be selected separately from the remaining roadmap.
 
 The bounded
 [Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md)

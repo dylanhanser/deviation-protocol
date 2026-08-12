@@ -36,9 +36,21 @@ browser evidence remains incomplete and optional.**
 
 ### 2026-08-10 autonomous validation and improvement candidate
 
-This separately user-authorized bounded loop supersedes the prior manual E1-E5
-execution sequence only for the current post-baseline candidate. All earlier
-samples and approval history remain historical evidence and are not rewritten.
+Status: **Approved, committed, published, and closed.** The implementation and
+bounded corrections are complete, all required independent reviews are
+complete, and the final diagnostic-terminology review returned
+`DNVS_AUTONOMOUS_IMPROVEMENT_DIAGNOSTIC_TERMINOLOGY_REVIEW_APPROVED`. The exact
+reviewed 14-path aggregate was committed as
+`f7905d7524fb7dbc3dd728a4cf5f9dcfb0d8aa2c`
+(`feat(narrative): harden autonomous dynamic generation`) and pushed to
+`origin/main`; local `main` and local `origin/main` were synchronized at that
+commit at publication. No additional review, correction, staging, local
+commit, push, or publication remains for this aggregate.
+
+This separately user-authorized bounded loop superseded the prior manual E1-E5
+execution sequence only for its then-current post-baseline candidate. All
+earlier samples and approval history remain historical evidence and are not
+rewritten.
 
 The preserved E1 sample committed state `0 -> 1` at HTTP 200 with revision `1`,
 one story segment, three suggestions, two public facts, two Provider
@@ -68,13 +80,32 @@ recorded outcomes only; they do not guarantee first-generation Provider
 compliance or production readiness.
 
 The first autonomous-improvement final review then returned four bounded
-findings. The corrected unstaged aggregate makes wrapper-attempt evidence
-observational and concurrency-safe, synchronizes current action authority to
-the exact Chinese server literals while preserving superseded English evidence
-as history, distinguishes the desired natural Simplified-Chinese output from
-the limited mechanical CJK/no-ASCII-letter check, and directly regresses
-dynamic adapter truncation. It awaits a focused independent re-review and is
-not approval to stage or commit.
+findings. The resulting corrections made wrapper-attempt evidence observational
+and concurrency-safe, synchronized current action authority to the exact
+Chinese server literals while preserving superseded English evidence as
+history, distinguished the desired natural Simplified-Chinese output from the
+limited mechanical CJK/no-ASCII-letter check, and directly regressed dynamic
+adapter truncation. A focused re-review then identified the instrumentation
+`BaseException` failure-isolation defect. Its correction preserved isolation of
+ordinary evidence-output failures while allowing process-control exceptions to
+propagate normally and prevent pre-delegation dispatch. The following focused
+review identified misleading Provider-generation terminology for the
+instrumentation counter; the final correction made both counter and diagnostic
+consistently represent accepted wrapper attempts. The approving final review
+confirmed that no material diagnostic-terminology finding remained,
+Corrections 2–4 remained accepted, MODEL-002 is enforced, and MODEL-003 is
+unaffected.
+
+The observational instrumentation counter records accepted wrapper attempts,
+not genuine Provider generations, and does not establish Provider dispatch or
+generation completion. The bounded application policy still permits at most
+two genuine Provider generations—one ordinary generation and one eligible
+replacement—with zero transport retries. Terminal truncation remains terminal,
+and the server-authoritative Chinese affordances remain in force. This closeout
+does not claim first-generation schema reliability, general production
+readiness, or completion of any new phase. The autonomous-improvement work item
+is closed; the next development work item must be selected separately from the
+remaining roadmap.
 
 ### Current Provider-stability correction status and Optional Live gate
 
