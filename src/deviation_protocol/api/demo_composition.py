@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 import hashlib
 import os
 from pathlib import Path
+from threading import Lock
 from typing import Any, Mapping
 
 from deviation_protocol.api.dependencies import ApiServices
@@ -223,6 +224,17 @@ def _report_live_rejection_diagnostic(
     print(token.value, flush=True)
 
 
+def _emit_dynamic_live_wrapper_attempt_evidence(
+    wrapper_attempt_ordinal: int,
+) -> None:
+    print(
+        "DNVS_LIVE_EVIDENCE event=wrapper_attempt "
+        f"ordinal={wrapper_attempt_ordinal} "
+        f"cumulative_wrapper_attempts={wrapper_attempt_ordinal}",
+        flush=True,
+    )
+
+
 class _DynamicFakeProvider:
     __slots__ = ("_failure_at", "_invocations", "_closed")
 
@@ -262,6 +274,7 @@ class _DynamicFakeProvider:
         request_digest = hashlib.sha256(request_bytes).hexdigest()
         stable_number = int(request_digest[:12], 16)
         stable_label = request_digest[:12]
+        stable_action_number = stable_number % 1_000_000
         result_schedule = (
             NarrativeOutcomeResult.SUCCESS,
             NarrativeOutcomeResult.AMBIGUOUS,
@@ -300,9 +313,9 @@ class _DynamicFakeProvider:
                 summary="The visible amber marker established earlier now identifies the route forward.",
             )
         suggestions = (
-            f"Consider possibility alpha ({stable_label}).",
-            f"Consider possibility beta ({stable_label}).",
-            f"Consider possibility gamma ({stable_label}).",
+            f"核对第一项可见变化（{stable_action_number:06d}）。",
+            f"比较第二项公开线索（{stable_action_number:06d}）。",
+            f"谨慎追踪第三项现场迹象（{stable_action_number:06d}）。",
         )
         return UntrustedDynamicNarrativeCandidate(
             candidate=DynamicNarrativeCandidatePayload(
@@ -326,6 +339,47 @@ class _DynamicFakeProvider:
 
     async def aclose(self) -> None:
         self._closed = True
+
+
+class _DynamicLiveEvidenceProvider:
+    """Observational process-local counter at the wrapper-attempt boundary."""
+
+    __slots__ = (
+        "_provider",
+        "_wrapper_attempt_count",
+        "_wrapper_attempt_lock",
+        "_closed",
+    )
+
+    def __init__(self, provider: DynamicNarrativeProvider) -> None:
+        self._provider = provider
+        self._wrapper_attempt_count = 0
+        self._wrapper_attempt_lock = Lock()
+        self._closed = False
+
+    @property
+    def wrapper_attempt_count(self) -> int:
+        with self._wrapper_attempt_lock:
+            return self._wrapper_attempt_count
+
+    async def generate_dynamic(self, request):
+        with self._wrapper_attempt_lock:
+            if self._closed:
+                raise NarrativeProviderUnavailableError()
+            self._wrapper_attempt_count += 1
+            wrapper_attempt_ordinal = self._wrapper_attempt_count
+        try:
+            _emit_dynamic_live_wrapper_attempt_evidence(wrapper_attempt_ordinal)
+        except Exception:
+            pass
+        return await self._provider.generate_dynamic(request)
+
+    async def aclose(self) -> None:
+        with self._wrapper_attempt_lock:
+            if self._closed:
+                return
+            self._closed = True
+        await self._provider.aclose()
 
 
 @dataclass(slots=True)
@@ -712,9 +766,11 @@ def build_dynamic_demo_runtime(
             raise DynamicDemoConfigurationError() from None
         if settings.max_retries != 0:
             raise DynamicDemoConfigurationError()
-        selected_provider = DeepSeekNarrativeProvider(
-            settings,
-            PromptBuilder(profiles=(default_style_profile(),)),
+        selected_provider = _DynamicLiveEvidenceProvider(
+            DeepSeekNarrativeProvider(
+                settings,
+                PromptBuilder(profiles=(default_style_profile(),)),
+            )
         )
         owned = True
         provider_name = "deepseek"

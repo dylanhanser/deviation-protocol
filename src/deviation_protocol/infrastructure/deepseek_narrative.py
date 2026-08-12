@@ -45,6 +45,7 @@ OFFICIAL_DEEPSEEK_CHAT_COMPLETIONS_URL = (
 ALLOWED_DEEPSEEK_MODELS = frozenset(
     {"deepseek-v4-flash", "deepseek-v4-pro"}
 )
+DEFAULT_DEEPSEEK_MAX_TOKENS = 4_096
 MAX_RESPONSE_BYTES = 1_000_000
 
 
@@ -59,7 +60,9 @@ class DeepSeekSettings(BaseModel):
     timeout_seconds: Annotated[
         float, Field(strict=True, gt=0.0, le=120.0)
     ] = 30.0
-    max_tokens: Annotated[int, Field(strict=True, ge=64, le=4_096)] = 1_200
+    max_tokens: Annotated[int, Field(strict=True, ge=64, le=4_096)] = (
+        DEFAULT_DEEPSEEK_MAX_TOKENS
+    )
     # The conservative production default is one transport attempt.  An
     # interrupted/read-timed-out request may already have reached the provider,
     # so an automatic retry can duplicate provider work or billing.
@@ -104,7 +107,11 @@ class DeepSeekSettings(BaseModel):
             raise ValueError("DEEPSEEK_API_KEY is not configured")
         try:
             timeout = float(source.get("DEEPSEEK_TIMEOUT_SECONDS", "30"))
-            max_tokens = int(source.get("DEEPSEEK_MAX_TOKENS", "1200"))
+            max_tokens = int(
+                source.get(
+                    "DEEPSEEK_MAX_TOKENS", str(DEFAULT_DEEPSEEK_MAX_TOKENS)
+                )
+            )
             max_retries = int(source.get("DEEPSEEK_MAX_RETRIES", "0"))
         except (TypeError, ValueError) as exc:
             raise ValueError("DeepSeek numeric configuration is invalid") from None

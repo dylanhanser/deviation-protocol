@@ -124,7 +124,7 @@ Proposal schema 没有 memory operation、importance、summary code、relationsh
 
 `deepseek-chat` 和 `deepseek-reasoner` 不在配置枚举中。官方文档说明它们将在 2026-07-24 退役；本仓库不依赖兼容别名。参见 [DeepSeek V4 更新说明](https://api-docs.deepseek.com/updates/)、[Chat Completions](https://api-docs.deepseek.com/api/create-chat-completion/) 和 [JSON Output](https://api-docs.deepseek.com/guides/json_mode/)。
 
-配置仅在显式调用 `DeepSeekSettings.from_environment()` 时读取进程环境；模块导入不会读取 key、创建 client 或联网。默认 timeout 30 秒、max output 1,200 tokens、0 retry（一次 HTTP attempt）；运维可显式配置最多 2 次 retry（总共最多 3 次 attempt），且配置模型进一步限制 timeout、token 与 retry 上界。玩家请求无法覆盖这些值。
+配置仅在显式调用 `DeepSeekSettings.from_environment()` 时读取进程环境；模块导入不会读取 key、创建 client 或联网。默认 timeout 30 秒、max output 4,096 tokens、0 retry（一次 HTTP attempt）；运维可显式配置最多 2 次 retry（总共最多 3 次 attempt），且配置模型进一步限制 timeout、token 与 retry 上界。4,096-token 默认值来自一次已确认的 Dynamic Narrative Live 截断：原 1,200-token 默认值在严格候选完成前得到 `finish_reason=length`。该修正只扩展既有有限输出预算；截断仍直接失败，且玩家请求无法覆盖这些值。
 
 错误映射与重试：
 
@@ -171,9 +171,49 @@ invalid selection, invalid Live settings, or Fake construction failure fails
 closed and never falls back. Credentials never select a mode and are never sent
 to the Web child. Fake reads no Provider variable and constructs no transport.
 
+Explicit Live Demo composition wraps the selected adapter in a private
+process-local observational counter. A new wrapper, which in normal operation
+means a new launcher process and in tests means a new fixture/runtime, starts at
+zero; the wrapper exposes a synchronized process-local read and no in-place
+reset operation. Its private accessor is `wrapper_attempt_count`. Each call that
+passes the wrapper's closed check increments once at the wrapper-attempt
+boundary, before evidence emission and Provider delegation, then attempts to
+emit only this secret-free diagnostic shape:
+
+```text
+DNVS_LIVE_EVIDENCE event=wrapper_attempt ordinal=<positive-decimal> cumulative_wrapper_attempts=<same-positive-decimal>
+```
+
+An ordinary `Exception` raised by that evidence output is
+non-propagating, and the delegate is still invoked exactly once.
+`asyncio.CancelledError`, `KeyboardInterrupt`, `SystemExit`, and other
+`BaseException` subclasses retain normal Python semantics: the exact original
+exception propagates, and when evidence emission raises it before delegation,
+the delegate is not invoked. The counter is not rolled back, so the first such
+interrupted wrapper attempt leaves it at one; it is not evidence of delegate
+entry, Provider dispatch, remote Provider receipt, billing, or generation
+completion. The delegate's original return value, ordinary exception, or
+cancellation propagates unchanged, and instrumentation introduces neither a
+retry nor another generation.
+
+The counter and evidence are non-persistent, secret-free, non-authoritative,
+and outside every public API, persistence, billing, retry, and gameplay-state
+contract. They record no credential, prompt, response body, private memory, or
+private fact. Concurrent increments and reads are synchronized so the total is
+the number of wrapper attempts that passed the closed check in that wrapper
+lifetime. Ordinary evidence-output failure cannot prevent or duplicate
+dispatch; process-control propagation cannot trigger dispatch, retry, or
+recovery generation. Neither category changes application generation policy.
+
 The automated dynamic live smoke remains separately authorized: it is exactly
 one real Provider call and zero retries. Manual Fake browser evidence is exactly
 eight submitted actions and zero real calls; Optional Live browser evaluation,
 if separately authorized, is exactly eight requests. None of those activities
 is implied by the current unstaged implementation candidate or by its Offline
 tests.
+
+The Dynamic Narrative Live adapter uses the same bounded 4,096-token default.
+A terminal `finish_reason=length` emits only
+`DNVS_LIVE_DIAG_TERMINAL_RESPONSE_TRUNCATED`; it does not expose content or
+authorize an application replacement, transport retry, partial acceptance, or
+schema relaxation.

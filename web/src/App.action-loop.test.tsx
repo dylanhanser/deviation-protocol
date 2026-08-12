@@ -194,21 +194,21 @@ function dynamicCommittedActionResponse({
 }
 
 const initialNoNpcSuggestionTexts = [
-  "Observe the surroundings.",
-  "Investigate the immediate situation.",
-  "Attempt a cautious change to the current situation.",
+  "观察周围可见的环境。",
+  "调查眼前的情况。",
+  "谨慎尝试改变当前局面。",
 ] as const;
 
 const initialGuideSuggestionTexts = [
-  "Observe the surroundings.",
-  "Speak to Guide.",
-  "Attempt a cautious change to the current situation.",
+  "观察周围可见的环境。",
+  "与眼前可见的人交谈。",
+  "谨慎尝试改变当前局面。",
 ] as const;
 
 const laterServerSuggestionTexts = [
-  "Trace the newly revealed signal.",
-  "Compare the committed public facts.",
-  "Proceed using the changed situation.",
+  "追踪刚刚显现的信号。",
+  "比较已经确认的公开事实。",
+  "依据变化后的局面继续行动。",
 ] as const;
 
 function dynamicSuggestionSubmission(
@@ -231,7 +231,7 @@ function dynamicSuggestionViewFixture({
   stateVersion,
   suggestionTexts,
   visibleNpcs = [],
-  customLabel = "Scenario-owned free action",
+  customLabel = "自由行动",
 }: {
   stateVersion: number;
   suggestionTexts: readonly [string, string, string];
@@ -821,15 +821,15 @@ describe("action_affordances and synchronous lifecycle", () => {
     }
     expect(screen.queryByText("权威 View 已推进到版本 99。")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+      screen.getByRole("button", { name: "提交自由行动" }),
     ).toBeVisible();
 
-    await user.type(screen.getByLabelText("行动描述"), "A separate free action.");
+    await user.type(screen.getByLabelText("行动描述"), "检查眼前公开可见的细节。");
     expect(
-      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+      screen.getByRole("button", { name: "提交自由行动" }),
     ).toBeEnabled();
     await user.click(
-      screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+      screen.getByRole("button", { name: "提交自由行动" }),
     );
     await waitFor(() => expect(viewReads).toBe(5));
 
@@ -838,7 +838,7 @@ describe("action_affordances and synchronous lifecycle", () => {
       turn_id: "client-owned-free-turn",
       client_request_id: "client-owned-free-request",
       action_type: "CUSTOM",
-      description: "A separate free action.",
+      description: "检查眼前公开可见的细节。",
     });
     expect(screen.getByText("权威 View：当前")).toBeVisible();
   });
@@ -849,13 +849,13 @@ describe("action_affordances and synchronous lifecycle", () => {
       "The visible amber marker established earlier now identifies the route forward.";
     const suggestionTexts = [
       initialNoNpcSuggestionTexts,
-      ["Follow the amber trace.", "Compare the new marker.", "Inspect the changed route."],
-      ["Check the committed signal.", "Ask what changed.", "Map the visible route."],
-      ["Review the public marker.", "Compare the current scene.", "Proceed cautiously."],
-      ["Return to the marker.", "Observe the sealed doorway.", "Use the recovered route."],
-      ["Trace the later signal.", "Compare the retained facts.", "Advance through the change."],
-      ["Use the amber route.", "Review the prior marker.", "Wait for a new signal."],
-      ["Confirm the route forward.", "Inspect the final marker.", "Compare the visible changes."],
+      ["沿琥珀色痕迹继续。", "比较新出现的标记。", "检查改变后的路线。"],
+      ["核对已确认的信号。", "询问发生了什么变化。", "标记可见的路线。"],
+      ["复核公开标记。", "比较当前场景。", "谨慎继续行动。"],
+      ["返回标记处。", "观察密封门口。", "沿恢复的路线行动。"],
+      ["追踪稍后出现的信号。", "比较保留的事实。", "依据变化继续行动。"],
+      ["沿琥珀色路线行动。", "复核先前的标记。", "等待新的信号。"],
+      ["确认前进路线。", "检查最后的标记。", "比较可见的变化。"],
     ] as const;
     const submittedBodies: unknown[] = [];
     let actionPosts = 0;
@@ -926,18 +926,18 @@ describe("action_affordances and synchronous lifecycle", () => {
       await waitFor(() => expect(actionPosts).toBe(expectedPosts));
     }
 
-    await user.click(screen.getByRole("button", { name: "Observe the surroundings." }));
+    await user.click(screen.getByRole("button", { name: "观察周围可见的环境。" }));
     await waitFor(() => expect(committedVersion).toBe(1));
     expect(screen.getAllByText(anchor)).toHaveLength(2);
 
-    await submitCustom("Examine the visible floor markings without touching anything.", 2);
-    await user.click(screen.getByRole("button", { name: "Ask what changed." }));
+    await submitCustom("检查可见的地面标记，但不要触碰任何物品。", 2);
+    await user.click(screen.getByRole("button", { name: "询问发生了什么变化。" }));
     await waitFor(() => expect(committedVersion).toBe(3));
     await submitCustom(
-      "Wait quietly and compare the current scene with the last visible change.",
+      "安静等待，并把当前场景与上一次可见变化进行比较。",
       4,
     );
-    await submitCustom("Pause and listen for changes in the room.", 5);
+    await submitCustom("停下来倾听房间里的变化。", 5);
     expect(
       await screen.findByText(
         "HTTP 409 · NARRATIVE_OUTCOME_UNKNOWN · Narrative turn cannot be committed",
@@ -953,46 +953,46 @@ describe("action_affordances and synchronous lifecycle", () => {
     await waitFor(() => expect(viewReads).toBe(readsBeforeRecovery + 1));
     expect(actionPosts).toBe(5);
 
-    await user.click(screen.getByRole("button", { name: "Use the recovered route." }));
+    await user.click(screen.getByRole("button", { name: "沿恢复的路线行动。" }));
     await waitFor(() => expect(committedVersion).toBe(5));
     await submitCustom(
-      "Follow the earlier visible change and check what it now affects.",
+      "沿先前可见的变化继续检查它现在影响了什么。",
       7,
     );
-    await user.click(screen.getByRole("button", { name: "Use the amber route." }));
+    await user.click(screen.getByRole("button", { name: "沿琥珀色路线行动。" }));
     await waitFor(() => expect(committedVersion).toBe(7));
     expect(await screen.findByText(continuity)).toBeVisible();
 
     expect(actionPosts).toBe(8);
     expect(submittedBodies).toEqual([
-      dynamicSuggestionSubmission(0, 0, "Observe the surroundings."),
+      dynamicSuggestionSubmission(0, 0, "观察周围可见的环境。"),
       {
         turn_id: "opaque-turn-1",
         client_request_id: "opaque-request-1",
         action_type: "CUSTOM",
-        description: "Examine the visible floor markings without touching anything.",
+        description: "检查可见的地面标记，但不要触碰任何物品。",
       },
-      dynamicSuggestionSubmission(2, 1, "Ask what changed."),
+      dynamicSuggestionSubmission(2, 1, "询问发生了什么变化。"),
       {
         turn_id: "opaque-turn-2",
         client_request_id: "opaque-request-2",
         action_type: "CUSTOM",
-        description: "Wait quietly and compare the current scene with the last visible change.",
+        description: "安静等待，并把当前场景与上一次可见变化进行比较。",
       },
       {
         turn_id: "opaque-turn-3",
         client_request_id: "opaque-request-3",
         action_type: "CUSTOM",
-        description: "Pause and listen for changes in the room.",
+        description: "停下来倾听房间里的变化。",
       },
-      dynamicSuggestionSubmission(4, 2, "Use the recovered route."),
+      dynamicSuggestionSubmission(4, 2, "沿恢复的路线行动。"),
       {
         turn_id: "opaque-turn-4",
         client_request_id: "opaque-request-4",
         action_type: "CUSTOM",
-        description: "Follow the earlier visible change and check what it now affects.",
+        description: "沿先前可见的变化继续检查它现在影响了什么。",
       },
-      dynamicSuggestionSubmission(6, 0, "Use the amber route."),
+      dynamicSuggestionSubmission(6, 0, "沿琥珀色路线行动。"),
     ]);
   });
 
@@ -1001,7 +1001,7 @@ describe("action_affordances and synchronous lifecycle", () => {
       branch: "zero eligible NPCs",
       visibleNpcs: [],
       suggestionTexts: initialNoNpcSuggestionTexts,
-      middleLabel: "Investigate the immediate situation.",
+      middleLabel: "调查眼前的情况。",
     },
     {
       branch: "one eligible NPC",
@@ -1013,7 +1013,7 @@ describe("action_affordances and synchronous lifecycle", () => {
         },
       ],
       suggestionTexts: initialGuideSuggestionTexts,
-      middleLabel: "Speak to Guide.",
+      middleLabel: "与眼前可见的人交谈。",
     },
     {
       branch: "multiple eligible NPCs with the server-selected Guide",
@@ -1030,7 +1030,7 @@ describe("action_affordances and synchronous lifecycle", () => {
         },
       ],
       suggestionTexts: initialGuideSuggestionTexts,
-      middleLabel: "Speak to Guide.",
+      middleLabel: "与眼前可见的人交谈。",
     },
   ])(
     "renders the exact initial suggestion branch for $branch and submits its server payload",
@@ -1088,7 +1088,7 @@ describe("action_affordances and synchronous lifecycle", () => {
         .closest("section");
       expect(playerState).toHaveTextContent(`可见 NPC${visibleNpcs.length}`);
       expect(
-        screen.getByRole("button", { name: "提交Scenario-owned free action" }),
+        screen.getByRole("button", { name: "提交自由行动" }),
       ).toBeVisible();
 
       await user.click(

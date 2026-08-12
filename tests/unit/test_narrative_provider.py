@@ -15,6 +15,7 @@ import pytest
 import httpx
 from pydantic import ValidationError
 
+import deviation_protocol.infrastructure.deepseek_narrative as deepseek_narrative_module
 from deviation_protocol.application.dynamic_narrative_models import (
     DynamicCurrentScene,
     DynamicNarrativeLength,
@@ -74,6 +75,7 @@ from deviation_protocol.domain.player_memory import (
     ScenarioMemoryStatus,
 )
 from deviation_protocol.infrastructure.deepseek_narrative import (
+    DEFAULT_DEEPSEEK_MAX_TOKENS,
     DeepSeekHttpResponse,
     DeepSeekNarrativeProvider,
     DeepSeekSettings,
@@ -982,7 +984,7 @@ def test_missing_process_key_is_a_safe_optional_runtime_configuration() -> None:
         DeepSeekSettings.from_environment({})
 
 
-def test_retry_is_opt_in_for_direct_and_environment_configuration() -> None:
+def test_safe_defaults_use_zero_retries_and_full_bounded_output_budget() -> None:
     direct = DeepSeekSettings(api_key="test-only")
     from_environment = DeepSeekSettings.from_environment(
         {"DEEPSEEK_API_KEY": "test-only"}
@@ -990,6 +992,8 @@ def test_retry_is_opt_in_for_direct_and_environment_configuration() -> None:
 
     assert direct.max_retries == 0
     assert from_environment.max_retries == 0
+    assert direct.max_tokens == DEFAULT_DEEPSEEK_MAX_TOKENS == 4_096
+    assert from_environment.max_tokens == DEFAULT_DEEPSEEK_MAX_TOKENS
 
 
 @pytest.mark.asyncio
@@ -1877,6 +1881,79 @@ async def test_dynamic_combined_default_preserves_transport_contract_and_zero_re
         response_json == response_content
         for _decoded, response_json in validation_calls
     ) == 1
+
+
+@pytest.mark.asyncio
+async def test_generate_dynamic_length_termination_rejects_partial_before_content_parsing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    canary = "INERT-TRUNCATED-DYNAMIC-CONTENT-CANARY-73194"
+    partial_content = (
+        '{"schema_version":"dynamic-narrative-candidate-v2",'
+        '"narrative_text":"'
+        + "叙" * 350
+        + '","result":"SUCCESS","proposed_consequences":[],'
+        '"partial_canary":"'
+        + canary
+        + '"'
+    )
+    transport = FakeTransport(
+        [
+            _response(content=partial_content, finish_reason="length"),
+            _response(
+                content=json.dumps(_dynamic_candidate_payload(), ensure_ascii=False)
+            ),
+        ]
+    )
+    original_json_loads = json.loads
+    partial_parse_calls: list[str] = []
+
+    def track_json_loads(value: str, *args: Any, **kwargs: Any):
+        if value == partial_content:
+            partial_parse_calls.append(value)
+        return original_json_loads(value, *args, **kwargs)
+
+    original_validate = DynamicProviderCandidateContract.validate_response_json
+    partial_validation_calls: list[str] = []
+
+    def track_validation(decoded: object, response_json: str):
+        if response_json == partial_content:
+            partial_validation_calls.append(response_json)
+        return original_validate(decoded, response_json)
+
+    monkeypatch.setattr(
+        deepseek_narrative_module.json,
+        "loads",
+        track_json_loads,
+    )
+    monkeypatch.setattr(
+        DynamicProviderCandidateContract,
+        "validate_response_json",
+        classmethod(
+            lambda _cls, decoded, response_json: track_validation(
+                decoded, response_json
+            )
+        ),
+    )
+    provider = DeepSeekNarrativeProvider(
+        _settings(max_retries=0),
+        _builder(),
+        transport=transport,
+    )
+
+    with pytest.raises(NarrativeProviderTruncatedError) as caught:
+        await provider.generate_dynamic(_dynamic_request())
+
+    error = caught.value
+    assert type(error) is NarrativeProviderTruncatedError
+    assert error.code == "NARRATIVE_PROVIDER_RESPONSE_TRUNCATED"
+    assert _assert_exception_surface_excludes_canary(error, canary) == (error,)
+    assert error.__context__ is None
+    assert error.__cause__ is None
+    assert partial_parse_calls == []
+    assert partial_validation_calls == []
+    assert len(transport.calls) == 1
+    assert len(transport.scripted) == 1
 
 
 @pytest.mark.asyncio

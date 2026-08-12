@@ -1221,6 +1221,18 @@ server constructs every View and exact suggestion submission; the Web client
 only renders and returns those contracts. Provider output remains an untrusted
 candidate until current authority, finite public/hidden provenance, state
 version, job lease, request binding, and storage-slot validation all succeed.
+Providers are required to generate natural Simplified Chinese for every
+player-facing Dynamic field. At candidate and authoritative projection
+boundaries, the deterministic minimum zh-CN affordance check requires at least
+one Unicode CJK Unified Ideograph and rejects every ASCII letter. It is not a
+complete language classifier: it does not distinguish Simplified from
+Traditional Chinese, prove that every mechanically accepted CJK string is
+semantically Chinese, or identify language generally. Punctuation, permitted
+whitespace, Arabic numerals, and emoji do not independently invalidate text
+that otherwise meets that minimum. Stable JSON keys, IDs, action types, and
+enum literals remain English. The Web client renders authoritative labels,
+descriptions, and suggestions verbatim and performs no translation or
+authority-diverging copy substitution.
 
 Each accepted dynamic turn uses prepare/call/finalize transactions. The single
 Provider await occurs outside every UoW and lock. Finalize atomically publishes

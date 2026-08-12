@@ -15,6 +15,64 @@ documents.
 
 ## Dynamic Narrative Vertical Spike planning
 
+### 2026-08-10 bounded autonomous improvement candidate
+
+**Implemented, unstaged, and awaiting independent review.** A user-authorized
+bounded autonomous loop superseded the prior manual E1-E5 work sequencing for
+this candidate only. It did not erase or reinterpret the earlier samples,
+approval records, hashes, or published commits below.
+
+The preserved historical Live evidence is:
+
+- E1: one submission, HTTP 200 / COMMITTED, state `0 -> 1`, revision `1`, one
+  new story segment, three suggestions, two new public facts, two Provider
+  generations, and no diagnostic token.
+- E2: the exact one-time action
+  `检查密封的接收室，寻找能证明死亡记录有误的明显证据。`, two Provider generations,
+  HTTP 503, no authoritative commit, and the ordered sanitized diagnostics
+  `DNVS_LIVE_DIAG_RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS` followed by
+  `DNVS_LIVE_DIAG_PRE_RESPONSE_UNPARSEABLE`.
+
+The first material candidate made the strict ordinary/recovery Prompt contract
+more explicit, ended both Prompt forms with the same validated canonical
+example, and enforced server-authored Simplified Chinese action affordances.
+Its fresh automated Live evidence used four Provider generations: Case A
+committed `0 -> 1` after one replacement; the first post-change E2 action
+failed terminally at `finish_reason=length` after one generation and left state
+at `0`; and Case C committed the Case A Session from `1 -> 2` in one
+generation. That truncation confirmed that the inherited 1,200-token default
+did not let this instructed structured generation complete and exposed the
+absence of a local sanitized truncation diagnostic; it did not prove that the
+unfinished content would otherwise have passed strict validation.
+
+The one permitted follow-up correction raised the finite default to the
+adapter's existing 4,096-token ceiling and added
+`DNVS_LIVE_DIAG_TERMINAL_RESPONSE_TRUNCATED`, without changing strict schema
+validation, partial-response rejection, application replacement eligibility,
+or zero transport retries. The affected E2 action was then submitted exactly
+once against a fresh Run and committed `0 -> 1` after two generations, with
+`DNVS_LIVE_DIAG_RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE`, one story segment, three
+suggestions, and two new public facts. Total Provider generations for the
+autonomous task were six, below the ceiling of eight. Every submitted action
+and every inspected player-facing action affordance was Simplified Chinese;
+stable protocol identifiers and literals remained English.
+
+The first autonomous-improvement final review returned four bounded findings.
+This corrected candidate makes Live wrapper-attempt evidence observational and
+concurrency-safe, synchronizes current DNVS action authority to the exact
+server-authored Chinese literals while preserving old English walkthrough data
+as superseded history, documents the limited CJK-evidence/no-ASCII-letter
+validator separately from the desired natural Simplified-Chinese output, and
+adds the missing direct `generate_dynamic()` length-termination regression.
+These corrections require a focused independent re-review; they do not replace
+that review or authorize staging or commit.
+
+This is an improvement candidate, not a guarantee of first-generation schema
+success and not a production-readiness or phase-completion claim. The smallest
+next step is a focused independent re-review of the corrected complete unstaged
+aggregate, followed by a local commit only if the user separately authorizes
+that exact operation.
+
 The bounded
 [Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md)
 now contains the independently approved and published `DN-DKO-006`-corrected

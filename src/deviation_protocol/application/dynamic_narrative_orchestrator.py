@@ -42,6 +42,7 @@ from deviation_protocol.application.dynamic_narrative_models import (
     UntrustedDynamicNarrativeCandidate,
     ValidatedDynamicNarrativeCandidate,
     canonical_json,
+    meets_zh_cn_action_text_minimum,
     normalize_dynamic_text,
 )
 from deviation_protocol.application.errors import (
@@ -150,9 +151,9 @@ DYNAMIC_ALL_SLOTS = frozenset(
      *DYNAMIC_SUGGESTION_SLOTS, DYNAMIC_RESULT, DYNAMIC_CONSEQUENCES,
      DYNAMIC_CONTINUATION)
 )
-INITIAL_SUGGESTION_0 = "Observe the surroundings."
-INITIAL_SUGGESTION_1_NONE = "Investigate the immediate situation."
-INITIAL_SUGGESTION_2 = "Attempt a cautious change to the current situation."
+INITIAL_SUGGESTION_0 = "观察周围可见的环境。"
+INITIAL_SUGGESTION_1_NONE = "调查眼前的情况。"
+INITIAL_SUGGESTION_2 = "谨慎尝试改变当前局面。"
 _OPAQUE_ID = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
 _INTERNAL_TEXT_MARKERS = (
     "action_signature", "state_version", "client_request_id", "turn_id",
@@ -647,9 +648,12 @@ def _dynamic_custom_label(definition: ScenarioDefinition) -> str:
     if len(matches) != 1:
         raise InvalidScenarioDefinitionError(definition.scenario_id)
     try:
-        return _normalize_public_text(matches[0].label, maximum=80)
+        label = _normalize_public_text(matches[0].label, maximum=80)
     except ValueError:
         raise InvalidScenarioDefinitionError(definition.scenario_id) from None
+    if not meets_zh_cn_action_text_minimum(label):
+        raise InvalidScenarioDefinitionError(definition.scenario_id)
+    return label
 
 
 def _committed_suggestion_texts(
@@ -663,14 +667,22 @@ def _committed_suggestion_texts(
         middle = INITIAL_SUGGESTION_1_NONE
         if visible_pairs:
             selected_id = visible_pairs[0][1]
-            name = _normalize_public_text(npc_records[selected_id].display_name, maximum=120)
-            middle = _normalize_public_text("Speak to " + name + ".", maximum=150)
+            name = _normalize_public_text(
+                npc_records[selected_id].display_name, maximum=120
+            )
+            middle = _normalize_public_text(f"与{name}交谈。", maximum=150)
+            if not meets_zh_cn_action_text_minimum(middle):
+                raise ValueError(
+                    "initial dynamic suggestion must meet the zh-CN text minimum"
+                )
         return (INITIAL_SUGGESTION_0, middle, INITIAL_SUGGESTION_2)
     if any(item is None for item in present):
         raise ValueError("committed dynamic suggestions are incomplete")
     normalized = tuple(_normalize_public_text(item, maximum=150) for item in present)
     if len(normalized) != len(set(normalized)):
         raise ValueError("committed dynamic suggestions repeat")
+    if any(not meets_zh_cn_action_text_minimum(item) for item in normalized):
+        raise ValueError("committed dynamic suggestions must meet the zh-CN text minimum")
     return normalized  # type: ignore[return-value]
 
 
@@ -980,6 +992,7 @@ class DynamicNarrativeRejectionDiagnostic(StrEnum):
     PRE_REVALIDATION = "DNVS_LIVE_DIAG_PRE_REVALIDATION"
     PRE_RESPONSE_UNPARSEABLE = "DNVS_LIVE_DIAG_PRE_RESPONSE_UNPARSEABLE"
     PRE_RESPONSE_SCHEMA_INVALID = "DNVS_LIVE_DIAG_PRE_RESPONSE_SCHEMA_INVALID"
+    TERMINAL_RESPONSE_TRUNCATED = "DNVS_LIVE_DIAG_TERMINAL_RESPONSE_TRUNCATED"
     RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE = (
         "DNVS_LIVE_DIAG_RECOVERY_SCHEMA_ROOT_OR_OBJECT_SHAPE"
     )
@@ -1573,6 +1586,10 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
             )
             raise
         except NarrativeBoundaryError as exc:
+            if isinstance(exc, NarrativeProviderTruncatedError):
+                self._report_rejection(
+                    DynamicNarrativeRejectionDiagnostic.TERMINAL_RESPONSE_TRUNCATED
+                )
             uncertain = exc.code == "NARRATIVE_PROVIDER_UNAVAILABLE"
             status = (
                 NarrativeJobStatus.OUTCOME_UNKNOWN

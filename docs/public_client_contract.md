@@ -1313,6 +1313,23 @@ View is loaded. Pending, stale, outcome-unknown, capacity, and terminal failure
 continue to use the existing sanitized response/error and recovery rules; the
 client never retries an action automatically.
 
+The product-facing generation requirement is natural Simplified Chinese for
+every server-authored Dynamic action label, description, and suggestion.
+Separately, the deterministic minimum zh-CN affordance check requires at least
+one Unicode CJK Unified Ideograph and rejects every ASCII letter; candidate
+suggestions and current authoritative projections both pass that same check.
+This bounded mechanical rule does not distinguish Simplified from Traditional
+Chinese, prove that every accepted CJK string is semantically Chinese, or act
+as a full language-identification system. Non-Chinese CJK text can therefore
+pass mechanically even though it is not desired product prose. Punctuation,
+permitted whitespace, Arabic numerals, and emoji do not independently
+invalidate otherwise compliant Chinese text. Stable protocol keys,
+identifiers, action types, and enum literals remain English. The Web client
+renders and submits authoritative text verbatim and must not translate,
+replace, or maintain a divergent client-only label. Free-action test input is a
+natural Chinese sentence, but the submitted protocol shape remains `CUSTOM`
+with its unchanged English identifiers.
+
 This additive extension belongs only to the experimental implementation
 candidate awaiting independent review. It does not complete production or
 evidence work and does not alter Phase 6, Phase 7, or completed Phase 8.

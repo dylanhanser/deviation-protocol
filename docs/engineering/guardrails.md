@@ -385,6 +385,10 @@ Observed failure:
 - Provider calls risked holding database locks.
 - Retry and crash windows created ambiguous billing.
 - Candidate prose and accepted prose were described inconsistently.
+- A process-local Live evidence sink raised after its counter increment,
+  preventing Provider delegation while misleadingly reporting one generation.
+- Its failure-isolation handler then caught `BaseException`, swallowed
+  cancellation and process-control exceptions, and delegated after the signal.
 
 Rule:
 
@@ -395,11 +399,59 @@ Rule:
 - Only atomically committed accepted prose is visible, replayable, or usable as
   recent narrative context.
 - Do not claim exactly-once provider billing.
+- The Live wrapper's synchronized `wrapper_attempt_count` records accepted
+  wrapper attempts that passed the closed check. It increments before evidence
+  emission and Provider delegation. Its runtime diagnostic uses exactly
+  `event=wrapper_attempt` and
+  `cumulative_wrapper_attempts=<wrapper-attempt-count>`.
+- Neither that counter nor its diagnostic proves delegate entry, Provider
+  dispatch, remote receipt, billing, or generation completion.
+- Provider instrumentation is process-local, non-persistent, secret-free,
+  observational, and non-authoritative. Its counter boundary and lifecycle are
+  explicit and concurrency-safe; it is outside public and persistence
+  contracts.
+- Ordinary instrumentation evidence-output failures are non-propagating and
+  cannot prevent or duplicate dispatch. `BaseException` subclasses retain
+  normal Python semantics: in particular, `asyncio.CancelledError`,
+  `KeyboardInterrupt`, and `SystemExit` are not swallowed, and when raised by
+  evidence emission before Provider delegation, the delegate is not invoked
+  and no Provider request is dispatched.
+- Instrumentation does not transform delegate results, ordinary errors, or
+  cancellation and cannot change Provider retry or application generation
+  policy.
 
 Enforcement:
 
 - Three-stage narrative orchestration
 - Lease, crash, concurrency, and recent-context tests
+- Production Live-wrapper ordinary evidence-failure, evidence-emitter
+  process-control, result, error, delegate-cancellation, concurrency, and
+  two-generation recovery tests
+
+## MODEL-003: Structured output budgets must fit the accepted contract
+
+Observed failure:
+
+- A Live Dynamic Narrative response reached the configured 1,200-token output
+  limit and ended with `finish_reason=length` before strict schema validation.
+- The terminal truncation had a safe public error but no local sanitized
+  `DNVS_LIVE_DIAG_*` classification.
+
+Rule:
+
+- The default Provider output budget for a strict structured contract must
+  cover that contract's bounded expected response, while retaining a finite
+  configured ceiling.
+- `finish_reason=length` remains terminal: never accept partial JSON, retry the
+  transport, or weaken schema validation to salvage it.
+- Live-only diagnostics identify truncation with a closed sanitized token and
+  never include response content.
+
+Enforcement:
+
+- DeepSeek default-configuration and dynamic payload tests
+- Dynamic truncation terminality, no-retry, atomicity, replay, and diagnostic
+  regression tests
 
 ## TOOL-001: Scenario scaffolds never overwrite or publish formal content
 

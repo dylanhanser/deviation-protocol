@@ -73,6 +73,7 @@ from deviation_protocol.infrastructure.deterministic_narrative import (
     DeterministicDemoNarrativeProvider,
 )
 from deviation_protocol.infrastructure.deepseek_narrative import (
+    DEFAULT_DEEPSEEK_MAX_TOKENS,
     DeepSeekNarrativeProvider,
 )
 from deviation_protocol.infrastructure.errors import OptimisticLockError
@@ -3637,10 +3638,19 @@ async def test_dynamic_live_selection_is_exact_explicit_opt_in_with_zero_retries
         }
     )
     try:
-        assert isinstance(runtime.provider, DeepSeekNarrativeProvider)
+        assert isinstance(
+            runtime.provider, demo_composition_module._DynamicLiveEvidenceProvider
+        )
+        assert runtime.provider.wrapper_attempt_count == 0
+        assert isinstance(runtime.provider._provider, DeepSeekNarrativeProvider)
         assert runtime.services.turn_orchestrator.provider_name == "deepseek"
         assert runtime.services.turn_orchestrator.live_provider_references
-        assert runtime.provider._settings.max_retries == 0
+        assert runtime.provider._provider._settings.max_retries == 0
+        assert (
+            runtime.provider._provider._settings.max_tokens
+            == DEFAULT_DEEPSEEK_MAX_TOKENS
+            == 4_096
+        )
         assert capsys.readouterr().out == ""
     finally:
         await runtime.aclose()
@@ -3688,9 +3698,9 @@ async def test_dynamic_rejection_console_reporter_is_live_selection_only(
                                 update={"title": "INERT_INTERNAL_IDENTIFIER_SENTINEL"}
                             ),
                             "suggested_actions": (
-                                "INERT_SUGGESTED_ACTION_SENTINEL",
-                                "Safe beta.",
-                                "Safe gamma.",
+                                "隐秘建议哨兵。",
+                                "比较另一项公开线索。",
+                                "谨慎等待新的变化。",
                             ),
                         }
                     ),
@@ -3786,13 +3796,21 @@ async def test_dynamic_rejection_console_reporter_is_live_selection_only(
             }
             assert "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX" not in rejected.text
         captured = capsys.readouterr()
-        assert captured.out == "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX\n"
+        assert captured.out == (
+            "DNVS_LIVE_EVIDENCE event=wrapper_attempt ordinal=1 "
+            "cumulative_wrapper_attempts=1\n"
+            "DNVS_LIVE_DIAG_PRE_REFERENCE_INDEX\n"
+        )
         assert captured.err == ""
         output = captured.out + captured.err
+        assert "event=wrapper_attempt" in output
+        assert "cumulative_wrapper_attempts=1" in output
+        assert "event=provider_generation" not in output
+        assert "cumulative_generations" not in output
         for sentinel in (
             "INERT_SUBMITTED_ACTION_SENTINEL",
             "INERT_CANDIDATE_NARRATIVE_SENTINEL",
-            "INERT_SUGGESTED_ACTION_SENTINEL",
+            "隐秘建议哨兵。",
             "INERT_PROMPT_FRAGMENT_SENTINEL",
             "INERT_PROTECTED_HIDDEN_VALUE_SENTINEL",
             "INERT_INTERNAL_MARKER_SENTINEL",
@@ -3806,6 +3824,10 @@ async def test_dynamic_rejection_console_reporter_is_live_selection_only(
             "Traceback",
         ):
             assert sentinel not in output
+        assert isinstance(
+            live.provider, demo_composition_module._DynamicLiveEvidenceProvider
+        )
+        assert live.provider.wrapper_attempt_count == 1
         assert local_live is not None and local_live.invocation_count == 1
         assert "INERT_PROMPT_FRAGMENT_SENTINEL" in local_live.captured_prompt
         assert local_live.base_url
