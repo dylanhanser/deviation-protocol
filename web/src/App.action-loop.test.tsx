@@ -193,6 +193,50 @@ function dynamicCommittedActionResponse({
   };
 }
 
+const dynamicFeedbackPrivacyCanaries = {
+  public_fact_key: "D1_PUBLIC_FACT_KEY_CANARY_6A21",
+  public_fact_value: "D1_PUBLIC_FACT_VALUE_CANARY_0C95",
+  raw_provider_fragment: "D1_RAW_PROVIDER_FRAGMENT_CANARY_B437",
+  private_internal_memory: "D1_PRIVATE_MEMORY_CANARY_E8D2",
+} as const;
+
+const dynamicFeedbackCanaryValues = Object.values(
+  dynamicFeedbackPrivacyCanaries,
+);
+
+function expectDynamicFeedbackCanariesAbsent(container: HTMLElement) {
+  for (const canary of dynamicFeedbackCanaryValues) {
+    expect(container).not.toHaveTextContent(canary);
+    expect(container.innerHTML).not.toContain(canary);
+  }
+}
+
+function expectPreviousDynamicEvidenceRemoved(
+  container: HTMLElement,
+  previousCount = 2,
+) {
+  expect(
+    screen.queryByRole("region", {
+      name: "Dynamic Narrative action evidence",
+    }),
+  ).not.toBeInTheDocument();
+  expect(screen.queryByText(/^NEW_PUBLIC_FACTS=/)).not.toBeInTheDocument();
+  expect(
+    screen.queryByText(`NEW_PUBLIC_FACTS=${previousCount}`),
+  ).not.toBeInTheDocument();
+  expectDynamicFeedbackCanariesAbsent(container);
+}
+
+async function expectValidDynamicEvidence(container: HTMLElement, count = 2) {
+  const evidence = await screen.findByRole("region", {
+    name: "Dynamic Narrative action evidence",
+  });
+  expect(within(evidence).getByText("REVISION=1")).toBeVisible();
+  expect(within(evidence).getByText(`NEW_PUBLIC_FACTS=${count}`)).toBeVisible();
+  expectDynamicFeedbackCanariesAbsent(evidence);
+  expectDynamicFeedbackCanariesAbsent(container);
+}
+
 const initialNoNpcSuggestionTexts = [
   "观察周围可见的环境。",
   "调查眼前的情况。",
@@ -285,6 +329,178 @@ function deferred<T>() {
     reject = promiseReject;
   });
   return { promise, resolve, reject };
+}
+
+function installRemovalSensitiveEvidenceTransition(
+  transition:
+    | "terminal-action-failure"
+    | "outcome-unknown"
+    | "post-commit-view-failure",
+) {
+  let actionPosts = 0;
+  let statusReads = 0;
+  let viewReads = 0;
+  const submittedBodies: unknown[] = [];
+  const secondSubmission = dynamicSuggestionSubmission(
+    1,
+    0,
+    initialNoNpcSuggestionTexts[0],
+  );
+
+  server.use(
+    scenarioHandler(),
+    http.get(
+      `${apiOrigin}/v1/sessions/session-public-1/view`,
+      () => {
+        const stateVersion = viewReads;
+        viewReads += 1;
+        if (transition === "post-commit-view-failure" && viewReads === 3) {
+          return HttpResponse.json(
+            errorFixture("INTERNAL_SERVER_ERROR", "Internal server error"),
+            { status: 500 },
+          );
+        }
+        return HttpResponse.json(
+          dynamicSuggestionViewFixture({
+            stateVersion,
+            suggestionTexts: initialNoNpcSuggestionTexts,
+          }),
+        );
+      },
+    ),
+    http.post(
+      `${apiOrigin}/v1/sessions/session-public-1/actions`,
+      async ({ request }) => {
+        const body = (await request.json()) as { client_request_id: string };
+        actionPosts += 1;
+        submittedBodies.push(body);
+        if (actionPosts === 1) {
+          return HttpResponse.json(
+            dynamicCommittedActionResponse({
+              clientRequestId: body.client_request_id,
+              stateVersion: 1,
+              feedbackParameters: {
+                outcome_result: "SUCCESS",
+                public_fact_count: 2,
+                ...dynamicFeedbackPrivacyCanaries,
+              },
+            }),
+          );
+        }
+        if (transition === "terminal-action-failure") {
+          return HttpResponse.json(
+            errorFixture(
+              "NARRATIVE_PROVIDER_RESPONSE_INVALID",
+              "Narrative processing failed",
+            ),
+            { status: 503 },
+          );
+        }
+        if (transition === "outcome-unknown") {
+          return HttpResponse.json(
+            pendingActionResponseFixture(body.client_request_id),
+            { status: 202 },
+          );
+        }
+        return HttpResponse.json(
+          dynamicCommittedActionResponse({
+            clientRequestId: body.client_request_id,
+            stateVersion: 2,
+            feedbackParameters: {
+              outcome_result: "SUCCESS",
+              public_fact_count: 3,
+            },
+          }),
+        );
+      },
+    ),
+    http.get(
+      `${apiOrigin}/v1/sessions/session-public-1/requests/${secondSubmission.client_request_id}`,
+      () => {
+        statusReads += 1;
+        return HttpResponse.json({
+          session_id: "session-public-1",
+          client_request_id: secondSubmission.client_request_id,
+          status: "OUTCOME_UNKNOWN",
+          client_action: "DO_NOT_RETRY",
+          error_code: "NARRATIVE_OUTCOME_UNKNOWN",
+          retry_after_seconds: null,
+          response: null,
+        });
+      },
+    ),
+  );
+
+  return {
+    actionPosts: () => actionPosts,
+    statusReads: () => statusReads,
+    submittedBodies,
+    viewReads: () => viewReads,
+  };
+}
+
+function lateCompletionEvidenceClient() {
+  const lateResponse = deferred<PublicActionSubmissionResult>();
+  const lateStarted = deferred<void>();
+  let actionPosts = 0;
+  let statusReads = 0;
+  let viewReads = 0;
+  let lateSignal: AbortSignal | undefined;
+  const submittedRequestIds: string[] = [];
+  const client = {
+    listScenarios: async () => scenarioCatalogFixture,
+    listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
+    getSessionView: async () => {
+      const stateVersion = Math.min(viewReads, 1);
+      viewReads += 1;
+      return dynamicSuggestionViewFixture({
+        stateVersion,
+        suggestionTexts: initialNoNpcSuggestionTexts,
+      });
+    },
+    submitAction: async (
+      _sessionId: string,
+      request: unknown,
+      signal?: AbortSignal,
+    ) => {
+      const clientRequestId = (request as { client_request_id: string })
+        .client_request_id;
+      submittedRequestIds.push(clientRequestId);
+      actionPosts += 1;
+      if (actionPosts === 1) {
+        return {
+          status: 200,
+          response: dynamicCommittedActionResponse({
+            clientRequestId,
+            stateVersion: 1,
+            feedbackParameters: {
+              outcome_result: "SUCCESS",
+              public_fact_count: 2,
+              ...dynamicFeedbackPrivacyCanaries,
+            },
+          }),
+        } as const;
+      }
+      lateSignal = signal;
+      lateStarted.resolve();
+      return lateResponse.promise;
+    },
+    getNarrativeRequestStatus: async () => {
+      statusReads += 1;
+      throw new Error("status must not be read");
+    },
+  } as unknown as PublicApiClient;
+
+  return {
+    actionPosts: () => actionPosts,
+    client,
+    lateResponse,
+    lateSignal: () => lateSignal,
+    lateStarted,
+    statusReads: () => statusReads,
+    submittedRequestIds,
+    viewReads: () => viewReads,
+  };
 }
 
 afterEach(() => {
@@ -2387,6 +2603,414 @@ describe("committed Dynamic Narrative action evidence", () => {
       expect(screen.queryByText(/^NEW_PUBLIC_FACTS=/)).not.toBeInTheDocument();
     },
   );
+
+  it.each([
+    ["terminal-action-failure", "current", 2, 0],
+    ["outcome-unknown", "outcome-unknown", 2, 1],
+    ["post-commit-view-failure", "confirmed-view-unavailable", 3, 0],
+  ] as const)(
+    "removes established evidence across %s without replay or identity replacement",
+    async (transition, expectedViewState, expectedViewReads, expectedStatusReads) => {
+      const harness = installRemovalSensitiveEvidenceTransition(transition);
+      const actionIdentityFactory = vi.fn(() => ({
+        turnId: "must-not-be-created",
+        clientRequestId: "must-not-be-created",
+      }));
+      const user = userEvent.setup();
+      const rendered = renderActionApp({ actionIdentityFactory });
+      await loadSession(user);
+
+      await user.click(
+        screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+      );
+      await expectValidDynamicEvidence(rendered.container);
+      expect(harness.actionPosts()).toBe(1);
+      expect(harness.viewReads()).toBe(2);
+
+      await user.click(
+        screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+      );
+      if (expectedViewState === "current") {
+        expect(
+          await screen.findByText(/NARRATIVE_PROVIDER_RESPONSE_INVALID/),
+        ).toBeVisible();
+        expect(screen.getByText("权威 View：当前")).toBeVisible();
+      } else {
+        expect(
+          await screen.findByText(`权威 View：可能 stale（${expectedViewState}）`),
+        ).toBeVisible();
+      }
+      await act(async () => Promise.resolve());
+
+      expectPreviousDynamicEvidenceRemoved(rendered.container);
+      expect(
+        screen.getAllByText("权威 View 已推进到版本 1。").length,
+      ).toBeGreaterThan(0);
+      expect(harness.actionPosts()).toBe(2);
+      expect(harness.statusReads()).toBe(expectedStatusReads);
+      expect(harness.viewReads()).toBe(expectedViewReads);
+      expect(harness.submittedBodies).toEqual([
+        dynamicSuggestionSubmission(0, 0, initialNoNpcSuggestionTexts[0]),
+        dynamicSuggestionSubmission(1, 0, initialNoNpcSuggestionTexts[0]),
+      ]);
+      expect(actionIdentityFactory).not.toHaveBeenCalled();
+    },
+  );
+
+  it("removes established evidence when a manual read replaces the Session", async () => {
+    let actionPosts = 0;
+    let firstSessionViewReads = 0;
+    let replacementViewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "must-not-be-created",
+      clientRequestId: "must-not-be-created",
+    }));
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const stateVersion = firstSessionViewReads;
+          firstSessionViewReads += 1;
+          return HttpResponse.json(
+            dynamicSuggestionViewFixture({
+              stateVersion,
+              suggestionTexts: initialNoNpcSuggestionTexts,
+            }),
+          );
+        },
+      ),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-2/view`,
+        () => {
+          replacementViewReads += 1;
+          return HttpResponse.json(
+            withSessionId(
+              dynamicSuggestionViewFixture({
+                stateVersion: 7,
+                suggestionTexts: laterServerSuggestionTexts,
+              }),
+              "session-public-2",
+            ),
+          );
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          actionPosts += 1;
+          const body = (await request.json()) as {
+            client_request_id: string;
+          };
+          return HttpResponse.json(
+            dynamicCommittedActionResponse({
+              clientRequestId: body.client_request_id,
+              stateVersion: 1,
+              feedbackParameters: {
+                outcome_result: "SUCCESS",
+                public_fact_count: 2,
+                ...dynamicFeedbackPrivacyCanaries,
+              },
+            }),
+          );
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    const rendered = renderActionApp({ actionIdentityFactory });
+    await loadSession(user);
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await expectValidDynamicEvidence(rendered.container);
+
+    const input = screen.getByLabelText("Session ID");
+    await user.clear(input);
+    await user.type(input, "session-public-2");
+    await user.click(
+      screen.getByRole("button", { name: "读取 PlayerSessionView" }),
+    );
+    expect(
+      await screen.findByText("当前 Session：session-public-2"),
+    ).toBeVisible();
+
+    expectPreviousDynamicEvidenceRemoved(rendered.container);
+    expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(
+      screen.getAllByText("权威 View 已推进到版本 7。").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+    expect(actionPosts).toBe(1);
+    expect(firstSessionViewReads).toBe(2);
+    expect(replacementViewReads).toBe(1);
+    expect(actionIdentityFactory).not.toHaveBeenCalled();
+  });
+
+  it("removes established evidence when the API client is replaced", async () => {
+    let oldActionPosts = 0;
+    let oldViewReads = 0;
+    let newActionPosts = 0;
+    let newStatusReads = 0;
+    let newViewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "must-not-be-created",
+      clientRequestId: "must-not-be-created",
+    }));
+    const oldClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
+      getSessionView: async () => {
+        const stateVersion = oldViewReads;
+        oldViewReads += 1;
+        return dynamicSuggestionViewFixture({
+          stateVersion,
+          suggestionTexts: initialNoNpcSuggestionTexts,
+        });
+      },
+      submitAction: async (_sessionId: string, request: unknown) => {
+        oldActionPosts += 1;
+        return {
+          status: 200,
+          response: dynamicCommittedActionResponse({
+            clientRequestId: (request as { client_request_id: string })
+              .client_request_id,
+            stateVersion: 1,
+            feedbackParameters: {
+              outcome_result: "SUCCESS",
+              public_fact_count: 2,
+              ...dynamicFeedbackPrivacyCanaries,
+            },
+          }),
+        } as const;
+      },
+    } as unknown as PublicApiClient;
+    const newClient = {
+      listScenarios: async () => scenarioCatalogFixture,
+      listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
+      getSessionView: async () => {
+        newViewReads += 1;
+        return dynamicSuggestionViewFixture({
+          stateVersion: 1,
+          suggestionTexts: initialNoNpcSuggestionTexts,
+        });
+      },
+      submitAction: async () => {
+        newActionPosts += 1;
+        throw new Error("replacement client must not submit");
+      },
+      getNarrativeRequestStatus: async () => {
+        newStatusReads += 1;
+        throw new Error("replacement client must not poll");
+      },
+    } as unknown as PublicApiClient;
+    const user = userEvent.setup();
+    const rendered = renderActionApp({ client: oldClient, actionIdentityFactory });
+    await loadSession(user);
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await expectValidDynamicEvidence(rendered.container);
+
+    rendered.rerender(
+      <App
+        client={newClient}
+        idempotencyKeyFactory={() => "opaque-mutation-request"}
+        actionIdentityFactory={actionIdentityFactory}
+      />,
+    );
+    await waitFor(() => expect(newViewReads).toBe(1));
+    expect(
+      await screen.findByText("当前 Session：session-public-1"),
+    ).toBeVisible();
+
+    expectPreviousDynamicEvidenceRemoved(rendered.container);
+    expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(oldActionPosts).toBe(1);
+    expect(oldViewReads).toBe(2);
+    expect(newActionPosts).toBe(0);
+    expect(newStatusReads).toBe(0);
+    expect(actionIdentityFactory).not.toHaveBeenCalled();
+  });
+
+  it("removes established evidence when same-tab recovery starts", async () => {
+    let actionPosts = 0;
+    let statusReads = 0;
+    let viewReads = 0;
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "must-not-be-created",
+      clientRequestId: "must-not-be-created",
+    }));
+    server.use(
+      scenarioHandler(),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/view`,
+        () => {
+          const stateVersion = viewReads === 0 ? 0 : 1;
+          viewReads += 1;
+          return HttpResponse.json(
+            dynamicSuggestionViewFixture({
+              stateVersion,
+              suggestionTexts: initialNoNpcSuggestionTexts,
+            }),
+          );
+        },
+      ),
+      http.post(
+        `${apiOrigin}/v1/sessions/session-public-1/actions`,
+        async ({ request }) => {
+          actionPosts += 1;
+          const body = (await request.json()) as {
+            client_request_id: string;
+          };
+          return HttpResponse.json(
+            dynamicCommittedActionResponse({
+              clientRequestId: body.client_request_id,
+              stateVersion: 1,
+              feedbackParameters: {
+                outcome_result: "SUCCESS",
+                public_fact_count: 2,
+                ...dynamicFeedbackPrivacyCanaries,
+              },
+            }),
+          );
+        },
+      ),
+      http.get(
+        `${apiOrigin}/v1/sessions/session-public-1/requests/:requestId`,
+        () => {
+          statusReads += 1;
+          return HttpResponse.json({}, { status: 500 });
+        },
+      ),
+    );
+    const user = userEvent.setup();
+    const firstRender = renderActionApp({ actionIdentityFactory });
+    await loadSession(user);
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await expectValidDynamicEvidence(firstRender.container);
+
+    firstRender.unmount();
+    const recoveredRender = renderActionApp({ actionIdentityFactory });
+    expect(
+      await screen.findByText("当前 Session：session-public-1"),
+    ).toBeVisible();
+    await waitFor(() => expect(viewReads).toBe(3));
+
+    expectPreviousDynamicEvidenceRemoved(recoveredRender.container);
+    expect(screen.getByText("权威 View：当前")).toBeVisible();
+    expect(actionPosts).toBe(1);
+    expect(statusReads).toBe(0);
+    expect(actionIdentityFactory).not.toHaveBeenCalled();
+  });
+
+  it("prevents a late Action completion from reinstalling evidence after explicit invalidation", async () => {
+    const harness = lateCompletionEvidenceClient();
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "must-not-be-created",
+      clientRequestId: "must-not-be-created",
+    }));
+    const user = userEvent.setup();
+    const rendered = renderActionApp({
+      client: harness.client,
+      actionIdentityFactory,
+    });
+    await loadSession(user);
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await expectValidDynamicEvidence(rendered.container);
+
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await harness.lateStarted.promise;
+    await user.click(
+      screen.getByRole("button", { name: "清除本标签页 Session" }),
+    );
+    expect(harness.lateSignal()?.aborted).toBe(true);
+    harness.lateResponse.resolve({
+      status: 200,
+      response: dynamicCommittedActionResponse({
+        clientRequestId: dynamicSuggestionSubmission(
+          1,
+          0,
+          initialNoNpcSuggestionTexts[0],
+        ).client_request_id,
+        stateVersion: 2,
+        feedbackParameters: {
+          outcome_result: "SUCCESS",
+          public_fact_count: 3,
+        },
+      }),
+    });
+    await act(async () => Promise.resolve());
+
+    expectPreviousDynamicEvidenceRemoved(rendered.container);
+    expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "进入 Run" })).toBeEnabled();
+    expect(harness.actionPosts()).toBe(2);
+    expect(harness.statusReads()).toBe(0);
+    expect(harness.viewReads()).toBe(2);
+    expect(harness.submittedRequestIds).toEqual([
+      dynamicSuggestionSubmission(0, 0, initialNoNpcSuggestionTexts[0])
+        .client_request_id,
+      dynamicSuggestionSubmission(1, 0, initialNoNpcSuggestionTexts[0])
+        .client_request_id,
+    ]);
+    expect(actionIdentityFactory).not.toHaveBeenCalled();
+  });
+
+  it("prevents a late Action completion from installing evidence after unmount", async () => {
+    const harness = lateCompletionEvidenceClient();
+    const actionIdentityFactory = vi.fn(() => ({
+      turnId: "must-not-be-created",
+      clientRequestId: "must-not-be-created",
+    }));
+    const user = userEvent.setup();
+    const rendered = renderActionApp({
+      client: harness.client,
+      actionIdentityFactory,
+    });
+    await loadSession(user);
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await expectValidDynamicEvidence(rendered.container);
+
+    await user.click(
+      screen.getByRole("button", { name: initialNoNpcSuggestionTexts[0] }),
+    );
+    await harness.lateStarted.promise;
+    rendered.unmount();
+    expect(harness.lateSignal()?.aborted).toBe(true);
+    harness.lateResponse.resolve({
+      status: 200,
+      response: dynamicCommittedActionResponse({
+        clientRequestId: dynamicSuggestionSubmission(
+          1,
+          0,
+          initialNoNpcSuggestionTexts[0],
+        ).client_request_id,
+        stateVersion: 2,
+        feedbackParameters: {
+          outcome_result: "SUCCESS",
+          public_fact_count: 3,
+        },
+      }),
+    });
+    await act(async () => Promise.resolve());
+
+    expect(rendered.container).toBeEmptyDOMElement();
+    expect(rendered.container).not.toHaveTextContent("NEW_PUBLIC_FACTS=2");
+    expect(rendered.container).not.toHaveTextContent("NEW_PUBLIC_FACTS=3");
+    expectDynamicFeedbackCanariesAbsent(rendered.container);
+    expect(harness.actionPosts()).toBe(2);
+    expect(harness.statusReads()).toBe(0);
+    expect(harness.viewReads()).toBe(2);
+    expect(actionIdentityFactory).not.toHaveBeenCalled();
+  });
 });
 
 describe("HTTP 202 request-status lifecycle", () => {

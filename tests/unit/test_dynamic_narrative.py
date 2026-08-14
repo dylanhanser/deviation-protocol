@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import datetime, timezone
 import hashlib
@@ -24,6 +25,7 @@ from deviation_protocol.api.demo_composition import (
 )
 from deviation_protocol.api.main import create_app
 from deviation_protocol.application.dynamic_narrative_models import (
+    DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
     DynamicAllocatedPublicFact,
     DynamicGeneratedPublicFactKeyAllocator,
     DynamicGeneratedPublicFactKeyGrammar,
@@ -77,7 +79,14 @@ from deviation_protocol.application.errors import (
     SnapshotInvalidError,
     StoredTurnResponseInvalidError,
 )
-from deviation_protocol.application.narrative_jobs import NarrativeJobStatus
+from deviation_protocol.application.identity import RequestPrincipal
+from deviation_protocol.application.narrative_jobs import (
+    LOCAL_TEMPLATE_MODEL_NAME,
+    LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+    LOCAL_TEMPLATE_PROVIDER_NAME,
+    NarrativeJob,
+    NarrativeJobStatus,
+)
 from deviation_protocol.application.narrative_models import (
     NarrativeProposalRejectedError,
     NarrativeProviderMetadata,
@@ -95,6 +104,7 @@ from deviation_protocol.application.session_service import (
     PublicNpc,
     PublicPlayableCharacter,
 )
+from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 from deviation_protocol.domain.content import ContentCatalog
@@ -8015,7 +8025,7 @@ async def test_offline_fake_submits_exactly_510_dynamic_turns_without_terminatio
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("count", (0, 1, 2, 3))
-async def test_server_generated_fact_allocator_covers_zero_one_two_three_and_original_order(
+async def test_valid_v2_committed_post_and_get_recovery_covers_zero_one_two_three_and_preserves_identity(
     count: int,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -8132,6 +8142,23 @@ async def test_server_generated_fact_allocator_covers_zero_one_two_three_and_ori
         assert tuple(fact["value"] for fact in ring.values()) == values
         assert len(allocation_calls) == count
 
+        recovery_baseline = runtime.store.snapshot()
+        allocation_count_before_recovery = len(allocation_calls)
+        provider_invocations_before_recovery = provider.invocations
+        recovery_commit_calls = 0
+        original_commit = DemoUnitOfWork.commit
+
+        async def tracked_recovery_commit(self):
+            nonlocal recovery_commit_calls
+            recovery_commit_calls += 1
+            await original_commit(self)
+
+        monkeypatch.setattr(
+            DemoUnitOfWork,
+            "commit",
+            tracked_recovery_commit,
+        )
+
         status = await client.get(
             f"/v1/sessions/{session_id}/requests/{submission['client_request_id']}"
         )
@@ -8146,9 +8173,10 @@ async def test_server_generated_fact_allocator_covers_zero_one_two_three_and_ori
         assert replay.status_code == 200
         assert replay.json() == response_body
         assert replay.json()["feedback_parameters"]["public_fact_count"] == count
-        assert provider.invocations == 1
-        assert len(allocation_calls) == count
-        assert after_replay == after
+        assert provider.invocations == provider_invocations_before_recovery
+        assert len(allocation_calls) == allocation_count_before_recovery
+        assert recovery_commit_calls == 0
+        assert after_replay == recovery_baseline == after
     finally:
         await client.aclose()
         await runtime.aclose()
@@ -8473,76 +8501,334 @@ async def test_v1_uncommitted_dynamic_job_stales_without_provider_resend_or_comm
         await runtime.aclose()
 
 
+_FROZEN_HISTORICAL_V1_SESSION_ID = "demo-session-00000001"
+_FROZEN_HISTORICAL_V1_TURN_ID = "historical-v1-turn-0001"
+_FROZEN_HISTORICAL_V1_REQUEST_ID = "historical-v1-request-0001"
+_FROZEN_HISTORICAL_V1_ACTION_SIGNATURE = (
+    "11b697832618bb2e40077a15444e65dd17cbc6d1b06415507b3b7ab1d6f0f6a8"
+)
+_FROZEN_HISTORICAL_V1_NARRATIVE = (
+    "你核对了公开记录，确认眼前的叙事已经稳定提交。"
+)
+# Frozen historical-contract artifact derived from committed
+# 8af790cc280f78102fa2e736806362527043424e source authority: the historical
+# Dynamic finalization construction and TurnResponse persistence expectation.
+# This canonical literal is independent of current v2 production helpers.
+_FROZEN_HISTORICAL_V1_RESPONSE_BYTES = (
+    '{"action_signature":"11b697832618bb2e40077a15444e65dd17cbc6d1b06415507b3b7ab1d6f0f6a8",'
+    '"client_request_id":"historical-v1-request-0001",'
+    '"feedback_code":"DYNAMIC_NARRATIVE_COMMITTED",'
+    '"feedback_parameters":{"outcome_result":"SUCCESS"},'
+    '"local_query_result":null,"narrative_frame":{'
+    '"allowed_custom_action_constraints":null,'
+    '"current_location_id":"historical.location.public","decision_id":null,'
+    '"decision_reason":null,"decision_required":false,'
+    '"frame_id":"frame.dynamic.historical-v1","max_length":900,'
+    '"may_render_facts":[],"min_length":350,"mode":"FLOW",'
+    '"must_render_event_types":[],"must_render_facts":['
+    '{"fact_id":"historical.public.fact","value":"冻结的公开事实。"}],'
+    '"npc_knowledge":[],"phase_id":"historical.phase",'
+    '"player_visible_clocks":[],"recent_verified_events":[],'
+    '"scenario_id":"death_certificate","stop_condition":"CONTINUE",'
+    '"suggested_actions":[],"target_length":650,'
+    '"tone_hints":["历史合同"],"visible_clues":[],"visible_entities":[]},'
+    '"narrative_pending":false,"narrative_required":true,'
+    '"narrative_status":"COMMITTED",'
+    '"narrative_text":"你核对了公开记录，确认眼前的叙事已经稳定提交。",'
+    '"resolution_kind":"NARRATIVE_COMMITTED",'
+    '"result_code":"DYNAMIC_NARRATIVE_COMMITTED",'
+    '"resulting_state_version":1,"session_id":"demo-session-00000001",'
+    '"state_changed":true}'
+).encode("utf-8")
+_FROZEN_HISTORICAL_V1_RESPONSE_SHA256 = (
+    "c27dd244ad00231f3ef896b811ec29853e8909735472fcf09068cb3256572e36"
+)
+_HISTORICAL_V1_RESPONSE_FIELDS = frozenset(
+    {
+        "session_id",
+        "client_request_id",
+        "action_signature",
+        "resolution_kind",
+        "result_code",
+        "feedback_code",
+        "feedback_parameters",
+        "resulting_state_version",
+        "state_changed",
+        "narrative_required",
+        "narrative_pending",
+        "narrative_frame",
+        "narrative_text",
+        "narrative_status",
+        "local_query_result",
+    }
+)
+
+
+def _canonical_json_bytes(value: object) -> bytes:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode("utf-8")
+
+
+def _install_genuine_v1_committed_recovery_fixture(
+    runtime,
+    session_id: str,
+) -> tuple[dict[str, object], dict[str, object]]:
+    """Install independent pre-D1 response and job artifacts without finalization."""
+
+    assert session_id == _FROZEN_HISTORICAL_V1_SESSION_ID
+    historical_response = json.loads(_FROZEN_HISTORICAL_V1_RESPONSE_BYTES)
+    assert type(historical_response) is dict
+    assert set(historical_response) == _HISTORICAL_V1_RESPONSE_FIELDS
+    assert historical_response["feedback_parameters"] == {
+        "outcome_result": "SUCCESS"
+    }
+    parsed = TurnResponse.model_validate_json(
+        _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+    )
+    assert parsed.to_persistence() == historical_response
+
+    submission: dict[str, object] = {
+        "turn_id": _FROZEN_HISTORICAL_V1_TURN_ID,
+        "client_request_id": _FROZEN_HISTORICAL_V1_REQUEST_ID,
+        "action_type": "CUSTOM",
+        "description": "检查冻结的历史响应。",
+    }
+    submitted = ActionSubmission(session_id=session_id, **submission)
+    assert submitted.action_signature() == _FROZEN_HISTORICAL_V1_ACTION_SIGNATURE
+
+    historical_proposal = {
+        "candidate_contract": "dynamic-narrative-candidate-v1",
+        "outcome_result": "SUCCESS",
+        "source_commit": "8af790cc280f78102fa2e736806362527043424e",
+    }
+    historical_job = NarrativeJob(
+        job_id="historical-v1-job-0001",
+        session_id=session_id,
+        turn_id=_FROZEN_HISTORICAL_V1_TURN_ID,
+        client_request_id=_FROZEN_HISTORICAL_V1_REQUEST_ID,
+        action_signature=_FROZEN_HISTORICAL_V1_ACTION_SIGNATURE,
+        prepared_state_version=0,
+        state_fingerprint="1" * 64,
+        scenario_id="death_certificate",
+        scenario_content_version="historical-death-certificate-v1",
+        request_fingerprint="2" * 64,
+        narrative_request={
+            "historical_contract_source_commit": (
+                "8af790cc280f78102fa2e736806362527043424e"
+            )
+        },
+        prompt_schema_version=DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
+        style_profile_version="historical-style-v1",
+        provider_name="historical-provider",
+        model_name="historical-model-v1",
+        status=NarrativeJobStatus.COMMITTED,
+        attempt_count=1,
+        validated_proposal=historical_proposal,
+        validated_proposal_digest=hashlib.sha256(
+            _canonical_json_bytes(historical_proposal)
+        ).hexdigest(),
+        outcome_rule_id="dynamic.narrative.accepted",
+        accepted_narrative_text=_FROZEN_HISTORICAL_V1_NARRATIVE,
+        created_at=datetime(2000, 1, 2, tzinfo=timezone.utc),
+        updated_at=datetime(2000, 1, 2, tzinfo=timezone.utc),
+    )
+    persisted_session = runtime.store._sessions[session_id]
+    runtime.store._sessions[session_id] = replace(
+        persisted_session,
+        session=replace(persisted_session.session, state_version=1),
+    )
+    persisted_snapshot = runtime.store._snapshots[session_id]
+    runtime.store._snapshots[session_id] = replace(
+        persisted_snapshot,
+        state_version=1,
+    )
+    runtime.store._turn_requests[(session_id, _FROZEN_HISTORICAL_V1_REQUEST_ID)] = (
+        PersistedTurnRequest(
+            turn_id=_FROZEN_HISTORICAL_V1_TURN_ID,
+            action_signature=_FROZEN_HISTORICAL_V1_ACTION_SIGNATURE,
+            response=historical_response,
+        )
+    )
+    runtime.store._narrative_jobs[historical_job.job_id] = historical_job
+    return submission, historical_response
+
+
+def test_frozen_historical_v1_response_artifact_is_canonical_and_hash_stable() -> None:
+    assert hashlib.sha256(
+        _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+    ).hexdigest() == _FROZEN_HISTORICAL_V1_RESPONSE_SHA256
+    payload = json.loads(_FROZEN_HISTORICAL_V1_RESPONSE_BYTES)
+    assert _canonical_json_bytes(payload) == _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+    assert set(payload) == _HISTORICAL_V1_RESPONSE_FIELDS
+    assert payload["feedback_parameters"] == {"outcome_result": "SUCCESS"}
+    assert "public_fact_count" not in payload["feedback_parameters"]
+    assert TurnResponse.model_validate_json(
+        _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+    ).to_persistence() == payload
+
+
+def _track_recovery_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> tuple[list[dict[str, object]], Callable[[], int]]:
+    allocation_calls: list[dict[str, object]] = []
+    original_allocate = DynamicGeneratedPublicFactKeyAllocator.allocate
+
+    def tracked_allocate(_cls, **kwargs):
+        allocation_calls.append(kwargs)
+        return original_allocate(**kwargs)
+
+    monkeypatch.setattr(
+        DynamicGeneratedPublicFactKeyAllocator,
+        "allocate",
+        classmethod(tracked_allocate),
+    )
+    commit_calls = 0
+    original_commit = DemoUnitOfWork.commit
+
+    async def tracked_commit(self):
+        nonlocal commit_calls
+        commit_calls += 1
+        await original_commit(self)
+
+    monkeypatch.setattr(DemoUnitOfWork, "commit", tracked_commit)
+    return allocation_calls, lambda: commit_calls
+
+
 @pytest.mark.asyncio
-async def test_old_schema_committed_job_replays_stored_response_without_provider_or_commit(
+async def test_genuine_v1_committed_post_replay_preserves_historical_response_without_side_effects(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime, client, session_id = await _entered_dynamic_client()
     try:
-        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
-        submission = view["action_affordances"]["suggested_actions"][0][
-            "submission"
-        ]
-        first = await client.post(
-            f"/v1/sessions/{session_id}/actions", json=submission
+        assert runtime.provider.invocation_count == 0
+        submission, historical_response = (
+            _install_genuine_v1_committed_recovery_fixture(runtime, session_id)
         )
-        assert first.status_code == 200, first.text
-        assert first.json()["feedback_parameters"]["public_fact_count"] == 1
-        committed = next(iter(runtime.store.snapshot().narrative_jobs.values()))
-        assert committed.status is NarrativeJobStatus.COMMITTED
-        assert committed.accepted_narrative_text is not None
-        assert (
-            session_id,
-            submission["client_request_id"],
-        ) in runtime.store.snapshot().turn_requests
-        historical = committed.model_copy(
-            update={"prompt_schema_version": "dynamic-narrative-prompt-v1"}
-        )
-        runtime.store._narrative_jobs[committed.job_id] = historical
         orchestrator = runtime.services.turn_orchestrator
-        orchestrator._buckets.clear()
+        emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+        orchestrator.diagnostic_reporter = emitted.append
         before = runtime.store.snapshot()
-        provider_invocations = runtime.provider.invocation_count
-        allocation_calls: list[dict[str, object]] = []
-        original_allocate = DynamicGeneratedPublicFactKeyAllocator.allocate
-
-        def tracked_allocate(_cls, **kwargs):
-            allocation_calls.append(kwargs)
-            return original_allocate(**kwargs)
-
-        monkeypatch.setattr(
-            DynamicGeneratedPublicFactKeyAllocator,
-            "allocate",
-            classmethod(tracked_allocate),
+        stored_before = before.turn_requests[
+            (session_id, _FROZEN_HISTORICAL_V1_REQUEST_ID)
+        ]
+        assert stored_before.response is not None
+        artifact_before = _canonical_json_bytes(stored_before.response)
+        assert artifact_before == _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+        assert hashlib.sha256(artifact_before).hexdigest() == (
+            _FROZEN_HISTORICAL_V1_RESPONSE_SHA256
         )
-        commit_calls = 0
-        original_commit = DemoUnitOfWork.commit
-
-        async def tracked_commit(self):
-            nonlocal commit_calls
-            commit_calls += 1
-            await original_commit(self)
-
-        monkeypatch.setattr(DemoUnitOfWork, "commit", tracked_commit)
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
 
         replay = await client.post(
             f"/v1/sessions/{session_id}/actions", json=submission
         )
         after = runtime.store.snapshot()
+        historical_public_response = {
+            key: value
+            for key, value in historical_response.items()
+            if key != "action_signature"
+        }
 
         assert replay.status_code == 200
-        assert replay.json() == first.json()
-        assert replay.json()["feedback_parameters"]["public_fact_count"] == 1
+        assert replay.json() == historical_public_response
+        assert replay.json()["feedback_parameters"] == historical_response[
+            "feedback_parameters"
+        ]
+        assert "public_fact_count" not in replay.json()["feedback_parameters"]
         assert runtime.provider.invocation_count == provider_invocations
         assert allocation_calls == []
-        assert commit_calls == 0
+        assert commit_calls() == 0
+        assert emitted == []
         assert after == before
-        replayed_job = after.narrative_jobs[committed.job_id]
+        stored_after = after.turn_requests[
+            (session_id, _FROZEN_HISTORICAL_V1_REQUEST_ID)
+        ]
+        assert stored_after.response is not None
+        artifact_after = _canonical_json_bytes(stored_after.response)
+        assert artifact_after == artifact_before
+        assert hashlib.sha256(artifact_after).hexdigest() == (
+            _FROZEN_HISTORICAL_V1_RESPONSE_SHA256
+        )
+        replayed_job = next(iter(after.narrative_jobs.values()))
         assert replayed_job.status is NarrativeJobStatus.COMMITTED
-        assert replayed_job.prompt_schema_version == "dynamic-narrative-prompt-v1"
-        assert replayed_job.accepted_narrative_text == committed.accepted_narrative_text
+        assert (
+            replayed_job.prompt_schema_version
+            == DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION
+        )
         assert after.sessions[session_id].session.state_version == 1
         assert after.snapshots[session_id].state_version == 1
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_genuine_v1_committed_get_status_preserves_historical_response_without_side_effects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix="genuine-v1-get"
+    )
+    try:
+        assert runtime.provider.invocation_count == 0
+        submission, historical_response = (
+            _install_genuine_v1_committed_recovery_fixture(runtime, session_id)
+        )
+        orchestrator = runtime.services.turn_orchestrator
+        emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+        orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        stored_before = before.turn_requests[
+            (session_id, _FROZEN_HISTORICAL_V1_REQUEST_ID)
+        ]
+        assert stored_before.response is not None
+        artifact_before = _canonical_json_bytes(stored_before.response)
+        assert artifact_before == _FROZEN_HISTORICAL_V1_RESPONSE_BYTES
+        assert hashlib.sha256(artifact_before).hexdigest() == (
+            _FROZEN_HISTORICAL_V1_RESPONSE_SHA256
+        )
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission['client_request_id']}"
+        )
+        after = runtime.store.snapshot()
+        historical_public_response = {
+            key: value
+            for key, value in historical_response.items()
+            if key != "action_signature"
+        }
+
+        assert status.status_code == 200
+        assert status.json()["status"] == "COMMITTED"
+        assert status.json()["response"] == historical_public_response
+        assert status.json()["response"]["feedback_parameters"] == (
+            historical_response["feedback_parameters"]
+        )
+        assert (
+            "public_fact_count"
+            not in status.json()["response"]["feedback_parameters"]
+        )
+        assert runtime.provider.invocation_count == provider_invocations
+        assert allocation_calls == []
+        assert commit_calls() == 0
+        assert emitted == []
+        assert after == before
+        stored_after = after.turn_requests[
+            (session_id, _FROZEN_HISTORICAL_V1_REQUEST_ID)
+        ]
+        assert stored_after.response is not None
+        artifact_after = _canonical_json_bytes(stored_after.response)
+        assert artifact_after == artifact_before
+        assert hashlib.sha256(artifact_after).hexdigest() == (
+            _FROZEN_HISTORICAL_V1_RESPONSE_SHA256
+        )
     finally:
         await client.aclose()
         await runtime.aclose()
@@ -8778,20 +9064,40 @@ async def test_atomic_success_commits_one_revision_story_segment_and_allocated_f
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    ("case", "malformed_value"),
+    ("case", "feedback_parameters"),
     (
-        ("missing", None),
-        ("null", None),
-        ("boolean", True),
-        ("string", "1"),
-        ("fractional", 1.5),
-        ("negative", -1),
-        ("above-maximum", 4),
+        ("missing", {"outcome_result": "SUCCESS"}),
+        ("null", {"outcome_result": "SUCCESS", "public_fact_count": None}),
+        ("boolean-false", {"outcome_result": "SUCCESS", "public_fact_count": False}),
+        ("boolean-true", {"outcome_result": "SUCCESS", "public_fact_count": True}),
+        ("string", {"outcome_result": "SUCCESS", "public_fact_count": "1"}),
+        ("fractional", {"outcome_result": "SUCCESS", "public_fact_count": 1.5}),
+        ("negative", {"outcome_result": "SUCCESS", "public_fact_count": -1}),
+        ("above-maximum", {"outcome_result": "SUCCESS", "public_fact_count": 4}),
+        (
+            "extra-feedback-field",
+            {
+                "outcome_result": "SUCCESS",
+                "public_fact_count": 1,
+                "unexpected_feedback": "D1_UNDECLARED_FEEDBACK_CANARY_71A9",
+            },
+        ),
+        (
+            "privacy-canary-fields",
+            {
+                "outcome_result": "SUCCESS",
+                "public_fact_count": 1,
+                "public_fact_key": "D1_PUBLIC_FACT_KEY_CANARY_2B64",
+                "public_fact_value": "D1_PUBLIC_FACT_VALUE_CANARY_93CD",
+                "raw_provider_fragment": "D1_RAW_PROVIDER_FRAGMENT_CANARY_A417",
+                "private_internal_memory": "D1_PRIVATE_MEMORY_CANARY_E805",
+            },
+        ),
     ),
 )
-async def test_committed_dynamic_replay_rejects_missing_or_invalid_public_fact_count(
+async def test_invalid_v2_committed_post_and_get_recovery_fail_closed_without_leakage_or_side_effects(
     case: str,
-    malformed_value: object,
+    feedback_parameters: dict[str, object],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     runtime, client, session_id = await _entered_dynamic_client(
@@ -8812,51 +9118,764 @@ async def test_committed_dynamic_replay_rejects_missing_or_invalid_public_fact_c
         stored = runtime.store._turn_requests[key]
         assert stored.response is not None
         damaged_response = dict(stored.response)
-        damaged_feedback = dict(damaged_response["feedback_parameters"])
-        if case == "missing":
-            damaged_feedback.pop("public_fact_count")
-        else:
-            damaged_feedback["public_fact_count"] = malformed_value
-        damaged_response["feedback_parameters"] = damaged_feedback
+        damaged_response["feedback_parameters"] = feedback_parameters
         runtime.store._turn_requests[key] = replace(
             stored, response=damaged_response
         )
         orchestrator = runtime.services.turn_orchestrator
         orchestrator._buckets.clear()
+        emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+        orchestrator.diagnostic_reporter = emitted.append
         before = runtime.store.snapshot()
         provider_invocations = runtime.provider.invocation_count
-        allocation_calls: list[dict[str, object]] = []
-        original_allocate = DynamicGeneratedPublicFactKeyAllocator.allocate
-
-        def tracked_allocate(_cls, **kwargs):
-            allocation_calls.append(kwargs)
-            return original_allocate(**kwargs)
-
-        monkeypatch.setattr(
-            DynamicGeneratedPublicFactKeyAllocator,
-            "allocate",
-            classmethod(tracked_allocate),
-        )
-        commit_calls = 0
-        original_commit = DemoUnitOfWork.commit
-
-        async def tracked_commit(self):
-            nonlocal commit_calls
-            commit_calls += 1
-            await original_commit(self)
-
-        monkeypatch.setattr(DemoUnitOfWork, "commit", tracked_commit)
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
         submission = ActionSubmission(
             session_id=session_id,
             **submission_payload,
         )
+        expected_public_error = {
+            "error": {
+                "error_code": "STORED_TURN_RESPONSE_INVALID",
+                "message": "Session state is unavailable or incompatible",
+            }
+        }
+        canaries = (
+            "D1_UNDECLARED_FEEDBACK_CANARY_71A9",
+            "D1_PUBLIC_FACT_KEY_CANARY_2B64",
+            "D1_PUBLIC_FACT_VALUE_CANARY_93CD",
+            "D1_RAW_PROVIDER_FRAGMENT_CANARY_A417",
+            "D1_PRIVATE_MEMORY_CANARY_E805",
+        )
 
-        with pytest.raises(StoredTurnResponseInvalidError):
+        post = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission.client_request_id}"
+        )
+
+        assert post.status_code == status.status_code == 409
+        assert post.json() == status.json() == expected_public_error
+        assert "COMMITTED" not in post.text
+        assert "COMMITTED" not in status.text
+
+        with pytest.raises(StoredTurnResponseInvalidError) as post_error:
             await orchestrator.handle(submission)
+        with pytest.raises(StoredTurnResponseInvalidError) as get_error:
+            await runtime.services.session_service.get_narrative_request_status(
+                RequestPrincipal(
+                    player_id="demo-player",
+                    authentication_scheme="demo-dev-only",
+                ),
+                session_id,
+                submission.client_request_id,
+            )
+
+        for error in (post_error.value, get_error.value):
+            assert error.__cause__ is None
+            assert error.__context__ is None
+            diagnostic_surface = " ".join(
+                (str(error), repr(error.__cause__), repr(error.__context__))
+            )
+            for canary in canaries:
+                assert canary not in diagnostic_surface
+        public_surface = post.text + status.text
+        for canary in canaries:
+            assert canary not in public_surface
 
         assert runtime.provider.invocation_count == provider_invocations
         assert allocation_calls == []
-        assert commit_calls == 0
+        assert commit_calls() == 0
+        assert emitted == []
+        assert runtime.store.snapshot() == before
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_model_invalid_committed_response_recovery_has_clean_post_and_get_exception_chains(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    canary = "D1_PRIVATE_MODEL_INVALID_STATE_CHANGED_CANARY_4E91"
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix="model-invalid-response-chain"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        valid_response = dict(stored.response)
+        malformed_response = dict(valid_response)
+        malformed_response["state_changed"] = canary
+        assert type(malformed_response["state_changed"]) is str
+        feedback_parameters = malformed_response["feedback_parameters"]
+        assert type(feedback_parameters) is dict
+        assert set(feedback_parameters) == {"outcome_result", "public_fact_count"}
+        assert feedback_parameters["outcome_result"] in {
+            "SUCCESS",
+            "AMBIGUOUS",
+            "FAILURE",
+            "NO_EFFECT",
+        }
+        assert feedback_parameters["public_fact_count"] == 1
+        assert canary not in canonical_json(
+            malformed_response["feedback_parameters"]
+        )
+        assert {
+            field: value
+            for field, value in malformed_response.items()
+            if field != "state_changed"
+        } == {
+            field: value
+            for field, value in valid_response.items()
+            if field != "state_changed"
+        }
+
+        submission = ActionSubmission(session_id=session_id, **submission_payload)
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert (
+            job.prompt_schema_version
+            == dynamic_orchestrator_module.DYNAMIC_PROMPT_SCHEMA_VERSION
+        )
+        assert job.session_id == valid_response["session_id"] == session_id
+        assert (
+            job.client_request_id
+            == valid_response["client_request_id"]
+            == submission.client_request_id
+        )
+        assert (
+            job.action_signature
+            == stored.action_signature
+            == valid_response["action_signature"]
+            == submission.action_signature()
+        )
+        assert job.turn_id == stored.turn_id == submission.turn_id
+
+        malformed_stored = replace(stored, response=malformed_response)
+        runtime.store._turn_requests[key] = malformed_stored
+        orchestrator = runtime.services.turn_orchestrator
+        orchestrator._buckets.clear()
+        emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+        orchestrator.diagnostic_reporter = emitted.append
+        before = runtime.store.snapshot()
+        receipt_before = before.turn_requests[key]
+        assert receipt_before.response == malformed_response
+        malformed_bytes = _canonical_json_bytes(malformed_response)
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+
+        def assert_recovery_state_unchanged() -> None:
+            after = runtime.store.snapshot()
+            assert runtime.provider.invocation_count == provider_invocations
+            assert allocation_calls == []
+            assert commit_calls() == 0
+            assert emitted == []
+            assert after.sessions == before.sessions
+            assert after.snapshots == before.snapshots
+            assert after.events == before.events
+            assert after.provider_progress == before.provider_progress
+            assert after.narrative_jobs == before.narrative_jobs
+            assert after.turn_requests == before.turn_requests
+            assert after.turn_requests[key] == receipt_before
+            assert after.turn_requests[key].response is not None
+            assert (
+                _canonical_json_bytes(after.turn_requests[key].response)
+                == malformed_bytes
+            )
+            assert runtime.store._turn_requests[key] == malformed_stored
+            assert runtime.store._turn_requests[key].response == malformed_response
+            assert orchestrator._buckets == {}
+
+        expected_public_error = {
+            "error": {
+                "error_code": "STORED_TURN_RESPONSE_INVALID",
+                "message": "Session state is unavailable or incompatible",
+            }
+        }
+        caplog.set_level("DEBUG")
+        caplog.clear()
+        capsys.readouterr()
+
+        post = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert post.status_code == 409
+        assert post.json() == expected_public_error
+        assert "response" not in post.json()
+        assert "COMMITTED" not in post.text
+        assert canary.encode("utf-8") not in post.content
+        assert_recovery_state_unchanged()
+
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission.client_request_id}"
+        )
+        assert status.status_code == 409
+        assert status.json() == expected_public_error
+        assert "response" not in status.json()
+        assert "COMMITTED" not in status.text
+        assert canary.encode("utf-8") not in status.content
+        assert_recovery_state_unchanged()
+
+        with pytest.raises(StoredTurnResponseInvalidError) as post_error:
+            await orchestrator.handle(submission)
+        assert_recovery_state_unchanged()
+        with pytest.raises(StoredTurnResponseInvalidError) as get_error:
+            await runtime.services.session_service.get_narrative_request_status(
+                RequestPrincipal(
+                    player_id="demo-player",
+                    authentication_scheme="demo-dev-only",
+                ),
+                session_id,
+                submission.client_request_id,
+            )
+        assert_recovery_state_unchanged()
+
+        def exception_chain(error: BaseException) -> tuple[BaseException, ...]:
+            pending = [error]
+            seen: set[int] = set()
+            chain: list[BaseException] = []
+            while pending:
+                current = pending.pop()
+                if id(current) in seen:
+                    continue
+                seen.add(id(current))
+                chain.append(current)
+                if current.__cause__ is not None:
+                    pending.append(current.__cause__)
+                if current.__context__ is not None:
+                    pending.append(current.__context__)
+            return tuple(chain)
+
+        def recursive_exception_diagnostics(error: BaseException) -> str:
+            pending: list[object] = [error]
+            seen: set[int] = set()
+            diagnostics: list[str] = []
+            while pending:
+                current = pending.pop()
+                if id(current) in seen:
+                    continue
+                seen.add(id(current))
+                if isinstance(current, BaseException):
+                    diagnostics.extend(
+                        (
+                            type(current).__qualname__,
+                            str(current),
+                            repr(current),
+                            repr(current.args),
+                            repr(current.__dict__),
+                        )
+                    )
+                    pending.extend(current.args)
+                    if current.__cause__ is not None:
+                        pending.append(current.__cause__)
+                    if current.__context__ is not None:
+                        pending.append(current.__context__)
+                elif isinstance(current, dict):
+                    pending.extend(current.keys())
+                    pending.extend(current.values())
+                elif isinstance(current, (tuple, list, set, frozenset)):
+                    pending.extend(current)
+                else:
+                    diagnostics.append(repr(current))
+            return "\n".join(diagnostics)
+
+        for error in (post_error.value, get_error.value):
+            assert type(error) is StoredTurnResponseInvalidError
+            assert error.code == "STORED_TURN_RESPONSE_INVALID"
+            assert error.args == (f"STORED_TURN_RESPONSE_INVALID: {session_id}",)
+            assert error.__cause__ is None
+            assert error.__context__ is None
+            assert exception_chain(error) == (error,)
+            assert canary not in recursive_exception_diagnostics(error)
+
+        captured = capsys.readouterr()
+        diagnostics = "\n".join(
+            (caplog.text, captured.out, captured.err, repr(emitted))
+        )
+        assert canary not in diagnostics
+        assert canary not in post.text + status.text
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+async def _assert_recovery_rejected_without_leakage_or_side_effects(
+    *,
+    runtime,
+    client: httpx.AsyncClient,
+    session_id: str,
+    submission_payload: dict[str, object],
+    canaries: tuple[str, ...],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    orchestrator = runtime.services.turn_orchestrator
+    orchestrator._buckets.clear()
+    emitted: list[DynamicNarrativeRejectionDiagnostic] = []
+    orchestrator.diagnostic_reporter = emitted.append
+    before = runtime.store.snapshot()
+    provider_invocations = runtime.provider.invocation_count
+    allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+    submission = ActionSubmission(session_id=session_id, **submission_payload)
+    expected_public_error = {
+        "error": {
+            "error_code": "STORED_TURN_RESPONSE_INVALID",
+            "message": "Session state is unavailable or incompatible",
+        }
+    }
+
+    post = await client.post(
+        f"/v1/sessions/{session_id}/actions", json=submission_payload
+    )
+    status = await client.get(
+        f"/v1/sessions/{session_id}/requests/{submission.client_request_id}"
+    )
+
+    assert post.status_code == status.status_code == 409
+    assert post.json() == status.json() == expected_public_error
+    assert "COMMITTED" not in post.text
+    assert "COMMITTED" not in status.text
+
+    with pytest.raises(StoredTurnResponseInvalidError) as post_error:
+        await orchestrator.handle(submission)
+    with pytest.raises(StoredTurnResponseInvalidError) as get_error:
+        await runtime.services.session_service.get_narrative_request_status(
+            RequestPrincipal(
+                player_id="demo-player",
+                authentication_scheme="demo-dev-only",
+            ),
+            session_id,
+            submission.client_request_id,
+        )
+
+    for error in (post_error.value, get_error.value):
+        assert error.__cause__ is None
+        assert error.__context__ is None
+        diagnostic_surface = " ".join(
+            (
+                str(error),
+                repr(error.args),
+                repr(error.__dict__),
+                repr(error.__cause__),
+                repr(error.__context__),
+                repr(emitted),
+            )
+        )
+        for canary in canaries:
+            assert canary not in diagnostic_surface
+    public_surface = post.text + status.text
+    for canary in canaries:
+        assert canary not in public_surface
+
+    after = runtime.store.snapshot()
+    assert runtime.provider.invocation_count == provider_invocations
+    assert allocation_calls == []
+    assert commit_calls() == 0
+    assert emitted == []
+    assert after.sessions == before.sessions
+    assert after.snapshots == before.snapshots
+    assert after.events == before.events
+    assert after.turn_requests == before.turn_requests
+    assert after.narrative_jobs == before.narrative_jobs
+    assert after.provider_progress == before.provider_progress
+    assert after == before
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "case",
+    (
+        "resolved-local",
+        "narrative-required-pending",
+        "wrong-result-code",
+        "wrong-feedback-code",
+        "committed-without-state-change",
+    ),
+)
+async def test_dynamic_committed_job_rejects_response_controlled_lifecycle_and_stable_code_contradictions(
+    case: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix=f"contradictory-lifecycle-{case}"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        damaged_response = dict(stored.response)
+        canary = f"D1_PRIVATE_RECOVERY_CANARY_{case.upper()}_7C31"
+        if case == "resolved-local":
+            private_feedback = {"private_feedback": canary}
+            damaged_response.update(
+                resolution_kind="RESOLVED_LOCAL",
+                feedback_parameters=private_feedback,
+                state_changed=False,
+                narrative_required=False,
+                narrative_pending=False,
+                narrative_frame=None,
+                narrative_text=None,
+                narrative_status=None,
+                local_query_result=private_feedback,
+            )
+        elif case == "narrative-required-pending":
+            damaged_response.update(
+                resolution_kind="NARRATIVE_REQUIRED",
+                feedback_parameters={
+                    "outcome_result": "SUCCESS",
+                    "private_feedback": canary,
+                },
+                state_changed=False,
+                narrative_required=True,
+                narrative_pending=True,
+                narrative_text=None,
+                narrative_status="PENDING",
+                local_query_result=None,
+            )
+        elif case == "wrong-result-code":
+            damaged_response.update(
+                result_code="NARRATIVE_OUTCOME_COMMITTED",
+                narrative_text=canary,
+            )
+        elif case == "wrong-feedback-code":
+            damaged_response.update(
+                feedback_code="NARRATIVE_OUTCOME_COMMITTED",
+                narrative_text=canary,
+            )
+        else:
+            assert case == "committed-without-state-change"
+            damaged_response.update(
+                state_changed=False,
+                narrative_text=canary,
+            )
+
+        model_valid_response = TurnResponse.model_validate(damaged_response)
+        runtime.store._turn_requests[key] = replace(
+            stored,
+            response=model_valid_response.to_persistence(),
+        )
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        assert job.status is NarrativeJobStatus.COMMITTED
+        assert job.prompt_schema_version != DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION
+
+        await _assert_recovery_rejected_without_leakage_or_side_effects(
+            runtime=runtime,
+            client=client,
+            session_id=session_id,
+            submission_payload=submission_payload,
+            canaries=(canary,),
+            monkeypatch=monkeypatch,
+        )
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_committed_job_turn_mismatch_fails_closed_for_post_and_get(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix="committed-turn-mismatch"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        mismatched_turn_canary = "D1_PRIVATE_MISMATCHED_TURN_CANARY_71E2"
+        job_payload = job.model_dump(mode="python")
+        job_payload["turn_id"] = mismatched_turn_canary
+        mismatched_job = NarrativeJob.model_validate(job_payload)
+        assert mismatched_job.session_id == stored.response["session_id"]
+        assert mismatched_job.client_request_id == submission_payload[
+            "client_request_id"
+        ]
+        assert mismatched_job.action_signature == stored.action_signature
+        assert mismatched_job.prompt_schema_version == job.prompt_schema_version
+        assert mismatched_job.status is NarrativeJobStatus.COMMITTED
+        assert mismatched_job.turn_id != stored.turn_id
+        runtime.store._narrative_jobs[job.job_id] = mismatched_job
+
+        await _assert_recovery_rejected_without_leakage_or_side_effects(
+            runtime=runtime,
+            client=client,
+            session_id=session_id,
+            submission_payload=submission_payload,
+            canaries=(mismatched_turn_canary,),
+            monkeypatch=monkeypatch,
+        )
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+async def test_dynamic_committed_recovery_accepts_all_four_exact_job_receipt_associations(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix="committed-full-association"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        submission = ActionSubmission(session_id=session_id, **submission_payload)
+        assert job.session_id == stored.response["session_id"] == session_id
+        assert (
+            job.client_request_id
+            == stored.response["client_request_id"]
+            == submission.client_request_id
+        )
+        assert (
+            job.action_signature
+            == stored.action_signature
+            == stored.response["action_signature"]
+            == submission.action_signature()
+        )
+        assert job.turn_id == stored.turn_id == submission.turn_id
+
+        runtime.services.turn_orchestrator._buckets.clear()
+        before = runtime.store.snapshot()
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+        replay = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission.client_request_id}"
+        )
+        after = runtime.store.snapshot()
+
+        assert replay.status_code == status.status_code == 200
+        assert replay.json() == committed.json()
+        assert status.json()["status"] == "COMMITTED"
+        assert status.json()["response"] == committed.json()
+        assert runtime.provider.invocation_count == provider_invocations
+        assert allocation_calls == []
+        assert commit_calls() == 0
+        assert after == before
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("case", "prompt_schema_version", "feedback_parameters", "remove_job"),
+    (
+        (
+            "v1-with-v2-feedback",
+            DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
+            {"outcome_result": "SUCCESS", "public_fact_count": 1},
+            False,
+        ),
+        (
+            "v1-with-unauthorized-feedback",
+            DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
+            {
+                "outcome_result": "SUCCESS",
+                "unauthorized": "D1_V1_UNAUTHORIZED_CANARY_4F20",
+            },
+            False,
+        ),
+        (
+            "unsupported-dynamic-schema",
+            "dynamic-narrative-prompt-v99",
+            None,
+            False,
+        ),
+        ("absent-dynamic-job", None, None, True),
+    ),
+)
+async def test_dynamic_recovery_discriminator_integrity_rejects_untrusted_or_contradictory_metadata(
+    case: str,
+    prompt_schema_version: str | None,
+    feedback_parameters: dict[str, object] | None,
+    remove_job: bool,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix=f"discriminator-{case}"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        if feedback_parameters is not None:
+            damaged_response = dict(stored.response)
+            damaged_response["feedback_parameters"] = feedback_parameters
+            runtime.store._turn_requests[key] = replace(
+                stored, response=damaged_response
+            )
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        if remove_job:
+            del runtime.store._narrative_jobs[job.job_id]
+        else:
+            assert prompt_schema_version is not None
+            runtime.store._narrative_jobs[job.job_id] = job.model_copy(
+                update={"prompt_schema_version": prompt_schema_version}
+            )
+        runtime.services.turn_orchestrator._buckets.clear()
+
+        before = runtime.store.snapshot()
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+        expected_error = {
+            "error": {
+                "error_code": "STORED_TURN_RESPONSE_INVALID",
+                "message": "Session state is unavailable or incompatible",
+            }
+        }
+
+        post = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission_payload['client_request_id']}"
+        )
+
+        assert post.status_code == status.status_code == 409
+        assert post.json() == status.json() == expected_error
+        assert "D1_V1_UNAUTHORIZED_CANARY_4F20" not in post.text + status.text
+        assert runtime.provider.invocation_count == provider_invocations
+        assert allocation_calls == []
+        assert commit_calls() == 0
+        assert runtime.store.snapshot() == before
+    finally:
+        await client.aclose()
+        await runtime.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("contract", ("non-dynamic", "local-template"))
+async def test_committed_recovery_preserves_non_dynamic_and_local_template_behavior(
+    contract: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    runtime, client, session_id = await _entered_dynamic_client(
+        identity_suffix=f"unchanged-{contract}"
+    )
+    try:
+        view = (await client.get(f"/v1/sessions/{session_id}/view")).json()
+        submission_payload = view["action_affordances"]["suggested_actions"][0][
+            "submission"
+        ]
+        committed = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        assert committed.status_code == 200, committed.text
+
+        key = (session_id, submission_payload["client_request_id"])
+        stored = runtime.store._turn_requests[key]
+        assert stored.response is not None
+        response = dict(stored.response)
+        job = next(iter(runtime.store._narrative_jobs.values()))
+        job_payload = job.model_dump(mode="python")
+        if contract == "non-dynamic":
+            response.update(
+                result_code="NARRATIVE_OUTCOME_COMMITTED",
+                feedback_code="NARRATIVE_OUTCOME_COMMITTED",
+                feedback_parameters={"outcome_result": "SUCCESS"},
+            )
+            job_payload["prompt_schema_version"] = "narrative-prompt-v2"
+        else:
+            response.update(
+                resolution_kind="RESOLVED_LOCAL",
+                result_code="SCENARIO_DECISION_RECORDED",
+                feedback_code="SCENARIO_DECISION_RECORDED",
+                feedback_parameters={
+                    "decision_id": "public-decision",
+                    "selected_action_id": "public-action",
+                },
+                narrative_required=False,
+                narrative_pending=False,
+                narrative_status=None,
+            )
+            job_payload.update(
+                prompt_schema_version=LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+                provider_name=LOCAL_TEMPLATE_PROVIDER_NAME,
+                model_name=LOCAL_TEMPLATE_MODEL_NAME,
+                attempt_count=0,
+                outcome_rule_id="local.server_decision_template",
+            )
+        runtime.store._turn_requests[key] = replace(stored, response=response)
+        runtime.store._narrative_jobs[job.job_id] = type(job).model_validate(
+            job_payload
+        )
+        runtime.services.turn_orchestrator._buckets.clear()
+
+        before = runtime.store.snapshot()
+        provider_invocations = runtime.provider.invocation_count
+        allocation_calls, commit_calls = _track_recovery_side_effects(monkeypatch)
+        public_response = {
+            field: value for field, value in response.items() if field != "action_signature"
+        }
+
+        post = await client.post(
+            f"/v1/sessions/{session_id}/actions", json=submission_payload
+        )
+        status = await client.get(
+            f"/v1/sessions/{session_id}/requests/{submission_payload['client_request_id']}"
+        )
+
+        assert post.status_code == status.status_code == 200
+        assert post.json() == public_response
+        assert status.json()["status"] == "COMMITTED"
+        assert status.json()["response"] == public_response
+        assert runtime.provider.invocation_count == provider_invocations
+        assert allocation_calls == []
+        assert commit_calls() == 0
         assert runtime.store.snapshot() == before
     finally:
         await client.aclose()

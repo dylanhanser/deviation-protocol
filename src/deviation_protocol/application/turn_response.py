@@ -4,9 +4,19 @@ from typing import Any, Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from deviation_protocol.application.dynamic_narrative_models import (
+    DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
+    DYNAMIC_PROMPT_SCHEMA_VERSION,
+)
+from deviation_protocol.application.narrative_jobs import (
+    LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION,
+    NarrativeJob,
+    NarrativeJobStatus,
+)
 from deviation_protocol.application.resolution import ResolutionStatus
 from deviation_protocol.domain.json_values import freeze_json_object
 from deviation_protocol.domain.narrative import NarrativeFrame
+from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 
 
 StableId = Annotated[str, Field(strict=True, min_length=1, max_length=64)]
@@ -15,6 +25,16 @@ StableCode = Annotated[
     Field(strict=True, pattern=r"^[A-Z][A-Z0-9_]{0,127}$"),
 ]
 StrictBool = Annotated[bool, Field(strict=True)]
+_DYNAMIC_COMMITTED_CODE = "DYNAMIC_NARRATIVE_COMMITTED"
+_DYNAMIC_PROMPT_SCHEMA_PREFIX = "dynamic-narrative-prompt-"
+_DYNAMIC_OUTCOME_RESULTS = frozenset(item.value for item in NarrativeOutcomeResult)
+
+
+class CommittedTurnResponseValidationError(ValueError):
+    """Sanitized internal failure for contradictory persisted recovery data."""
+
+    def __init__(self) -> None:
+        super().__init__("stored committed response violates its trusted schema")
 
 
 class TurnResponse(BaseModel):
@@ -106,3 +126,85 @@ class TurnResponse(BaseModel):
 
     def to_persistence(self) -> dict[str, Any]:
         return self.model_dump(mode="json")
+
+
+def validate_committed_turn_response_for_recovery(
+    response: TurnResponse,
+    job: NarrativeJob | None,
+    *,
+    stored_turn_id: str,
+) -> TurnResponse:
+    """Validate one parsed commitment against its trusted durable schema epoch."""
+
+    if not isinstance(response, TurnResponse):
+        raise CommittedTurnResponseValidationError()
+
+    if job is None:
+        if (
+            response.result_code == _DYNAMIC_COMMITTED_CODE
+            or response.feedback_code == _DYNAMIC_COMMITTED_CODE
+        ):
+            raise CommittedTurnResponseValidationError()
+        return response
+    if not isinstance(job, NarrativeJob):
+        raise CommittedTurnResponseValidationError()
+    if (
+        type(stored_turn_id) is not str
+        or job.session_id != response.session_id
+        or job.turn_id != stored_turn_id
+        or job.client_request_id != response.client_request_id
+        or job.action_signature != response.action_signature
+    ):
+        raise CommittedTurnResponseValidationError()
+
+    prompt_schema_version = job.prompt_schema_version
+    if prompt_schema_version == LOCAL_TEMPLATE_PROMPT_SCHEMA_VERSION:
+        if (
+            response.result_code == _DYNAMIC_COMMITTED_CODE
+            or response.feedback_code == _DYNAMIC_COMMITTED_CODE
+        ):
+            raise CommittedTurnResponseValidationError()
+        return response
+    if prompt_schema_version not in {
+        DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION,
+        DYNAMIC_PROMPT_SCHEMA_VERSION,
+    }:
+        if (
+            prompt_schema_version.startswith(_DYNAMIC_PROMPT_SCHEMA_PREFIX)
+            or response.result_code == _DYNAMIC_COMMITTED_CODE
+            or response.feedback_code == _DYNAMIC_COMMITTED_CODE
+        ):
+            raise CommittedTurnResponseValidationError()
+        return response
+
+    if (
+        job.status is not NarrativeJobStatus.COMMITTED
+        or response.resolution_kind is not ResolutionStatus.NARRATIVE_COMMITTED
+        or response.state_changed is not True
+        or response.narrative_required is not True
+        or response.narrative_pending is not False
+        or response.narrative_status != "COMMITTED"
+        or response.narrative_text is None
+        or response.result_code != _DYNAMIC_COMMITTED_CODE
+        or response.feedback_code != _DYNAMIC_COMMITTED_CODE
+    ):
+        raise CommittedTurnResponseValidationError()
+
+    expected_feedback_keys = {"outcome_result"}
+    if prompt_schema_version == DYNAMIC_PROMPT_SCHEMA_VERSION:
+        expected_feedback_keys.add("public_fact_count")
+    if set(response.feedback_parameters) != expected_feedback_keys:
+        raise CommittedTurnResponseValidationError()
+
+    outcome_result = response.feedback_parameters["outcome_result"]
+    if type(outcome_result) is not str or outcome_result not in _DYNAMIC_OUTCOME_RESULTS:
+        raise CommittedTurnResponseValidationError()
+
+    if prompt_schema_version == DYNAMIC_PROMPT_SCHEMA_VERSION:
+        public_fact_count = response.feedback_parameters["public_fact_count"]
+        if (
+            type(public_fact_count) is not int
+            or not 0 <= public_fact_count <= 3
+        ):
+            raise CommittedTurnResponseValidationError()
+    return response

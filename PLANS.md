@@ -96,6 +96,8 @@ general production readiness, or completion of any new phase. The
 autonomous-improvement work item is closed. The next development work item must
 be selected separately from the remaining roadmap.
 
+### D1 post-publication lifecycle reconciliation
+
 The bounded
 [Dynamic Narrative Provider Reliability Remediation Plan](docs/dynamic_narrative_provider_reliability_remediation_plan.md)
 now contains the independently approved and published `DN-DKO-006`-corrected
@@ -124,102 +126,113 @@ and finalization. A maximum locked current version fails before calculation,
 allocation, detached mutation, fact-ring mutation, story publication, or
 commit, at only the existing sanitized failure boundary.
 
-The original D1-D5 Live diagnostic is closed as failed/incomplete. It stopped
-after historical D1 (Run A, suggested ordinal `0`) returned HTTP `200` and
-normally committed revision `0 -> 1`, one new story segment, and three
-suggestions. The official DeepSeek Dashboard delta and Provider-generation
-count were both `1`; there was no authorized application replacement, transport
-retry, or third generation. The exact newly committed public-fact count is
-`UNKNOWN`, so D1 is incomplete, not passed, not reconstructable, and not
-retroactively reinterpretable or repeatable within that procedure. D2-D5 were
-never started, and the procedure may never resume at D2 or be rewritten as
-successful.
+The original D1-D5 diagnostic remains failed/incomplete. Historical D1 (Run A,
+suggested ordinal `0`) returned HTTP `200`, normally committed revision
+`0 -> 1`, one story segment, and three suggestions, with an official DeepSeek
+Dashboard delta and Provider-generation count of `1`. Its exact newly committed
+public-fact count remains `UNKNOWN`; D2-D5 never started, and that procedure is
+not reconstructable, repeatable, or retrospectively passable.
 
-The missing browser-visible committed fact-count evidence is confirmed. The
-completed read-only analysis, with verdict
-`DYNAMIC_NARRATIVE_D1_NEW_PUBLIC_FACTS_EVIDENCE_REMEDIATION_PLAN_COMPLETE`,
-selected a privacy-safe bounded integer `public_fact_count` in the committed
-Dynamic Narrative response's existing `feedback_parameters`. The React action
-loop must retain that committed response across the authoritative View refresh
-and render a Session- and revision-associated post-Action summary. It must not
-reconstruct the count from the View, long-term-memory categories, prose,
-Provider requests or proposals, fact-ring size, keys, or values.
-
-The first independent review of the exact four-document authority-correction
-candidate returned
-`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REVIEW_CHANGES_REQUIRED`.
-Its two blocking findings were the non-executable clean-baseline lifecycle and
-the committed-scalar derivation timing. This bounded four-document correction
-addresses only those findings. It is complete only as an unstaged documentation
-candidate and has not yet received the required independent re-review or
-approval.
-
-The current complete worktree inventory remains exactly nine unstaged paths:
+The D1 implementation was nevertheless committed and pushed. Its published
+baseline was `8af790cc280f78102fa2e736806362527043424e`; publication commit
+`7ceb93eda21afeb437508bff46e057db5178c242` has subject
+`feat(narrative): implement dynamic narrative vertical spike`. The exact
+`8af790c..7ceb93e` aggregate contains these eleven paths:
 
 1. `PLANS.md`;
 2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
-3. `docs/public_client_contract.md`;
-4. `docs/engineering/codex_workflow.md`;
-5. `src/deviation_protocol/application/dynamic_narrative_models.py`;
-6. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
-7. `src/deviation_protocol/api/demo_composition.py`;
-8. `tests/unit/test_dynamic_narrative.py`; and
-9. `tests/unit/test_narrative_provider.py`.
+3. `docs/engineering/codex_workflow.md`;
+4. `docs/public_client_contract.md`;
+5. `src/deviation_protocol/api/demo_composition.py`;
+6. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+7. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+8. `tests/unit/test_dynamic_narrative.py`;
+9. `tests/unit/test_narrative_provider.py`;
+10. `web/src/App.action-loop.test.tsx`; and
+11. `web/src/App.tsx`.
 
-The first four are the authority-document candidate. The last five are the
-intentionally preserved existing runtime/test candidate. The post-correction
-per-path hashes and complete nine-path diff size/hash are the proposed manifest
-for the next independent re-review; they are not approved or locked merely by
-this correction.
+That published code materially implements the nested committed-response
+`public_fact_count` derivation and Web evidence summary. Commit ancestry and
+the local `origin/main` reflog prove the commit and push; they do not prove the
+required pre-publication lifecycle. There is no proven returned outcome for the
+original independent new-session authority re-review or its operative
+pre-implementation approval token, no completed exact nine-path approval-bound
+manifest lock, no proven separate implementation authorization or historical
+deterministic execution evidence, and no proven candidate freeze, formal D1
+Gate, independent pre-publication implementation review, or D1 aggregate
+staging authorization. Ordinary Git does not retain the old dirty-worktree
+bytes, so that obsolete nine-path candidate cannot now be reconstructed or
+retrospectively locked. The historical publication is therefore not declared
+approved, procedurally compliant, or properly closed.
 
-If and only if that re-review approves, the resulting exact nine-path dirty
-state is locked as the authorized pre-implementation manifest under the narrow
-manifest-locked dirty aggregate-candidate exception in the Codex workflow. It
-is not a Git-clean baseline. The four documents are not separately staged,
-committed, or pushed because that would leave the protected implementation
-candidate dirty, while committing all nine paths would prematurely bypass the
-remaining evidence and review gates. The ordinary published-clean-baseline rule
-continues to apply outside this exact aggregate candidate.
+The prescribed E1-E5 Live epoch also remains incomplete. Its preserved record
+is E1 success followed by E2 HTTP `503`; E3-E5 did not complete under that
+epoch before the sequence was superseded. Later Live samples, the separate
+autonomous-improvement evidence above, and current deterministic evidence do
+not backfill that epoch, a freeze, or a formal Gate. Commits `f7905d7` and
+`d77ab58` close the later autonomous Dynamic Narrative hardening and its status
+synchronization, not the D1 publication lifecycle.
 
-The future implementation delta remains exactly four paths:
+A later independent post-publication static review found material recovery-
+compatibility, request-status validation, durable-association, Web evidence-
+clearing/removal-sensitivity, and exception-sanitization defects or coverage
+gaps. The resulting correction is implemented in exactly six unstaged
+code/test paths:
 
-1. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`
-   (application runtime);
-2. `tests/unit/test_dynamic_narrative.py` (backend deterministic tests);
-3. `web/src/App.tsx` (Web runtime); and
-4. `web/src/App.action-loop.test.tsx` (Web deterministic tests).
+1. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+2. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+3. `src/deviation_protocol/application/session_service.py`;
+4. `src/deviation_protocol/application/turn_response.py`;
+5. `tests/unit/test_dynamic_narrative.py`; and
+6. `web/src/App.action-loop.test.tsx`.
 
-That four-path list is a delta budget, not the complete candidate inventory.
-The orchestrator and backend test are already dirty in the nine-path baseline
-and may receive only the separately authorized implementation changes. The two
-Web paths are currently clean and may become newly modified. After a successful
-implementation, the complete aggregate worktree would ordinarily contain
-exactly eleven unstaged paths: the original nine plus those two Web paths. The
-four authority documents must remain exact at their approved hashes, as must
-`dynamic_narrative_models.py`, `demo_composition.py`, and
-`test_narrative_provider.py`; only the two already-dirty implementation paths
-may change from the nine-path baseline, and no path outside the eleven-path
-inventory may appear. The final eleven-path per-path hashes and complete-diff
-size/hash must be recorded and verified.
+The corrected current boundaries are:
 
-The executable lifecycle is: four-document authority candidate; independent
-read-only review; this bounded four-document correction; independent
-new-session read-only re-review; if and only if approved, exact nine-path
-manifest lock without separate document staging/commit/push; separately
-authorized four-path implementation delta; deterministic local verification;
-separately authorized E1-E5 Live diagnostic epoch; candidate freeze; formal
-Gate; independent implementation review; complete aggregate staging; one
-intentional aggregate commit; manual user push; and only then publication
-confirmation or another separately authorized phase. Every later task must
-verify the applicable manifest and stop on unexplained identity, path, hash, or
-inventory drift. A manifest alone authorizes none of those later actions.
+- trusted `NarrativeJob.prompt_schema_version` distinguishes genuine v1 from
+  v2 recovery;
+- v1 accepts only historical exact feedback `{outcome_result}` and never
+  synthesizes `public_fact_count`, while v2 requires exact
+  `{outcome_result, public_fact_count}` with an exact non-Boolean integer count
+  in `0..3`;
+- POST replay and GET request-status recovery share the same validation
+  authority and require Session ID, client request ID, action signature, and
+  durable turn ID association;
+- response-controlled lifecycle and stable-code fields cannot bypass the
+  trusted Dynamic-job contract;
+- malformed stored responses fail through the established sanitized HTTP `409`
+  boundary, with no Pydantic/private canary in the public body or direct
+  exception cause/context chain;
+- recovery invokes no Provider and performs no allocation, persistence write,
+  or commit; and
+- Web evidence-clearing and privacy regressions are removal-sensitive across
+  failure, identity replacement, recovery restart, stale completion, and
+  unmount. `web/src/App.tsx` already enforced the production behavior and
+  required no production correction.
 
-No implementation, deterministic verification, future Live diagnostic,
-candidate freeze, formal Gate, implementation review, staging, commit, manual
-push, publication, or later phase is complete or authorized by this correction.
-The prior independent review was not approved. The unique current next task is:
+The final independent correction review returned exactly
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
+That verdict approves only the present six-path code/test correction. The
+correction remains unstaged in the current aggregate; it is not committed or
+published, and its approval does not backfill any missing historical D1 gate.
 
-> An independent new-session read-only re-review of the corrected four-document authority candidate against the two prior independent-review findings.
+| Time and scope | Durable status |
+| --- | --- |
+| `7ceb93e` historical publication | Implemented, committed, and pushed; procedural compliance remains unproven. |
+| Historical E1-E5 epoch | Incomplete: E1 succeeded, E2 failed, and the remainder did not complete under that epoch. |
+| Current six-path correction | Implemented and independently reviewed; still unstaged. |
+| Current three-document task | Documentation reconciliation candidate being authored; independent documentation review pending. |
+| Future | Review the exact reconciliation, then consider a separately authorized local aggregate commit; the user controls any push. |
+
+The exact next task after this authoring pass is a short, independent, read-only
+review of the three-document reconciliation in `PLANS.md`,
+`docs/dynamic_narrative_provider_reliability_remediation_plan.md`, and
+`docs/public_client_contract.md`, including consistency with the unchanged
+approved six-path code/test correction. This authoring task is not that review
+and does not make the resulting nine-path unstaged aggregate commit-ready. Only
+after the documentation review succeeds may a separately authorized local
+aggregate commit be considered; the user remains responsible for any push. No
+new roadmap feature, Phase 6/7 slice, Provider experiment, or Live epoch is
+selected here.
 
 The separate experimental Dynamic Narrative Vertical Spike implementation was
 published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated

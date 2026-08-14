@@ -64,7 +64,11 @@ from deviation_protocol.application.story_director import (
     DeterministicStoryDirector,
     StoryDirectorError,
 )
-from deviation_protocol.application.turn_response import TurnResponse
+from deviation_protocol.application.turn_response import (
+    CommittedTurnResponseValidationError,
+    TurnResponse,
+    validate_committed_turn_response_for_recovery,
+)
 from deviation_protocol.domain.content import ContentCatalog
 from deviation_protocol.domain.models import GameSession
 from deviation_protocol.domain.events import DomainEvent
@@ -1209,15 +1213,29 @@ class SessionService:
         if stored is not None and (
             job is None or job.status is NarrativeJobStatus.COMMITTED
         ):
+            response: TurnResponse | None = None
             try:
                 response = TurnResponse.model_validate(stored.response)
             except (ValidationError, TypeError, ValueError):
-                raise StoredTurnResponseInvalidError(session_id) from None
+                pass
+            if response is None:
+                raise StoredTurnResponseInvalidError(session_id)
             if (
                 response.session_id != session_id
                 or response.client_request_id != client_request_id
                 or response.action_signature != stored.action_signature
             ):
+                raise StoredTurnResponseInvalidError(session_id)
+            invalid = False
+            try:
+                validate_committed_turn_response_for_recovery(
+                    response,
+                    job,
+                    stored_turn_id=stored.turn_id,
+                )
+            except CommittedTurnResponseValidationError:
+                invalid = True
+            if invalid:
                 raise StoredTurnResponseInvalidError(session_id)
             return NarrativeRequestStatusResult(
                 session_id=session_id,

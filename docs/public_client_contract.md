@@ -1330,26 +1330,26 @@ replace, or maintain a divergent client-only label. Free-action test input is a
 natural Chinese sentence, but the submitted protocol shape remains `CUSTOM`
 with its unchanged English identifiers.
 
-This additive extension belongs only to the experimental implementation
-candidate awaiting independent review. It does not complete production or
-evidence work and does not alter Phase 6, Phase 7, or completed Phase 8.
+This additive extension remains experimental, but its runtime and Web behaviors
+exist in published history. It does not complete production or evidence work
+and does not alter Phase 6, Phase 7, or completed Phase 8.
 
 ### Committed Dynamic Narrative public-fact count
 
-The D1 evidence authority correction makes the smallest compatible extension
-to the existing `feedback_parameters` object. An exact committed Dynamic
-Narrative Action response includes an object equivalent to this canonical JSON
-excerpt:
+The implemented D1 contract makes the smallest compatible extension to the
+existing nested `feedback_parameters` object. It adds no top-level Action DTO
+or View field. An exact v2 committed Dynamic Narrative Action response includes
+an object equivalent to this canonical JSON excerpt:
 
 ```json
 {"feedback_parameters":{"outcome_result":"SUCCESS","public_fact_count":0}}
 ```
 
-`public_fact_count` is required for every newly amended exact
-`DYNAMIC_NARRATIVE_COMMITTED` success result. It is an integer from `0` through
-`3`; integer `0` must be serialized and preserved and is not semantically
-equivalent to a missing member. The value represents only the public facts
-newly accepted and committed by that Action.
+`public_fact_count` is required for every exact v2
+`DYNAMIC_NARRATIVE_COMMITTED` success result. It is an exact non-Boolean integer
+from `0` through `3`; integer `0` must be serialized and preserved and is not
+semantically equivalent to a missing member. The value represents only the
+public facts newly accepted and committed by that Action.
 
 The server-owned atomic finalization seam calculates the scalar prospectively as
 `len(allocated_public_facts)`. The source is the final allocated public-fact
@@ -1383,6 +1383,38 @@ current Session and the exact resulting authoritative revision. Missing,
 malformed, out-of-range, wrong-lifecycle, wrong-Session, or wrong-revision data
 fails closed and cannot produce a browser-visible claimed count.
 
+Committed-response recovery is schema-epoch aware. Trusted durable
+`NarrativeJob.prompt_schema_version`, not response-controlled data, selects the
+contract:
+
+- genuine historical v1 requires exact feedback
+  `{"outcome_result": <validated result>}` and does not synthesize the v2
+  member; and
+- v2 requires exact feedback
+  `{"outcome_result": <validated result>, "public_fact_count": <exact non-Boolean integer 0..3>}`.
+
+For a committed Dynamic result, the durable job and stored response/receipt
+must agree on Session ID, client request ID, action signature, and durable turn
+ID. The turn ID is an internal recovery association and adds no public response
+or request-status field. Trusted Dynamic-job status and the complete committed
+lifecycle/stable-code shape are mandatory; contradictory response-controlled
+lifecycle or stable-code fields cannot disguise another response as a valid
+Dynamic commitment. POST replay and GET request-status recovery call the same
+validation authority and fail closed on the same boundary.
+
+Malformed or contradictory stored data returns exactly HTTP `409` with the
+established sanitized envelope:
+
+```json
+{"error":{"error_code":"STORED_TURN_RESPONSE_INVALID","message":"Session state is unavailable or incompatible"}}
+```
+
+The serialized message is periodless. Recovery validation performs no Provider
+call, allocation, persistence mutation, or commit. No private fact key/value,
+Provider fragment, private-memory canary, malformed stored field, Pydantic
+validation detail, or other internal value may enter the public body or a
+retained direct exception cause/context chain.
+
 The scalar exposes no fact value, generated key, allocation information, slot,
 collision input, hidden reference, or Provider data. It adds no top-level Action
 field, does not change the `PlayerSessionView` schema, and does not create a
@@ -1394,6 +1426,21 @@ successor View, fact-ring net growth, logs, UI totals, memory categories,
 Provider responses, or generated keys. Missing, malformed, or out-of-range data
 is invalid, not zero.
 
-This contract amendment is an unimplemented bounded authority-correction
-candidate pending independent new-session re-review after a prior
-`CHANGES_REQUIRED` verdict; it authorizes no implementation or Live activity.
+The Web summary remains associated with the exact Session and authoritative
+revision. Established evidence is cleared across terminal action failure,
+outcome uncertainty, post-commit View failure, manual Session replacement, API
+client identity replacement, same-tab recovery restart, explicit Session
+clear, stale or late completion, and unmount. Feedback privacy tests are
+removal-sensitive: the prior evidence and every private canary must be absent,
+not merely hidden by another rendering path. The existing `web/src/App.tsx`
+production behavior already enforced these boundaries; the current correction
+strengthens its regression evidence without changing that file.
+
+Historical implementation entered commit `7ceb93e` and was pushed, while its
+pre-publication procedural compliance remains unproven. The current six-path
+recovery/sanitization correction is independently reviewed under
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`
+and remains unstaged. That verdict does not approve the current three-document
+reconciliation or retroactively satisfy a historical gate. The current
+post-publication correction adds no route, error code, new public `turn_id`
+field, DTO, response shape, OpenAPI, schema, or migration change.

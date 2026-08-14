@@ -4,8 +4,14 @@
 
 Base key-ownership status: `PLAN_AMENDMENT_PUBLISHED`.
 
-D1 evidence correction status:
-`AUTHORITY_CORRECTION_BOUNDED_CORRECTION_CANDIDATE_AWAITING_INDEPENDENT_REREVIEW`.
+D1 historical publication status: implemented, committed, and pushed in
+`7ceb93eda21afeb437508bff46e057db5178c242`; procedural compliance unproven.
+
+Current post-publication correction status: exact six-path code/test correction
+implemented, independently reviewed, and unstaged.
+
+Current documentation status: exact three-document reconciliation candidate
+being authored; independent documentation review pending.
 
 This document is the independently approved and published `DN-DKO-006`-
 corrected deterministic generated-public-fact-key ownership amendment to the
@@ -32,35 +38,56 @@ All amendment findings `DN-DKO-001` through `DN-DKO-006` are closed, and no
 material finding remains within the approved review scope. The fresh review,
 not the earlier authoring correction, supplied the sole operative approval. The
 corrected key-ownership amendment is independently approved and published and
-remains the base allocation authority. The current four-document D1 evidence
-correction is a separate unapproved candidate. Its first independent review
-returned
+remains the base allocation authority.
+
+The later D1 evidence-authority work was a separate lifecycle. Its first
+independent review returned
 `DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REVIEW_CHANGES_REQUIRED`
 for exactly two blocking findings: the non-executable lifecycle over the
-protected dirty candidate and the committed-scalar derivation timing. This
-bounded correction addresses only those findings, is complete only as an
-unstaged documentation candidate, and has not yet been independently
-re-reviewed. No implementation completion, deterministic verification
-completion, future Live diagnostic, candidate freeze, formal Gate,
-implementation review, staging, commit, push, publication, production
-readiness, or phase completion is claimed for that correction.
-
-The token above applies only to the exact approved technical amendment.
-Historical plan-review, implementation-review, Live-Gate, failure,
-`CHANGES_REQUIRED`, `BLOCKED_BASELINE_MISMATCH`, and `INCOMPLETE` verdicts are
-non-operative for this approval. This bounded publication records the approved
-key-ownership lifecycle result without approving the current evidence
-correction. The sole operative success verdict for the current exact
-four-document candidate is
-`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REREVIEW_APPROVED`.
-The authoring results
+protected dirty candidate and the committed-scalar derivation timing. The
+historical bounded correction claimed to address those findings and prescribed
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_INDEPENDENT_REREVIEW_APPROVED`
+as its operative success verdict. No returned outcome for that exact approval
+token is proven in the repository or local history. The authoring-result tokens
 `DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_CANDIDATE_COMPLETE` and
-`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_BOUNDED_CORRECTION_CANDIDATE_COMPLETE`,
-and all historical, superseded, example, prohibited, failure,
-`CHANGES_REQUIRED`, `BLOCKED`, and `INCOMPLETE` verdicts are non-operative for
-its approval. Any byte change requires new hashes and a fresh independent
-review. This correction does not authorize implementation, validation, Live
-activity, or Git handoff.
+`DYNAMIC_NARRATIVE_D1_EVIDENCE_AUTHORITY_CORRECTION_BOUNDED_CORRECTION_CANDIDATE_COMPLETE`
+were never approval verdicts.
+
+Repository history establishes a different, narrower fact: from baseline
+`8af790cc280f78102fa2e736806362527043424e`, commit
+`7ceb93eda21afeb437508bff46e057db5178c242`
+(`feat(narrative): implement dynamic narrative vertical spike`) intentionally
+committed the predicted eleven-path aggregate, and the local `origin/main`
+reflog records its push. The commit materially introduced the D1
+`public_fact_count` runtime, persistence/replay evidence, and Web summary. It
+does not prove pre-publication authority approval, a completed exact nine-path
+approval-bound manifest lock, separate implementation authorization,
+historical deterministic execution evidence, completion of the prescribed
+E1-E5 epoch, candidate freeze, formal Gate, independent implementation review,
+or staging authorization. Ordinary Git does not preserve the obsolete dirty
+nine-path candidate bytes, so that candidate cannot now be reconstructed or
+retroactively locked. The historical publication is not declared approved,
+procedurally compliant, or properly closed.
+
+A later independent post-publication static review found recovery
+compatibility, request-status validation, durable association, Web evidence-
+clearing/removal-sensitivity, and exception-sanitization defects or coverage
+gaps. The current exact six-path code/test correction addresses those findings
+and received the final verdict
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
+That verdict approves only those six current code/test paths. They remain
+unstaged; the verdict neither approves this three-document reconciliation nor
+backfills any missing historical gate. The exact next task after this authoring
+pass is a short independent read-only review of the three documentation changes
+and their consistency with the unchanged approved six-path correction. Only
+after that review succeeds may a separately authorized local aggregate commit
+be considered; the user controls any push.
+
+The key-ownership approval token above applies only to its exact historical
+technical amendment. The missing D1 authority-approval token, all D1 authoring
+tokens, historical failure and `CHANGES_REQUIRED` tokens, and the current
+six-path correction verdict are mutually non-substitutable under the workflow's
+approval-token and baseline-invalidation rules.
 
 This `DN-DKO-006` correction was authored against the following read-only local
 identity, without fetch or pull:
@@ -107,20 +134,19 @@ Applicable authority, in descending specificity for this correction, is:
 2. `docs/engineering/guardrails.md`, especially `AUTH-001`, `MODEL-001`,
    `MODEL-002`, `STATE-001`, `API-001`, and `ENV-002`;
 3. `docs/engineering/codex_workflow.md`;
-4. this document's current D1 evidence correction, if and only if independently
-   approved and its exact aggregate manifest is locked under the workflow's
-   narrow dirty aggregate-candidate exception, layered over the published
-   key-ownership amendment;
+4. this document's normative D1 contract and post-publication lifecycle
+   reconciliation, without any retroactive approval or manifest-lock claim,
+   layered over the published key-ownership amendment;
 5. the matching amendment in `docs/public_client_contract.md`;
 6. `docs/dynamic_narrative_vertical_spike_plan.md`;
 7. `docs/narrative_provider.md` and `docs/architecture.md`;
 8. the inspected application contracts, finalization implementation, and direct
    regressions.
 
-A relevant baseline change before review, implementation, deterministic
-validation, either real-Provider stage, implementation review, staging, or
-commit invokes the pending-plan baseline invalidation and approval-token
-consistency rules. This correction authorizes none of those later steps.
+A relevant baseline change before review, staging, or commit invokes the
+pending-plan baseline-invalidation and approval-token-consistency rules. This
+authoring task authorizes no staging, commit, push, Live activity, or new
+implementation.
 
 ## 2. Established failure evidence
 
@@ -200,9 +226,12 @@ confirmed that the Action API preserves a committed response's
 `feedback_parameters`, but the React action loop discards that response before
 rendering the refreshed View, and the View cannot safely reconstruct the exact
 per-Action fact count. The selected correction is the bounded committed scalar
-and associated browser evidence surface defined below; its implementation is
-blocked until this exact authority correction receives its operative
-independent-review approval.
+and associated browser evidence surface defined below. At that historical
+planning checkpoint, implementation was described as blocked until the exact
+authority correction received its operative independent-review approval. The
+planned implementation later entered published history in `7ceb93e`, but no
+returned outcome for that approval token is proven; publication does not turn
+the historical prerequisite into a satisfied gate.
 
 ## 3. Normative amendment decision and frozen boundaries
 
@@ -741,8 +770,8 @@ hidden identifiers, or Provider material.
 
 The three-path Prompt-only diff recorded when the published key-ownership
 amendment was authored is historical. Its disposition remains design rationale;
-it is not the current evidence-remediation budget and requires no edit in the
-future four-path implementation:
+it is not the current correction budget. The following table records how the
+then-planned four-path implementation was expected to treat it:
 
 | Historical material | Published key-ownership disposition |
 | --- | --- |
@@ -760,10 +789,10 @@ future four-path implementation:
 
 No Prompt-only code or test is retained if it contradicts server key ownership.
 
-## 7. Exact current inventory, future implementation delta, and aggregate manifest
+## 7. Historical candidate inventory, published implementation, and current correction
 
-Before and after this documentation-only bounded correction, the complete
-worktree inventory is exactly these nine unstaged paths:
+At the historical pre-implementation checkpoint, this plan recorded the
+complete worktree inventory as exactly these nine unstaged paths:
 
 1. `PLANS.md`;
 2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
@@ -775,36 +804,46 @@ worktree inventory is exactly these nine unstaged paths:
 8. `tests/unit/test_dynamic_narrative.py`; and
 9. `tests/unit/test_narrative_provider.py`.
 
-The first four paths are the authority correction. The last five are the
-protected existing runtime/test candidate and must retain their correction-
-entry SHA-256 values throughout this task. The correction handoff records all
-nine resulting per-path hashes and the complete nine-path diff byte size and
-SHA-256. Those resulting values are the proposed baseline for the independent
-re-review; this authoring task does not approve or lock them.
+The first four paths were the authority correction and the last five were the
+protected existing runtime/test candidate. Their proposed post-correction
+hashes and complete-diff identity were intended for an independent re-review
+and manifest lock. No completed approval-bound nine-path lock or approving
+returned verdict is proven. Ordinary Git preserves committed snapshots, not
+those old dirty-worktree bytes; the obsolete candidate cannot be reconstructed
+or used as a current baseline.
 
-The later evidence-remediation implementation budget is exactly a **four
-tracked-path delta with zero newly created files**:
+The historical plan then limited the evidence-remediation implementation to a
+**four tracked-path delta with zero newly created files**:
 
 | Exact path | Starting state | Exact responsibility |
 | --- | --- | --- |
-| `src/deviation_protocol/application/dynamic_narrative_orchestrator.py` | Already dirty in the nine-path candidate; hash may change only during separately authorized implementation | Derive the bounded count prospectively from the final allocated tuple at the common finalization seam and preserve it through committed response, replay/status, private event, and `COMPLETE_NEW` expectation/reconciliation. |
-| `tests/unit/test_dynamic_narrative.py` | Already dirty in the nine-path candidate; hash may change only during separately authorized implementation | Prove exact count, final-candidate, replay/reconciliation, event agreement, failure, and privacy semantics. |
-| `web/src/App.tsx` | Currently clean; permitted to become modified only during separately authorized implementation | Retain and validate the committed Action response through the authoritative View refresh and render the exact Session/revision-associated evidence summary. |
-| `web/src/App.action-loop.test.tsx` | Currently clean; permitted to become modified only during separately authorized implementation | Prove direct-200, 202-to-`COMMITTED`, refresh retention, association, fail-closed, privacy, and preserved action-loop behavior. |
+| `src/deviation_protocol/application/dynamic_narrative_orchestrator.py` | Already dirty in the historical nine-path candidate; planned to change only during separately authorized implementation | Derive the bounded count prospectively from the final allocated tuple at the common finalization seam and preserve it through committed response, replay/status, private event, and `COMPLETE_NEW` expectation/reconciliation. |
+| `tests/unit/test_dynamic_narrative.py` | Already dirty in the historical nine-path candidate; planned to change only during separately authorized implementation | Prove exact count, final-candidate, replay/reconciliation, event agreement, failure, and privacy semantics. |
+| `web/src/App.tsx` | Clean at that checkpoint; planned to become modified only during separately authorized implementation | Retain and validate the committed Action response through the authoritative View refresh and render the exact Session/revision-associated evidence summary. |
+| `web/src/App.action-loop.test.tsx` | Clean at that checkpoint; planned to become modified only during separately authorized implementation | Prove direct-200, 202-to-`COMMITTED`, refresh retention, association, fail-closed, privacy, and preserved action-loop behavior. |
 
-This four-path list is the technical implementation delta, not the complete
-synchronized candidate. After successful implementation, the complete
-aggregate worktree would ordinarily contain exactly eleven unstaged paths: all
-nine paths above plus the two Web paths. It is not eleven newly implemented
-paths. The four authority documents remain byte-exact at their independently
-approved hashes during implementation. The three excluded existing code/test
-paths—`dynamic_narrative_models.py`, `demo_composition.py`, and
-`test_narrative_provider.py`—also remain hash-protected. Only the two already-
-dirty implementation paths may change from the approved nine-path manifest,
-and only the two named clean Web paths may join the dirty inventory. No path
-outside the resulting eleven-path inventory may appear.
+That four-path list described a delta, not the complete synchronized candidate.
+The plan predicted an eleven-path aggregate: the nine historical paths plus the
+two Web paths. Commit `7ceb93eda21afeb437508bff46e057db5178c242`, whose
+parent is `8af790cc280f78102fa2e736806362527043424e`, contains exactly that
+intended inventory:
 
-Implementation does not require and must not modify:
+1. `PLANS.md`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
+3. `docs/engineering/codex_workflow.md`;
+4. `docs/public_client_contract.md`;
+5. `src/deviation_protocol/api/demo_composition.py`;
+6. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+7. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+8. `tests/unit/test_dynamic_narrative.py`;
+9. `tests/unit/test_narrative_provider.py`;
+10. `web/src/App.action-loop.test.tsx`; and
+11. `web/src/App.tsx`.
+
+The commit and its push prove publication and material D1 implementation, but
+not satisfaction of the planned approval, authorization, validation, Live,
+freeze, Gate, review, or staging sequence. The historical implementation plan
+also stated that its four-path delta did not require or permit changes to:
 
 - `src/deviation_protocol/application/dynamic_narrative_models.py`;
 - `src/deviation_protocol/api/demo_composition.py`;
@@ -816,42 +855,30 @@ Implementation does not require and must not modify:
 - the Provider adapter; or
 - `tests/unit/test_narrative_provider.py`.
 
-A need for any other path stops implementation and requires a new authority
-correction and independent review before that path is edited. This
-documentation task does not authorize implementation.
+A need for another path would have stopped that planned implementation and
+required new authority. This historical restriction is preserved as the design
+record; it is not a claim that the missing pre-publication gate occurred.
 
-### 7.1 Manifest lock and allowed transition
+### 7.1 Historical manifest-lock disposition
 
-The independent re-review must freshly record and verify the repository root
-and branch, `HEAD`, local `origin/main`, ahead/behind, exact nine-path inventory,
-SHA-256 of every dirty path, complete nine-path diff byte size and SHA-256,
-empty index, no untracked paths, no conflicts, and no active Git operation. If
-and only if the re-review returns the operative approval verdict, that exact
-resulting nine-path manifest becomes the authorized pre-implementation baseline
-for this aggregate candidate under the workflow's manifest-locked dirty
-aggregate-candidate exception. It is explicitly not a Git-clean baseline.
+The plan required an independent re-review to record repository and branch
+identity, `HEAD`, local `origin/main`, ahead/behind, the exact nine-path
+inventory, every path SHA-256, complete-diff size/SHA-256, empty index, and the
+absence of untracked paths, conflicts, and active operations. Only the exact
+approving verdict could have locked that non-clean manifest and admitted the
+specified nine-to-eleven transition. No completed lock is proven.
 
-Before implementation and every later task, the applicable manifest must be
-reverified. The allowed nine-to-eleven transition is exact: the four authority
-paths and three excluded existing code/test paths remain at their approved
-protected hashes; the orchestrator and backend test are the only already-dirty
-paths whose hashes may change; the two named Web paths are the only clean paths
-that may become modified. The implementation handoff records every final dirty
-path's SHA-256 plus the complete final eleven-path diff byte size and SHA-256.
-Any unexplained repository identity, path, hash, Git-state, or inventory drift
-blocks the task.
+The later baseline and publication make the proposed manifest factually stale.
+Under `docs/engineering/codex_workflow.md`, neither an old hash nor the missing
+approval token may be preserved as current authority after that change. The
+manifest exception waived none of the downstream gates, and the fact that the
+eleven-path aggregate was committed cannot be used to infer that they passed.
 
-The approved manifest is a substitute only for the ordinary pre-implementation
-documentation publication and clean-baseline gate for this exact candidate.
-The four authority paths are not separately staged, committed, or pushed. The
-manifest authorizes no implementation, deterministic verification, Live
-traffic, freeze, Gate, review, staging, commit, push, or unrelated edit; each
-later action retains its separate authorization and evidence boundary.
+### 7.2 Historical implementation responsibilities and current correction
 
-### 7.2 Deterministic implementation responsibilities
-
-The four-path implementation must prove all of the following with fake,
-scripted, or synthetic inputs and no Provider or network request:
+The historical four-path implementation was required to prove all of the
+following with fake, scripted, or synthetic inputs and no Provider or network
+request:
 
 1. zero committed facts reports integer `0`;
 2. one, two, and three committed facts report their exact counts;
@@ -875,16 +902,52 @@ scripted, or synthetic inputs and no Provider or network request:
 15. every test remains deterministic, unpaid, and offline.
 
 No fixture, integration, API-schema, Provider-adapter, database, or migration
-test path is added. Existing broader tests may be run for verification, but the
-implementation edit budget remains the four exact paths above.
+test path was part of that planned delta. Commit `7ceb93e` materially
+implemented the count, direct/replay/status propagation, event agreement, and
+Web summary, but historical completion of the prescribed deterministic gate is
+unproven.
 
-## 8. Exact deterministic validation before Live traffic
+The later post-publication review found recovery-compatibility, request-status,
+durable-association, Web removal-sensitivity, and sanitization defects or
+coverage gaps. The current approved correction is exactly these six unstaged
+paths:
 
-All commands run from `D:\deviation-protocol` in PowerShell 7+ with the
-repository venv. `RUN_LIVE_DEEPSEEK_TEST` remains disabled. No database or
-Provider variable is inherited by the canonical Offline gate.
+1. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+2. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+3. `src/deviation_protocol/application/session_service.py`;
+4. `src/deviation_protocol/application/turn_response.py`;
+5. `tests/unit/test_dynamic_narrative.py`; and
+6. `web/src/App.action-loop.test.tsx`.
 
-The future implementation verification set is mandatory and ordered:
+Trusted `NarrativeJob.prompt_schema_version` now selects genuine v1 versus v2
+recovery. V1 requires exact historical `{outcome_result}` feedback and never
+synthesizes `public_fact_count`; v2 requires exact
+`{outcome_result, public_fact_count}` with a non-Boolean integer in `0..3`.
+POST replay and GET request-status recovery share the validator and require
+matching Session, client request, action signature, and durable turn identity.
+Trusted Dynamic jobs cannot be disguised through response-controlled lifecycle
+or stable-code fields. Invalid stored artifacts fail through the established
+sanitized HTTP `409` boundary without Pydantic/private canaries in public bodies
+or direct cause/context chains, and recovery performs no Provider, allocation,
+write, or commit. Web regressions prove removal and privacy across failure,
+identity replacement, recovery restart, stale completion, and unmount;
+`web/src/App.tsx` already supplied the production behavior and required no
+correction.
+
+The final independent verdict is
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
+It approves the present six-path correction only, which remains unstaged. It
+does not approve this documentation candidate or repair the historical
+publication lifecycle.
+
+## 8. Historical prescribed deterministic validation before Live traffic
+
+At the historical checkpoint, all commands were required to run from
+`D:\deviation-protocol` in PowerShell 7+ with the repository venv,
+`RUN_LIVE_DEEPSEEK_TEST` disabled, and no database or Provider variable
+inherited by the canonical Offline gate. The following ordered set is preserved
+as the intended gate; repository history does not prove that it completed
+against one unchanged approval-bound candidate:
 
 1. run the focused backend test node IDs covering every responsibility in
    section 7.2 and record those exact node IDs;
@@ -925,36 +988,48 @@ git diff --check
 .\scripts\verify.ps1 -Mode Offline
 ```
 
-No Live traffic may start until every command passes against one unchanged
-four-path implementation-delta identity within one unchanged eleven-path
-complete aggregate identity. Full or MySQL verification is not a substitute for
-Offline. CI is not a substitute for any relevant local verification above.
+The plan prohibited Live traffic until every command passed against one
+unchanged four-path implementation-delta identity within one unchanged
+eleven-path aggregate identity. Full, MySQL, and CI evidence were not
+substitutes for the prescribed Offline gate.
 
-Before Live traffic, freeze a sanitized successor manifest containing exact
+It also required a pre-Live sanitized successor manifest containing exact
 repository and branch identity, parent `HEAD`, local `origin/main`,
-ahead/behind, the approved nine-path starting manifest, the exact allowed
-nine-to-eleven transition, all eleven dirty paths and their SHA-256 values, the
-complete eleven-path diff byte size and SHA-256, deterministic command evidence,
-approved-authority identity, empty index, no untracked path, no conflict, and no
-active operation. The four-path delta identity is recorded within that complete
-aggregate manifest; it does not replace it.
+ahead/behind, the approval-bound nine-path starting manifest, the exact allowed
+nine-to-eleven transition, all eleven dirty-path SHA-256 values, complete-diff
+size/SHA-256, deterministic command evidence, approved-authority identity,
+empty index, and no untracked path, conflict, or active operation. No completed
+manifest or candidate freeze satisfying that prescription is proven. The
+current documentation-only reconciliation deliberately does not rerun or
+replace the historical deterministic evidence.
 
-## 9. Future separately authorized user-operated real-Provider validation
+## 9. Historical prescribed user-operated real-Provider validation
 
-Mocks, fixtures, source inspection, and deterministic tests are necessary but
-not sufficient for a later Live claim. No Live execution is authorized by this
-documentation correction. Only after the authority is independently approved
-and its exact nine-path baseline is manifest-locked, the separately authorized
-four-path implementation and complete local verification pass, and the Live-
-evidence preflight in
-`docs/engineering/codex_workflow.md` passes may a separate authorization permit
-the two real-Provider stages below.
-The user launches every Live process from a fresh PowerShell process in which
-Provider configuration is present before launcher startup, and performs every
-browser operation. Codex must never receive or inspect the API key, operate the
-browser, issue a direct Provider/API substitute call, launch a network-restricted
-process as authoritative Live evidence, or inspect raw Provider requests or
-responses.
+The plan treated mocks, fixtures, source inspection, and deterministic tests as
+necessary but insufficient for a Live claim. It prescribed that the two stages
+below could begin only after independent authority approval, an exact locked
+nine-path baseline, separately authorized implementation, complete local
+verification, and the Live-evidence preflight in
+`docs/engineering/codex_workflow.md`, followed by separate Live authorization.
+The user was to launch each Live process from a fresh PowerShell process with
+Provider configuration present before startup and perform every browser
+operation. Codex was not to receive or inspect the API key, operate the browser,
+issue a direct Provider/API substitute call, treat a network-restricted process
+as authoritative Live evidence, or inspect raw Provider requests or responses.
+
+That prescribed E1-E5 sequence is historically incomplete. E1 committed
+HTTP `200`, state `0 -> 1`, revision `1`, one story segment, three suggestions,
+two public facts, and no diagnostic after two Provider generations. E2 then
+submitted
+`检查密封的接收室，寻找能证明死亡记录有误的明显证据。` once, used two Provider
+generations, returned HTTP `503` with no commit, and emitted the ordered
+sanitized diagnostics
+`DNVS_LIVE_DIAG_RECOVERY_SCHEMA_REQUIRED_OR_EXTRA_FIELDS` followed by
+`DNVS_LIVE_DIAG_PRE_RESPONSE_UNPARSEABLE`. E3-E5 did not complete under that
+epoch, and a later bounded autonomous-improvement sequence superseded its work
+sequencing without completing it. No later Live, autonomous, Offline, or
+current correction evidence may be imported into the old epoch. The candidate
+freeze and formal Gate that depended on a passed epoch remain unproven.
 
 The exact launcher command for every case is:
 
@@ -974,12 +1049,13 @@ activity; and shuts down before the next case. Only sanitized public results,
 closed-set local diagnostic families, and the official per-case request-count
 delta may be recorded.
 
-### 9.1 New diagnostic epoch E1-E5: exactly 5 cases, maximum 10 requests
+### 9.1 Prescribed diagnostic epoch E1-E5: exactly 5 cases, maximum 10 requests
 
-This is a new diagnostic epoch after a material runtime/evidence change. It is
-not a continuation, repair, retry, replacement, or reinterpretation of
-historical D1-D5. Historical D1 remains permanently incomplete, and no
-historical result is combined with this epoch. The fixed matrix is:
+This was prescribed as a new diagnostic epoch after a material
+runtime/evidence change, not a continuation, repair, retry, replacement, or
+reinterpretation of historical D1-D5. Historical D1 remains permanently
+incomplete, and no historical result may be combined with this epoch. The
+fixed matrix and acceptance contract were:
 
 | Case | Fresh Run | Exact one Action |
 | --- | --- | --- |
@@ -1067,10 +1143,12 @@ unreachability; that guarantee remains owned
 by the strict keyless schema, deterministic server allocation, and Offline
 regressions.
 
-### 9.2 Formal acceptance Gate: exactly 4 cases, maximum 8 requests
+### 9.2 Prescribed formal acceptance Gate: exactly 4 cases, maximum 8 requests
 
-After the five-case diagnostic passes and the executable candidate identity is
-frozen again, run a fresh Gate from Case 1:
+This Gate was contingent on the five-case diagnostic passing and the executable
+candidate identity being frozen again. Those prerequisites are not proven, and
+the Gate is not proven to have begun or passed. Its preserved contract required
+a fresh start at Case 1:
 
 | Case | Fresh Run | Exact one Action |
 | --- | --- | --- |
@@ -1110,72 +1188,53 @@ separately authorized five-case diagnostic epoch with the same fixed case
 responsibilities; no result is carried across epochs. The formal Gate restarts
 at Case 1 only after that complete new epoch passes.
 
-## 10. Post-task lifecycle and publication boundaries
+## 10. Historical lifecycle audit and current post-publication boundary
 
 The published `DN-DKO-006` key-ownership correction and its operative approval
-record remain historical completed steps. The current D1 evidence correction
-does not inherit that approval. Its exact lifecycle keeps these stages
-separate:
+remain separate historical authority. They cannot approve D1. The D1 plan also
+kept authoring, independent approval, implementation authorization,
+deterministic validation, Live authorization/evidence, freeze, formal Gate,
+implementation review, staging, commit, manual push, and publication as
+distinct stages. Current evidence classifies them as follows:
 
-1. author the exact four-document authority-correction candidate;
-2. conduct an independent new-session read-only review;
-3. when that review returns findings, perform a bounded correction in the same
-   exact four-document budget;
-4. conduct an independent new-session read-only re-review of the corrected
-   four-document candidate;
-5. if and only if that re-review returns the operative approval verdict, lock
-   the resulting exact nine-path dirty baseline by repository/branch identity,
-   `HEAD`, local `origin/main`, ahead/behind, path inventory, every per-path
-   SHA-256, complete-diff byte size/SHA-256, empty index, no untracked path, no
-   conflict, and no active Git operation; do not separately stage, commit, or
-   push the four authority documents;
-6. separately authorize the exact four-path implementation delta;
-7. perform complete deterministic/local verification;
-8. separately authorize and, only then, run the future E1-E5 Live diagnostic
-   epoch;
-9. freeze the exact complete executable candidate after the diagnostic passes;
-10. separately authorize and run the unchanged formal Gate from Case 1;
-11. conduct a fresh independent implementation review;
-12. under separate authorization, stage the complete approved aggregate
-    candidate;
-13. under separate exact authorization, create one intentional aggregate local
-    commit;
-14. have the user perform the manual push; and
-15. confirm publication or separately authorize status synchronization or any
-    later phase.
+| D1 lifecycle stage | Historical disposition |
+| --- | --- |
+| Authority authoring / candidate completion | The authority candidate and bounded correction text existed and was later included in `7ceb93e`; authoring completion was not approval. |
+| Independent authority approval | The first review returned `CHANGES_REQUIRED`; no returned outcome for the prescribed operative re-review token is proven. |
+| Exact nine-path manifest lock | Unproven and now obsolete; the historical dirty bytes cannot be reconstructed from ordinary Git. |
+| Separate implementation authorization | Unproven. |
+| Deterministic local validation | The plan prescribed the sequence in section 8, but completion against one unchanged approved candidate is unproven. |
+| Separately authorized E1-E5 Live evidence | Incomplete: E1 succeeded, E2 failed with HTTP `503`, and E3-E5 did not complete under that epoch; separate authorization is unproven. |
+| Candidate freeze | Unproven. |
+| Formal D1 Gate | Unproven; the incomplete epoch did not satisfy its prerequisite. |
+| Independent pre-publication implementation review | Unproven. |
+| Aggregate staging authorization | Unproven. |
+| Commit | Proven: `7ceb93e` committed the exact eleven-path aggregate over `8af790c`. |
+| Manual push | A push is proven by the local `origin/main` reflog; compliance with every preceding authorization gate is not. |
+| Publication | Proven: `7ceb93e` is in local `origin/main` ancestry. Publication does not retroactively satisfy the missing stages. |
 
-Stages 1 and 2 occurred, and stage 2 returned `CHANGES_REQUIRED` rather than
-approval. This task completes stage 3 only as an unstaged documentation
-candidate. Stage 4 is the unique next task. No implementation or Live activity
-is authorized.
+Commits `f7905d7524fb7dbc3dd728a4cf5f9dcfb0d8aa2c` and
+`d77ab58041286134fdde1239fec1c37860e1dd73` concern the later autonomous
+Dynamic Narrative hardening and its publication closeout. Neither is a D1
+lifecycle closeout.
 
-The ordinary repository rule still requires independently approved authority
-documentation to be staged, committed, manually pushed, and confirmed as a new
-clean baseline before implementation. This candidate qualifies for the
-workflow's narrow manifest-locked dirty aggregate-candidate exception because
-the intentionally preserved implementation candidate is already dirty in five
-runtime/test paths while the correction occupies four documentation paths. A
-four-document commit would not create a clean worktree; an aggregate nine-path
-commit now would prematurely publish implementation before deterministic
-verification, separately authorized Live evidence, freeze, formal Gate, and
-independent implementation review. Cleanup, discard, stash, premature staging,
-and either premature commit are prohibited.
+The current post-publication six-path correction is implemented, independently
+reviewed under
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`,
+and still unstaged. That approval is exact-candidate approval for the code/test
+correction only. This three-document authoring pass is a separate documentation
+reconciliation candidate, not an approval and not a historical cure.
 
-If stage 4 approves, its exact nine-path manifest is therefore the authorized
-substitute for the ordinary pre-implementation publication/clean-baseline gate
-for this aggregate candidate only. It must never be described as Git-clean and
-does not create permission to implement on an arbitrary dirty worktree. Every
-later task verifies that manifest and the exact allowed transition in section
-7.1 and stops on unexplained drift. Aggregate staging and the one aggregate
-commit remain deferred until every named downstream gate has passed.
+The exact next task is a short independent read-only review of `PLANS.md`, this
+plan, and `docs/public_client_contract.md`, including their consistency with
+the byte-unchanged approved six-path correction. The resulting exact nine-path
+unstaged aggregate is not commit-ready before that review. If the review
+succeeds, a local aggregate commit may be considered only under separate exact
+authorization. Codex does not push this repository; the user controls any push.
 
-The implementation session must not review itself. The later implementation-
-review approval binds exact candidate bytes and does not authorize a repository
-edit merely to record that later verdict. Codex never pushes this repository.
+## 11. Historical stop conditions
 
-## 11. Stop conditions
-
-Stop without informal adaptation if:
+The planned lifecycle required a stop without informal adaptation if:
 
 - baseline or candidate identity differs;
 - the separately authorized implementation does not begin from the exact
@@ -1205,36 +1264,37 @@ Stop without informal adaptation if:
   staged change, conflict, active Git operation, untracked path, or inventory
   transition differs from the applicable manifest.
 
-No reset, restore, checkout, clean, unapproved retry, stage, commit, or push is
-authorized as a remedy.
+Those conditions remain design and evidence boundaries; they cannot now be
+used to infer that a historical gate passed or to repair the publication by
+retrospective classification. No reset, restore, checkout, clean, unapproved
+retry, stage, commit, or push is authorized as a remedy during the current
+documentation reconciliation.
 
 ## 12. Completion criteria and residual uncertainty
 
-This bounded four-document correction task is complete as an unstaged
-documentation candidate only when
-`PLANS.md`, this plan, `docs/public_client_contract.md`, and
-`docs/engineering/codex_workflow.md` are the only paths changed by this task;
-all protected pre-existing runtime/test bytes remain exact; the index remains
-empty; the complete worktree identity is recorded; and all authorized read-only
-documentation and hygiene checks pass. Candidate completion is not independent
-approval. The prior review was not approved; this candidate addresses its two
-findings but has not yet been independently re-reviewed. No later stage is
-complete or authorized.
+This post-publication documentation reconciliation is complete as an authoring
+candidate only when exactly `PLANS.md`, this plan, and
+`docs/public_client_contract.md` are newly modified; the approved six code/test
+paths remain byte-identical to their starting state;
+`docs/engineering/codex_workflow.md` remains byte-identical; the index remains
+empty; no untracked path, conflict, or active Git operation appears; and the
+complete nine-path worktree identity and documentation checks are recorded.
 
-Even a later passed new diagnostic epoch and Gate prove only the exact bounded
-candidate and nine consecutive user-operated cases. They do not prove long-run
-Provider availability, schema reliability outside the observed matrix, billing behavior,
-quality, moderation, production distribution, or production readiness. Strict
-local validation remains mandatory and Provider output remains untrusted.
+Candidate completion is not independent approval. The exact nine-path unstaged
+aggregate requires a fresh, short, independent read-only review of these three
+documentation paths and their consistency with the unchanged six-path
+correction. It is not commit-ready before that review. Only after a successful
+documentation review may a separately authorized local aggregate commit be
+considered, and the user remains responsible for any push.
 
-Guardrail impact: **None**. The narrow reusable manifest-locked dirty aggregate-
-candidate exception belongs in the Codex workflow and adds or changes no
-engineering guardrail ID.
+The current correction fixes the reviewed committed-response recovery and Web
+evidence boundaries; it does not prove long-run Provider availability, schema
+reliability outside validated contracts, billing behavior, quality,
+moderation, production distribution, or production readiness. Strict local
+validation remains mandatory and Provider output remains untrusted. The
+historical D1 E1-E5 epoch, freeze, formal Gate, and other missing lifecycle
+evidence remain incomplete or unproven.
 
-The unique current next task is:
-
-> An independent new-session read-only re-review of the corrected four-document authority candidate against the two prior independent-review findings.
-
-Implementation is not the immediate next task and remains unauthorized unless
-that re-review returns the exact operative approval verdict and verifies the
-resulting nine-path manifest.
+Guardrail impact: **None**. No engineering or safety guardrail ID is added or
+changed, and `docs/engineering/codex_workflow.md` remains the unchanged
+lifecycle authority.

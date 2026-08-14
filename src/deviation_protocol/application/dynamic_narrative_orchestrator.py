@@ -91,7 +91,11 @@ from deviation_protocol.application.session_service import (
     SessionService,
 )
 from deviation_protocol.application.turn_orchestrator import FirstPhaseTurnOrchestrator
-from deviation_protocol.application.turn_response import TurnResponse
+from deviation_protocol.application.turn_response import (
+    CommittedTurnResponseValidationError,
+    TurnResponse,
+    validate_committed_turn_response_for_recovery,
+)
 from deviation_protocol.domain.actions import ActionSubmission, ActionType
 from deviation_protocol.domain.content import (
     AttributeModifierEffectDefinition,
@@ -1143,13 +1147,26 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
     def _replay_response(
         stored: PersistedTurnRequest,
         submission: ActionSubmission,
+        job: NarrativeJob | None = None,
     ) -> TurnResponse:
-        response = FirstPhaseTurnOrchestrator._replay_response(stored, submission)
-        if response.resolution_kind is ResolutionStatus.NARRATIVE_COMMITTED:
-            try:
-                _committed_public_fact_count(response)
-            except (TypeError, ValueError):
-                raise StoredTurnResponseInvalidError(submission.session_id) from None
+        inherited_response_invalid = False
+        try:
+            response = FirstPhaseTurnOrchestrator._replay_response(stored, submission)
+        except StoredTurnResponseInvalidError:
+            inherited_response_invalid = True
+        if inherited_response_invalid:
+            raise StoredTurnResponseInvalidError(submission.session_id)
+        invalid = False
+        try:
+            validate_committed_turn_response_for_recovery(
+                response,
+                job,
+                stored_turn_id=stored.turn_id,
+            )
+        except CommittedTurnResponseValidationError:
+            invalid = True
+        if invalid:
+            raise StoredTurnResponseInvalidError(submission.session_id)
         return response
 
     async def handle(self, submission: ActionSubmission) -> TurnResponse:
@@ -1269,7 +1286,12 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 submission.session_id, submission.client_request_id
             )
             if stored is not None:
-                return self._replay_response(stored, submission)
+                job = await uow.narrative_jobs.get_by_client_request_id(
+                    submission.session_id,
+                    submission.client_request_id,
+                    for_update=True,
+                )
+                return self._replay_response(stored, submission, job)
             job = await uow.narrative_jobs.get_by_client_request_id(
                 submission.session_id,
                 submission.client_request_id,
@@ -2708,7 +2730,9 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
         new_response_exact = False
         if stored is not None:
             try:
-                response = self._replay_response(stored, submission)
+                response = FirstPhaseTurnOrchestrator._replay_response(
+                    stored, submission
+                )
                 new_response_exact = (
                     stored.turn_id == submission.turn_id
                     and stored.action_signature == submission.action_signature()
@@ -2819,7 +2843,12 @@ class DynamicNarrativeOrchestrator(FirstPhaseTurnOrchestrator):
                 submission.session_id, submission.client_request_id
             )
             if stored is not None:
-                return self._replay_response(stored, submission)
+                job = await uow.narrative_jobs.get_by_client_request_id(
+                    submission.session_id,
+                    submission.client_request_id,
+                    for_update=True,
+                )
+                return self._replay_response(stored, submission, job)
             job = await uow.narrative_jobs.get_by_client_request_id(
                 submission.session_id,
                 submission.client_request_id,
@@ -3250,13 +3279,6 @@ def _allocate_public_facts(
             DynamicNarrativeRejectionDiagnostic.FINAL_GENERATED_PUBLIC_FACT_KEY_ALLOCATION
         ) from None
     return tuple(allocated)
-
-
-def _committed_public_fact_count(response: TurnResponse) -> int:
-    value = response.feedback_parameters.get("public_fact_count")
-    if type(value) is not int or not 0 <= value <= 3:
-        raise ValueError("committed public fact count is invalid")
-    return value
 
 
 def _apply_candidate_slots(

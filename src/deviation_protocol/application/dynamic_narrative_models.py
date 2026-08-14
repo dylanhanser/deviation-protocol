@@ -20,6 +20,7 @@ from deviation_protocol.domain.actions import ActionType
 from deviation_protocol.domain.narrative_outcome import NarrativeOutcomeResult
 
 
+DYNAMIC_LEGACY_PROMPT_SCHEMA_VERSION = "dynamic-narrative-prompt-v1"
 DYNAMIC_PROMPT_SCHEMA_VERSION = "dynamic-narrative-prompt-v2"
 DYNAMIC_CANDIDATE_SCHEMA_VERSION = "dynamic-narrative-candidate-v2"
 DYNAMIC_ACCEPTED_OUTCOME_RULE_ID = "dynamic.narrative.accepted"
