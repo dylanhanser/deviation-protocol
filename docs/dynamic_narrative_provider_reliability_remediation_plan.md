@@ -7,11 +7,18 @@ Base key-ownership status: `PLAN_AMENDMENT_PUBLISHED`.
 D1 historical publication status: implemented, committed, and pushed in
 `7ceb93eda21afeb437508bff46e057db5178c242`; procedural compliance unproven.
 
-Current post-publication correction status: exact six-path code/test correction
-implemented, independently reviewed, and unstaged.
-
-Current documentation status: exact three-document reconciliation candidate
-being authored; independent documentation review pending.
+Current post-publication corrective lifecycle: closed. The exact six-path
+code/test correction received
+`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`,
+and the exact three-document reconciliation received
+`DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED`.
+Both were committed together in the exact nine-path publication commit
+`12485f309860c496ff4aebae0e5e834779e485d7`, whose parent is
+`d77ab58041286134fdde1239fec1c37860e1dd73` and whose subject is
+`fix(narrative): harden committed response recovery`. Git records 9 files
+changed, 2,369 insertions, and 463 deletions. The local push record is
+`d77ab58..12485f3`, `main -> origin/main`; local `HEAD` and local
+`origin/main` were synchronized at the publication SHA with ahead/behind `0/0`.
 
 This document is the independently approved and published `DN-DKO-006`-
 corrected deterministic generated-public-fact-key ownership amendment to the
@@ -75,19 +82,20 @@ clearing/removal-sensitivity, and exception-sanitization defects or coverage
 gaps. The current exact six-path code/test correction addresses those findings
 and received the final verdict
 `DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
-That verdict approves only those six current code/test paths. They remain
-unstaged; the verdict neither approves this three-document reconciliation nor
-backfills any missing historical gate. The exact next task after this authoring
-pass is a short independent read-only review of the three documentation changes
-and their consistency with the unchanged approved six-path correction. Only
-after that review succeeds may a separately authorized local aggregate commit
-be considered; the user controls any push.
+The separate exact three-document reconciliation received
+`DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED`.
+Each verdict applies only to its exact reviewed scope; neither verdict nor the
+later publication backfills any missing historical gate. Both scopes were
+committed and pushed together in `12485f3`. The present corrective lifecycle is
+closed, with no correction, review, staging, commit, push, or publication action
+remaining for that exact aggregate. Future development must be selected
+separately from the remaining roadmap.
 
 The key-ownership approval token above applies only to its exact historical
 technical amendment. The missing D1 authority-approval token, all D1 authoring
-tokens, historical failure and `CHANGES_REQUIRED` tokens, and the current
-six-path correction verdict are mutually non-substitutable under the workflow's
-approval-token and baseline-invalidation rules.
+tokens, historical failure and `CHANGES_REQUIRED` tokens, and the two current
+scope-specific review verdicts are mutually non-substitutable under the
+workflow's approval-token and baseline-invalidation rules.
 
 This `DN-DKO-006` correction was authored against the following read-only local
 identity, without fetch or pull:
@@ -789,7 +797,7 @@ then-planned four-path implementation was expected to treat it:
 
 No Prompt-only code or test is retained if it contradicts server key ownership.
 
-## 7. Historical candidate inventory, published implementation, and current correction
+## 7. Historical candidate inventory and published implementation/correction
 
 At the historical pre-implementation checkpoint, this plan recorded the
 complete worktree inventory as exactly these nine unstaged paths:
@@ -874,7 +882,7 @@ approval token may be preserved as current authority after that change. The
 manifest exception waived none of the downstream gates, and the fact that the
 eleven-path aggregate was committed cannot be used to infer that they passed.
 
-### 7.2 Historical implementation responsibilities and current correction
+### 7.2 Historical implementation responsibilities and published correction
 
 The historical four-path implementation was required to prove all of the
 following with fake, scripted, or synthetic inputs and no Provider or network
@@ -909,15 +917,18 @@ unproven.
 
 The later post-publication review found recovery-compatibility, request-status,
 durable-association, Web removal-sensitivity, and sanitization defects or
-coverage gaps. The current approved correction is exactly these six unstaged
-paths:
+coverage gaps. The published recovery/reconciliation aggregate combines exactly
+three documentation paths with six code/test correction paths:
 
-1. `src/deviation_protocol/application/dynamic_narrative_models.py`;
-2. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
-3. `src/deviation_protocol/application/session_service.py`;
-4. `src/deviation_protocol/application/turn_response.py`;
-5. `tests/unit/test_dynamic_narrative.py`; and
-6. `web/src/App.action-loop.test.tsx`.
+1. `PLANS.md`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
+3. `docs/public_client_contract.md`;
+4. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+5. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+6. `src/deviation_protocol/application/session_service.py`;
+7. `src/deviation_protocol/application/turn_response.py`;
+8. `tests/unit/test_dynamic_narrative.py`; and
+9. `web/src/App.action-loop.test.tsx`.
 
 Trusted `NarrativeJob.prompt_schema_version` now selects genuine v1 versus v2
 recovery. V1 requires exact historical `{outcome_result}` feedback and never
@@ -936,9 +947,16 @@ correction.
 
 The final independent verdict is
 `DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
-It approves the present six-path correction only, which remains unstaged. It
-does not approve this documentation candidate or repair the historical
-publication lifecycle.
+It approves the exact six-path code/test correction only. The separate
+three-document reconciliation verdict is
+`DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED`.
+Both approved scopes were committed together in
+`12485f309860c496ff4aebae0e5e834779e485d7` (parent
+`d77ab58041286134fdde1239fec1c37860e1dd73`, subject
+`fix(narrative): harden committed response recovery`) as 9 files changed, 2,369
+insertions, and 463 deletions. The local push record is `d77ab58..12485f3`,
+`main -> origin/main`. Publication closes the present correction; it does not
+repair the historical publication lifecycle.
 
 ## 8. Historical prescribed deterministic validation before Live traffic
 
@@ -1000,7 +1018,7 @@ nine-to-eleven transition, all eleven dirty-path SHA-256 values, complete-diff
 size/SHA-256, deterministic command evidence, approved-authority identity,
 empty index, and no untracked path, conflict, or active operation. No completed
 manifest or candidate freeze satisfying that prescription is proven. The
-current documentation-only reconciliation deliberately does not rerun or
+documentation-only reconciliation published in `12485f3` did not rerun or
 replace the historical deterministic evidence.
 
 ## 9. Historical prescribed user-operated real-Provider validation
@@ -1218,19 +1236,24 @@ Commits `f7905d7524fb7dbc3dd728a4cf5f9dcfb0d8aa2c` and
 Dynamic Narrative hardening and its publication closeout. Neither is a D1
 lifecycle closeout.
 
-The current post-publication six-path correction is implemented, independently
-reviewed under
-`DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`,
-and still unstaged. That approval is exact-candidate approval for the code/test
-correction only. This three-document authoring pass is a separate documentation
-reconciliation candidate, not an approval and not a historical cure.
+The later post-publication lifecycle has this separate durable disposition:
 
-The exact next task is a short independent read-only review of `PLANS.md`, this
-plan, and `docs/public_client_contract.md`, including their consistency with
-the byte-unchanged approved six-path correction. The resulting exact nine-path
-unstaged aggregate is not commit-ready before that review. If the review
-succeeds, a local aggregate commit may be considered only under separate exact
-authorization. Codex does not push this repository; the user controls any push.
+| Post-publication scope | Durable disposition |
+| --- | --- |
+| Six-path recovery/sanitization correction | Independently reviewed under `DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`, committed, pushed, and published in `12485f3`. |
+| Three-document reconciliation | Independently reviewed under `DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED` and published in `12485f3`. |
+| Exact corrective aggregate | Closed; no correction, review, staging, commit, push, or publication remains. |
+
+Publication commit `12485f309860c496ff4aebae0e5e834779e485d7`, parent
+`d77ab58041286134fdde1239fec1c37860e1dd73`, has subject
+`fix(narrative): harden committed response recovery` and records 9 files
+changed, 2,369 insertions, and 463 deletions. The local `origin/main` push record
+is `d77ab58..12485f3`, `main -> origin/main`; local `HEAD` and local
+`origin/main` were synchronized at the publication SHA with ahead/behind `0/0`.
+This closes only the present corrective aggregate. It supplies no missing
+historical verdict, manifest lock, validation, Live evidence, freeze, Gate,
+review, or authorization. A later roadmap item, feature, phase, Live epoch, or
+Provider experiment must be selected separately.
 
 ## 11. Historical stop conditions
 
@@ -1267,25 +1290,23 @@ The planned lifecycle required a stop without informal adaptation if:
 Those conditions remain design and evidence boundaries; they cannot now be
 used to infer that a historical gate passed or to repair the publication by
 retrospective classification. No reset, restore, checkout, clean, unapproved
-retry, stage, commit, or push is authorized as a remedy during the current
-documentation reconciliation.
+retry, stage, commit, or push was authorized as a retrospective remedy by the
+now-published documentation reconciliation.
 
 ## 12. Completion criteria and residual uncertainty
 
-This post-publication documentation reconciliation is complete as an authoring
-candidate only when exactly `PLANS.md`, this plan, and
-`docs/public_client_contract.md` are newly modified; the approved six code/test
-paths remain byte-identical to their starting state;
-`docs/engineering/codex_workflow.md` remains byte-identical; the index remains
-empty; no untracked path, conflict, or active Git operation appears; and the
-complete nine-path worktree identity and documentation checks are recorded.
+The post-publication correction and three-document reconciliation are complete,
+published, and closed. Their exact, scope-specific review verdicts are recorded
+above; both scopes are included in the exact nine-path `12485f3` aggregate, and
+the local push record places that commit on `origin/main`. No further
+correction, review, staging, commit, push, or publication action remains for
+that aggregate.
 
-Candidate completion is not independent approval. The exact nine-path unstaged
-aggregate requires a fresh, short, independent read-only review of these three
-documentation paths and their consistency with the unchanged six-path
-correction. It is not commit-ready before that review. Only after a successful
-documentation review may a separately authorized local aggregate commit be
-considered, and the user remains responsible for any push.
+This completion boundary is prospective only for the present correction. It
+does not backfill the historical D1 approval, authorization, validation, Live,
+freeze, formal-Gate, review, staging, or manifest-lock evidence and does not
+complete production readiness or the wider roadmap. Future development must be
+selected separately.
 
 The current correction fixes the reviewed committed-response recovery and Web
 evidence boundaries; it does not prove long-run Provider availability, schema

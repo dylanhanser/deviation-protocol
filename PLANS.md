@@ -176,15 +176,8 @@ synchronization, not the D1 publication lifecycle.
 A later independent post-publication static review found material recovery-
 compatibility, request-status validation, durable-association, Web evidence-
 clearing/removal-sensitivity, and exception-sanitization defects or coverage
-gaps. The resulting correction is implemented in exactly six unstaged
-code/test paths:
-
-1. `src/deviation_protocol/application/dynamic_narrative_models.py`;
-2. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
-3. `src/deviation_protocol/application/session_service.py`;
-4. `src/deviation_protocol/application/turn_response.py`;
-5. `tests/unit/test_dynamic_narrative.py`; and
-6. `web/src/App.action-loop.test.tsx`.
+gaps. The resulting correction was implemented in six code/test paths and is
+now part of the published aggregate recorded below.
 
 The corrected current boundaries are:
 
@@ -211,28 +204,46 @@ The corrected current boundaries are:
 
 The final independent correction review returned exactly
 `DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`.
-That verdict approves only the present six-path code/test correction. The
-correction remains unstaged in the current aggregate; it is not committed or
-published, and its approval does not backfill any missing historical D1 gate.
+The separate three-document reconciliation review returned exactly
+`DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED`.
+Both independently reviewed scopes were committed together in publication
+commit `12485f309860c496ff4aebae0e5e834779e485d7`, whose parent is
+`d77ab58041286134fdde1239fec1c37860e1dd73` and whose subject is
+`fix(narrative): harden committed response recovery`. Its exact inventory is:
+
+1. `PLANS.md`;
+2. `docs/dynamic_narrative_provider_reliability_remediation_plan.md`;
+3. `docs/public_client_contract.md`;
+4. `src/deviation_protocol/application/dynamic_narrative_models.py`;
+5. `src/deviation_protocol/application/dynamic_narrative_orchestrator.py`;
+6. `src/deviation_protocol/application/session_service.py`;
+7. `src/deviation_protocol/application/turn_response.py`;
+8. `tests/unit/test_dynamic_narrative.py`; and
+9. `web/src/App.action-loop.test.tsx`.
+
+Git records the aggregate as 9 files changed, 2,369 insertions, and 463
+deletions. The local `origin/main` reflog records the push from
+`d77ab58041286134fdde1239fec1c37860e1dd73` to
+`12485f309860c496ff4aebae0e5e834779e485d7`, corresponding to range
+`d77ab58..12485f3` and branch update `main -> origin/main`. At publication,
+local `HEAD` and local `origin/main` were synchronized at the publication SHA
+with ahead/behind `0/0`. This is local push evidence; Git does not independently
+authenticate the human operator.
 
 | Time and scope | Durable status |
 | --- | --- |
-| `7ceb93e` historical publication | Implemented, committed, and pushed; procedural compliance remains unproven. |
-| Historical E1-E5 epoch | Incomplete: E1 succeeded, E2 failed, and the remainder did not complete under that epoch. |
-| Current six-path correction | Implemented and independently reviewed; still unstaged. |
-| Current three-document task | Documentation reconciliation candidate being authored; independent documentation review pending. |
-| Future | Review the exact reconciliation, then consider a separately authorized local aggregate commit; the user controls any push. |
+| Historical `7ceb93e` D1 publication | Implemented, committed, and pushed; pre-publication procedural compliance remains unproven. |
+| Historical E1-E5 epoch | Incomplete: E1 succeeded, E2 failed with HTTP `503`, and E3-E5 did not complete under that epoch. |
+| Current recovery/sanitization correction | Independently reviewed, committed, pushed, and published in `12485f3`. |
+| Three-document reconciliation included in `12485f3` | Independently reviewed and published. |
+| Current corrective work item | Closed; no correction, review, staging, commit, push, or publication remains for the `12485f3` aggregate. |
+| Future development | A later roadmap item, feature, phase, Live epoch, or Provider experiment must be selected separately. |
 
-The exact next task after this authoring pass is a short, independent, read-only
-review of the three-document reconciliation in `PLANS.md`,
-`docs/dynamic_narrative_provider_reliability_remediation_plan.md`, and
-`docs/public_client_contract.md`, including consistency with the unchanged
-approved six-path code/test correction. This authoring task is not that review
-and does not make the resulting nine-path unstaged aggregate commit-ready. Only
-after the documentation review succeeds may a separately authorized local
-aggregate commit be considered; the user remains responsible for any push. No
-new roadmap feature, Phase 6/7 slice, Provider experiment, or Live epoch is
-selected here.
+The current correction and reconciliation are complete and closed. Neither
+approval nor publication backfills a missing historical D1 gate, completes the
+historical E1-E5 epoch, or closes the wider roadmap. No further action remains
+for this exact `12485f3` aggregate, and no new roadmap feature, Phase 6/7 slice,
+Provider experiment, or Live epoch is selected here.
 
 The separate experimental Dynamic Narrative Vertical Spike implementation was
 published at `0eba2fd192b05c9455c73803a95a846c27307be9`; its automated

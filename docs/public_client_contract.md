@@ -1437,10 +1437,14 @@ production behavior already enforced these boundaries; the current correction
 strengthens its regression evidence without changing that file.
 
 Historical implementation entered commit `7ceb93e` and was pushed, while its
-pre-publication procedural compliance remains unproven. The current six-path
-recovery/sanitization correction is independently reviewed under
+pre-publication procedural compliance remains unproven. The six-path
+recovery/sanitization correction was independently approved under
 `DYNAMIC_NARRATIVE_D1_COMMITTED_RESPONSE_RECOVERY_SANITIZATION_CORRECTION_REVIEW_APPROVED`
-and remains unstaged. That verdict does not approve the current three-document
-reconciliation or retroactively satisfy a historical gate. The current
-post-publication correction adds no route, error code, new public `turn_id`
-field, DTO, response shape, OpenAPI, schema, or migration change.
+and the three-document reconciliation was independently approved under
+`DYNAMIC_NARRATIVE_D1_POST_PUBLICATION_DOCUMENTATION_RECONCILIATION_REVIEW_APPROVED`.
+Both are published in `12485f309860c496ff4aebae0e5e834779e485d7`; the
+correction is no longer unstaged, and the reconciliation no longer awaits
+approval. Neither review nor publication retroactively satisfies a historical
+gate. The published correction introduced no route, error code, new public
+`turn_id` field, DTO, response shape, OpenAPI schema, database schema, or
+migration.
