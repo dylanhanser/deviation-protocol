@@ -1,6 +1,11 @@
 # Run Protocol, Difficulty, and World Profiles
 
-Status: **Approved product design — not implemented**
+Status: **Approved product design. P3.3-G0 is approved, published, frozen, and
+complete. The first exact local no-migration P3.3-S1 implementation review
+returned `CHANGES_REQUIRED`; the published review-authority amendment is now
+part of the baseline, and the corrected exact seven-path candidate remains
+unapproved, unstaged, uncommitted, unpublished, and incomplete. Phase 3.3
+remains incomplete.**
 
 Phase ownership: **Phase 3.3**
 
@@ -62,7 +67,8 @@ constructible lifecycle remains `pre_first_turn`.**
 
 ## Non-goals
 
-- Implementing Phase 3.3 in the current codebase.
+- Completing Phase 3.3, or implementing P3.3-S2 through P3.3-S7, in the current
+  P3.3-S1 candidate.
 - Letting prose or model preference change resources, success, betrayal, death,
   relationship progression, or permanent facts.
 - Replacing scenario-authored facts, character definitions, or engine rules.
@@ -70,20 +76,20 @@ constructible lifecycle remains `pre_first_turn`.**
 - Letting a player freely select an arbitrary world or directly select every
   later world.
 
-## Repository-specific Phase 3.3 planning candidate
+## Published Phase 3.3 plan and local P3.3-S1 candidate
 
 The repository-specific
-[Phase 3.3 Run Protocol implementation-plan candidate](phase_3_3_run_protocol_implementation_plan.md)
-is a documentation-only candidate authored against
+[Phase 3.3 Run Protocol implementation plan](phase_3_3_run_protocol_implementation_plan.md)
+was originally authored against
 `49bb7c9c8f616e4036cbe56549f9621544ebf84b`. Its first independent review
-returned `CHANGES_REQUIRED`; the corrected candidate awaits fresh independent
-read-only re-review. Its authoring does not approve, freeze, publish, or authorize
-implementation and is not evidence that Phase 3.3 began or completed. This
-document remains approved product design, not implemented behavior.
+returned `CHANGES_REQUIRED`; the bounded B1-B4 correction later received
+`PHASE_3_3_RUN_PROTOCOL_IMPLEMENTATION_PLAN_INDEPENDENT_REVIEW_APPROVED`, was
+separately committed and user-published as
+`76064d200d1aa5af7cddff22d33acb03e608e598`, and was confirmed at a clean,
+aligned baseline. P3.3-G0 is approved, published, frozen, and complete.
 
-The candidate records the exact repository compatibility boundary proposed for
-freeze without changing current runtime behavior. It remains non-operative
-until the candidate's review and publication gates complete:
+The frozen plan records the exact repository compatibility boundary without
+changing current legacy runtime behavior:
 
 - existing Phase 8 revisions 1/2/3, immutable character binding, first Session
   participation, Session initialization family, V1 evidence/fingerprints/
@@ -101,11 +107,15 @@ until the candidate's review and publication gates complete:
 - `scenario_id` remains scenario-definition identity only. It is never world,
   visit, region, protocol, or profile identity.
 
-The candidate's no-migration P3.3-S1 representation has exactly one initial envelope
-schema, `run-protocol-envelope/v1`. It contains only an exact versioned profile
-reference and the approved presentation values `world_tone`,
-`reality_boundary`, and `relationship_overlay`. It contains no numeric engine
-values, defaults, overrides, catalogue definitions, scenario/world/visit/region
+The plan's no-migration P3.3-S1 representation has exactly one initial envelope
+schema, `run-protocol-envelope/v1`. The separately authorized local candidate
+implements that representation, its strict original-state validator, canonical
+encoder/v1 decoder, trusted version dispatcher, golden vector, and no-I/O
+in-memory stored-record conversion/reconstruction boundary. It contains only
+an exact versioned profile reference and the approved presentation values
+`world_tone`, `reality_boundary`, and `relationship_overlay`. It contains no
+numeric engine values, defaults, overrides, catalogue definitions,
+scenario/world/visit/region
 fields, prose, secrets, or Provider output. The strict canonical form uses
 UTF-8 without BOM, repository-consistent NFC, sorted object keys, compact JSON,
 no ASCII escaping, signed-positive 64-bit profile versions, duplicate-key and
@@ -115,7 +125,50 @@ reinterpretation. P3.3-S1 representation validity is separate from profile
 authorization, lookup, and deterministic resolution, and P3.3-S1 creates no durable
 Run Protocol.
 
-The corrected unapproved planning allocation is exactly:
+The candidate's first independent read-only review returned `CHANGES_REQUIRED`
+for four findings: missing operative S1 review authority, missing exact
+pre-normalization scalar-type enforcement, synthetic 1,024/1,025 canonical
+branch evidence incorrectly characterized as genuine valid-envelope evidence,
+and stale Phase 8/Dynamic Narrative status text in `architecture.md`. The
+authority defect and ceiling clarification were independently approved and
+published in commit `a722dbf7f07e6e55cd4918a80b5153d6043f2100`. The remaining
+exact-type, genuine 329-byte maximum-envelope, defensive-branch
+characterization, and documentation corrections are carried only by the exact
+local seven-path candidate.
+
+The corrected carrier validators require exact `str` for profile ID and schema
+literal and exact `int` for profile version before Pydantic normalization, so
+equal-valued subclasses, `StrEnum`, `IntEnum`, and Boolean-as-integer inputs fail
+both direct construction and original-state revalidation. Genuine real-encoder
+maximum evidence uses the frozen 128-byte `A` profile ID, maximum signed-positive
+64-bit profile version, `balanced`, `deviant`, and `charged`; it is exactly 329
+bytes with SHA-256
+`0e0b1f498e1bf51656f1c5e5c742074e864da9678964c048087f52bdf5066e78`.
+The internal 1,024/1,025 canonical-guard test is defensive branch-isolation
+evidence only, while the public decoder retains genuine raw-input boundary
+evidence at both sizes. Neither 1,024-byte ceiling changes.
+
+The historical pre-correction seven-path patch identity of `80,019` bytes and
+SHA-256 `064dd425f1b412495ddbf62e6995b18d1266c5b0b7dc2ab7d12b41c6e58bfe25`
+is non-operative after correction. The corrected candidate remains unapproved,
+unstaged, uncommitted, unpublished, unaccepted, and incomplete. After all
+prescribed correction verification succeeds, the exact next action is a fresh
+independent read-only review using
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`; no staging, commit,
+publication, or later slice is authorized.
+
+The former authoring verification (`126` focused tests, `222` adjacent Run
+regressions, and Offline `2,463 passed, 182 skipped`) is historical evidence for
+the pre-correction bytes and cannot approve the corrected candidate.
+
+Current correction verification passes 141 focused P3.3-S1 tests, 222 adjacent
+Run regressions, targeted compilation, and canonical Offline verification at
+`2,478 passed, 182 skipped`. Offline also passes dependency consistency,
+metadata-only Alembic `heads`/`history`, and tracked diff checking in its
+sanitized child without database, Provider, or live-test environment variables.
+These results do not approve, stage, commit, publish, or complete P3.3-S1.
+
+The published frozen planning allocation is exactly:
 
 1. **P3.3-G0 — Plan and compatibility freeze candidate**;
 2. **P3.3-S1 — No-migration protocol/profile foundation**;
@@ -127,8 +180,14 @@ The corrected unapproved planning allocation is exactly:
 8. **P3.3-S7 — Later worlds, visits, regions, revisits, progression, and persistent world continuity**.
 
 P3.3-S7 belongs to Phase 3.3 and is unrelated to the nonexistent P8-S7.
-Phase 8 remains implemented and complete at P8-S6. This allocation is not
-approval, freeze, publication, or implementation authorization.
+Phase 8 remains implemented and complete at P8-S6. Publication of this
+allocation did not authorize any implementation slice. P3.3-S1 was separately
+authorized; P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
+After successful correction and prescribed verification, the exact next action
+is a fresh independent read-only review of the complete remeasured seven-path
+P3.3-S1 candidate using
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`, not staging or
+commit.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -148,8 +207,10 @@ presentation-only and cannot mutate Phase 3.4 relationship or residence state.
 
 ## Minimum Run-core prerequisite for player-character Phase 4
 
-The complete Run Protocol remains approved product design and is not
-implemented. Before Structured Player Character P4-S1, only the smaller
+The complete Run Protocol remains approved product design and is not complete
+or durably implemented; only the local corrected-but-unapproved P3.3-S1
+foundation candidate now exists. Before Structured Player Character P4-S1,
+only the smaller
 prerequisite specified by the
 [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 has been implemented, independently finally approved, committed, and pushed.
@@ -615,9 +676,11 @@ preset_version=1
 [/RUN_PROTOCOL]
 ```
 
-The structured, versioned boundary is accepted. Exact serialization and
-validation details will be finalized during Phase 3.3 implementation. No
-`RUN_PROTOCOL` block exists in the implemented prompt today.
+The structured, versioned boundary is accepted. The frozen P3.3-S1 plan fixes
+the exact `run-protocol-envelope/v1` representation and the local candidate
+implements its standalone codec/validation evidence. This does not select or
+implement the illustrative prompt block above; no `RUN_PROTOCOL` block exists
+in the implemented prompt today.
 
 ## Lifecycle
 
@@ -682,7 +745,8 @@ Phase 3.3 is acceptable only when:
 
 ## Deferred questions
 
-- Exact serialization and schema-validation form.
+- Successor-version compatibility, durable schema/migration, and later decoder
+  policy beyond the frozen standalone v1 representation.
 - Exact numeric/value ranges for the five engine-owned parameters.
 - Profile-to-parameter default values.
 - Which overrides are offered for each game mode or character.

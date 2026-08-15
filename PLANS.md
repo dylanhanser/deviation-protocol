@@ -17,36 +17,75 @@ documents.
 
 The authoritative readiness reconstruction returned
 `PHASE_3_3_IMPLEMENTATION_READINESS_RECONSTRUCTION_COMPLETE` with classification
-`PHASE_3_3_NEW_FROZEN_IMPLEMENTATION_PLAN_REQUIRED`. Phase 3.3 is therefore the
-current planning priority. The exact documentation-only three-document
-candidate consists of this roadmap,
+`PHASE_3_3_NEW_FROZEN_IMPLEMENTATION_PLAN_REQUIRED`. The resulting exact
+three-document P3.3-G0 candidate consists of this roadmap,
 [Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md), and the
-[Phase 3.3 Run Protocol implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md),
-all authored against
+[Phase 3.3 Run Protocol implementation plan](docs/phase_3_3_run_protocol_implementation_plan.md),
+all originally authored against
 `49bb7c9c8f616e4036cbe56549f9621544ebf84b`.
 
 The candidate's first independent read-only review returned `CHANGES_REQUIRED`.
-The bounded B1-B4 documentation correction is now the only active work item:
-it removes premature freeze claims, corrects the delivery sequence to
-P3.3-G0 plus P3.3-S1 through P3.3-S7, adds the dedicated objective-mechanics
-and trusted prompt-context compilation slice and complete acceptance-coverage
-matrix, fixes the exact S1 symbol/callable contracts, and restricts
+The bounded B1-B4 correction removed premature freeze claims, corrected the
+delivery sequence to P3.3-G0 plus P3.3-S1 through P3.3-S7, added the dedicated
+objective-mechanics/trusted-prompt-context slice and complete acceptance
+coverage, fixed the exact S1 symbol/callable contracts, and restricted
 important-NPC recovery to already-authorized identity/world predicates. The
-corrected candidate awaits a fresh independent read-only re-review. It is not
-approved, frozen, published, commit-ready, or implementation authorization;
-Phase 3.3 is not implemented and has not begun.
+corrected bytes later received
+`PHASE_3_3_RUN_PROTOCOL_IMPLEMENTATION_PLAN_INDEPENDENT_REVIEW_APPROVED`, were
+separately committed and user-published as
+`76064d200d1aa5af7cddff22d33acb03e608e598`, and were confirmed as a clean,
+aligned baseline. P3.3-G0 is approved, published, frozen, and complete.
 
 All pre-correction per-path identities are invalid and non-operative. The
 pre-correction canonical ordered complete patch identity of `57,908` bytes and
 SHA-256 `e9715b761f0030b30bcd6c136b3b7c016fcdddbf1243c1ffb272811c6c08bcad`
-is likewise invalid and cannot satisfy review or approval. The exact next task
-is a fresh independent read-only review of the newly measured three-document
-candidate. New identity measurement, fresh review, the exact operative token,
-separate local commit authorization, an exact three-path local commit, user
-push, clean aligned published-baseline confirmation, and separately authorized
-P3.3-S1 implementation must remain distinct ordered gates. Candidate semantics
-become frozen only after that complete sequence, not when authored, corrected,
-hashed, or reviewed.
+is likewise invalid and cannot satisfy review or approval. It remains only
+historical pre-correction evidence.
+
+One separately authorized exact P3.3-S1 implementation candidate exists
+locally in the frozen seven-path budget. Its first independent read-only review
+returned `CHANGES_REQUIRED` with four findings: the absence of an operative S1
+implementation-review token, missing exact pre-normalization scalar-type
+enforcement, incorrect characterization of synthetic canonical-ceiling branch
+evidence as a genuine valid-envelope boundary, and stale Phase 8/Dynamic
+Narrative status text in `docs/architecture.md`.
+
+The review-authority defect and canonical-ceiling interpretation were resolved
+by the independently approved and user-published predecessor amendment commit
+`a722dbf7f07e6e55cd4918a80b5153d6043f2100`. The remaining exact-type,
+maximum-envelope test-evidence, and architecture/documentation corrections are
+the bounded local work carried by the current exact seven-path candidate. The
+corrected candidate remains unapproved, unstaged, uncommitted, unpublished,
+and incomplete. P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized,
+and Phase 3.3 remains incomplete.
+
+This correction creates no durable protocol/profile persistence, migration,
+native admission, objective mechanics, public surface, later-world behavior,
+or identity authority. Legacy Run revisions 1/2/3 and `scenario_id` semantics
+remain unchanged.
+
+The historical pre-correction seven-path patch identity of `80,019` bytes and
+SHA-256 `064dd425f1b412495ddbf62e6995b18d1266c5b0b7dc2ab7d12b41c6e58bfe25`
+is non-operative and is not the corrected candidate identity. After correction
+and prescribed verification succeed, the exact next governance action is a
+fresh independent read-only review of the remeasured complete seven-path
+candidate whose sole operative success verdict is
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`. No staging or commit
+precedes that review.
+
+The pre-review authoring evidence passed the former 126-test focused P3.3-S1
+suite, the 222-test adjacent Run regression set, targeted `compileall`, and
+canonical Offline verification at `2,463 passed, 182 skipped`; that evidence is
+historical after correction. It is not independent review, approval,
+acceptance, publication, commit authorization, or Phase 3.3 completion.
+
+Current correction verification passes 141 focused P3.3-S1 tests, the unchanged
+222-test adjacent Run regression set, `compileall`, and canonical Offline
+verification at `2,478 passed, 182 skipped`. Offline also passes dependency
+consistency, metadata-only Alembic `heads`/`history`, and tracked diff checking
+in a sanitized child without database, Provider, or live-test environment
+variables. This remains authoring evidence, not independent approval or Git
+authority.
 
 Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
@@ -568,7 +607,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **Current planning priority — corrected three-document implementation-plan candidate awaiting fresh independent read-only re-review after `CHANGES_REQUIRED`; not implemented** | [Run Protocol design](docs/run_protocol.md) and [implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md) |
+| Phase 3.3 | **P3.3-G0 approved, published, frozen, and complete; first P3.3-S1 review returned `CHANGES_REQUIRED`; the exact local corrected seven-path candidate remains unapproved and Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md) and [frozen implementation plan](docs/phase_3_3_run_protocol_implementation_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1076,18 +1115,20 @@ themselves authorize later implementation. Phase 3.2b remains closed.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
-Status: **Current planning priority. Approved product design exists; the
-corrected repository-specific implementation-plan candidate is awaiting fresh
-independent read-only re-review after `CHANGES_REQUIRED`. Phase 3.3 is not
-implemented and has not begun.**
+Status: **P3.3-G0 is approved, published, frozen, and complete. The first exact
+P3.3-S1 implementation review returned `CHANGES_REQUIRED`; the published
+review-authority amendment is now part of the baseline, and an exact local
+corrected seven-path candidate remains unapproved, unstaged, uncommitted,
+unpublished, and incomplete. P3.3-S2 through P3.3-S7 are unauthorized and
+Phase 3.3 remains incomplete.**
 
 The authoritative readiness reconstruction completed with classification that
 a new frozen implementation plan is required. No defect was found. Its current
 documentation-only three-file candidate is this roadmap,
 [the canonical Run Protocol design](docs/run_protocol.md), and the
-[repository-specific Phase 3.3 implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md).
+[repository-specific Phase 3.3 implementation plan](docs/phase_3_3_run_protocol_implementation_plan.md).
 The first independent review of the candidate returned `CHANGES_REQUIRED` with
-four bounded findings, B1-B4. The corrected candidate proposes exact strict S1
+four bounded findings, B1-B4. The corrected candidate fixed exact strict S1
 representation semantics, legacy/native compatibility, version/decoder rules,
 identity and transaction boundaries, and this exact ordered delivery sequence:
 
@@ -1101,10 +1142,10 @@ identity and transaction boundaries, and this exact ordered delivery sequence:
 8. **P3.3-S7 — Later worlds, visits, regions, revisits, progression, and persistent world continuity**.
 
 P3.3-S7 is a Phase 3.3 slice. It is unrelated to the nonexistent P8-S7;
-Phase 8 remains implemented and complete at P8-S6. The corrected candidate is
-still unapproved and proposes, but does not yet freeze, these repository-
-specific decisions. It does not authorize code, persistence, migration,
-public-contract, Demo, Web, Provider, world, or gameplay changes.
+Phase 8 remains implemented and complete at P8-S6. The corrected plan later
+received its exact operative approval, separate commit, user publication, and
+clean aligned-baseline confirmation at `76064d2`; P3.3-G0 is therefore frozen
+and complete. Planning publication did not authorize any implementation slice.
 
 P3.3-S5 is the dedicated owner for deterministic application of all five
 engine-owned objective parameters and Provider-independent compilation of
@@ -1125,15 +1166,24 @@ state, cross-scenario persistence, Phase 6 hooks, and new identity/memory schema
 are outside Phase 3.3. Future integration requires separately published
 identity/memory authority and a fresh bounded P3.3-S7 subdivision review.
 
-The exact next task is a fresh independent read-only re-review of the exact
-newly hashed three-document candidate. Any later byte change invalidates its
-hash and review. Only the exact operative verdict
-`PHASE_3_3_RUN_PROTOCOL_IMPLEMENTATION_PLAN_INDEPENDENT_REVIEW_APPROVED` may
-satisfy the review gate. Only after that verdict may the user separately
-authorize an exact three-path local documentation commit; the user performs
-every push. A clean aligned published baseline and separate P3.3-S1
-implementation authorization are required before P3.3-S1. Until all of those
-steps complete, neither the candidate nor its proposed S1 semantics are frozen.
+The separately authorized P3.3-S1 candidate implements all 22 frozen
+module-level symbols in two new production modules, their deterministic unit
+evidence in two new test modules, and this slice's three-document status
+synchronization. Its first independent review returned `CHANGES_REQUIRED` for
+the four findings recorded above. Published amendment
+`a722dbf7f07e6e55cd4918a80b5153d6043f2100` supplied the reachable operative
+future-review token and clarified that genuine v1 maximum evidence is 329
+bytes, while 1,024/1,025 canonical-guard checks are defensive branch isolation.
+The exact-type, real-maximum evidence, and stale-status corrections are now in
+the local seven-path candidate.
+
+The candidate has no migration, database, repository, Unit of Work, runtime,
+API, Demo, Web, Dynamic Narrative, Provider, scenario, world, or gameplay
+integration. It remains unapproved, unstaged, uncommitted, unpublished, and
+incomplete. After successful correction and prescribed verification, its exact
+next action is a fresh independent read-only review using
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`; it must not be
+described as commit-ready before that review succeeds.
 
 Phase 3.3 owns the engine/world parameters, pre-game profiles and permitted
 overrides, versioned frozen Run Protocol, deterministic resolution, and the
@@ -1170,7 +1220,7 @@ independently finally approved, committed, and pushed as
   boundary. No public binding activation exists.
 
 Neither P4-G0, the minimum prerequisite, completed Phase 8 admission, nor the
-new documentation candidate marks the full Run Protocol implemented. Existing
+local P3.3-S1 candidate marks the full Run Protocol implemented. Existing
 Phase 8 rows remain legacy Session-backed Runs with their current strict stored
 proof, revision/evidence/replay/recovery, and production/Demo/Web/Dynamic
 Narrative behavior. They receive no synthesized protocol or world state. Native
@@ -1313,8 +1363,9 @@ real-MySQL verification.
   catalogues/weighting, visits/regions/world state, progression, anti-repeat,
   anti-farming, recovery priority, world-line transition, and later physical
   schema choices. The initial S1 serialization and compatibility semantics are
-  proposed freeze decisions in the unapproved candidate; they are not frozen
-  or implemented.
+  frozen planning decisions with a local corrected-but-unapproved
+  implementation candidate; they are not accepted, published implementation or
+  durable Run authority.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,
@@ -1381,8 +1432,10 @@ manually.
   [`docs/decisions/0001-production-provider-distribution.md`](docs/decisions/0001-production-provider-distribution.md).
 - Run Protocol and difficulty/world profiles:
   [`docs/run_protocol.md`](docs/run_protocol.md).
-- Documentation-only Phase 3.3 repository implementation-plan candidate,
-  awaiting fresh independent read-only re-review after `CHANGES_REQUIRED`:
+- Approved, published, and frozen Phase 3.3 repository implementation plan;
+  P3.3-G0 is complete, the first exact P3.3-S1 review returned
+  `CHANGES_REQUIRED`, and the exact local corrected seven-path candidate awaits
+  fresh independent read-only review under the amended operative token:
   [`docs/phase_3_3_run_protocol_implementation_plan.md`](docs/phase_3_3_run_protocol_implementation_plan.md).
 - Minimum Run-core prerequisite implementation sequence, persistence,
   transaction, and evidence:

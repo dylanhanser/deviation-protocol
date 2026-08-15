@@ -4,6 +4,79 @@ This document describes implemented architecture first. Sections named for
 earlier phases preserve the implementation history of those boundaries; they
 do not make later accepted designs current capabilities.
 
+## P3.3-S1 local no-migration foundation candidate
+
+P3.3-G0 is approved, published, frozen, and complete at
+`76064d200d1aa5af7cddff22d33acb03e608e598`. The separately authorized exact
+seven-path P3.3-S1 implementation candidate received a first independent
+read-only review verdict of `CHANGES_REQUIRED`. Its four findings were missing
+operative S1 review authority, missing exact pre-normalization scalar-type
+enforcement, incorrect genuine-boundary characterization of synthetic
+canonical-guard evidence, and stale Phase 8/Dynamic Narrative status text in
+this document.
+
+The authority defect and canonical-ceiling clarification were independently
+approved and published in predecessor commit
+`a722dbf7f07e6e55cd4918a80b5153d6043f2100`. The remaining exact-type,
+genuine-maximum evidence, and status corrections are local work within the
+same exact seven-path budget. The corrected candidate remains unapproved,
+unstaged, uncommitted, unpublished, and incomplete. Phase 3.3 remains
+incomplete; P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
+Phase 6 remains paused and Phase 7 remains inactive.
+
+The former authoring evidence of 126 focused tests, 222 adjacent Run
+regressions, and Offline `2,463 passed, 182 skipped` belongs to the historical
+pre-correction bytes. After successful correction and prescribed verification,
+the exact next action is a fresh independent read-only review using
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`.
+
+Current correction verification passes 141 focused P3.3-S1 tests, the unchanged
+222-test adjacent Run regression set, compilation, and canonical Offline
+verification at `2,478 passed, 182 skipped`. The sanitized Offline child also
+passes dependency consistency, metadata-only Alembic `heads`/`history`, and
+tracked diff checking without database, Provider, or live-test variables. This
+evidence is authoring evidence only and does not approve or complete the slice.
+
+`domain.run_protocol` owns the exact standalone `run-protocol-envelope/v1`
+representation: the envelope epoch and trusted record-version constants,
+strict immutable profile/version and presentation carriers, three closed
+presentation enums, domain validation and unsupported-version errors, original
+caller-state validation, the canonical encoder, the exact v1 decoder, and the
+trusted out-of-band version dispatcher. Canonical payloads are strict NFC
+UTF-8 without BOM, compact JSON with deterministic field order, and bounded to
+1,024 raw and canonical bytes. Checked-in golden evidence fixes the canonical
+vector at 193 UTF-8 bytes with SHA-256
+`a7e0149e8241f1b4d1c74487da2b8bcf36c93d05310c76a9b847d4e57c5a3a8a`.
+
+The profile ID and envelope schema literal require `type(value) is str`, and
+the profile version requires `type(value) is int`, at mode-before validation
+boundaries. Equal-valued string/integer subclasses, `StrEnum`, `IntEnum`, and
+Boolean values are rejected before Pydantic normalization both on direct
+construction and when original nested instance state is revalidated after
+corruption. The independently fixed maximum legal v1 carrier encodes to 329
+bytes with SHA-256
+`0e0b1f498e1bf51656f1c5e5c742074e864da9678964c048087f52bdf5066e78`.
+The 1,024/1,025 canonical encoder test isolates the otherwise unreachable
+defensive post-encoding guard and is not genuine valid-envelope evidence; the
+public decoder separately retains genuine 1,024/1,025 raw-input evidence.
+
+`infrastructure.run_protocol_persistence` owns only a frozen in-memory stored
+carrier, a distinct stored-record integrity error, deterministic conversion to
+that carrier, and reconstruction through the trusted version dispatcher. This
+boundary is synchronous, side-effect-free, and no-I/O. It adds no ORM, table,
+column, repository, Unit of Work, migration, transaction, durable Run Protocol,
+profile catalogue or resolution, native admission, world identity, mechanics,
+prompt-context compilation, public contract, Provider behavior, or later-world
+continuity.
+
+Legacy Run revisions 1/2/3 and their existing behavior remain unchanged.
+`scenario_id` remains scenario identity only, and no legacy Run receives
+synthesized protocol, profile, world, visit, region, or world-state authority.
+The historical pre-correction patch identity is non-operative after these
+changes. The corrected candidate is not commit-ready; after successful
+correction and verification, it requires fresh independent read-only review
+under the operative token above.
+
 ## Structured player-character Phase 1 pure foundation
 
 The approved and frozen structured player-character plan now has a Phase 1
@@ -573,12 +646,14 @@ implementation, and its corrected implementation received
 The exact eight-path Web implementation was committed and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. The frozen
 P8-S6 implementation plan was approved and published at
-`4edf2e3341e60632765b85796e8554797c645692`. Its fresh executable evidence now
-passes through C21; these current documentation bytes remain an unapproved,
-unstaged, uncommitted, and unpublished implementation candidate. Phase 8, Phase
-6, Phase 7, the Structured Player Character programme, and the overall project
-remain incomplete pending the plan-defined review, commit, publication, and
-aligned-ref gates.
+`4edf2e3341e60632765b85796e8554797c645692`. Historically, its fresh executable
+evidence passed through C21 while the then-current closure documentation still
+awaited independent review, commit, publication, and aligned-ref confirmation.
+That candidate-time checkpoint is closed: the closure documentation was later
+independently approved, committed, manually published, and confirmed at
+`7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`. P8-S6 and Phase 8 are complete;
+no P8-S7 exists. Phase 6 remains paused, Phase 7 remains inactive, and neither
+was completed by Phase 8.
 Later modifications to the planning-authority bytes require exact-byte
 independent review before a separately authorized documentation commit; that
 commit precedes user publication and clean published-baseline confirmation.
@@ -697,7 +772,8 @@ Character create/discovery, Run entry, authoritative View, and the canonical
 19-action ending in separate OS processes and compares deterministic public and
 generator traces without non-loopback network or real Provider access.
 
-Fresh P8-S6 cross-surface evidence preserves that separation. The normal
+The independently approved and published P8-S6 cross-surface evidence
+preserves that separation. The normal
 production ASGI path passed the designated MySQL 8 public entry-to-terminal
 playthrough and canonical MySQL/Full gates through the existing
 SQLAlchemy/`AsyncSession`/`asyncmy` composition. The independent Demo path passed
@@ -709,7 +785,9 @@ stored-Session-before-View, action/request-status/View/recovery, and terminal
 rendering lifecycle. No live Provider, production service, unrelated database,
 or other external runtime service was contacted. This evidence changes no
 composition, transaction, persistence, public-contract, migration, or Provider
-authority; it supports only the pending P8-S6 documentation candidate.
+authority. Its independently approved publication closeout completed P8-S6 and
+Phase 8 at the closure baseline above; it creates no P8-S7 and does not complete
+Phase 6 or Phase 7.
 
 ## Phase 3.2b local Demo Web boundary
 
@@ -781,10 +859,13 @@ meaning comes from trusted server templates.
 ## Future-design boundaries
 
 These designs are accepted or approved for later phases and are not
-implemented:
+implemented beyond the explicitly bounded local P3.3-S1 candidate described
+above:
 
-- Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles:
-  [`run_protocol.md`](run_protocol.md).
+- Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
+  local S1 candidate supplies only standalone representation, validation,
+  canonical codec evidence, and a no-I/O persistence seam; no durable or
+  runtime Run Protocol behavior exists: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider
@@ -792,8 +873,9 @@ implemented:
   [`ADR 0001`](decisions/0001-production-provider-distribution.md).
 
 Current architecture does not implement player-selectable multi-Provider
-routing, commercial quota or billing, a frozen `RUN_PROTOCOL` input,
-difficulty/world profiles, NPC residence mode, or unrestricted daily AI chat.
+routing, commercial quota or billing, a frozen `RUN_PROTOCOL` prompt input,
+resolved or applied difficulty/world profiles, NPC residence mode, or
+unrestricted daily AI chat.
 The future selected Provider/model channel remains distinct from both the
 application `NarrativeProvider` abstraction and the future Production
 Distribution Gateway.
@@ -1211,9 +1293,15 @@ DeepSeek adapter 只在 infrastructure，配置限制为官方 HTTPS host、`dee
 
 本段记录 Phase 2.2b-1 当时尚未接线的边界；现行 Phase 2.2c 生产行为以文首的三阶段架构为准。详细配置、数据合同与 smoke 规则见 [`docs/narrative_provider.md`](narrative_provider.md)。
 
-## Experimental Dynamic Narrative Vertical Spike candidate
+## Experimental Dynamic Narrative Vertical Spike historical boundary
 
-The DNVS candidate is a separate local Demo composition, not a production
+This section preserves the implementation boundary of the former DNVS
+candidate as history. The Dynamic Narrative corrective aggregate, its
+independent reviews, publication, and publication closeout are complete and
+closed; no correction, review, staging, commit, push, or publication remains
+pending for that aggregate.
+
+The DNVS composition is a separate Demo composition, not a production
 composition or a new formal phase. It enters the existing authoritative Run,
 Session, participation, Player Character, snapshot, event, turn-response, and
 narrative-job boundaries through a director-free dynamic Session service. The
@@ -1246,6 +1334,7 @@ authority and consume no new reservation.
 
 No schema or migration changes are needed: existing narrative-job JSON,
 snapshots, turn responses, and the literal 20-slot dynamic-facts allowlist carry
-the bounded experimental state. The candidate remains unstaged and awaits
-independent implementation review. It does not establish production or evidence
-completion and does not change Phase 6, Phase 7, completed Phase 8, or P8-S6.
+the bounded experimental state. The corrective aggregate and its status
+synchronization were independently approved, committed, pushed, published, and
+closed. That closeout does not establish production Provider distribution and
+does not change paused Phase 6, inactive Phase 7, or completed Phase 8/P8-S6.
