@@ -4,7 +4,7 @@ Status: **Approved product design — not implemented**
 
 Phase ownership: **Phase 3.3**
 
-Phase 8 planning amendment: **The approved and published Phase 8 Structured
+Phase 8 historical planning amendment: **The approved and published Phase 8 Structured
 Player Character Run Entry and Minimum Playable Loop planning authority defines
 one narrow Session-backed activation path below. Its planning bytes were
 published at `de4d8c0e35c7864948306d751a00aaf295ff77ff`, so P8-G0 is complete.
@@ -36,7 +36,10 @@ P8-S6 implementation plan was approved and published at
 through C21, and these current documentation bytes are its unapproved,
 unstaged, uncommitted, and unpublished implementation candidate. Phase 8 and
 the overall project remain incomplete; this status does not mark Phase 3.3,
-Phase 6, or Phase 7 complete.**
+Phase 6, or Phase 7 complete.** This paragraph preserves the then-current P8-S6
+candidate record. Current status: P8-S1 through P8-S6 are implemented and
+complete; the closure documentation was independently approved, committed, and
+published at `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`, and no P8-S7 exists.
 
 P4-S1 status: **Minimum Run Core is the historical prerequisite at
 `e821cd922b61868097667b12c2b64cf8089a9681` (`feat(run): implement minimum run
@@ -66,6 +69,82 @@ constructible lifecycle remains `pre_first_turn`.**
 - Defining NPC residence progression or production Provider pricing.
 - Letting a player freely select an arbitrary world or directly select every
   later world.
+
+## Repository-specific Phase 3.3 planning candidate
+
+The repository-specific
+[Phase 3.3 Run Protocol implementation-plan candidate](phase_3_3_run_protocol_implementation_plan.md)
+is a documentation-only candidate authored against
+`49bb7c9c8f616e4036cbe56549f9621544ebf84b`. Its first independent review
+returned `CHANGES_REQUIRED`; the corrected candidate awaits fresh independent
+read-only re-review. Its authoring does not approve, freeze, publish, or authorize
+implementation and is not evidence that Phase 3.3 began or completed. This
+document remains approved product design, not implemented behavior.
+
+The candidate records the exact repository compatibility boundary proposed for
+freeze without changing current runtime behavior. It remains non-operative
+until the candidate's review and publication gates complete:
+
+- existing Phase 8 revisions 1/2/3, immutable character binding, first Session
+  participation, Session initialization family, V1 evidence/fingerprints/
+  replay, recovery, and production/Demo/Web/Dynamic Narrative compatibility are
+  legacy behavior;
+- existing rows are valid and replayable only when trusted stored legacy proof
+  passes its current strict decoder and cross-row integrity checks. They receive
+  no synthesized protocol, profile, world, visit, region, or world state and no
+  rewrite, backfill, refingerprint, relabel, default, or Provider/canon authority;
+- caller-controlled absence cannot select legacy handling;
+- a Phase-3.3-native Run will require explicit trusted server-owned versioned
+  state, an exact validated and authorized protocol/profile binding, and—before
+  native admission—an explicit authored entry-world ID/version. Missing,
+  malformed, unknown, contradictory, or incompatible state fails closed;
+- `scenario_id` remains scenario-definition identity only. It is never world,
+  visit, region, protocol, or profile identity.
+
+The candidate's no-migration P3.3-S1 representation has exactly one initial envelope
+schema, `run-protocol-envelope/v1`. It contains only an exact versioned profile
+reference and the approved presentation values `world_tone`,
+`reality_boundary`, and `relationship_overlay`. It contains no numeric engine
+values, defaults, overrides, catalogue definitions, scenario/world/visit/region
+fields, prose, secrets, or Provider output. The strict canonical form uses
+UTF-8 without BOM, repository-consistent NFC, sorted object keys, compact JSON,
+no ASCII escaping, signed-positive 64-bit profile versions, duplicate-key and
+non-finite-number rejection, and byte-for-byte decode/re-encode canonicality.
+Unknown versions receive no default, upgrade, downgrade, fallback, or
+reinterpretation. P3.3-S1 representation validity is separate from profile
+authorization, lookup, and deterministic resolution, and P3.3-S1 creates no durable
+Run Protocol.
+
+The corrected unapproved planning allocation is exactly:
+
+1. **P3.3-G0 — Plan and compatibility freeze candidate**;
+2. **P3.3-S1 — No-migration protocol/profile foundation**;
+3. **P3.3-S2 — Deterministic profile resolution**;
+4. **P3.3-S3 — Persistence and legacy/native compatibility**;
+5. **P3.3-S4 — Native Run admission and entry-world freezing**;
+6. **P3.3-S5 — Objective mechanics application and trusted prompt-context compilation**;
+7. **P3.3-S6 — Public API, Demo, Web, projection, and recovery parity**; and
+8. **P3.3-S7 — Later worlds, visits, regions, revisits, progression, and persistent world continuity**.
+
+P3.3-S7 belongs to Phase 3.3 and is unrelated to the nonexistent P8-S7.
+Phase 8 remains implemented and complete at P8-S6. This allocation is not
+approval, freeze, publication, or implementation authorization.
+
+P3.3-S5 must receive its own bounded implementation plan and independent
+review before implementation. It owns deterministic application by
+server-owned policies of `resource_pressure`, `social_trust`,
+`consequence_severity`, `information_opacity`, and `conflict_intensity`, with
+objective mechanics tested independently from prompt construction. It also owns
+a deterministic, pure or side-effect-free, Provider-independent compiler from
+validated trusted protocol state to canonical context bytes or one exact
+deterministic structured representation fixed by that plan. It must not call a
+real Provider. Provider calls remain outside database transactions and locks.
+
+The P3.3-S5 compiled context grants no outcome, resource, relationship, death,
+world-selection, permanent-state, or canon authority. Presentation changes
+permitted expression only. Regression evidence must prove that model output
+cannot create, change, or override mechanics or canon. Relationship overlay is
+presentation-only and cannot mutate Phase 3.4 relationship or residence state.
 
 ## Minimum Run-core prerequisite for player-character Phase 4
 
@@ -120,10 +199,9 @@ binding route or the `active` lifecycle transition.
 
 ## Phase 8 Session-backed minimum admission
 
-Status: **Implemented through completed, independently approved, committed, and
-published P8-S5 minimum Web connection; P8-S6 executable evidence collected
-and documentation implementation candidate pending independent review; Phase 8
-remains incomplete**
+Status: **Implemented and complete through independently approved, committed,
+and published P8-S6 closure at
+`7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`; no P8-S7 exists**
 
 The explicit Phase 8 allocation and detailed implementation boundary are owned
 by the
@@ -173,9 +251,10 @@ deterministic Demo journey separately completed the same canonical action,
 request-status, authoritative-View, and terminal sequence with exactly four
 completed guarded Provider calls. Focused Web evidence confirmed Session ID
 storage before the first View GET, a single action POST, confirmed-202 GET-only
-status polling, authoritative View refresh, and no automatic replay. These
-results support only the pending P8-S6 documentation candidate; they do not
-approve, commit, publish, or close it, and they do not make Phase 8 complete.
+status polling, authoritative View refresh, and no automatic replay. Those
+results and the synchronized closure documentation were independently approved,
+committed, and manually published at the P8-S6 closure baseline. They complete
+Phase 8 only; they do not implement or approve Phase 3.3, Phase 6, or Phase 7.
 
 ### Narrow authority amendment
 
@@ -330,8 +409,8 @@ Status: **Approved product design — not implemented**
 - Dynamic selection is deterministic and reproducible from engine-owned state
   and seed. It does not rely on uncontrolled model randomness.
 - Selection may consider prerequisites, completed worlds, current run state,
-  difficulty/world profile, major hidden-setting requirements, and
-  important-NPC recovery requirements.
+  difficulty/world profile, major hidden-setting requirements, and only the
+  important-NPC recovery predicate boundary defined below.
 - Pure randomness must not prevent required narrative progression or recovery
   of a major hidden setting or important NPC.
 
@@ -378,6 +457,27 @@ Status: **Approved product design — not implemented**
   priority are engine-owned.
 - The model must not independently return the player to a world, reset world
   state, unlock a region, or invent a required recovery event.
+
+### Important-NPC recovery predicate boundary
+
+P3.3-S7 recovery priority is engine-owned. It may consume only an
+already-authorized logical-NPC-identity predicate and authored-world predicate
+published by their owning authorities before the applicable P3.3-S7
+subdivision. It must not derive logical identity from runtime `npc_id`, treat a
+scenario NPC definition as cross-scenario identity, or match by name,
+appearance, role, template, model output, or semantic similarity. It must not
+create counterpart, reincarnation, copy, successor, replacement, or other
+continuity relations.
+
+P3.3-S7 recovery priority must not read or mutate relationship state, golden
+memory, cross-scenario NPC persistence, Phase 6 subject-reference hooks, an
+identity-resolution schema, or a memory schema. If no already-authorized
+predicate exists, important-NPC priority is unavailable and selection continues
+deterministically using other authorized eligibility and progression inputs.
+Absence must not manufacture identity, block unrelated valid selection, imply a
+Provider decision, promote a runtime NPC, or pull Phase 3.4 or Phase 6 into
+Phase 3.3. Future integration requires a separately published identity/memory
+authority and a fresh bounded P3.3-S7 subdivision review.
 
 The design distinguishes three conceptual identities without defining current
 schema fields:
@@ -544,8 +644,10 @@ validation details will be finalized during Phase 3.3 implementation. No
   Provider-selected random value.
 - Entry-world identity remains frozen, and later-world selection is
   reproducible from engine-owned state and seed.
-- Required progression and engine-confirmed major-setting or important-NPC
-  recovery constraints take priority over pure random weighting.
+- Required progression and engine-confirmed major-setting constraints take
+  priority over pure random weighting. Important-NPC priority participates only
+  when the already-authorized logical-identity and authored-world predicates
+  required by the boundary above exist.
 - The stored/frozen representation is sufficient to reproduce presentation
   inputs for a run.
 - Objective results are reproducible independently of prose variation.
@@ -589,7 +691,9 @@ Phase 3.3 is acceptable only when:
 - Exact eligible initial-world catalogue.
 - Later-world weighting algorithm and general anti-repeat rules.
 - Progression constraints and priority-injection rules for required story
-  progression, major hidden settings, and important-NPC recovery.
+  progression and major hidden settings; important-NPC integration remains
+  unavailable until separately published owning authorities supply the required
+  logical-identity and authored-world predicates.
 - Important-world designation schema.
 - Revisit limits and cooldowns.
 - Region-unlock rules.
@@ -619,6 +723,7 @@ and are revalidated on every reconstruction.
 
 This experimental composition neither implements nor amends the deferred formal
 Run Protocol described in this document. It is outside Phase 8, creates no
-P8-S7, and leaves completed P8-S6/Phase 8 and incomplete Phase 6/Phase 7 exactly
-as recorded in `PLANS.md`. The unstaged candidate still requires independent
-implementation review and later separately authorized evidence.
+P8-S7, and leaves completed P8-S6/Phase 8, paused Phase 6, and inactive Phase 7
+exactly as recorded in `PLANS.md`. The DNVS and its bounded autonomous
+improvement lifecycle are closed; neither supplies Phase 3.3 implementation
+evidence or Provider/world authority.

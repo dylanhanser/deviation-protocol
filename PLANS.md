@@ -13,6 +13,46 @@ documents.
 - **Planned phase:** assigned to a future phase whose implementation has not
   started.
 
+## Current planning priority: Phase 3.3
+
+The authoritative readiness reconstruction returned
+`PHASE_3_3_IMPLEMENTATION_READINESS_RECONSTRUCTION_COMPLETE` with classification
+`PHASE_3_3_NEW_FROZEN_IMPLEMENTATION_PLAN_REQUIRED`. Phase 3.3 is therefore the
+current planning priority. The exact documentation-only three-document
+candidate consists of this roadmap,
+[Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md), and the
+[Phase 3.3 Run Protocol implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md),
+all authored against
+`49bb7c9c8f616e4036cbe56549f9621544ebf84b`.
+
+The candidate's first independent read-only review returned `CHANGES_REQUIRED`.
+The bounded B1-B4 documentation correction is now the only active work item:
+it removes premature freeze claims, corrects the delivery sequence to
+P3.3-G0 plus P3.3-S1 through P3.3-S7, adds the dedicated objective-mechanics
+and trusted prompt-context compilation slice and complete acceptance-coverage
+matrix, fixes the exact S1 symbol/callable contracts, and restricts
+important-NPC recovery to already-authorized identity/world predicates. The
+corrected candidate awaits a fresh independent read-only re-review. It is not
+approved, frozen, published, commit-ready, or implementation authorization;
+Phase 3.3 is not implemented and has not begun.
+
+All pre-correction per-path identities are invalid and non-operative. The
+pre-correction canonical ordered complete patch identity of `57,908` bytes and
+SHA-256 `e9715b761f0030b30bcd6c136b3b7c016fcdddbf1243c1ffb272811c6c08bcad`
+is likewise invalid and cannot satisfy review or approval. The exact next task
+is a fresh independent read-only review of the newly measured three-document
+candidate. New identity measurement, fresh review, the exact operative token,
+separate local commit authorization, an exact three-path local commit, user
+push, clean aligned published-baseline confirmation, and separately authorized
+P3.3-S1 implementation must remain distinct ordered gates. Candidate semantics
+become frozen only after that complete sequence, not when authored, corrected,
+hashed, or reviewed.
+
+Phase 3.4 remains later. Phase 6 is paused under
+`PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
+at P8-S6 with no P8-S7. DNVS and its bounded autonomous improvement lifecycle
+are closed. Production Provider Distribution remains deferred.
+
 ## Dynamic Narrative Vertical Spike planning
 
 ### 2026-08-10 bounded autonomous improvement candidate
@@ -528,12 +568,12 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **Approved product design — not implemented** | [Run Protocol, difficulty, and world profiles](docs/run_protocol.md) |
-| Phase 3.4 | **Approved product design — not implemented** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
-| Phase 4.0 | **Accepted architectural direction — not implemented** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
+| Phase 3.3 | **Current planning priority — corrected three-document implementation-plan candidate awaiting fresh independent read-only re-review after `CHANGES_REQUIRED`; not implemented** | [Run Protocol design](docs/run_protocol.md) and [implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md) |
+| Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
+| Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
-| Structured Player Character Phase 6 | **Planned phase — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
-| Structured Player Character Phase 7 | **Planned phase — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
+| Structured Player Character Phase 6 | **Paused under `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE` — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
+| Structured Player Character Phase 7 | **Inactive — not implemented** | Regression, documentation, and closeout in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-7--regression-documentation-and-closeout) |
 | Phase 8 | **Implemented and complete at published P8-S6 closure baseline `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`; no P8-S7 exists** | [Structured Player Character Run Entry and Minimum Playable Loop](docs/structured_player_character_run_playable_loop_plan.md) |
 
 ## Implemented baseline through Phase 3.2b
@@ -1036,7 +1076,64 @@ themselves authorize later implementation. Phase 3.2b remains closed.
 
 ## Phase 3.3: Run Protocol and Difficulty/World Profiles
 
-Status: **Approved product design — not implemented.**
+Status: **Current planning priority. Approved product design exists; the
+corrected repository-specific implementation-plan candidate is awaiting fresh
+independent read-only re-review after `CHANGES_REQUIRED`. Phase 3.3 is not
+implemented and has not begun.**
+
+The authoritative readiness reconstruction completed with classification that
+a new frozen implementation plan is required. No defect was found. Its current
+documentation-only three-file candidate is this roadmap,
+[the canonical Run Protocol design](docs/run_protocol.md), and the
+[repository-specific Phase 3.3 implementation-plan candidate](docs/phase_3_3_run_protocol_implementation_plan.md).
+The first independent review of the candidate returned `CHANGES_REQUIRED` with
+four bounded findings, B1-B4. The corrected candidate proposes exact strict S1
+representation semantics, legacy/native compatibility, version/decoder rules,
+identity and transaction boundaries, and this exact ordered delivery sequence:
+
+1. **P3.3-G0 — Plan and compatibility freeze candidate**;
+2. **P3.3-S1 — No-migration protocol/profile foundation**;
+3. **P3.3-S2 — Deterministic profile resolution**;
+4. **P3.3-S3 — Persistence and legacy/native compatibility**;
+5. **P3.3-S4 — Native Run admission and entry-world freezing**;
+6. **P3.3-S5 — Objective mechanics application and trusted prompt-context compilation**;
+7. **P3.3-S6 — Public API, Demo, Web, projection, and recovery parity**; and
+8. **P3.3-S7 — Later worlds, visits, regions, revisits, progression, and persistent world continuity**.
+
+P3.3-S7 is a Phase 3.3 slice. It is unrelated to the nonexistent P8-S7;
+Phase 8 remains implemented and complete at P8-S6. The corrected candidate is
+still unapproved and proposes, but does not yet freeze, these repository-
+specific decisions. It does not authorize code, persistence, migration,
+public-contract, Demo, Web, Provider, world, or gameplay changes.
+
+P3.3-S5 is the dedicated owner for deterministic application of all five
+engine-owned objective parameters and Provider-independent compilation of
+validated trusted protocol state into deterministic canonical prompt context.
+Server-owned mechanics policies remain independently testable from prompt
+construction; presentation changes expression only, relationship overlay cannot
+mutate Phase 3.4 state, compiled context grants no mechanics/canon authority,
+Provider calls remain outside database transactions, and the slice uses no real
+Provider. P3.3-S5 requires its own bounded plan and independent review before
+implementation.
+
+P3.3-S7 important-NPC priority may consume only already-authorized logical-
+identity and authored-world predicates from separately published owning
+authorities. Without those predicates the priority is unavailable and other
+authorized eligibility/progression inputs continue. Runtime `npc_id`, scenario
+NPC definitions, descriptive/model similarity, relationship or golden-memory
+state, cross-scenario persistence, Phase 6 hooks, and new identity/memory schema
+are outside Phase 3.3. Future integration requires separately published
+identity/memory authority and a fresh bounded P3.3-S7 subdivision review.
+
+The exact next task is a fresh independent read-only re-review of the exact
+newly hashed three-document candidate. Any later byte change invalidates its
+hash and review. Only the exact operative verdict
+`PHASE_3_3_RUN_PROTOCOL_IMPLEMENTATION_PLAN_INDEPENDENT_REVIEW_APPROVED` may
+satisfy the review gate. Only after that verdict may the user separately
+authorize an exact three-path local documentation commit; the user performs
+every push. A clean aligned published baseline and separate P3.3-S1
+implementation authorization are required before P3.3-S1. Until all of those
+steps complete, neither the candidate nor its proposed S1 semantics are frozen.
 
 Phase 3.3 owns the engine/world parameters, pre-game profiles and permitted
 overrides, versioned frozen Run Protocol, deterministic resolution, and the
@@ -1053,8 +1150,10 @@ authorize it; the complete revisit decision remains engine-owned. Detailed
 revisit, region-unlock, anti-farming, recovery-priority, and world-line rules
 remain Deferred.
 
-The canonical design is
-[Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md).
+The canonical product design is
+[Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md). The
+candidate implementation sequence is
+[Phase 3.3 Run Protocol Implementation Plan](docs/phase_3_3_run_protocol_implementation_plan.md).
 
 P4-G0 documentation authority was approved and closed following independent
 read-only review with `STRUCTURED_PLAYER_CHARACTER_P4_G0_REVIEW_APPROVED`. It
@@ -1070,10 +1169,16 @@ independently finally approved, committed, and pushed as
   (`8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`) complete the internal binding
   boundary. No public binding activation exists.
 
-Neither P4-G0 nor the minimum prerequisite marks the full Run Protocol
-implemented. World generation, profile resolution, scenario execution,
+Neither P4-G0, the minimum prerequisite, completed Phase 8 admission, nor the
+new documentation candidate marks the full Run Protocol implemented. Existing
+Phase 8 rows remain legacy Session-backed Runs with their current strict stored
+proof, revision/evidence/replay/recovery, and production/Demo/Web/Dynamic
+Narrative behavior. They receive no synthesized protocol or world state. Native
+protocol/profile binding, authored-world identity, deterministic resolution,
+objective mechanics application, trusted prompt-context compilation,
 later-world selection, visits/revisits, world-line transitions, narrative
-progression, and public Run behavior remain deferred beyond this gate.
+progression, and public Run Protocol behavior remain ordered future slices in
+the candidate plan.
 
 ## Phase 3.4: NPC Relationship and Temporary Residence
 
@@ -1196,14 +1301,20 @@ real-MySQL verification.
 
 ## Deferred
 
-- Full Run Protocol behavior beyond the minimum prerequisite and the planned
-  Phase 8 Session-backed minimum admission; Phase 3.4 NPC residence; later
+- Full Run Protocol behavior beyond the minimum prerequisite and completed
+  Phase 8 Session-backed legacy admission; Phase 3.4 NPC residence; later
   structured-character API work beyond Phase 8; Provider,
   narrative, scenario, world, NPC, memory, relationship, combat, content, and
   broader public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
   progression, and priority-injection details.
-- Exact Phase 3.3 parameter values, serialization, and compatibility policy.
+- Exact Phase 3.3 numeric parameter ranges, profile defaults, override
+  catalogue, resolution rules, public discovery shape, authored-world
+  catalogues/weighting, visits/regions/world state, progression, anti-repeat,
+  anti-farming, recovery priority, world-line transition, and later physical
+  schema choices. The initial S1 serialization and compatibility semantics are
+  proposed freeze decisions in the unapproved candidate; they are not frozen
+  or implemented.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,
@@ -1270,6 +1381,9 @@ manually.
   [`docs/decisions/0001-production-provider-distribution.md`](docs/decisions/0001-production-provider-distribution.md).
 - Run Protocol and difficulty/world profiles:
   [`docs/run_protocol.md`](docs/run_protocol.md).
+- Documentation-only Phase 3.3 repository implementation-plan candidate,
+  awaiting fresh independent read-only re-review after `CHANGES_REQUIRED`:
+  [`docs/phase_3_3_run_protocol_implementation_plan.md`](docs/phase_3_3_run_protocol_implementation_plan.md).
 - Minimum Run-core prerequisite implementation sequence, persistence,
   transaction, and evidence:
   [`docs/minimum_run_core_implementation_plan.md`](docs/minimum_run_core_implementation_plan.md).
