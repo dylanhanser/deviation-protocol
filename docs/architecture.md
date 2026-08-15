@@ -4,78 +4,103 @@ This document describes implemented architecture first. Sections named for
 earlier phases preserve the implementation history of those boundaries; they
 do not make later accepted designs current capabilities.
 
-## P3.3-S1 local no-migration foundation candidate
+## P3.3-S1 implemented no-migration foundation
 
-P3.3-G0 is approved, published, frozen, and complete at
-`76064d200d1aa5af7cddff22d33acb03e608e598`. The separately authorized exact
-seven-path P3.3-S1 implementation candidate received a first independent
-read-only review verdict of `CHANGES_REQUIRED`. Its four findings were missing
-operative S1 review authority, missing exact pre-normalization scalar-type
-enforcement, incorrect genuine-boundary characterization of synthetic
-canonical-guard evidence, and stale Phase 8/Dynamic Narrative status text in
-this document.
+P3.3-G0 was independently approved, committed, published, frozen, and
+completed at `76064d200d1aa5af7cddff22d33acb03e608e598`. The first independent
+read-only review of the separately authorized exact seven-path P3.3-S1
+implementation returned `CHANGES_REQUIRED` for missing reachable
+implementation-review authority, missing exact pre-normalization scalar-type
+enforcement, incorrect characterization of unreachable canonical-ceiling
+evidence, and stale Phase 8/Dynamic Narrative status wording.
 
-The authority defect and canonical-ceiling clarification were independently
-approved and published in predecessor commit
-`a722dbf7f07e6e55cd4918a80b5153d6043f2100`. The remaining exact-type,
-genuine-maximum evidence, and status corrections are local work within the
-same exact seven-path budget. The corrected candidate remains unapproved,
-unstaged, uncommitted, unpublished, and incomplete. Phase 3.3 remains
-incomplete; P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
-Phase 6 remains paused and Phase 7 remains inactive.
-
-The former authoring evidence of 126 focused tests, 222 adjacent Run
-regressions, and Offline `2,463 passed, 182 skipped` belongs to the historical
-pre-correction bytes. After successful correction and prescribed verification,
-the exact next action is a fresh independent read-only review using
-`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`.
-
-Current correction verification passes 141 focused P3.3-S1 tests, the unchanged
-222-test adjacent Run regression set, compilation, and canonical Offline
-verification at `2,478 passed, 182 skipped`. The sanitized Offline child also
-passes dependency consistency, metadata-only Alembic `heads`/`history`, and
-tracked diff checking without database, Provider, or live-test variables. This
-evidence is authoring evidence only and does not approve or complete the slice.
+The review-authority amendment and canonical-ceiling clarification were
+independently approved, committed, manually published by the user, and
+confirmed at predecessor `a722dbf7f07e6e55cd4918a80b5153d6043f2100`.
+The corrected candidate then enforced exact scalar types before normalization,
+added genuine 329-byte maximum-envelope evidence, classified the 1,024/1,025
+canonical guard only as defensive branch isolation, corrected the stale status,
+and preserved the complete frozen S1 contract. It received
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED` and was committed
+byte-identically at `6212a760a549920c1c11dcb01e07566945df5556` with subject
+`feat(run): implement Phase 3.3 S1 protocol envelope`. The user manually pushed
+`a722dbf..6212a76, main -> main`; public `main` and local refs were then
+confirmed identical at ahead/behind `0/0`, with a clean worktree and empty
+index. The implementation publication is complete and awaits no implementation
+review, commit, push, or published-baseline confirmation.
 
 `domain.run_protocol` owns the exact standalone `run-protocol-envelope/v1`
-representation: the envelope epoch and trusted record-version constants,
-strict immutable profile/version and presentation carriers, three closed
-presentation enums, domain validation and unsupported-version errors, original
-caller-state validation, the canonical encoder, the exact v1 decoder, and the
-trusted out-of-band version dispatcher. Canonical payloads are strict NFC
-UTF-8 without BOM, compact JSON with deterministic field order, and bounded to
-1,024 raw and canonical bytes. Checked-in golden evidence fixes the canonical
-vector at 193 UTF-8 bytes with SHA-256
+representation and 18 domain symbols: the envelope epoch and trusted record-
+version constants, the profile ID/version/reference carriers, three closed
+presentation enums, strict v1 envelope, domain validation and unsupported-
+version exceptions, original caller-state validation, canonical encoder, exact
+v1 decoder, and trusted out-of-band version dispatcher. It enforces exact
+pre-normalization scalar and nested carrier types; strict UTF-8 without BOM;
+NFC; duplicate-key rejection; exact canonical compact JSON; positive signed
+int64 profile versions; closed enums; raw and canonical byte ceilings; and
+byte-identical decode/re-encode. There is no default, fallback, repair, upgrade,
+or downgrade.
+
+Checked-in golden evidence fixes the canonical vector at 193 UTF-8 bytes with
+SHA-256
 `a7e0149e8241f1b4d1c74487da2b8bcf36c93d05310c76a9b847d4e57c5a3a8a`.
-
-The profile ID and envelope schema literal require `type(value) is str`, and
-the profile version requires `type(value) is int`, at mode-before validation
-boundaries. Equal-valued string/integer subclasses, `StrEnum`, `IntEnum`, and
-Boolean values are rejected before Pydantic normalization both on direct
-construction and when original nested instance state is revalidated after
-corruption. The independently fixed maximum legal v1 carrier encodes to 329
-bytes with SHA-256
+The independently constructed largest legal v1 envelope is 329 bytes with
+SHA-256
 `0e0b1f498e1bf51656f1c5e5c742074e864da9678964c048087f52bdf5066e78`.
-The 1,024/1,025 canonical encoder test isolates the otherwise unreachable
-defensive post-encoding guard and is not genuine valid-envelope evidence; the
-public decoder separately retains genuine 1,024/1,025 raw-input evidence.
+Both raw and canonical ceilings remain 1,024 bytes. Public decoder evidence
+genuinely exercises raw 1,024/1,025 inputs; the unreachable canonical
+1,024/1,025 guard evidence is defensive branch isolation only and does not
+claim a valid envelope of either size.
 
-`infrastructure.run_protocol_persistence` owns only a frozen in-memory stored
-carrier, a distinct stored-record integrity error, deterministic conversion to
-that carrier, and reconstruction through the trusted version dispatcher. This
-boundary is synchronous, side-effect-free, and no-I/O. It adds no ORM, table,
-column, repository, Unit of Work, migration, transaction, durable Run Protocol,
-profile catalogue or resolution, native admission, world identity, mechanics,
-prompt-context compilation, public contract, Provider behavior, or later-world
-continuity.
+`infrastructure.run_protocol_persistence` owns the other four public symbols:
+a frozen slotted in-memory stored carrier, the distinct stored-record integrity
+exception, deterministic storage conversion, and detached reconstruction
+through the trusted dispatcher. The boundary is synchronous, side-effect-free,
+no-I/O, and dependent on the domain; the domain does not depend on
+infrastructure. Reconstruction rejects malformed, unsupported, partial,
+non-canonical, or contradictory records and never supplies defaults or repairs.
 
-Legacy Run revisions 1/2/3 and their existing behavior remain unchanged.
-`scenario_id` remains scenario identity only, and no legacy Run receives
-synthesized protocol, profile, world, visit, region, or world-state authority.
-The historical pre-correction patch identity is non-operative after these
-changes. The corrected candidate is not commit-ready; after successful
-correction and verification, it requires fresh independent read-only review
-under the operative token above.
+The final independently reviewed evidence accepted for the published
+implementation is 141 focused S1 tests, 222 tests in the eight adjacent Run
+suites, passing `compileall`, and Offline `2,478 passed, 182 skipped`.
+Dependency consistency passed. Alembic `heads` and `history` were metadata-only
+at head `20260729_0005`, with a linear graph from `20260719_0001` through
+`20260729_0005`. There was no database connection and no Provider, Live, or
+network operation. The former 126 focused tests, 222 adjacent tests, and
+Offline `2,463 passed, 182 skipped` remain historical pre-correction authoring
+evidence, not the accepted final evidence. These commands are publication
+evidence; they are not rerun by the later documentation closeout task.
+
+S1 adds no durable Run Protocol persistence, ORM, database table or column,
+migration, repository or Unit of Work integration, Run binding, profile
+catalogue or lookup, defaults or overrides, deterministic profile resolution,
+objective numeric mechanics, native admission, entry-world freeze, public API
+or projection, Demo, Web, Provider integration, scenario/world/visit/region/
+revisit/progression/continuity behavior, or identity or memory schema. P3.3-S2
+through P3.3-S7 remain unimplemented and unauthorized; the complete Run
+Protocol and Phase 3.3 remain incomplete.
+
+Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
+evidence, replay, recovery, production, Demo, Web, and Dynamic Narrative
+behavior remain unchanged. No legacy Run receives synthesized protocol,
+profile, world, visit, region, or world-state authority. `scenario_id` remains
+scenario-definition identity only. Phase 8 remains complete at P8-S6 with no
+P8-S7; Dynamic Narrative corrective and publication work remains closed; Phase
+6 remains paused, Phase 7 remains inactive, and Production Provider
+Distribution remains deferred.
+
+At the 2026-08-15 authoring checkpoint recorded by the exact three-document
+publication-closeout bytes, those documentation bytes are an unapproved and
+unpublished candidate. This is explicitly historical candidate-time evidence.
+Their exact next action is fresh independent read-only review under the sole
+closeout gate defined in `docs/run_protocol.md`, followed only after approval
+by separate authorization for the exact local documentation commit, the user's
+manual push, and clean aligned publication confirmation. Once the same exact
+bytes complete that sequence, they durably record P3.3-S1 as fully closed and
+no second status-synchronization task is required. P3.3-S2 then becomes the
+next sequential planning subject but remains unauthorized and requires its own
+separately authored, approved, committed, manually published, and confirmed
+commit-sized plan before implementation.
 
 ## Structured player-character Phase 1 pure foundation
 
@@ -859,12 +884,12 @@ meaning comes from trusted server templates.
 ## Future-design boundaries
 
 These designs are accepted or approved for later phases and are not
-implemented beyond the explicitly bounded local P3.3-S1 candidate described
-above:
+implemented beyond the explicitly bounded published P3.3-S1 foundation
+described above:
 
 - Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
-  local S1 candidate supplies only standalone representation, validation,
-  canonical codec evidence, and a no-I/O persistence seam; no durable or
+  published S1 foundation supplies only standalone representation, validation,
+  canonical codec evidence, and a no-I/O stored-carrier seam; no durable or
   runtime Run Protocol behavior exists: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).

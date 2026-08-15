@@ -1,11 +1,13 @@
 # Run Protocol, Difficulty, and World Profiles
 
 Status: **Approved product design. P3.3-G0 is approved, published, frozen, and
-complete. The first exact local no-migration P3.3-S1 implementation review
-returned `CHANGES_REQUIRED`; the published review-authority amendment is now
-part of the baseline, and the corrected exact seven-path candidate remains
-unapproved, unstaged, uncommitted, unpublished, and incomplete. Phase 3.3
-remains incomplete.**
+complete. The corrected exact no-migration P3.3-S1 implementation is
+independently approved, committed, manually published by the user, and
+confirmed clean/aligned at
+`6212a760a549920c1c11dcb01e07566945df5556`. Its exact three-document
+post-publication status synchronization remains governed by the explicitly
+temporal closeout below. P3.3-S2 through P3.3-S7 remain unimplemented and
+unauthorized, and Phase 3.3 remains incomplete.**
 
 Phase ownership: **Phase 3.3**
 
@@ -37,12 +39,13 @@ frozen during implementation, and its corrected implementation received
 The exact eight-path Web implementation was committed and published at
 `2ce56a757beed8a3989d38453da3b6d80342ca05`. P8-S5 is complete. The frozen
 P8-S6 implementation plan was approved and published at
-`4edf2e3341e60632765b85796e8554797c645692`; its executable evidence has passed
-through C21, and these current documentation bytes are its unapproved,
-unstaged, uncommitted, and unpublished implementation candidate. Phase 8 and
-the overall project remain incomplete; this status does not mark Phase 3.3,
-Phase 6, or Phase 7 complete.** This paragraph preserves the then-current P8-S6
-candidate record. Current status: P8-S1 through P8-S6 are implemented and
+`4edf2e3341e60632765b85796e8554797c645692`. At the historical P8-S6 candidate
+checkpoint, its executable evidence had passed through C21 while those
+documentation bytes were unapproved, unstaged, uncommitted, and unpublished;
+Phase 8 and the overall project were then incomplete. That candidate-time
+status did not mark Phase 3.3, Phase 6, or Phase 7 complete.** This paragraph
+preserves the historical P8-S6 candidate record. Current status: P8-S1 through
+P8-S6 are implemented and
 complete; the closure documentation was independently approved, committed, and
 published at `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`, and no P8-S7 exists.
 
@@ -67,8 +70,8 @@ constructible lifecycle remains `pre_first_turn`.**
 
 ## Non-goals
 
-- Completing Phase 3.3, or implementing P3.3-S2 through P3.3-S7, in the current
-  P3.3-S1 candidate.
+- Completing Phase 3.3 or implementing P3.3-S2 through P3.3-S7 through the
+  bounded P3.3-S1 foundation or its documentation closeout.
 - Letting prose or model preference change resources, success, betrayal, death,
   relationship progression, or permanent facts.
 - Replacing scenario-authored facts, character definitions, or engine rules.
@@ -76,7 +79,7 @@ constructible lifecycle remains `pre_first_turn`.**
 - Letting a player freely select an arbitrary world or directly select every
   later world.
 
-## Published Phase 3.3 plan and local P3.3-S1 candidate
+## Published Phase 3.3 plan, implemented P3.3-S1, and publication closeout
 
 The repository-specific
 [Phase 3.3 Run Protocol implementation plan](phase_3_3_run_protocol_implementation_plan.md)
@@ -108,35 +111,30 @@ changing current legacy runtime behavior:
   visit, region, protocol, or profile identity.
 
 The plan's no-migration P3.3-S1 representation has exactly one initial envelope
-schema, `run-protocol-envelope/v1`. The separately authorized local candidate
-implements that representation, its strict original-state validator, canonical
-encoder/v1 decoder, trusted version dispatcher, golden vector, and no-I/O
-in-memory stored-record conversion/reconstruction boundary. It contains only
-an exact versioned profile reference and the approved presentation values
-`world_tone`, `reality_boundary`, and `relationship_overlay`. It contains no
-numeric engine values, defaults, overrides, catalogue definitions,
-scenario/world/visit/region
-fields, prose, secrets, or Provider output. The strict canonical form uses
-UTF-8 without BOM, repository-consistent NFC, sorted object keys, compact JSON,
-no ASCII escaping, signed-positive 64-bit profile versions, duplicate-key and
-non-finite-number rejection, and byte-for-byte decode/re-encode canonicality.
-Unknown versions receive no default, upgrade, downgrade, fallback, or
-reinterpretation. P3.3-S1 representation validity is separate from profile
-authorization, lookup, and deterministic resolution, and P3.3-S1 creates no durable
-Run Protocol.
+schema, `run-protocol-envelope/v1`. The independently approved and published
+implementation supplies that representation, strict original-state validator,
+canonical encoder, v1 decoder, trusted version dispatcher, golden and boundary
+evidence, and no-I/O in-memory stored-record conversion/reconstruction
+boundary. It contains only an exact versioned profile reference and the
+approved presentation values `world_tone`, `reality_boundary`, and
+`relationship_overlay`. It contains no numeric engine values, defaults,
+overrides, catalogue definitions, scenario/world/visit/region fields, prose,
+secrets, or Provider output. Representation validity remains separate from
+profile authorization, lookup, and deterministic resolution, and S1 creates no
+durable Run Protocol.
 
-The candidate's first independent read-only review returned `CHANGES_REQUIRED`
+The implementation's first independent read-only review returned `CHANGES_REQUIRED`
 for four findings: missing operative S1 review authority, missing exact
 pre-normalization scalar-type enforcement, synthetic 1,024/1,025 canonical
 branch evidence incorrectly characterized as genuine valid-envelope evidence,
 and stale Phase 8/Dynamic Narrative status text in `architecture.md`. The
 authority defect and ceiling clarification were independently approved and
-published in commit `a722dbf7f07e6e55cd4918a80b5153d6043f2100`. The remaining
-exact-type, genuine 329-byte maximum-envelope, defensive-branch
-characterization, and documentation corrections are carried only by the exact
-local seven-path candidate.
+published in commit `a722dbf7f07e6e55cd4918a80b5153d6043f2100`. That amendment
+was separately committed, manually pushed by the user, and confirmed as the
+published predecessor authority.
 
-The corrected carrier validators require exact `str` for profile ID and schema
+The corrected exact seven-path implementation preserved the complete frozen S1
+contract. Its carrier validators require exact `str` for profile ID and schema
 literal and exact `int` for profile version before Pydantic normalization, so
 equal-valued subclasses, `StrEnum`, `IntEnum`, and Boolean-as-integer inputs fail
 both direct construction and original-state revalidation. Genuine real-encoder
@@ -150,23 +148,148 @@ evidence at both sizes. Neither 1,024-byte ceiling changes.
 
 The historical pre-correction seven-path patch identity of `80,019` bytes and
 SHA-256 `064dd425f1b412495ddbf62e6995b18d1266c5b0b7dc2ab7d12b41c6e58bfe25`
-is non-operative after correction. The corrected candidate remains unapproved,
-unstaged, uncommitted, unpublished, unaccepted, and incomplete. After all
-prescribed correction verification succeeds, the exact next action is a fresh
-independent read-only review using
-`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`; no staging, commit,
-publication, or later slice is authorized.
+is non-operative after correction. The corrected candidate received
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED` and was committed
+byte-identically as the one-parent non-merge commit
+`6212a760a549920c1c11dcb01e07566945df5556`, directly after `a722dbf7`, with
+exact subject `feat(run): implement Phase 3.3 S1 protocol envelope`. The user
+manually pushed `a722dbf..6212a76, main -> main`. Public `main` was confirmed
+identical to that commit, and local `main` and local `origin/main` were aligned
+at ahead/behind `0/0`, with a clean worktree and empty index. The implementation
+publication is complete and awaits no further implementation review, commit,
+push, or published-baseline confirmation.
+
+The published implementation inventory is exactly:
+
+| Kind | Exact path | Diff |
+| --- | --- | ---: |
+| Documentation | `PLANS.md` | `+99/-46` |
+| Documentation | `docs/architecture.md` | `+107/-18` |
+| Documentation | `docs/run_protocol.md` | `+90/-26` |
+| Production | `src/deviation_protocol/domain/run_protocol.py` | `+463/-0` |
+| Production | `src/deviation_protocol/infrastructure/run_protocol_persistence.py` | `+85/-0` |
+| Tests | `tests/unit/test_run_protocol.py` | `+760/-0` |
+| Tests | `tests/unit/test_run_protocol_persistence.py` | `+327/-0` |
+
+That is exactly seven files, 1,931 insertions, 90 deletions, and a complete
+binary-safe patch of 95,987 bytes with SHA-256
+`30e592f751937786d58f64e90a36aa0355b66803c7fb06eafea96f4ab7371e23`.
 
 The former authoring verification (`126` focused tests, `222` adjacent Run
-regressions, and Offline `2,463 passed, 182 skipped`) is historical evidence for
-the pre-correction bytes and cannot approve the corrected candidate.
+tests, and Offline `2,463 passed, 182 skipped`) is historical evidence for the
+pre-correction bytes.
 
-Current correction verification passes 141 focused P3.3-S1 tests, 222 adjacent
-Run regressions, targeted compilation, and canonical Offline verification at
-`2,478 passed, 182 skipped`. Offline also passes dependency consistency,
-metadata-only Alembic `heads`/`history`, and tracked diff checking in its
-sanitized child without database, Provider, or live-test environment variables.
-These results do not approve, stage, commit, publish, or complete P3.3-S1.
+The final corrected and independently reviewed evidence accepted for the exact
+published implementation is 141 focused P3.3-S1 tests, 222 tests across the
+eight adjacent Run suites, passing `compileall`, and canonical Offline
+verification at `2,478 passed, 182 skipped`. Dependency consistency passed.
+Alembic `heads` and `history` were metadata-only at head `20260729_0005`, with
+a linear migration graph from `20260719_0001` through `20260729_0005`. There
+was no database connection and no Provider, Live, or network operation. These
+results are accepted publication evidence, not merely authoring evidence, and
+they are not rerun by the later documentation-only closeout task.
+
+### Exact implemented and deferred boundary
+
+The exact 22-symbol S1 contract and public signatures remain frozen. The 18
+domain symbols own only the exact envelope epoch and trusted record-version
+constants, profile ID/version/reference carriers, three presentation enums,
+strict v1 envelope, validation and unsupported-version exceptions, original-
+state validator, canonical encoder, v1 decoder, and trusted version dispatcher.
+The four infrastructure symbols own only the frozen slotted no-I/O stored
+carrier, stored-record integrity exception, deterministic storage conversion,
+and detached reconstruction. Domain remains independent of infrastructure.
+
+The published implementation preserves strict exact types, UTF-8 without BOM,
+NFC, duplicate-key rejection, byte-identical canonical compact JSON, positive
+signed-int64 profile versions, closed enum values, exact corruption taxonomy,
+both 1,024-byte ceilings, detached no-I/O reconstruction, and no fallback,
+repair, upgrade, downgrade, coercion, or default. The exact 193-byte golden and
+329-byte genuine maximum identities above remain normative S1 evidence. Raw
+1,024/1,025 decoder tests are genuine input-boundary evidence; the unreachable
+canonical guard test remains defensive branch isolation only.
+
+P3.3-S1 does not implement durable Run Protocol persistence; an ORM model;
+database table or column; migration; repository or Unit of Work integration;
+Run binding; profile catalogue, lookup, default, override, or deterministic
+resolution; objective numeric mechanics; native Run admission; entry-world
+freezing; public API or projection; Demo, Web, or Provider integration; world,
+visit, region, revisit, progression, or continuity behavior; identity or memory
+schema; or P3.3-S2 through P3.3-S7. It does not implement the complete Run
+Protocol or complete Phase 3.3.
+
+Legacy Run revisions 1/2/3 remain unchanged. Their existing strict proof,
+binding, participation, V1 evidence, replay, recovery, production, Demo, Web,
+and Dynamic Narrative behavior remains unchanged. No legacy Run receives
+synthesized protocol, profile, world, visit, region, or world-state authority.
+`scenario_id` remains scenario-definition identity only.
+
+Phase 3.4 remains later. Phase 6 remains paused under
+`PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`, and Phase 7 remains inactive. Phase 8
+is complete at P8-S6 and no P8-S7 exists. Dynamic Narrative corrective and
+publication work remains closed. Production Provider Distribution remains
+deferred.
+
+### Post-publication status-synchronization closeout
+
+At the 2026-08-15 authoring checkpoint represented by the exact closeout
+candidate bytes, only `PLANS.md`, `docs/architecture.md`, and this document are
+modified; the candidate is unapproved, unstaged, uncommitted, and unpublished.
+This statement is explicitly commit-bound candidate-time history, not a durable
+claim about the later disposition of byte-identical files.
+
+The exact next action at that checkpoint is fresh independent read-only review
+of the complete three-document candidate. After a successful review, the user
+must separately authorize the exact three-path local documentation commit. The
+user then separately controls the manual push, after which the repository must
+receive a clean aligned published-baseline confirmation. Only after that exact
+review/commit/push/confirmation sequence may P3.3-S1 be called fully closed.
+Once the same exact bytes complete the sequence, these published words durably
+record that closure; no second status-synchronization task is required.
+
+After P3.3-S1 closure, P3.3-S2 becomes the next sequential planning subject but
+remains unauthorized. Its dedicated commit-sized plan must be separately
+authored, independently approved, committed, manually pushed by the user, and
+confirmed at a clean aligned published baseline before implementation. This
+closeout selects or authorizes no P3.3-S2 decision, plan content, or code.
+
+### Sole operative independent-review gate for this closeout
+
+There is exactly one operative success token for independent review of this
+exact three-document closeout candidate:
+
+`PHASE_3_3_S1_POST_PUBLICATION_STATUS_SYNCHRONIZATION_INDEPENDENT_REVIEW_APPROVED`
+
+The token is valid only when a fresh independent read-only review binds all of
+the following:
+
+1. baseline `6212a760a549920c1c11dcb01e07566945df5556` on `main`;
+2. exactly `PLANS.md`, `docs/architecture.md`, and `docs/run_protocol.md`, with
+   no fourth path;
+3. the final line, byte, and SHA-256 identity of each of those three files and
+   the complete lexicographically ordered binary-safe three-path patch byte
+   count, SHA-256, and bytes, all measured after the last authoring change and
+   supplied externally with the review prompt;
+4. the complete P3.3-G0, first-review, predecessor-amendment, corrected-
+   candidate, implementation-approval, exact-commit, manual-push, and clean
+   published-baseline lifecycle facts recorded here;
+5. byte preservation of the frozen plan at 1,233 lines, 83,331 bytes, and
+   SHA-256
+   `09ef2ffe9fc03fc60cd069df116463b2cc27d08f50fbbddc658b28d975683e1b`,
+   plus byte preservation of the two S1 production and two S1 test files at
+   commit `6212a760`; and
+6. preservation of the exact implemented/deferred boundary and the absence of
+   any P3.3-S2 or later-slice authority.
+
+Any byte change to an approval-bound closeout document after review invalidates
+the token and requires new identities and fresh independent read-only review.
+The token grants no editing, staging, commit, push, publication, implementation,
+or P3.3-S2 authority. Even after approval, a separate explicit authorization
+is required for the exact local three-path documentation commit, and the user
+performs every push. Every historical implementation/plan/amendment verdict,
+authoring-complete label, differently scoped success-looking label, subset
+review, failure, or changes-required result is non-operative for this closeout
+and cannot approve it.
 
 The published frozen planning allocation is exactly:
 
@@ -182,12 +305,10 @@ The published frozen planning allocation is exactly:
 P3.3-S7 belongs to Phase 3.3 and is unrelated to the nonexistent P8-S7.
 Phase 8 remains implemented and complete at P8-S6. Publication of this
 allocation did not authorize any implementation slice. P3.3-S1 was separately
-authorized; P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
-After successful correction and prescribed verification, the exact next action
-is a fresh independent read-only review of the complete remeasured seven-path
-P3.3-S1 candidate using
-`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`, not staging or
-commit.
+authorized, independently approved, and published as the bounded foundation
+described above. P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
+The only open S1 governance at the recorded authoring checkpoint is the exact
+three-document closeout sequence above; it grants no later-slice authority.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -208,9 +329,9 @@ presentation-only and cannot mutate Phase 3.4 relationship or residence state.
 ## Minimum Run-core prerequisite for player-character Phase 4
 
 The complete Run Protocol remains approved product design and is not complete
-or durably implemented; only the local corrected-but-unapproved P3.3-S1
-foundation candidate now exists. Before Structured Player Character P4-S1,
-only the smaller
+or durably implemented. The independently approved and published P3.3-S1
+foundation now supplies only the standalone no-migration boundary described
+above. Before Structured Player Character P4-S1, only the smaller
 prerequisite specified by the
 [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 has been implemented, independently finally approved, committed, and pushed.
@@ -677,10 +798,10 @@ preset_version=1
 ```
 
 The structured, versioned boundary is accepted. The frozen P3.3-S1 plan fixes
-the exact `run-protocol-envelope/v1` representation and the local candidate
-implements its standalone codec/validation evidence. This does not select or
-implement the illustrative prompt block above; no `RUN_PROTOCOL` block exists
-in the implemented prompt today.
+the exact `run-protocol-envelope/v1` representation and the published S1
+foundation implements its standalone codec/validation evidence. This does not
+select or implement the illustrative prompt block above; no `RUN_PROTOCOL`
+block exists in the implemented prompt today.
 
 ## Lifecycle
 
