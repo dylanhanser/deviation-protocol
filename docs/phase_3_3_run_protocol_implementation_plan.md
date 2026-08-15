@@ -952,3 +952,282 @@ This candidate applies their existing reusable rules and establishes no new
 confirmed defect-derived reusable rule.
 
 Guardrail impact: None
+
+## P3.3-S1 review-authority amendment
+
+Status and effect: **This is a documentation-authority predecessor amendment
+candidate authored against published baseline
+`76064d200d1aa5af7cddff22d33acb03e608e598`. It changes only the review
+governance and verification interpretation for P3.3-S1. Until its exact bytes
+are independently approved, separately committed, user-pushed, and confirmed
+as a published authority baseline, it grants no implementation or Git
+authority.**
+
+This section is a clearly bounded amendment to the plan above. It preserves the
+original P3.3-G0 candidate-time narrative as history while superseding only its
+now-stale current-status, next-action, S1 review-verdict, and canonical-ceiling
+test-interpretation wording. It does not reopen or alter any P3.3-G0 product,
+representation, schema, compatibility, sequencing, symbol, or runtime decision.
+
+### Current authority and candidate status
+
+- P3.3-G0 remains approved, published, frozen, and complete at
+  `76064d200d1aa5af7cddff22d33acb03e608e598`.
+- The exact local seven-path P3.3-S1 implementation candidate remains
+  unapproved, unstaged, uncommitted, unpublished, and incomplete. Its first
+  independent read-only review returned `CHANGES_REQUIRED`.
+- The current seven-path hashes, its complete-patch identity, and every prior
+  implementation-authoring label are preservation and history facts only. They
+  are non-operative for approval and must not be reused after correction.
+- The seven implementation paths must remain byte-identical throughout this
+  one-path predecessor authority task. No review finding is corrected in those
+  paths by this amendment.
+- After this amendment is approved and published, the preserved seven-path
+  candidate must be corrected for every independent-review finding, fully
+  remeasured, reverified where required, and freshly independently reviewed.
+- P3.3-S1 is not complete. Phase 3.3 remains incomplete. P3.3-S2 through
+  P3.3-S7 remain unauthorized.
+
+The preservation-only pre-amendment implementation manifest is:
+
+| Exact path | Lines | Bytes | SHA-256 |
+| --- | ---: | ---: | --- |
+| `PLANS.md` | 1,407 | 87,348 | `6983b28f323599c852f0500499a5796ca5b0de4532d2fd8bb6f316641f7153c6` |
+| `docs/architecture.md` | 1,298 | 109,672 | `fa4a579ecf06063306ed61a5e010bf7a9c2e5773fa7875c2fefabf322179603d` |
+| `docs/run_protocol.md` | 754 | 39,294 | `f12be164b2aba2708b5ab837f482a8aaceb67ff06aa8d1fa9d6c4c31d2467d3b` |
+| `src/deviation_protocol/domain/run_protocol.py` | 449 | 15,391 | `db79005aa28662c4be3516b2f67c8c826a3b3cee8f0db23de1e3cd2505074a16` |
+| `src/deviation_protocol/infrastructure/run_protocol_persistence.py` | 85 | 3,381 | `31f1befca159113f0ef98c381f4026fb8e8b68131b76cd44beba2ea18c420196` |
+| `tests/unit/test_run_protocol.py` | 621 | 21,709 | `25a4b5463038e862795aa0bd8e060203675105158c4f577225ecc84ed5cd37bc` |
+| `tests/unit/test_run_protocol_persistence.py` | 327 | 11,141 | `0d4baabc82e39def27930610ca1318dd42f0effc40b55db7a702dc1e6964e792` |
+
+Their canonical ordered isolated seven-path patch is exactly `80,019` bytes
+with SHA-256
+`064dd425f1b412495ddbf62e6995b18d1266c5b0b7dc2ab7d12b41c6e58bfe25`.
+This manifest must remain exact during the amendment task, but neither it nor
+its prior review can satisfy a future implementation approval gate.
+
+### Operative review verdict for this one-path authority amendment
+
+There is exactly one operative success verdict for independent review of this
+exact one-path authority-amendment candidate:
+
+`PHASE_3_3_S1_REVIEW_AUTHORITY_AMENDMENT_INDEPENDENT_REVIEW_APPROVED`
+
+The verdict is valid only when all of these conditions hold:
+
+1. It is returned by a fresh independent read-only review of exactly
+   `docs/phase_3_3_run_protocol_implementation_plan.md` as the sole amendment
+   path. It applies to no implementation path or other documentation path.
+2. The review prompt binds branch `main`; exact `HEAD`, local `main`, and local
+   `origin/main` baseline
+   `76064d200d1aa5af7cddff22d33acb03e608e598`; ahead/behind `0/0`; the exact
+   amended-plan bytes and per-file line/byte/SHA-256 identity; and the exact
+   isolated one-path amendment-patch byte count and SHA-256 against that
+   baseline.
+3. The amended-plan and isolated amendment-patch identities are measured only
+   after authoring is complete and are supplied externally with the review
+   prompt. They are not written back into this approval-bound file.
+4. Any byte change to the amended plan or any relevant baseline, inventory, or
+   identity change invalidates the measurements and every review of them. The
+   changed candidate must be remeasured and freshly independently reviewed.
+5. Historical P3.3-G0 approval, including
+   `PHASE_3_3_RUN_PROTOCOL_IMPLEMENTATION_PLAN_INDEPENDENT_REVIEW_APPROVED`,
+   cannot satisfy this gate. No historical or subset review can satisfy it.
+6. The non-operative authoring-complete label
+   `PHASE_3_3_S1_REVIEW_AUTHORITY_AMENDMENT_CANDIDATE_COMPLETE` cannot satisfy
+   this gate. No prior P3.3-S1 implementation authoring label can satisfy it.
+7. The future
+   `PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED` verdict cannot
+   satisfy this gate and is not a substitute for amendment review.
+8. Approval authorizes no staging, commit, push, implementation correction,
+   implementation acceptance, publication claim, or P3.3-S2 through P3.3-S7
+   work.
+9. After approval, a separate explicit authorization is required for one exact
+   local commit containing only the approved plan amendment. The user performs
+   the push. The pushed amendment must then be confirmed as the published
+   authority baseline before the seven-path implementation may be corrected.
+
+Every other success-looking, authoring, historical, implementation, failure,
+blocked, changes-required, or differently scoped verdict is non-operative for
+this exact one-path amendment.
+
+### Operative review verdict for the future corrected S1 implementation
+
+The sole operative success verdict for a future corrected exact seven-path
+P3.3-S1 implementation candidate is:
+
+`PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`
+
+This token is defined now so the implementation gate is reachable and
+unambiguous, but it is not usable for the current amendment or the current
+uncorrected implementation candidate. It becomes usable only after this exact
+authority amendment has received its own operative approval, has been committed
+under separate one-path authorization, has been pushed manually by the user,
+and has been confirmed as the published authority baseline.
+
+The future implementation verdict is valid only when all of these conditions
+hold:
+
+1. It is returned by a fresh independent read-only review of one corrected
+   candidate containing exactly these seven paths and no others:
+
+   ```text
+   PLANS.md
+   docs/architecture.md
+   docs/run_protocol.md
+   src/deviation_protocol/domain/run_protocol.py
+   src/deviation_protocol/infrastructure/run_protocol_persistence.py
+   tests/unit/test_run_protocol.py
+   tests/unit/test_run_protocol_persistence.py
+   ```
+
+2. That implementation candidate is authored against the later exact published
+   authority baseline containing this amendment. The review binds that exact
+   baseline and branch/ref topology, the exact seven-path inventory, every
+   file's line/byte/SHA-256 identity, the complete canonical ordered binary-safe
+   seven-path patch byte count and SHA-256, and the complete candidate bytes.
+3. The review binds the required verification evidence, the exact 22-symbol
+   P3.3-S1 production contract, canonical documentation synchronization, and
+   every P3.3-S1 acceptance and verification requirement in this amended plan.
+4. Any candidate byte change or relevant baseline, inventory, identity,
+   contract, evidence, or authority change invalidates approval. A changed
+   candidate must be remeasured, reverified as required, and freshly
+   independently reviewed.
+5. The historical P3.3-G0 token, this authority-amendment token, any authoring
+   token, the first `CHANGES_REQUIRED` review, any other historical review, and
+   any subset review cannot satisfy the future implementation gate.
+6. Implementation approval authorizes no staging, commit, push, publication,
+   or P3.3-S2 through P3.3-S7 work. A separate exact implementation-commit
+   authorization remains mandatory, and the user performs every push.
+
+### Canonical-envelope ceiling clarification
+
+This amendment preserves without modification:
+
+- the `1,024`-byte raw ceiling;
+- the `1,024`-byte canonical ceiling;
+- envelope epoch `run-protocol-envelope` and record version `1`;
+- schema literal `run-protocol-envelope/v1`;
+- the exact 22-symbol P3.3-S1 contract;
+- golden vector V1-REP-001, its exact `193` bytes, and SHA-256
+  `a7e0149e8241f1b4d1c74487da2b8bcf36c93d05310c76a9b847d4e57c5a3a8a`;
+- the profile-ID grammar and its `128`-byte/code-point maximum;
+- all enum values and canonical encoding rules; and
+- the exact seven-path P3.3-S1 implementation budget.
+
+The canonical `1,024`-byte limit is a defensive version-envelope ceiling and
+reserved headroom. It is not a claim that the current v1 grammar can produce a
+valid envelope at that size. The ceiling must not be reduced or increased, and
+the v1 grammar must not be expanded merely to make the ceiling reachable.
+
+For v1, canonical length is exactly the fixed `160` bytes of object framing,
+field names, punctuation, quotes, and fixed schema literal, plus the UTF-8 byte
+lengths of profile ID, decimal profile version, world tone, reality boundary,
+and relationship overlay. The independent maximum is therefore:
+
+```text
+160 + 128 + 19 + 8 + 7 + 7 = 329 UTF-8 bytes
+```
+
+The maxima are a legal `128`-byte ASCII profile ID, positive signed 64-bit
+profile version `9223372036854775807` (`19` digits), `balanced` (`8` bytes),
+either `deviant` or `chaotic` (`7` bytes), and `charged` (`7` bytes). There are
+no other variable-length v1 fields. Thus the largest valid canonical v1
+envelope is `329` bytes, leaving `695` bytes of defensive headroom. A genuine
+valid canonical v1 envelope of `1,024` or `1,025` bytes is mathematically
+unreachable under the frozen grammar.
+
+The future correction test must fix one maximum-length representation
+independently of the production serializer. Its exact construction is:
+
+```python
+MAXIMUM_V1_CANONICAL_BYTES = (
+    b'{"profile_ref":{"profile_id":"'
+    + (b"A" * 128)
+    + b'","profile_version":9223372036854775807},'
+    + b'"reality_boundary":"deviant",'
+    + b'"relationship_overlay":"charged",'
+    + b'"schema_version":"run-protocol-envelope/v1",'
+    + b'"world_tone":"balanced"}'
+)
+```
+
+That exact independently constructed byte string has length `329` and SHA-256
+`0e0b1f498e1bf51656f1c5e5c742074e864da9678964c048087f52bdf5066e78`.
+Selecting `chaotic` instead of the fixed `deviant` vector also reaches the same
+maximum length but produces different bytes and is not the fixed digest vector.
+
+The corrected P3.3-S1 evidence must satisfy all of the following:
+
+1. No test may fabricate or describe a `1,024`- or `1,025`-byte string as a
+   genuine valid serialized v1 envelope.
+2. Branch-isolation testing of the encoder's post-canonicalization inclusive
+   `1,024`/reject-`1,025` guard is explicitly acceptable. It must be named and
+   described as internal defensive-branch evidence and may replace the internal
+   canonical-byte helper solely to isolate that otherwise unreachable branch.
+   It is not end-to-end valid-envelope or real-serializer boundary evidence.
+3. Independent genuine serializer evidence must construct an envelope from the
+   exact maximum legal inputs fixed above, exercise the real production
+   canonical serializer without replacing its helper, and compare the result
+   with `MAXIMUM_V1_CANONICAL_BYTES` or another equally independent exact fixed
+   representation.
+4. That genuine test must assert exact length `329`, separately fixed SHA-256
+   `0e0b1f498e1bf51656f1c5e5c742074e864da9678964c048087f52bdf5066e78`,
+   and that `329 < 1_024`. Expected bytes or digest must not be calculated by
+   calling the production serializer or its canonical helper.
+5. The raw `1,024`/`1,025` boundary must continue to be exercised genuinely
+   through the public decoder: an exact `1,024`-byte raw payload reaches parsing
+   and the expected later canonicality rejection, while an exact `1,025`-byte
+   raw payload fails the pre-parse raw ceiling.
+6. The production encoder must continue enforcing the `1,024`-byte canonical
+   defensive ceiling even though valid current v1 values cannot reach it.
+7. Any future envelope version or grammar expansion requires separate authority,
+   compatibility analysis, new exact bounds/vectors, independent review, and
+   implementation authorization. It cannot silently consume the reserved
+   headroom.
+
+### Required predecessor and correction order
+
+The only authorized order is:
+
+1. Author this exact one-path authority-amendment candidate.
+2. Obtain fresh independent read-only review whose sole success verdict is
+   `PHASE_3_3_S1_REVIEW_AUTHORITY_AMENDMENT_INDEPENDENT_REVIEW_APPROVED`.
+3. Obtain separate explicit authorization for one exact local one-path commit.
+4. Commit only the exact independently approved plan amendment.
+5. The user pushes that commit manually.
+6. Confirm the amended authority as the published baseline.
+7. Correct the preserved seven-path P3.3-S1 implementation candidate for exact
+   scalar pre-normalization validation; scalar-subclass and `StrEnum`/`IntEnum`
+   regressions; genuine 329-byte maximum-envelope evidence; explicit internal
+   defensive-branch characterization of the 1,024/1,025 canonical guard test;
+   and stale architecture status passages.
+8. Rerun every verification required for the corrected P3.3-S1 candidate.
+9. Recompute all seven per-file identities and the complete binary-safe
+   seven-path patch identity against the new published authority baseline.
+10. Obtain fresh independent read-only review whose sole success verdict is
+    `PHASE_3_3_S1_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`.
+11. Only after that approval may a separately authorized exact implementation
+    commit be considered. Approval alone is not commit authorization.
+
+No step may be collapsed, reordered, inferred from a prior review, or treated
+as authority for the next step.
+
+### Amendment scope and document ownership
+
+This one-path amendment changes S1 review governance and verification
+interpretation only. The plan is the canonical owner of its slice gate,
+verification interpretation, and ordered predecessor/correction sequence; no
+second document is required for this authority correction.
+
+This amendment changes no runtime or product behavior, public contract,
+canonical envelope byte, ceiling constant, epoch, record version, schema,
+profile-ID grammar, enum, symbol contract, golden vector, canonical encoding
+rule, database or migration authority, P3.3-S2 through P3.3-S7 behavior, current
+seven-path implementation byte, or historical P3.3-G0 approval fact. It grants
+no authority to correct the implementation during this predecessor task.
+
+Guardrail impact: None. The confirmed approval-token reachability failure is
+already governed by the approval-token consistency rule in
+`docs/engineering/codex_workflow.md`; this bounded amendment applies that
+existing rule and creates no new reusable guardrail.
