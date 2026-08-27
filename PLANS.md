@@ -78,26 +78,26 @@ API, Demo, Web, Provider, scenario, world, visit, region, revisit, progression,
 continuity, identity, or memory behavior. Phase 3.3 remains incomplete;
 P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
 
-At the 2026-08-15 authoring checkpoint captured by these exact candidate bytes,
-the only remaining P3.3-S1 work is documentation governance, and the
-three-document publication-closeout candidate is unapproved, unstaged,
-uncommitted, and unpublished. That sentence is commit-bound historical
-evidence, not a durable claim about the later disposition of identical bytes.
-The exact next action at that checkpoint is fresh independent read-only review
-under the sole closeout gate defined in
-[the canonical Run Protocol document](docs/run_protocol.md). After approval,
-the required order is separate explicit authorization for an exact three-path
-local documentation commit, the user's separately controlled manual push, and
-clean aligned published-baseline confirmation. Only after that complete
-sequence is P3.3-S1 fully closed. Once those exact bytes are confirmed
-published, they durably record the closure and require no second status-
-synchronization task.
+The exact three-document S1 publication closeout was subsequently independently
+approved, committed as `4d146679e782ff555819b411fc5048e55299de4d` with
+subject `docs(run): close Phase 3.3 S1 publication`, manually published by the
+user, and confirmed at a clean aligned baseline. P3.3-S1 is fully closed and
+requires no further review, commit, push, publication confirmation, or status
+synchronization.
 
-After P3.3-S1 closure, P3.3-S2 becomes the next sequential planning subject but
-remains unauthorized. Its dedicated commit-sized plan must be separately
-authored, independently approved, committed, manually pushed by the user, and
-confirmed before implementation; this closeout selects no P3.3-S2 decision or
-implementation. Phase 3.4 remains later. Phase 6 is paused under
+At the 2026-08-16 authoring checkpoint represented by the present three-path
+working candidate, the dedicated
+[P3.3-S2 deterministic profile-resolution plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md)
+is newly authored, unapproved, unstaged, uncommitted, and unpublished. That is
+explicit candidate-time history. Its proposed decisions are not frozen, and
+S2 implementation has not begun. The candidate proposes exact five-parameter
+integer domains, three version-1 profile entries and defaults, exhaustive
+per-profile overrides, fail-closed precedence, resolver v1 with no randomness
+or seed, canonical S1-envelope binding, domain-separated SHA-256 vectors, an
+exact 33-symbol contract, and an exact five-path future implementation budget.
+Fresh independent read-only review of the exact candidate is the next action;
+even approval grants no implementation or Git authority. P3.3-S3 through
+P3.3-S7 remain unauthorized. Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
 remains closed. Production Provider Distribution remains deferred.
@@ -617,7 +617,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **P3.3-G0 and the exact P3.3-S1 implementation are independently approved and published; the three-document closeout records an explicitly dated candidate-time sequence and a durable post-publication closure condition, while Phase 3.3 remains incomplete** | [Run Protocol design and closeout gate](docs/run_protocol.md) and [frozen implementation plan](docs/phase_3_3_run_protocol_implementation_plan.md) |
+| Phase 3.3 | **P3.3-G0 is complete; P3.3-S1 implementation and publication closeout are fully closed at `4d146679`; the exact P3.3-S2 plan is a newly authored unapproved documentation candidate; S2 implementation has not begun; Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), and [S2 candidate](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1128,19 +1128,21 @@ themselves authorize later implementation. Phase 3.2b remains closed.
 Status: **P3.3-G0 is approved, published, frozen, and complete at `76064d2`.
 The corrected exact P3.3-S1 implementation is independently approved,
 committed, manually published by the user, and confirmed clean/aligned at
-`6212a760a549920c1c11dcb01e07566945df5556`. Its exact three-document
-publication closeout remains governed by the explicitly temporal sequence in
-this roadmap and `docs/run_protocol.md`. P3.3-S2 through P3.3-S7 are
-unimplemented and unauthorized, and Phase 3.3 remains incomplete.**
+`6212a760a549920c1c11dcb01e07566945df5556`; its exact three-document
+publication closeout is fully closed at
+`4d146679e782ff555819b411fc5048e55299de4d`. The dedicated exact P3.3-S2
+plan is a newly authored, unapproved documentation candidate. S2 implementation
+has not begun, P3.3-S3 through P3.3-S7 are unauthorized, and Phase 3.3 remains
+incomplete.**
 
 The authoritative readiness reconstruction completed with classification that
 a new frozen implementation plan was required. No defect was found. The
 resulting plan was approved and published as the frozen
 [repository-specific Phase 3.3 implementation plan](docs/phase_3_3_run_protocol_implementation_plan.md).
-That plan remains byte-identical historical and sequencing authority; the
-current documentation-only publication-closeout candidate instead contains
-exactly this roadmap, [the canonical Run Protocol design](docs/run_protocol.md),
-and [the architecture](docs/architecture.md).
+That plan remains byte-identical historical and sequencing authority. The S1
+publication-closeout candidate described by its historical status passages was
+published unchanged at `4d146679`; those passages remain candidate-time
+history rather than current pending work.
 The first independent review of the historical P3.3-G0 three-document planning
 candidate returned `CHANGES_REQUIRED` with four bounded findings, B1-B4. The
 corrected P3.3-G0 planning candidate fixed exact strict S1 representation
@@ -1197,15 +1199,26 @@ were manually pushed and confirmed at `6212a760`. The published implementation
 has no migration, database, repository, Unit of Work, runtime integration, API,
 Demo, Web, Dynamic Narrative, Provider, scenario, world, or gameplay effect.
 
-At the 2026-08-15 authoring checkpoint for the exact three-document closeout,
-the closeout bytes remain an unapproved and unpublished documentation
-candidate. This is explicitly candidate-time history. Their next action is the
-fresh independent read-only review defined by the canonical closeout gate;
-approval is followed only by separate exact local-commit authorization, the
-user's manual push, and clean aligned publication confirmation. After those
-exact bytes complete that sequence, P3.3-S1 is fully closed with no additional
-status-synchronization candidate. P3.3-S2 then becomes the next sequential
-planning subject but remains unauthorized.
+The exact S1 closeout completed its review, separately authorized commit, user
+push, and clean aligned publication confirmation at `4d146679`. P3.3-S1 is
+fully closed with no additional synchronization candidate.
+
+The newly authored
+[P3.3-S2 plan candidate](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md)
+is the current sequential planning subject. At its explicit 2026-08-16
+candidate-time checkpoint it remains unapproved, unstaged, uncommitted, and
+unpublished; S2 implementation has not begun. It proposes, but does not yet
+freeze, exact discrete `0..100` step-`5` domains for the five engine values;
+three stable version-1 profiles and defaults; exhaustive narrower per-profile
+override ranges; no server-selected profile default; one fail-closed
+precedence algorithm; resolver epoch `run-protocol-resolution` version `1`
+with no randomness, PRNG, or seed; exact canonical S1-envelope/override input
+bytes; domain-separated SHA-256 fingerprints and independently reproduced
+goldens; a 33-symbol pure-domain contract; and a five-path future
+implementation budget. Its only next action is fresh independent read-only
+review of the exact three documentation paths. Review approval would grant no
+editing, staging, commit, push, publication, implementation, S3, or later-slice
+authority.
 
 Phase 3.3 owns the engine/world parameters, pre-game profiles and permitted
 overrides, versioned frozen Run Protocol, deterministic resolution, and the
@@ -1381,14 +1394,18 @@ real-MySQL verification.
   broader public gameplay integration.
 - The eligible initial-world catalogue and later-world weighting, anti-repeat,
   progression, and priority-injection details.
-- Exact Phase 3.3 numeric parameter ranges, profile defaults, override
-  catalogue, resolution rules, public discovery shape, authored-world
-  catalogues/weighting, visits/regions/world state, progression, anti-repeat,
-  anti-farming, recovery priority, world-line transition, and later physical
-  schema choices. The initial S1 serialization and compatibility semantics are
-  frozen planning decisions with an independently approved and published
-  standalone no-migration implementation; they are not durable Run authority
-  and do not select any later-slice decision.
+- The exact P3.3-S2 numeric domains, profile defaults, override catalogue,
+  resolver, canonical input, fingerprint, contract, and path decisions are
+  fully specified only as proposed, unapproved candidate decisions in the
+  dedicated S2 plan. They remain unfrozen until that exact plan completes its
+  independent approval, separate commit, user push, and clean aligned
+  publication confirmation. S2 implementation has not begun.
+- Public discovery shape, authored-world catalogues/weighting, visits/regions/
+  world state, mechanics application, trusted prompt compilation, progression,
+  anti-repeat, anti-farming, recovery priority, world-line transition, and
+  later physical schema choices remain owned by S3-S7. The S1 serialization
+  and compatibility semantics remain frozen and published but are not durable
+  Run authority.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,
@@ -1455,6 +1472,10 @@ manually.
   [`docs/decisions/0001-production-provider-distribution.md`](docs/decisions/0001-production-provider-distribution.md).
 - Run Protocol and difficulty/world profiles:
   [`docs/run_protocol.md`](docs/run_protocol.md).
+- Newly authored, unapproved P3.3-S2 deterministic profile-resolution plan
+  candidate; proposed decisions are not frozen and implementation has not
+  begun:
+  [`docs/phase_3_3_s2_deterministic_profile_resolution_plan.md`](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md).
 - Approved, published, byte-preserved, and frozen Phase 3.3 repository
   implementation plan; P3.3-G0 is complete, the first P3.3-S1 implementation
   review and predecessor amendment are historical, and the corrected exact S1

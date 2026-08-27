@@ -4,10 +4,13 @@ Status: **Approved product design. P3.3-G0 is approved, published, frozen, and
 complete. The corrected exact no-migration P3.3-S1 implementation is
 independently approved, committed, manually published by the user, and
 confirmed clean/aligned at
-`6212a760a549920c1c11dcb01e07566945df5556`. Its exact three-document
-post-publication status synchronization remains governed by the explicitly
-temporal closeout below. P3.3-S2 through P3.3-S7 remain unimplemented and
-unauthorized, and Phase 3.3 remains incomplete.**
+`6212a760a549920c1c11dcb01e07566945df5556`; its exact three-document
+publication closeout is independently approved, committed, manually published,
+and fully closed at `4d146679e782ff555819b411fc5048e55299de4d`.
+The exact P3.3-S2 deterministic profile-resolution plan is a newly authored,
+unapproved documentation candidate; S2 implementation has not begun.
+P3.3-S3 through P3.3-S7 remain unauthorized, and Phase 3.3 remains
+incomplete.**
 
 Phase ownership: **Phase 3.3**
 
@@ -71,7 +74,8 @@ constructible lifecycle remains `pre_first_turn`.**
 ## Non-goals
 
 - Completing Phase 3.3 or implementing P3.3-S2 through P3.3-S7 through the
-  bounded P3.3-S1 foundation or its documentation closeout.
+  bounded P3.3-S1 foundation, its completed closeout, or the newly authored S2
+  plan candidate.
 - Letting prose or model preference change resources, success, betrayal, death,
   relationship progression, or permanent facts.
 - Replacing scenario-authored facts, character definitions, or engine rules.
@@ -232,64 +236,56 @@ deferred.
 
 ### Post-publication status-synchronization closeout
 
-At the 2026-08-15 authoring checkpoint represented by the exact closeout
-candidate bytes, only `PLANS.md`, `docs/architecture.md`, and this document are
-modified; the candidate is unapproved, unstaged, uncommitted, and unpublished.
-This statement is explicitly commit-bound candidate-time history, not a durable
-claim about the later disposition of byte-identical files.
+At its explicit 2026-08-15 candidate-time checkpoint, the exact closeout
+contained only `PLANS.md`, `docs/architecture.md`, and this document and was
+unapproved, unstaged, uncommitted, and unpublished. That historical candidate
+then received its exact independent approval, separate commit authorization,
+commit, user-controlled manual push, and clean aligned published-baseline
+confirmation. The closing commit is
+`4d146679e782ff555819b411fc5048e55299de4d`, with exact subject
+`docs(run): close Phase 3.3 S1 publication`. P3.3-S1 is fully closed and
+requires no further review, commit, push, confirmation, or synchronization.
 
-The exact next action at that checkpoint is fresh independent read-only review
-of the complete three-document candidate. After a successful review, the user
-must separately authorize the exact three-path local documentation commit. The
-user then separately controls the manual push, after which the repository must
-receive a clean aligned published-baseline confirmation. Only after that exact
-review/commit/push/confirmation sequence may P3.3-S1 be called fully closed.
-Once the same exact bytes complete the sequence, these published words durably
-record that closure; no second status-synchronization task is required.
-
-After P3.3-S1 closure, P3.3-S2 becomes the next sequential planning subject but
-remains unauthorized. Its dedicated commit-sized plan must be separately
-authored, independently approved, committed, manually pushed by the user, and
-confirmed at a clean aligned published baseline before implementation. This
-closeout selects or authorizes no P3.3-S2 decision, plan content, or code.
-
-### Sole operative independent-review gate for this closeout
-
-There is exactly one operative success token for independent review of this
-exact three-document closeout candidate:
+The historical closeout review token was:
 
 `PHASE_3_3_S1_POST_PUBLICATION_STATUS_SYNCHRONIZATION_INDEPENDENT_REVIEW_APPROVED`
 
-The token is valid only when a fresh independent read-only review binds all of
-the following:
+It has satisfied only its exact historical closeout gate and is non-operative
+for current or future work. It grants no S2 plan approval, implementation, Git,
+or later-slice authority.
 
-1. baseline `6212a760a549920c1c11dcb01e07566945df5556` on `main`;
-2. exactly `PLANS.md`, `docs/architecture.md`, and `docs/run_protocol.md`, with
-   no fourth path;
-3. the final line, byte, and SHA-256 identity of each of those three files and
-   the complete lexicographically ordered binary-safe three-path patch byte
-   count, SHA-256, and bytes, all measured after the last authoring change and
-   supplied externally with the review prompt;
-4. the complete P3.3-G0, first-review, predecessor-amendment, corrected-
-   candidate, implementation-approval, exact-commit, manual-push, and clean
-   published-baseline lifecycle facts recorded here;
-5. byte preservation of the frozen plan at 1,233 lines, 83,331 bytes, and
-   SHA-256
-   `09ef2ffe9fc03fc60cd069df116463b2cc27d08f50fbbddc658b28d975683e1b`,
-   plus byte preservation of the two S1 production and two S1 test files at
-   commit `6212a760`; and
-6. preservation of the exact implemented/deferred boundary and the absence of
-   any P3.3-S2 or later-slice authority.
+### Current P3.3-S2 plan candidate
 
-Any byte change to an approval-bound closeout document after review invalidates
-the token and requires new identities and fresh independent read-only review.
-The token grants no editing, staging, commit, push, publication, implementation,
-or P3.3-S2 authority. Even after approval, a separate explicit authorization
-is required for the exact local three-path documentation commit, and the user
-performs every push. Every historical implementation/plan/amendment verdict,
-authoring-complete label, differently scoped success-looking label, subset
-review, failure, or changes-required result is non-operative for this closeout
-and cannot approve it.
+At the 2026-08-16 checkpoint represented by the present three-path working
+candidate, the dedicated
+[P3.3-S2 deterministic profile-resolution plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
+is newly authored, unapproved, unstaged, uncommitted, and unpublished. This is
+explicit candidate-time history that remains truthful after any later
+disposition of identical bytes. S2 implementation has not begun.
+
+The first independent read-only review returned `CHANGES_REQUIRED` for four
+material plan findings. The second independent read-only review returned
+`CHANGES_REQUIRED` for exactly two remaining Medium findings: the unfrozen
+universal-verification method and overlapping exception ownership for the S1
+profile reference nested in an S2 catalogue entry. The third independent
+read-only review returned `CHANGES_REQUIRED` for exactly one remaining Medium
+finding: repeat and aggregate public-resolver invocation counts were not frozen
+or asserted. None of the three reviews emitted a plan or implementation
+approval verdict. The third bounded documentation correction remains
+unapproved; any authoring-complete label is non-operative, and the changed
+candidate requires a fresh independent read-only re-review.
+
+The candidate proposes exact five-parameter discrete domains, three version-1
+profiles and defaults, exhaustive per-profile overrides, complete authority and
+precedence, resolver v1 with no randomness/PRNG/seed, canonical binding of the
+complete S1 envelope and exact override presence, domain-separated SHA-256
+goldens, an exact 33-symbol pure-domain implementation contract, and an exact
+five-path future implementation budget. Every decision remains proposed and
+unapproved until the exact plan completes its own independent review, separate
+commit authorization and commit, user manual push, and clean aligned
+publication confirmation. Its next action is only fresh independent read-only
+review under the sole plan gate defined in that candidate. Review approval
+would grant no implementation or Git authority.
 
 The published frozen planning allocation is exactly:
 
@@ -306,19 +302,28 @@ P3.3-S7 belongs to Phase 3.3 and is unrelated to the nonexistent P8-S7.
 Phase 8 remains implemented and complete at P8-S6. Publication of this
 allocation did not authorize any implementation slice. P3.3-S1 was separately
 authorized, independently approved, and published as the bounded foundation
-described above. P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
-The only open S1 governance at the recorded authoring checkpoint is the exact
-three-document closeout sequence above; it grants no later-slice authority.
+described above, and its closeout is fully closed at `4d146679`. P3.3-S2
+through P3.3-S7 remain unimplemented. The exact S2 plan is only the unapproved
+candidate described above; S3 through S7 remain unauthorized.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
 `consequence_severity`, `information_opacity`, and `conflict_intensity`, with
-objective mechanics tested independently from prompt construction. It also owns
-a deterministic, pure or side-effect-free, Provider-independent compiler from
+objective mechanics tested independently from prompt construction. It also
+exclusively owns any separately reviewed exact numeric-to-categorical
+mechanics/prompt projection from `resource_pressure` to the product labels
+`Scarce`, `Fluid`, and `Generous`. It additionally owns a deterministic, pure
+or side-effect-free, Provider-independent compiler from
 validated trusted protocol state to canonical context bytes or one exact
 deterministic structured representation fixed by that plan. It must not call a
 real Provider. Provider calls remain outside database transactions and locks.
+
+P3.3-S6 must receive its own bounded implementation plan and independent
+public-contract review before implementation. It alone owns any public API,
+OpenAPI, Demo, Web, projection, recovery, or client representation of
+`Scarce`, `Fluid`, and `Generous`. S5 and S6 may only project from the exact
+numeric S2 value; neither may change, round, clamp, or replace it.
 
 The P3.3-S5 compiled context grants no outcome, resource, relationship, death,
 world-selection, permanent-state, or canon authority. Presentation changes
@@ -685,9 +690,25 @@ world while allowing each visit to expose different authored content.
 - `Fluid`
 - `Generous`
 
-Resource pressure becomes an engine-owned world/difficulty input. A model may
-narrate its confirmed effects but cannot directly add, remove, restore, spoil,
-or otherwise modify resources.
+These three names are approved product vocabulary only, not an implemented or
+authoritative representation. P3.3-S2 resolves only the exact numeric
+`resource_pressure` objective value. `Scarce`, `Fluid`, and `Generous` are not
+S2 resolver inputs, profile identities, override values, alternative objective
+values, S1 presentation fields, or current runtime authority, and no label may
+be accepted as an alias for a numeric S2 value.
+
+P3.3-S5 owns the future separately reviewed exact numeric-to-categorical
+mechanics/prompt projection. P3.3-S6 owns any separately reviewed public API,
+OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
+slice may change, round, clamp, or replace the numeric S2 value; each may only
+project from it. Until P3.3-S5 and P3.3-S6 are each independently planned,
+approved, implemented, and published, no categorical projection is
+authoritative and no exact threshold or band mapping exists.
+
+Numeric resource pressure is an engine-owned world/difficulty input. A model
+may narrate confirmed effects supplied by later trusted mechanics/prompt
+authority but cannot directly add, remove, restore, spoil, or otherwise modify
+resources.
 
 ### Reality boundary
 
@@ -716,6 +737,204 @@ The engine owns these parameters:
 
 Profiles provide defaults. Permitted player overrides occur only before the run
 starts.
+
+### P3.3-S2 exact candidate proposal — unapproved
+
+The dedicated
+[P3.3-S2 plan candidate](phase_3_3_s2_deterministic_profile_resolution_plan.md)
+proposes the complete decisions below. At its explicit 2026-08-16 authoring
+checkpoint it is unapproved, unstaged, uncommitted, and unpublished; therefore
+none of these values is frozen and S2 implementation has not begun.
+
+All five values are proposed as exact discrete Python integers in `0..100`
+inclusive with step `5`. They are normalized engine profile points, not
+percentages, probabilities, quantities, or multipliers. Exact profile defaults
+are proposed as:
+
+| Stable profile ID/version | Human label | Resource | Trust | Consequence | Opacity | Conflict |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `difficulty.silent-hunting-ground` / `1` | `Extreme — Silent Hunting Ground` | 95 | 10 | 95 | 90 | 90 |
+| `difficulty.fragile-alliance` / `1` | `Standard — Fragile Alliance` | 60 | 45 | 65 | 60 | 60 |
+| `difficulty.open-expedition` / `1` | `Easier — Open Expedition` | 25 | 70 | 35 | 30 | 35 |
+
+All five parameters are proposed as directly overrideable only within these
+inclusive step-`5` profile ranges:
+
+| Parameter | Extreme | Standard | Easier |
+| --- | ---: | ---: | ---: |
+| `resource_pressure` | 80..100 | 40..75 | 10..40 |
+| `social_trust` | 0..25 | 30..65 | 55..85 |
+| `consequence_severity` | 80..100 | 45..80 | 20..50 |
+| `information_opacity` | 75..100 | 40..75 | 15..45 |
+| `conflict_intensity` | 75..100 | 40..75 | 20..50 |
+
+Including independent absence for each parameter, the candidate's exhaustive
+finite domain is exactly `12,348` Extreme maps from
+`(5 + 1) × (6 + 1) × (5 + 1) × (6 + 1) × (6 + 1)`, `59,049` Standard maps
+from `9^5`, and `32,768` Easier maps from `8^5`: exactly `104,165` valid
+profile/override maps. The three world tones, three reality boundaries, and
+three relationship overlays create exactly `3 × 3 × 3 = 27` presentation
+combinations.
+
+Future S2 evidence has one frozen method. In
+`tests/unit/test_run_protocol_resolution.py`, a direct exhaustive test must
+declare independent literal tuples for the exact three profile IDs/versions,
+their exact five-value defaults, every valid integer for each profile/parameter,
+and all 27 presentation triples. Production catalogue data and enum iteration
+may be compared with, but may not generate, that oracle. One `object()` sentinel
+represents absence. Each dimension is the sentinel followed by its independent
+valid integers in ascending order; fixed-order Cartesian generation omits only
+sentinel keys and retains every explicit integer, including one equal to the
+profile default.
+
+Before resolution, the test must assert the `12,348`, `59,049`, `32,768`,
+`104,165`, and 27 counts. It must then call the public
+`resolve_run_protocol_objectives` facade for every map and every presentation:
+exactly `333,396` Extreme, `1,594,323` Standard, and `884,736` Easier distinct
+trusted inputs, for `2,812,455` total.
+
+For each exact input, the frozen order is: select the profile in existing fixed
+Extreme, Standard, Easier order; generate its override map in existing fixed
+Cartesian order; select the presentation triple in existing fixed presentation
+order; make one primary call to public `resolve_run_protocol_objectives`;
+validate that primary result against the independent expected result; then
+immediately make one real repeat call to the same public callable using the
+exact same trusted input objects, or an exactly equivalent permitted detached
+input only where the relevant test expressly specifies detached reconstruction;
+compare exact resolved objective output, canonical resolution-input bytes, and
+fingerprint; and increment each separate primary or repeat counter only after
+its corresponding public call returns successfully. Every primary result must
+equal the independently computed defaults-plus-present-overrides tuple, retain
+exact override presence and canonical order, omit absent keys, identify the
+exact profile pair, and accept every Cartesian combination. Across each map's
+27 presentations, the first primary objective result is only the comparison
+baseline; presentation values never enter or alter the five objective fields.
+Fingerprints may differ because the canonical S1 envelope differs.
+
+The separately asserted primary public-call counters are exactly `333,396`
+Extreme, `1,594,323` Standard, `884,736` Easier, and `2,812,455` aggregate. The
+separate repeat public-call counters are exactly the same four values. Combined
+public-resolver invocation counters are exactly:
+
+- Extreme: `333,396 + 333,396 = 666,792`;
+- Standard: `1,594,323 + 1,594,323 = 3,188,646`;
+- Easier: `884,736 + 884,736 = 1,769,472`; and
+- aggregate: `2,812,455 + 2,812,455 = 5,624,910`.
+
+The counter structure separately asserts primary count per profile, repeat
+count per profile, aggregate primary count, aggregate repeat count, combined
+count per profile, and aggregate combined public invocation count. Exact private
+variable names remain a test detail. The meanings are not interchangeable:
+`2,812,455` distinct trusted inputs, `2,812,455` primary public calls,
+`2,812,455` repeat public calls, and `5,624,910` aggregate public resolver
+invocations.
+
+No static or property argument, source inspection, representative set, random
+or Hypothesis sampling, partial enumeration, short circuit, or deduplication
+may replace a required public resolver call. A repeat is an immediate real
+public invocation, not reuse of the primary result, memoized test data,
+comparison of an object with itself, an internal-helper call, source inspection,
+a cached assertion that suppresses the invocation, or a deferred later pass.
+Ordinary test optimization is permitted only if all `2,812,455` distinct
+trusted inputs, all `2,812,455` primary calls, all `2,812,455` repeat calls, all
+`5,624,910` aggregate public resolver invocations, and all assertions still
+occur. Unknown, duplicate, missing, wrong-type, Boolean/enum/subclass,
+global/profile-range, wrong-step, unknown-profile, unsupported-version,
+corruption, and contradictory-reference failures remain in a separate negative
+matrix and increment none of the distinct-input, primary, repeat, per-profile
+combined, or aggregate combined public-invocation counters.
+
+The candidate proposes no server-selected profile default and no
+cross-parameter rule beyond the Cartesian product of those exact ranges.
+Missing/unknown/retired/unsupported profile pairs, duplicate or unknown
+override keys, missing/invalid/out-of-range/wrong-step values, contradictions,
+and corrupted state fail closed. Equal-to-base overrides remain explicitly
+present. Recommendations have no authority.
+
+Resolver epoch `run-protocol-resolution` version `1` is proposed as a pure
+non-random algorithm with no PRNG or seed. Its compact canonical input binds
+the resolver version, authorized profile pair, the complete canonical S1
+envelope as lowercase hex, and exact canonical overrides. Scenario/content and
+server identity are excluded because no S2 rule consumes them. A
+domain-separated, length-framed SHA-256 preimage produces lowercase hexadecimal
+fingerprints. Presentation fields are audit-bound but never read when deriving
+the five objective values. The exact byte grammar, independently reproduced
+goldens, 33-symbol future contract, five-path future implementation budget, and
+review gates are authoritative only within the unapproved candidate.
+
+The candidate preserves field-level exception ownership. Direct invalid S1
+carrier construction retains `pydantic.ValidationError`, direct invalid
+presentation-enum construction retains `ValueError`, and the wrong exact
+envelope top-level type retains `TypeError`. Mutation of an exact S1 envelope,
+its embedded profile reference, presentation enums, or another nested S1-owned
+carrier retains `RunProtocolValidationError`; a well-typed unsupported S1
+dispatcher pair retains `UnsupportedRunProtocolVersionError`; and the published
+stored boundary retains `RunProtocolStoredRecordIntegrityError`. S2 never
+catches, wraps, translates, adds a cause layer to, or replaces those outcomes.
+
+For the S2 catalogue, the authoritative tuple binding/type/cardinality/order,
+the three entry object identities and exact `RunProtocolProfileDefinitionV1`
+types, and the entry fields `label`, `base_values`, `override_rules`, and
+`server_default_eligible` are S2-owned. The exact five named fields and nested
+`value` state under `base_values`; the exact ordered `parameter`, `minimum`,
+`maximum`, and `step` state under every `override_rules` member; the
+`RUN_PROTOCOL_OBJECTIVE_PARAMETER_ORDER` tuple; and the original-state metadata
+of those exact S2 carriers are also S2-owned. Replacement, removal, duplication,
+or reordering of entries, replacement by an equal fresh entry, and corruption
+of that closed S2 list raise `RunProtocolResolutionIntegrityError`.
+
+The catalogue entry's `profile_ref` boundary is split without overlap. Presence
+of the field and its association by identity with the one catalogue-owned
+reference originally installed in the authoritative entry are S2 structure.
+The already-associated exact `RunProtocolProfileRefV1` object, its
+`profile_id`, `profile_version`, nested `value` fields, exact types,
+normalization, validation, and original-state invariants remain S1-owned.
+Rebinding the association to another object, even an equal or malformed one,
+is S2 corruption; mutating only the internals of the still-associated object is
+S1 corruption. Outer ownership never absorbs nested S1 authority, and no object,
+field value, or association belongs to both classifications.
+
+Because S1 publishes no standalone profile-reference validator, the S2 plan
+freezes one private adapter: embed the same exact reference by identity in an
+otherwise-valid private `RunProtocolEnvelopeV1` created with `model_construct`
+and fixed `balanced`/`lawful`/`off` presentation, then call the published
+`validate_run_protocol_envelope_v1`. The adapter is validation-only and never
+resolved, encoded, fingerprinted, returned, or used as objective input. Its
+`RunProtocolValidationError` and direct cause behavior pass through unchanged.
+
+Catalogue lookup order is deterministic: validate the caller reference's exact
+top type and then its S1 state; validate catalogue tuple type, identity,
+cardinality, entry order/identities, and objective-parameter order; for each
+entry in Extreme, Standard, Easier order validate exact S2 entry type/identity
+and outer state, then `label`, `base_values`, `override_rules`, and
+`server_default_eligible`, then the `profile_ref` association, then the nested
+reference through S1; only then match exact ID/version and return the
+authoritative catalogue object. The first check to fail determines the outcome.
+In particular, an S2 field failure precedes nested S1 validation, a malformed
+replacement reference fails at the S2 association check, and internal mutation
+of the still-associated reference reaches the unchanged S1 outcome. All
+resolver, override, compatibility, reconstruction-input, encode, fingerprint,
+and dispatch paths reuse this order with no wrapper or fallback.
+
+The plan's N20 changes only the authoritative Standard entry's S2-owned
+`base_values.resource_pressure.value` from `60` to `65` and requires exactly
+`RunProtocolResolutionIntegrityError`. Separate N22 retains the outer tuple,
+entry, and association, mutates only the nested S1
+`profile_ref.profile_version.value` from `1` to `True` by the published hostile
+original-state technique, invokes lookup with a separate valid Standard
+reference, and requires exactly the published `RunProtocolValidationError` and
+direct `pydantic.ValidationError` cause without an S2 wrapper. N22 is distinct
+from S2 resolution state N16, equal fresh definition N17, S2 catalogue state
+N20, and S1 envelope corruption N21.
+
+Legitimate detached S2 reconstruction starts from trusted profile ID/version
+and reacquires the exact catalogue-owned profile through the candidate's exact
+future `lookup_run_protocol_profile` contract. Only value-authoritative
+carriers, including the S1 envelope through its published reconstruction
+boundary and fresh proposal/input values, may be rebuilt. An equal fresh
+profile definition remains unauthorized and rejected; re-lookup restores
+catalogue authority without preventing identical objective output, canonical
+resolution input, and fingerprint.
 
 ### Extreme — Silent Hunting Ground
 
@@ -748,10 +967,13 @@ starts.
   viewpoint.
 - Protocol presets control presentation.
 - Difficulty and character may supply recommended defaults.
+- Under the S2 candidate, recommendations are presentation advice outside the
+  resolver and cannot select a profile or create/mutate an override.
 - Player-approved overrides are resolved before the first turn.
 - The resolved protocol is versioned and frozen when the first turn begins.
-- Fluid behavior is resolved deterministically by the engine using state and
-  seed.
+- The proposed S2 profile resolver consumes no randomness, PRNG, or seed.
+  Later dynamic/world behavior may use separately frozen engine state and seed
+  only under its owning later-slice authority.
 - The model does not perform its own uncontrolled random selection.
 - The model does not invent resource loss, betrayal, death, permanent state
   changes, or major canon facts.
@@ -800,8 +1022,13 @@ preset_version=1
 The structured, versioned boundary is accepted. The frozen P3.3-S1 plan fixes
 the exact `run-protocol-envelope/v1` representation and the published S1
 foundation implements its standalone codec/validation evidence. This does not
-select or implement the illustrative prompt block above; no `RUN_PROTOCOL`
-block exists in the implemented prompt today.
+select or implement the illustrative `[RUN_PROTOCOL]` prompt block above; no
+`RUN_PROTOCOL` block exists in the implemented prompt today. In particular,
+`resource_pressure=<scarce|fluid|generous>` is not an S2 output, alias, band,
+or currently authoritative field. It is only an unfixed illustration of the
+later S5-owned prompt projection and S6-owned public/client representation. No
+numeric threshold or band exists, and any later projection must preserve the
+exact numeric S2 value without changing, rounding, clamping, or replacing it.
 
 ## Lifecycle
 
@@ -814,8 +1041,9 @@ block exists in the implemented prompt today.
 5. The resolved protocol, `entry_world_id`, and `entry_world_version` receive
    their run binding and are frozen at the first turn.
 6. Each turn uses the frozen protocol with current engine-confirmed state.
-7. The engine resolves any fluid behavior deterministically from state and
-   seed; the Provider only renders the permitted presentation.
+7. S2 profile resolution is non-random; any later dynamic behavior is resolved
+   deterministically from separately authorized state and seed. The Provider
+   only renders permitted presentation.
 8. When a later world is required, the engine deterministically selects it from
    the eligible pool while preserving required progression and recovery.
 9. Replay uses the same frozen protocol, authoritative state, and deterministic
@@ -824,6 +1052,11 @@ block exists in the implemented prompt today.
 ## Deterministic requirements
 
 - Resolution order, defaults, override precedence, and validation are stable.
+- The proposed S2 resolver uses canonical input and a deterministic fingerprint
+  and consumes no seed; later-world seed behavior remains S7 work.
+- The proposed S2 resolver produces only exact numeric `resource_pressure`;
+  categorical mechanics/prompt projection remains S5 work and public/client
+  representation remains S6 work.
 - No setting depends on unordered collection iteration, wall-clock time, or a
   Provider-selected random value.
 - Entry-world identity remains frozen, and later-world selection is
@@ -835,8 +1068,9 @@ block exists in the implemented prompt today.
 - The stored/frozen representation is sufficient to reproduce presentation
   inputs for a run.
 - Objective results are reproducible independently of prose variation.
-- A missing, unknown, incompatible, or mutated protocol fails explicitly; it
-  does not silently select new defaults mid-run.
+- A missing, unknown, incompatible, or mutated protocol fails explicitly under
+  its owning S1 or S2 exception taxonomy; S2 never translates S1 corruption,
+  and no failure silently selects new defaults mid-run.
 
 ## Implementation acceptance criteria
 
@@ -844,9 +1078,22 @@ Phase 3.3 is acceptable only when:
 
 1. The engine has a validated, versioned world/difficulty profile and frozen
    Run Protocol boundary.
-2. Profile defaults and permitted overrides are resolved before the first turn.
+2. Profile defaults and permitted overrides are resolved before the first turn;
+   S2 acceptance directly executes all `104,165` valid maps and all `2,812,455`
+   distinct presentation inputs through the public resolver using the
+   independent literal oracle in fixed profile, Cartesian-map, and presentation
+   order. It makes one validated primary call and one immediate real repeat call
+   per input, compares exact output/canonical bytes/fingerprint, and separately
+   asserts per-profile primary and repeat counts `333,396`, `1,594,323`, and
+   `884,736`, aggregate primary and repeat counts `2,812,455` each, combined
+   per-profile invocation counts `666,792`, `3,188,646`, and `1,769,472`, and
+   `5,624,910` aggregate public resolver invocations. It also preserves exact
+   field-level S1/S2 catalogue ownership and deterministic exception order and
+   reacquires catalogue identity for detached reconstruction.
 3. Objective parameter effects are implemented and tested independently from
-   presentation settings.
+   presentation settings; any `Scarce`/`Fluid`/`Generous` mechanics/prompt
+   projection is separately frozen in S5 and any public/client representation
+   is separately frozen in S6 without changing the numeric S2 value.
 4. Character authority remains separate from difficulty and presentation.
 5. Relationship atmosphere cannot mutate objective relationship state.
 6. Identical state, seed, character, and resolved settings produce identical
@@ -868,9 +1115,17 @@ Phase 3.3 is acceptable only when:
 
 - Successor-version compatibility, durable schema/migration, and later decoder
   policy beyond the frozen standalone v1 representation.
-- Exact numeric/value ranges for the five engine-owned parameters.
-- Profile-to-parameter default values.
-- Which overrides are offered for each game mode or character.
+- The exact S2 numeric domains, profile defaults, override catalogue,
+  precedence, resolver, canonical input, fingerprint, symbol contract, and path
+  budget are fully specified only as proposed, unapproved decisions in the
+  dedicated S2 plan. They remain unfrozen until exact independent approval,
+  separate commit, user push, and clean aligned publication confirmation.
+- P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
+  prompt projection; no threshold or band exists before its separately
+  reviewed plan and implementation.
+- P3.3-S6 owns every public API, OpenAPI, Demo, Web, projection, recovery, and
+  client representation of those labels; it may not replace the numeric S2
+  value.
 - Compatibility and migration policy for future protocol versions.
 - World/profile discovery and unlock policy.
 - Exact eligible initial-world catalogue.
@@ -891,6 +1146,8 @@ Phase 3.3 is acceptable only when:
 ## Related documents
 
 - [Project roadmap](../PLANS.md)
+- [P3.3-S2 deterministic profile-resolution plan candidate](phase_3_3_s2_deterministic_profile_resolution_plan.md)
+- [Frozen Phase 3.3 implementation plan](phase_3_3_run_protocol_implementation_plan.md)
 - [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 - [Narrative Provider boundary](narrative_provider.md)
 - [NPC Relationship and Temporary Residence](npc_relationship_residence.md)
