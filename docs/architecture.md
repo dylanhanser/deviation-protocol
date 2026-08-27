@@ -76,9 +76,10 @@ migration, repository or Unit of Work integration, Run binding, profile
 catalogue or lookup, defaults or overrides, deterministic profile resolution,
 objective numeric mechanics, native admission, entry-world freeze, public API
 or projection, Demo, Web, Provider integration, scenario/world/visit/region/
-revisit/progression/continuity behavior, or identity or memory schema. P3.3-S2
-through P3.3-S7 remain unimplemented and unauthorized; the complete Run
-Protocol and Phase 3.3 remain incomplete.
+revisit/progression/continuity behavior, or identity or memory schema. The
+separate P3.3-S2 implementation candidate below adds only pure numeric profile
+resolution. P3.3-S3 through P3.3-S7 remain unimplemented and unauthorized; the
+complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
 evidence, replay, recovery, production, Demo, Web, and Dynamic Narrative
@@ -97,10 +98,88 @@ closeout gate defined in `docs/run_protocol.md`, followed only after approval
 by separate authorization for the exact local documentation commit, the user's
 manual push, and clean aligned publication confirmation. Once the same exact
 bytes complete that sequence, they durably record P3.3-S1 as fully closed and
-no second status-synchronization task is required. P3.3-S2 then becomes the
-next sequential planning subject but remains unauthorized and requires its own
-separately authored, approved, committed, manually published, and confirmed
-commit-sized plan before implementation.
+no second status-synchronization task is required. P3.3-S2 then became the next
+sequential planning subject; its separately reviewed plan was committed,
+manually published, and confirmed at
+`2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe` before the present bounded
+implementation candidate began.
+
+## P3.3-S2 deterministic profile-resolution implementation candidate
+
+`domain.run_protocol_resolution` is the current isolated S2 implementation
+candidate. It imports the published S1 domain module and no application or
+infrastructure module, performs no I/O or persistence, and has no registry,
+plugin, decoder, repository port, package re-export, or runtime activation. Its
+public boundary is exactly 33 module-level symbols: six constants, five
+classified exceptions, eleven enums or strict frozen Pydantic carriers, one
+authoritative catalogue tuple, and ten synchronous pure callables.
+
+Resolver v1 owns five exact numeric engine-profile points in `0..100` step `5`
+and the fixed parameter order `resource_pressure`, `social_trust`,
+`consequence_severity`, `information_opacity`, `conflict_intensity`. Its
+authoritative catalogue is the frozen Extreme, Standard, Easier tuple with the
+published Unicode em-dash labels, defaults, and ordered per-profile ranges.
+Every entry has `server_default_eligible=False`; selection requires the exact
+S1 profile reference and admits no alias, fallback, recommendation, upgrade,
+downgrade, clamp, repair, categorical value, or presentation-driven objective
+branch.
+
+All catalogue consumers reuse the single deterministic lookup boundary. S2
+owns the catalogue binding, tuple/order/entry identities, S2 carrier metadata,
+labels, numeric bases, rules, and the association to the originally installed
+S1 reference. Internals of that still-associated reference remain S1-owned and
+are validated by embedding the same object in the published S1 envelope
+validator. Consequently N20's mutation of Standard's S2-owned base scalar
+raises `RunProtocolResolutionIntegrityError`, while N22's internal mutation of
+the still-associated S1 profile version raises the unchanged
+`RunProtocolValidationError` with a direct `pydantic.ValidationError` cause.
+Fresh equal catalogue definitions are rejected; legitimate detached inputs
+first reacquire the exact authoritative profile and rebuild only value-
+authoritative carriers.
+
+The first independent implementation review returned `CHANGES_REQUIRED` for
+two bounded defects. `RunProtocolResolutionInputV1.authorized_profile` used a
+`SkipValidation` annotation, exposing the wrong public signature and permitting
+ordinary construction with a fresh equal profile or hostile `label=123` state;
+those invalid inputs could then enter an ordinary resolved-output constructor.
+The correction restores the exact plain profile type, performs complete
+owner-ordered nested revalidation, retains the exact catalogue object by
+identity, and prevents either invalid trusted carrier from being constructed.
+The same review found N10/N11 direct-only evidence and a private-only N16 proof.
+N10/N11 now include restored post-construction mutation through the public
+resolver, while N16 covers override/input/output/fingerprint values and
+`__dict__`, fields-set, extra, private, tuple, and nested S2 state through public
+boundaries with exact `RunProtocolResolutionIntegrityError`.
+
+Canonical resolution input is compact sorted-key UTF-8 JSON with exactly six
+root fields, the complete lowercase-hex S1 envelope, and exact canonical
+override presence. Its inclusive defensive ceiling is 1,024 bytes; the genuine
+reachable v1 maximum is 863. Fingerprints use SHA-256 over the exact 57-byte
+domain, NUL separator, unsigned u32 big-endian input length, and canonical
+bytes, producing 64 lowercase hexadecimal characters. The four published
+fingerprints are reproduced exactly.
+
+The focused literal oracle directly completed all `104,165` override maps and
+all 27 presentation triples: `2,812,455` distinct trusted inputs, separately
+counted `2,812,455` primary calls and `2,812,455` immediate real repeat calls,
+and `5,624,910` aggregate public resolver invocations. Per-profile combined
+counts are `666,792`, `3,188,646`, and `1,769,472`. Presentation affects the
+audit-bound fingerprint but never the objective tuple. The candidate changes
+exactly five paths and activates no durable/public/categorical representation,
+migration, database, Provider, browser, or runtime surface. It remains
+unapproved, unstaged, uncommitted, and unpublished; S3-S7 remain unauthorized.
+
+Corrected local verification on the exact production/test candidate completed
+focused S2 with `23 passed, 2 warnings` in 2,566.53 seconds (42:46), published
+S1 regression with `141 passed`, eight adjacent Run suites with `222 passed`,
+compileall, and tracked/new-file whitespace checks. Canonical Offline completed
+full pytest with `2,501 passed, 182 expected skips, 2 warnings` in 2,982.13
+seconds (49:42), then passed compileall, dependency consistency, metadata-only
+Alembic heads/history at `20260729_0005`, and diff checking. The sanitized child
+had no database, Provider, or Live variables and made no database connection.
+The earlier focused `22 passed` and Offline `2,500 passed, 182 skipped, 2
+warnings` results are historical pre-correction evidence only. This evidence
+does not independently approve or publish the candidate.
 
 ## Structured player-character Phase 1 pure foundation
 

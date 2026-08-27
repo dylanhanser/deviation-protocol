@@ -75,8 +75,7 @@ migration, repository or Unit of Work integration, Run binding, profile
 catalogue or lookup, defaults or overrides, deterministic profile resolution,
 objective mechanics, native admission, entry-world freeze, public projection,
 API, Demo, Web, Provider, scenario, world, visit, region, revisit, progression,
-continuity, identity, or memory behavior. Phase 3.3 remains incomplete;
-P3.3-S2 through P3.3-S7 remain unimplemented and unauthorized.
+continuity, identity, or memory behavior. Phase 3.3 remains incomplete.
 
 The exact three-document S1 publication closeout was subsequently independently
 approved, committed as `4d146679e782ff555819b411fc5048e55299de4d` with
@@ -85,18 +84,24 @@ user, and confirmed at a clean aligned baseline. P3.3-S1 is fully closed and
 requires no further review, commit, push, publication confirmation, or status
 synchronization.
 
-At the 2026-08-16 authoring checkpoint represented by the present three-path
-working candidate, the dedicated
+The dedicated
 [P3.3-S2 deterministic profile-resolution plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md)
-is newly authored, unapproved, unstaged, uncommitted, and unpublished. That is
-explicit candidate-time history. Its proposed decisions are not frozen, and
-S2 implementation has not begun. The candidate proposes exact five-parameter
-integer domains, three version-1 profile entries and defaults, exhaustive
-per-profile overrides, fail-closed precedence, resolver v1 with no randomness
-or seed, canonical S1-envelope binding, domain-separated SHA-256 vectors, an
-exact 33-symbol contract, and an exact five-path future implementation budget.
-Fresh independent read-only review of the exact candidate is the next action;
-even approval grants no implementation or Git authority. P3.3-S3 through
+was independently approved, committed, manually published by the user, and
+confirmed at `2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe`. Its historical candidate-
+time wording remains frozen. The present exact five-path working tree is the
+first corrected P3.3-S2 implementation candidate: one new pure-domain module,
+one new focused test module, and synchronized `PLANS.md`, architecture, and
+product-contract documentation. The first independent implementation review
+returned `CHANGES_REQUIRED` because trusted public carriers bypassed catalogue
+identity/nested revalidation through `SkipValidation`, and N10, N11, and N16
+lacked the complete frozen mutated-state/public-exception proof. The correction
+removes that bypass, enforces authoritative identity during ordinary public
+construction, and supplies the missing public-boundary evidence. The corrected
+focused proof directly completed `104,165` maps, `2,812,455` inputs, and
+`5,624,910` public invocations. The candidate is unapproved, unstaged,
+uncommitted, and unpublished; it activates no durable, public, categorical,
+migration, or runtime behavior. Fresh independent review is the next action
+after final local verification. P3.3-S3 through
 P3.3-S7 remain unauthorized. Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
@@ -617,7 +622,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **P3.3-G0 is complete; P3.3-S1 implementation and publication closeout are fully closed at `4d146679`; the exact P3.3-S2 plan is a newly authored unapproved documentation candidate; S2 implementation has not begun; Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), and [S2 candidate](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md) |
+| Phase 3.3 | **P3.3-G0 is complete; P3.3-S1 implementation and publication closeout are fully closed at `4d146679`; the exact P3.3-S2 plan is published at `2f3f84a4`; the bounded five-path S2 implementation is an unapproved, unstaged, uncommitted first-corrected candidate after a `CHANGES_REQUIRED` review, with corrected direct exhaustive focused evidence; S3-S7 remain unauthorized and Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), and [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1131,9 +1136,10 @@ committed, manually published by the user, and confirmed clean/aligned at
 `6212a760a549920c1c11dcb01e07566945df5556`; its exact three-document
 publication closeout is fully closed at
 `4d146679e782ff555819b411fc5048e55299de4d`. The dedicated exact P3.3-S2
-plan is a newly authored, unapproved documentation candidate. S2 implementation
-has not begun, P3.3-S3 through P3.3-S7 are unauthorized, and Phase 3.3 remains
-incomplete.**
+plan is approved and published at `2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe`.
+The exact five-path P3.3-S2 implementation is an unapproved, unstaged,
+uncommitted working candidate; P3.3-S3 through P3.3-S7 are unauthorized, and
+Phase 3.3 remains incomplete.**
 
 The authoritative readiness reconstruction completed with classification that
 a new frozen implementation plan was required. No defect was found. The
@@ -1203,22 +1209,64 @@ The exact S1 closeout completed its review, separately authorized commit, user
 push, and clean aligned publication confirmation at `4d146679`. P3.3-S1 is
 fully closed with no additional synchronization candidate.
 
-The newly authored
-[P3.3-S2 plan candidate](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md)
-is the current sequential planning subject. At its explicit 2026-08-16
-candidate-time checkpoint it remains unapproved, unstaged, uncommitted, and
-unpublished; S2 implementation has not begun. It proposes, but does not yet
-freeze, exact discrete `0..100` step-`5` domains for the five engine values;
-three stable version-1 profiles and defaults; exhaustive narrower per-profile
-override ranges; no server-selected profile default; one fail-closed
-precedence algorithm; resolver epoch `run-protocol-resolution` version `1`
-with no randomness, PRNG, or seed; exact canonical S1-envelope/override input
-bytes; domain-separated SHA-256 fingerprints and independently reproduced
-goldens; a 33-symbol pure-domain contract; and a five-path future
-implementation budget. Its only next action is fresh independent read-only
-review of the exact three documentation paths. Review approval would grant no
-editing, staging, commit, push, publication, implementation, S3, or later-slice
-authority.
+The published
+[P3.3-S2 deterministic profile-resolution plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md)
+is frozen authority at `2f3f84a4`. Its candidate-time lifecycle wording is
+preserved as historical text. The current implementation candidate creates
+`domain.run_protocol_resolution` and its focused unit evidence and modifies
+only this roadmap, `docs/architecture.md`, and `docs/run_protocol.md`. The pure
+module imports only the S1 domain module, performs no I/O, and exposes exactly
+33 public module-level symbols: six constants, five exceptions, eleven enums or
+strict frozen carriers, the single authoritative catalogue tuple, and ten
+callables. It implements exact discrete `0..100` step-`5` numeric authority,
+the three version-1 profiles, the complete override Cartesian products,
+fail-closed precedence, canonical S1-envelope/override bytes, and the four
+published domain-separated SHA-256 fingerprints.
+
+The first independent implementation review returned `CHANGES_REQUIRED` for
+two material findings. The trusted resolution-input field used
+`Annotated[RunProtocolProfileDefinitionV1, SkipValidation()]`, so its public
+signature was wrong and ordinary input/output construction admitted a fresh
+equal profile or hostile `label=123` state. N10 and N11 proved only direct
+constructor rejection, and N16 called a private validator expecting a private
+exception. The first correction restores the exact plain profile annotation,
+genuinely revalidates complete nested input/output state while retaining the
+catalogue-owned object by identity, and rejects both demonstrated attacks during
+ordinary construction. N10/N11 now pair every direct invalid form with a
+restored valid-then-mutated carrier through the public resolver. N16 now covers
+override, resolution-input, resolved-output, fingerprint, nested scalar/tuple,
+`__dict__`, fields-set, extra, and private state through public boundaries, with
+exact `RunProtocolResolutionIntegrityError` and no partial output/fingerprint.
+
+The independently literal focused oracle directly completed all `12,348`
+Extreme, `59,049` Standard, and `32,768` Easier maps (`104,165` total) across
+all 27 presentation triples. It separately asserted `333,396`, `1,594,323`, and
+`884,736` primary calls and the same repeat counts, `2,812,455` primary and
+`2,812,455` repeat calls in aggregate, and combined profile counts `666,792`,
+`3,188,646`, and `1,769,472`, for exactly `5,624,910` real public resolver
+invocations. Every repeat was the immediate second call with the same trusted
+input objects. N20 produces the S2 integrity exception while N22 preserves the
+published S1 validation exception and direct Pydantic cause. Detached
+reconstruction rebuilds value-authoritative carriers only after authoritative
+catalogue re-lookup; N17 continues to reject a fresh equal catalogue definition.
+This candidate adds no persistence, migration, runtime registration, API,
+Demo, Web, Provider, database, categorical projection, or public activation.
+It remains unapproved, unstaged, uncommitted, and unpublished; its next action
+after complete local verification is fresh independent implementation review.
+
+Corrected local authoring evidence on the exact production/test candidate is:
+focused S2 `23 passed, 2 warnings` in 2,566.53 seconds (42:46), including every
+direct exhaustive invocation; published S1 regression `141 passed`; adjacent
+Run regression `222 passed`; passing `compileall` and tracked/new-file whitespace
+checks; and canonical Offline `2,501 passed, 182 expected skips, 2 warnings` in
+2,982.13 seconds (49:42) for full pytest. Offline then passed compileall,
+dependency consistency, metadata-only Alembic heads/history at
+`20260729_0005`, and diff checking. The sanitized child had no database,
+Provider, or Live variables and made no database connection. The former focused
+`22 passed` and Offline `2,500 passed, 182 skipped, 2 warnings` results are
+historical pre-correction evidence only. This is implementation-authoring
+evidence, not independent approval, staging, commit, push, publication, or
+later-slice authority.
 
 Phase 3.3 owns the engine/world parameters, pre-game profiles and permitted
 overrides, versioned frozen Run Protocol, deterministic resolution, and the
@@ -1396,10 +1444,9 @@ real-MySQL verification.
   progression, and priority-injection details.
 - The exact P3.3-S2 numeric domains, profile defaults, override catalogue,
   resolver, canonical input, fingerprint, contract, and path decisions are
-  fully specified only as proposed, unapproved candidate decisions in the
-  dedicated S2 plan. They remain unfrozen until that exact plan completes its
-  independent approval, separate commit, user push, and clean aligned
-  publication confirmation. S2 implementation has not begun.
+  frozen by the published S2 plan and implemented only in the present
+  unapproved, uncommitted pure-domain candidate. Durable/public/categorical
+  activation and every S3-S7 integration remain deferred and unauthorized.
 - Public discovery shape, authored-world catalogues/weighting, visits/regions/
   world state, mechanics application, trusted prompt compilation, progression,
   anti-repeat, anti-farming, recovery priority, world-line transition, and
@@ -1472,9 +1519,9 @@ manually.
   [`docs/decisions/0001-production-provider-distribution.md`](docs/decisions/0001-production-provider-distribution.md).
 - Run Protocol and difficulty/world profiles:
   [`docs/run_protocol.md`](docs/run_protocol.md).
-- Newly authored, unapproved P3.3-S2 deterministic profile-resolution plan
-  candidate; proposed decisions are not frozen and implementation has not
-  begun:
+- Approved, published, and frozen P3.3-S2 deterministic profile-resolution plan
+  at `2f3f84a4`; its bounded implementation remains an unapproved, unstaged,
+  uncommitted five-path candidate:
   [`docs/phase_3_3_s2_deterministic_profile_resolution_plan.md`](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md).
 - Approved, published, byte-preserved, and frozen Phase 3.3 repository
   implementation plan; P3.3-G0 is complete, the first P3.3-S1 implementation
