@@ -10,8 +10,19 @@ and fully closed at `4d146679e782ff555819b411fc5048e55299de4d`.
 The exact P3.3-S2 deterministic profile-resolution plan is approved, committed,
 manually published by the user, and confirmed at
 `2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe`. Its exact five-path
-implementation is the present unapproved, unstaged, uncommitted candidate.
-P3.3-S3 through P3.3-S7 remain unauthorized, and Phase 3.3 remains incomplete.**
+implementation is independently approved and published at
+`20eab60a99c093f2ccf0224dee200e142fc194b6`. P3.3-S3 is the next sequential
+planning subject. Its dedicated plan is an unapproved, unstaged, uncommitted,
+unpublished third correction candidate after its first independent review
+returned `CHANGES_REQUIRED` with exactly five material findings. First correction
+completed; the second review returned `CHANGES_REQUIRED` with five Medium
+findings. Second correction completed; the third review returned
+`CHANGES_REQUIRED` with exactly three findings on stale-snapshot visibility,
+immutable-character preload order, and between-DDL state loss. None was approval; no S3
+implementation has begun and no migration has been created or executed.
+P3.3-S4 through P3.3-S7
+remain unauthorized, Phase 3.3 remains incomplete, and plan approval alone
+grants no implementation or Git authority.**
 
 Phase ownership: **Phase 3.3**
 
@@ -75,8 +86,8 @@ constructible lifecycle remains `pre_first_turn`.**
 ## Non-goals
 
 - Completing Phase 3.3 or implementing P3.3-S3 through P3.3-S7 through the
-  bounded P3.3-S1 foundation, its completed closeout, the published S2 plan, or
-  the present isolated S2 implementation candidate.
+  bounded P3.3-S1 foundation, its completed closeout, the published S2 plan and
+  implementation, or the present documentation-only S3 plan candidate.
 - Letting prose or model preference change resources, success, betrayal, death,
   relationship progression, or permanent facts.
 - Replacing scenario-authored facts, character definitions, or engine rules.
@@ -255,7 +266,7 @@ It has satisfied only its exact historical closeout gate and is non-operative
 for current or future work. It grants no S2 plan approval, implementation, Git,
 or later-slice authority.
 
-### Current P3.3-S2 implementation candidate
+### Published P3.3-S2 implementation
 
 The dedicated
 [P3.3-S2 deterministic profile-resolution plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
@@ -275,7 +286,7 @@ or asserted. None of those three reviews emitted a plan or implementation
 approval verdict. The later corrected plan completed its own separate approval
 and publication lifecycle; that approval did not approve an implementation.
 
-The current implementation candidate realizes the frozen five-parameter
+The published implementation realizes the frozen five-parameter
 numeric domains, three version-1 profiles and defaults, exhaustive per-profile
 overrides, complete authority and precedence, resolver v1 with no randomness/
 PRNG/seed, canonical binding of the complete S1 envelope and exact override
@@ -283,10 +294,10 @@ presence, domain-separated SHA-256 goldens, exact 33-symbol pure-domain module,
 and exact five-path budget. The focused literal oracle directly completed all
 `104,165` maps across 27 presentation triples, with `2,812,455` primary and
 `2,812,455` immediate repeat calls—`5,624,910` public resolver invocations.
-The candidate remains unapproved, unstaged, uncommitted, and unpublished. It
-grants no persistence, migration, runtime/public/categorical activation, S3, or
-later-slice authority; fresh independent implementation review is next only
-after complete local verification.
+It was independently approved, committed, manually published by the user, and
+confirmed at `20eab60a99c093f2ccf0224dee200e142fc194b6`. It grants no
+persistence, migration, runtime/public/categorical activation, S3, or later-
+slice authority.
 
 The published frozen planning allocation is exactly:
 
@@ -304,8 +315,10 @@ Phase 8 remains implemented and complete at P8-S6. Publication of this
 allocation did not authorize any implementation slice. P3.3-S1 was separately
 authorized, independently approved, and published as the bounded foundation
 described above, and its closeout is fully closed at `4d146679`. The exact S2
-plan is published and its bounded implementation is the unapproved candidate
-described above; S3 through S7 remain unimplemented and unauthorized.
+plan and bounded implementation are published at `2f3f84a4` and `20eab60a`.
+The dedicated S3 plan is an unapproved, unstaged, uncommitted, unpublished
+documentation candidate; S3 implementation has not begun, no migration exists,
+and S4 through S7 remain unimplemented and unauthorized.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -739,13 +752,13 @@ The engine owns these parameters:
 Profiles provide defaults. Permitted player overrides occur only before the run
 starts.
 
-### P3.3-S2 exact pure-domain implementation candidate — unapproved
+### P3.3-S2 exact pure-domain implementation — published
 
 The dedicated
 [published P3.3-S2 plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
-freezes the complete decisions below. The present exact five-path
-implementation candidate implements them locally but remains unapproved,
-unstaged, uncommitted, and unpublished.
+freezes the complete decisions below. The exact five-path
+implementation is independently approved and published at
+`20eab60a99c093f2ccf0224dee200e142fc194b6`.
 
 All five values are implemented as exact discrete Python integers in `0..100`
 inclusive with step `5`. They are normalized engine profile points, not
@@ -777,7 +790,7 @@ profile/override maps. The three world tones, three reality boundaries, and
 three relationship overlays create exactly `3 × 3 × 3 = 27` presentation
 combinations.
 
-Future S2 evidence has one frozen method. In
+Published S2 evidence has one frozen method. In
 `tests/unit/test_run_protocol_resolution.py`, a direct exhaustive test must
 declare independent literal tuples for the exact three profile IDs/versions,
 their exact five-value defaults, every valid integer for each profile/parameter,
@@ -861,8 +874,8 @@ domain-separated, length-framed SHA-256 preimage produces lowercase hexadecimal
 fingerprints. Presentation fields are audit-bound but never read when deriving
 the five objective values. The exact byte grammar, independently reproduced
 goldens, 33-symbol contract, five-path implementation budget, and review gates
-remain exactly those frozen by the published plan. The implementation is still
-an unapproved candidate.
+remain exactly those frozen by the published plan. The implementation is the
+published authority at `20eab60a99c093f2ccf0224dee200e142fc194b6`.
 
 The first independent implementation review returned `CHANGES_REQUIRED` for
 two material findings. The resolution input's trusted profile field exposed
@@ -970,8 +983,95 @@ heads/history at `20260729_0005`, and diff checking. Its sanitized child had no
 database, Provider, or Live variables and made no database connection. The
 former 22-test focused result and Offline `2,500 passed, 182 skipped, 2
 warnings` result are historical pre-correction evidence only. The candidate
-remains unapproved, unstaged, uncommitted, and unpublished and activates no
-durable, runtime, public, or categorical representation.
+was subsequently approved and published at `20eab60a`; the implementation
+activates no durable, runtime, public, or categorical representation.
+
+### Current P3.3-S3 third correction candidate — unapproved
+
+The dedicated
+[P3.3-S3 persistence and legacy/native compatibility plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
+is the next sequential planning subject. Its first independent review returned
+`CHANGES_REQUIRED` with exactly five material findings: a hidden production test
+writer, an unimplementable/conflated legacy proof, a race-unsafe downgrade,
+unsupported 1062 key identification, and non-executable vectors. The first
+correction freezes the same 19-column durable representation and exact S1/S2
+reconstruction while making production S3 binding access read-only. Native test
+rows are constructed only by a direct `AsyncSession.add()` helper in
+`tests/integration/test_mysql_run_protocol_binding.py`, never by production code.
+
+The corrected classifier proves persisted Run revisions/receipts, immutable and
+current active character/controller association, participation, structural
+Session/event/snapshot initialization, canonical namespaces/fingerprints, and
+cross-row source consistency. The shared loading sequence first uses the
+persisted current Run's character-reference triplet to load/decode its immutable
+revision, then supplies that exact object as
+`referenced_player_character_revision` to the unchanged complete Run validator.
+Current-character/controller and legacy Session proof remain later separate
+checks. Missing/partial/crossed references detected by S3 have no-cause stored
+integrity failures; immutable codec, reference-constructor, and Run-validator
+failures receive one S3 wrapper with the exact owning lower exception as direct
+cause, at their respective first-failure positions. It contains no caller
+principal. The unchanged
+`RunEntryService` continues to resolve and lock the caller-owned controller/
+character, authorize replay and disclosure, bind results to
+`principal.player_id`, and enforce configured source authority; the unchanged
+`SessionService` retains behavioral Session validation. Classification alone
+grants no replay, recovery, disclosure, or public authority.
+
+Downgrade uses the exact MySQL connection-owned lock
+`deviation_protocol:p33:s3:run_protocol_bindings:ddl_write:v1`, acquired by
+`GET_LOCK(..., 30)` before the exact
+`SELECT 1 FROM run_protocol_bindings LIMIT 1 FOR UPDATE` current/locking probe
+on the same physical connection and retained transaction. It observes committed
+rows newer than an already-established REPEATABLE READ snapshot; named-lock
+acquisition does not refresh snapshots. No fresh Alembic transaction is assumed.
+A visible row prevents every destructive DDL statement. The named lock is held
+across ordered destructive DDL despite implicit commits; it excludes compliant
+lock-taking writers, not arbitrary SQL writers. Future compliant S4 binding writers must share
+that exclusion contract, but S4 remains the first owner of any production
+write, conflict translation, admission evidence, and entry-world binding. S3
+has exactly four new infrastructure exception types and exactly 36 executable
+top-level vectors and 56 blocks. After the first correction completed, the
+second review returned `CHANGES_REQUIRED` with five Medium findings. The second
+correction supplied acquisition/release/connection-loss matrices, preserved
+the primary body error over cleanup failure, froze exactly one S3 wrapper
+and direct-cause contract per lower exception, and used the single N01-N15
+physical/semantic/reconstruction/comparison sequence. V05/V06 prove simultaneous
+defect precedence; V02 starts with no binding and performs one test-local add/
+flush; V03 uses isolated literal in-memory inputs twice with no I/O.
+The third review returned `CHANGES_REQUIRED` with exactly three findings:
+stale-snapshot downgrade visibility, complete Run validation before its required
+immutable-character load, and missing state-only between-DDL loss branches.
+This third correction supplies the current-read/old-snapshot V31-B proof and
+the L01-L04 immutable-preload sequence, synchronized with V01-A/V13/V14/V29.
+After acknowledged FK removal, state-only loss before index removal raises
+`RuntimeError("P3.3-S3 downgrade BODY_CONNECTION_LOST_BEFORE_INDEX")`; after
+acknowledged index removal, state-only loss before table removal raises
+`RuntimeError("P3.3-S3 downgrade BODY_CONNECTION_LOST_BEFORE_TABLE")`. Both have
+`__cause__ is None`, prohibit subsequent DDL and release SQL, preserve the
+primary over cleanup errors, and invalidate/discard without reconnecting.
+V30-D2/D3 each retain one primary block with explicit independent (a) ordinary
+statement-failure, (b) during-statement disconnect, and (c) between-statement
+state-only variations. An observer inspects partial schema and server-session/
+lock termination before fixture restoration; client detection alone does not
+prove immediate lock release. All of this remains future test specification.
+The plan's exact vector allocation assigns P=27 persistence-unit, R=4
+repository-unit, E=1 existing entry-service-unit, and M=24 real-MySQL
+blocks, with one uncounted existing composition secondary proof. Mandatory unit
+suites pass their assigned blocks; focused MySQL passes only M with zero
+environment skips; the union covers exactly 56. The 15-path future edit budget
+is unchanged; unchanged E/C regression files are execution-only. None of the
+three prior reviews was approval. It creates no public/native
+admission, entry-world binding, objective mechanics, prompt compilation,
+API/OpenAPI, Demo, Web, Provider, visit, region, world-state, or continuity
+authority.
+
+The exact three-document third correction candidate is unapproved, unstaged,
+uncommitted, and unpublished. No S3 implementation has begun; migration
+`20260828_0006` is only
+a planned identity and has neither been created nor executed. P3.3-S4 through
+P3.3-S7 remain unauthorized, Phase 3.3 remains incomplete, and plan approval
+alone grants no implementation or Git authority.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1004,11 +1104,11 @@ durable, runtime, public, or categorical representation.
   viewpoint.
 - Protocol presets control presentation.
 - Difficulty and character may supply recommended defaults.
-- Under the S2 candidate, recommendations are presentation advice outside the
+- Under the published S2 implementation, recommendations are presentation advice outside the
   resolver and cannot select a profile or create/mutate an override.
 - Player-approved overrides are resolved before the first turn.
 - The resolved protocol is versioned and frozen when the first turn begins.
-- The proposed S2 profile resolver consumes no randomness, PRNG, or seed.
+- The published S2 profile resolver consumes no randomness, PRNG, or seed.
   Later dynamic/world behavior may use separately frozen engine state and seed
   only under its owning later-slice authority.
 - The model does not perform its own uncontrolled random selection.
@@ -1154,9 +1254,9 @@ Phase 3.3 is acceptable only when:
   policy beyond the frozen standalone v1 representation.
 - The exact S2 numeric domains, profile defaults, override catalogue,
   precedence, resolver, canonical input, fingerprint, symbol contract, and path
-  budget are frozen by the published S2 plan and realized only in the current
-  unapproved, uncommitted pure-domain implementation candidate. Durable and
-  runtime integration remains S3-S7 work.
+  budget are frozen by the published S2 plan and implementation. Durable S3
+  representation is frozen only in the current unapproved documentation
+  candidate; runtime integration remains S4-S7 work.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; no threshold or band exists before its separately
   reviewed plan and implementation.
