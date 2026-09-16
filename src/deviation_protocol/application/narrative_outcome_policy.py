@@ -199,6 +199,19 @@ def _structurally_eligible_rules(
     return tuple(eligible)
 
 
+def select_native_outcome(allowed: tuple[AllowedNarrativeOutcome, ...]) -> tuple[AllowedNarrativeOutcome, ...]:
+    """Native choice is made by the server, before any renderer invocation."""
+    if not allowed:
+        return ()
+    chosen = min(allowed, key=lambda item: (-item.rule.priority, item.rule.rule_id))
+    result = next(result for result in (
+        NarrativeOutcomeResult.SUCCESS, NarrativeOutcomeResult.AMBIGUOUS,
+        NarrativeOutcomeResult.NO_EFFECT, NarrativeOutcomeResult.FAILURE,
+    ) if result in chosen.candidate.allowed_results)
+    candidate = chosen.candidate.model_copy(update={"allowed_results": (result,)})
+    return (AllowedNarrativeOutcome(chosen.rule, candidate),)
+
+
 @dataclass(frozen=True, slots=True, init=False)
 class ValidatedNarrativeOutcomeCapability:
     job_id: str
@@ -247,6 +260,7 @@ class NarrativeOutcomePolicy:
         resolution_status: ResolutionStatus,
         expected_state_fingerprint: str,
         expected_proposal_digest: str,
+        native_selection: bool = False,
     ) -> AuthorizedNarrativeOutcome:
         if resolution_status is not ResolutionStatus.NARRATIVE_REQUIRED:
             raise ValueError("action did not pass the narrative gateway")
@@ -264,6 +278,8 @@ class NarrativeOutcomePolicy:
             definition=definition,
             frame=frame,
         )
+        if native_selection:
+            allowed = select_native_outcome(allowed)
         matched = next(
             (item for item in allowed if item.candidate.outcome_token == selected.outcome_token),
             None,

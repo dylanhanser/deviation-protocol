@@ -1,5 +1,27 @@
 from __future__ import annotations
 
+
+def test_native_attachment_is_private_and_legacy_prompt_bytes_are_preserved():
+    import hashlib
+    from tests.unit.test_native_turn_mechanics import fixture_inputs
+    from deviation_protocol.application.narrative_models import NarrativeRequest, NarrativePlayerIntent
+    from deviation_protocol.application.narrative_prompt import PromptBuilder, default_style_profile
+    from deviation_protocol.application.run_protocol_prompt_context import compile_run_protocol_context
+    f = fixture_inputs()
+    request = NarrativeRequest(frame=f.frame, player_intent=NarrativePlayerIntent.from_submission(f.submission),
+        style_profile_id="original-zh-second-person-v1", outcome_candidates=(f.selected.candidate,))
+    builder = PromptBuilder(profiles=(default_style_profile(),))
+    legacy = builder.build(request)
+    # Independently obtained from the published baseline's PromptBuilder source.
+    assert hashlib.sha256((legacy.system + "\0" + legacy.user).encode()).hexdigest() == "23d32cfefb5777d1343ebdc66ba4abe529c582e00573232a3fa98f705d69cfb4"
+    attached = request.with_compiled_run_protocol_context(compile_run_protocol_context(f.inputs, f.decision))
+    assert attached.model_dump_json() == request.model_dump_json()
+    assert builder.build(request) == legacy
+    native = builder.build(attached)
+    assert '"run_protocol_context"' in native.user
+    for forbidden in ("run.test", "line.test", "session-1", "character.test", "resolution_fingerprint", "snapshot_bytes"):
+        assert forbidden not in native.system + native.user
+
 import ast
 import asyncio
 import json

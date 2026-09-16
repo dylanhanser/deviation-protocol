@@ -108,6 +108,7 @@ class FirstPhaseTurnOrchestrator:
     memory_projector: PlayerMemoryProjector = field(
         default_factory=PlayerMemoryProjector
     )
+    native_coordinator: Any = None
 
     def __post_init__(self) -> None:
         if (
@@ -154,6 +155,7 @@ class FirstPhaseTurnOrchestrator:
                 submission.session_id,
             )
             visible_npc_ids = self._visible_runtime_npc_ids(state, definition)
+            native_family = await self.native_coordinator.load(uow, game_session, state, definition) if self.native_coordinator is not None else None
 
             # This capability is minted only after the authoritative state has been
             # loaded. Scene visibility and skill-learning authority remain empty
@@ -183,6 +185,7 @@ class FirstPhaseTurnOrchestrator:
                 resolution,
                 definition,
                 state_version=game_session.state_version,
+                native_family=native_family,
             )
 
             expected_version = game_session.state_version
@@ -539,6 +542,7 @@ class FirstPhaseTurnOrchestrator:
         definition: ScenarioDefinition | None,
         *,
         state_version: int,
+        native_family=None,
     ) -> tuple[ResolutionResult, NarrativeFrame | None]:
         if definition is None and submission.action_type is ActionType.CONTINUE:
             return self._scenario_rejection("CONTINUE_REQUIRES_ACTIVE_SCENARIO"), None
@@ -576,11 +580,14 @@ class FirstPhaseTurnOrchestrator:
                     return self._scenario_rejection(exc.code), current_frame
                 before_phase_id = runtime.current_phase_id
                 before_beat_index = runtime.phase_beat_index
+                native_plan = self._native_local_plan(native_family, state, definition,
+                    submission, state_version, current_frame)
                 directed = self.story_director.advance_after_verified_result(
                     state,
                     definition,
                     (),
                     profession_tags=profession_tags,
+                    native_plan=native_plan,
                 )
                 advanced_runtime = directed.candidate_state.scenario_runtime
                 assert advanced_runtime is not None
@@ -612,7 +619,7 @@ class FirstPhaseTurnOrchestrator:
                         result_code="SCENARIO_AUTO_BEAT_ADVANCED",
                         updated_state=directed.candidate_state,
                         state_changed=True,
-                        events=(audit, *generated_drafts),
+                        events=(audit, *generated_drafts, *self._native_audit(native_plan)),
                         feedback=PlayerFeedback(
                             "SCENARIO_AUTO_BEAT_ADVANCED",
                             {},
@@ -689,11 +696,14 @@ class FirstPhaseTurnOrchestrator:
                     )
                 base_state = resolution.updated_state
                 mechanical_events = resolution.events
+            native_plan = self._native_local_plan(native_family, state, definition,
+                submission, state_version, current_frame, event=issued.sealed_event)
             directed = self.story_director.advance_after_verified_result(
                 base_state,
                 definition,
                 (issued.sealed_event,),
                 profession_tags=profession_tags,
+                native_plan=native_plan,
             )
             generated_drafts = tuple(
                 DomainEventDraft(
@@ -716,6 +726,7 @@ class FirstPhaseTurnOrchestrator:
                         *mechanical_events,
                         issued.audit_event,
                         *generated_drafts,
+                        *self._native_audit(native_plan),
                     ),
                     feedback=PlayerFeedback(
                         "SCENARIO_DECISION_RECORDED",
@@ -743,6 +754,15 @@ class FirstPhaseTurnOrchestrator:
             )
         except StoryDirectorError:
             raise CandidateStateInvalidError(submission.session_id) from None
+
+    def _native_local_plan(self, family, state, definition, submission, version, frame, *, event=None):
+        if family is None:
+            return None
+        inputs = self.native_coordinator.bind(family, state, submission, version, frame)
+        return self.native_coordinator.decide(inputs, state, definition, submission, event=event)
+
+    def _native_audit(self, plan):
+        return (self.native_coordinator.audit(plan),) if plan is not None else ()
 
     @staticmethod
     def _scenario_rejection(code: str) -> ResolutionResult:

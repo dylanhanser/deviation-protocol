@@ -21,8 +21,9 @@ approved with DF-001 deferred and published at
 published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-time
 wording is historical. S4 internal implementation was independently approved
 and published at `34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains
-deferred. S5 is the current planning subject; implementation has not started.
-S5-S7 implementation remains unauthorized, and Phase 3.3 remains incomplete.**
+deferred. The S5 plan was independently approved and published at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`.
+S5 now has an internal implementation candidate awaiting independent review.
+S6/S7 remain unauthorized and Phase 3.3 remains incomplete.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
 [PLANS.md](../PLANS.md#immediate-delivery-priority)
@@ -327,13 +328,12 @@ approved with DF-001 deferred. The
 [Published S4 native admission/entry-world plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
 was independently approved and published at `42411b2`. S4 implementation is
 independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`.
-The [S5 plan candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
-is awaiting focused re-review after `CHANGES_REQUIRED` with one finding;
-implementation has not started.
-S5-S7 implementation remains unauthorized; DF-001 remains deferred.
+The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+is independently approved at `ff866d2`; its candidate-time wording is historical.
+The S5 implementation candidate awaits independent review. S6/S7 remain
+unauthorized; DF-001 remains deferred.
 
-P3.3-S5 must receive its own bounded implementation plan and independent
-review before implementation. It owns deterministic application by
+P3.3-S5 owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
 `consequence_severity`, `information_opacity`, and `conflict_intensity`, with
 objective mechanics tested independently from prompt construction. It also
@@ -720,21 +720,21 @@ world while allowing each visit to expose different authored content.
 - `Fluid`
 - `Generous`
 
-These three names are approved product vocabulary only, not an implemented or
-authoritative representation. P3.3-S2 resolves only the exact numeric
+These three names are approved product vocabulary. S5 now implements an internal
+projection only; the labels carry no authority and are not public representation. P3.3-S2 resolves only the exact numeric
 `resource_pressure` objective value. `Scarce`, `Fluid`, and `Generous` are not
 S2 resolver inputs, profile identities, override values, alternative objective
 values, S1 presentation fields, or current runtime authority, and no label may
 be accepted as an alias for a numeric S2 value.
 
-P3.3-S5 owns the future separately reviewed exact numeric-to-categorical
+P3.3-S5 owns the approved exact numeric-to-categorical internal
 mechanics/prompt projection. P3.3-S6 owns any separately reviewed public API,
 OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
 slice may change, round, clamp, or replace the numeric S2 value; each may only
-project from it. The current S5 plan proposes exact internal bands, but they
-are not approved or implemented. S5's internal projection and S6's public
-representation each require their own approval, implementation and publication;
-neither grants authority to the other surface.
+project from it. The approved S5 internal bands are Generous 0..30, Fluid
+35..65 and Scarce 70..100 on the S2 lattice. The S5 implementation candidate
+uses these bands only in trusted context. S6 public representation still requires
+its own approval, implementation and publication; internal labels do not activate it.
 
 Numeric resource pressure is an engine-owned world/difficulty input. A model
 may narrate confirmed effects supplied by later trusted mechanics/prompt
@@ -1100,8 +1100,8 @@ earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
 The implementation and migration `20260828_0006` subsequently received independent
 approval with DF-001 deferred and were published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4's plan was approved and published at `42411b2`; its separately authorized
-implementation is independently approved and published at `34dc752`. S5 is the
-current planning subject; S5-S7 implementation remains unstarted and unauthorized.
+implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and an internal implementation
+candidate awaiting independent review; S6/S7 remain unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -1332,38 +1332,113 @@ updated without adding a rule. DF-001 remains deferred. At that historical
 checkpoint the correction was ready for focused re-review; it subsequently
 received independent approval and publication with S4 at `34dc752`.
 
-### P3.3-S5 current planning candidate
+### P3.3-S5 implementation candidate evidence
 
-The [bounded S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
-proposes real native-turn integration through the existing production durable
-narrative orchestrator: complete S4 reconstruction, deterministic server-owned
-outcome selection, five independent mechanics policies and one atomic Session
-commit. Proposed balance uses existing composure depletion and authored clock
-costs; it adds no relationship state, schema or scenario-fact rewrite.
+The [frozen S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md) was
+independently approved with DF-001 deferred and published at
+`ff866d2fd40181e0bf27937d255d70ebd1ae1544`, parent `34dc752`. Its first review's
+CHANGES_REQUIRED resource-call finding and corrected candidate wording remain
+historical. The implementation follows the approved correction: computed charge
+and actual depletion are distinct; only positive depletion calls `consume_resource`
+and emits `RunProtocolResourceSpent`. Both zero cases still advance the Director
+and commit legitimate effects. The positive-amount resource API is unchanged.
 
-The independent review returned `CHANGES_REQUIRED` with one finding: an
-unconditional call to the existing positive-amount resource API would reject
-zero depletion. The corrected plan requires one `consume_resource` call and
-one successful-spend event only for positive actual depletion; zero skips both
-without rejection or early return, preserving Director advancement and other
-legitimate effects. Computed charge, saturation, atomicity and replay semantics
-are unchanged. Integration acceptance covers Easier default zero charge,
-exhausted composure with a positive charge, and a positive-depletion control.
-The corrected candidate remains unapproved pending focused re-review by the
-previous independent reviewer of this correction and its direct dependencies,
-preserving earlier conclusions. DF-001 remains deferred; no new finding is
-deferred.
+The current unapproved candidate implements the five pure policies, trusted
+native coordinator, native job evidence codec, canonical compiler, production
+composition, atomic native turns, replay/reload and authored endings. Gameplay
+uses the exact approved coefficients and catalogue association. The integration
+is internal: public native discovery/admission, API/OpenAPI, Demo/Web activation
+and public recovery remain S6; later worlds/visits/continuity remain S7;
+relationship/residence state remains Phase 3.4. Phase 3.3 remains incomplete.
 
-The proposed pure compiler emits canonical `run-prompt-context/v1` JSON after
-all UoWs, AsyncSessions and locks have ended. It projects exact numeric pressure
-to internal Generous `0..30`, Fluid `35..65`, Scarce `70..100` labels on the S2
-lattice. These are new proposals awaiting plan approval, not implemented or
-previously approved thresholds. Numeric S2 values remain exact. Presentation
-and compiled text grant no mechanical or canon authority; public labels remain
-S6-owned. The plan specifies native/legacy separation, detached evidence,
-outside-transaction compilation, focused tests and real-MySQL atomicity proof.
-No runtime evidence is claimed by this documentation candidate. S5 implementation
-has not started; Phase 3.3 remains incomplete.
+The compiler emits closed `run-prompt-context/v1` canonical UTF-8 JSON, at most
+1,024 bytes, after all UoWs/AsyncSessions close. It includes exact numeric
+objectives, three presentation enums, selected result and the approved internal
+pressure label. Generous=0..30, Fluid=35..65, Scarce=70..100 on the S2 lattice;
+labels do not replace numeric values. The private request attachment is not
+serialized into legacy requests or public DTOs. PromptBuilder only inserts
+validated data and fixed expression instructions; neither it nor the compiler
+selects outcomes, mutates or persists state. Finalize compares reconstructed
+bindings/decisions without compilation. Model output and compiled text grant no
+mechanics, relationship, death, world-selection, permanent-state or canon authority.
+
+Dependency-derived candidate inventory follows section 6: new domain policies,
+new application coordinator/compiler, existing two turn orchestrators, outcome
+policy, Director, internal request/prompt, production composition, and the
+participation reverse-read port/SQL repository. New tests cover pure policies,
+trusted decisions/compiler and real native MySQL turns. Existing Director tests
+prove generic multi-clock order; Provider and composition tests add compatibility
+assertions. Documentation changes are this
+protocol, roadmap, architecture and narrative Provider boundary. No storage,
+public-contract, frozen-plan or migration extension was necessary. Acceptance
+is concentrated in those tests rather than editing every execution-only regression.
+
+External implementation evidence is under
+`C:\Users\DYLANM~1\AppData\Local\Temp\deviation-protocol-s5-implementation-20260917-1318b56094c540e4a491d05698b3db37`.
+The external manifest freezes exact file identities and the complete lexicographic
+binary/full-index patch including new files; it is not embedded in the candidate
+whose bytes it identifies. Raw logs retain failed development attempts separately
+from final evidence. Verification and restoration results are recorded below.
+
+The original external S3 correction bundle's S2 exhaustive evidence is reused
+only after comparing actual raw logs, the counter plugin hash, S1/S2 source/test
+hashes, full dependency versions, Python 3.12.14, platform, command, exit status
+and environment containment. It proves 23 tests and 5,624,910 resolver calls;
+`s2-reuse-applicability.json` records the comparison and original absolute paths.
+Canonical Offline deselects only
+`tests/unit/test_run_protocol_resolution.py::test_complete_direct_exhaustive_public_resolution_domain`;
+all other S2 tests execute. The unchanged S3/S4 migration fault matrices are
+excluded from MySQL acceptance with explicit recorded paths/nodes; schema metadata
+remains checked. No summary substitutes for a missing test result.
+
+Executed canonical acceptance (all commands exited 0):
+
+| Run | Passed | Skipped | Deselected | Scope |
+| --- | ---: | ---: | ---: | --- |
+| `canonical-offline` | 2,659 | 375 | 1 | Broad offline regression; only exhaustive S2 node reused |
+| `canonical-mysql` | 322 | 0 | 16 | Real MySQL integration; unchanged S4 migration file excluded before collection and S3 migration fault nodes explicitly deselected |
+| `final-focused-offline` | 436 | 40 | 2,564 | Final native policies/compiler/coordinator, Director, outcome, turn, Provider, composition and repository regressions |
+| `final-focused-mysql` | 40 | 0 | 346 | Final production-composed native integration suite |
+
+The broad source identities were captured before final decision-carrier and
+catalogue integrity hardening. Broad Offline completed across that edit interval;
+it is not claimed as a byte-exact final-source run. The final focused runs cover
+those direct dependencies and the added non-hospital multi-clock regression;
+their separate source manifest binds the final code. Unaffected broad results
+remain applicable. No broad suite was repeated merely for prose edits.
+Every canonical run also passed compileall, dependency checks and Alembic
+heads/history (`20260916_0007`); no migration ran. The verification runner's
+online Alembic check was deliberately skipped because it lacks a test-URL-only
+entry point. Offline skips are database/Live guards and unavailable Windows
+symlink privilege. Existing schema-shadow and unavailable-Turkish-locale warnings are
+retained in raw logs. Focused Offline skips are its 40 MySQL cases.
+
+The three resource controls and three profile routes to authored endings pass
+through normal production composition and real MySQL. Evidence covers one-winner
+concurrency, exact replay, validated-proposal resume, stale rejection, uncertain
+commit acknowledgement, Provider cancellation and rollback at all six persistence
+fault points. Compiler, PromptBuilder and fake Provider probes find no active
+UoW or unclosed AsyncSession; an independent MySQL connection acquires the same
+Session row lock and verifies the admission named lock is free at each probe.
+Canonical compiler goldens, all 27 presentations at each default, hidden-data
+boundaries and adversarial output rejection pass. Locale evidence records C,
+English and Chinese as verified, Turkish as unavailable; unavailable is not a pass.
+
+Designated-database identity and complete table row-count/hash records match
+before and after verification. Fixture mutations are restored. Database/Provider
+environment sanitization, test selection and DF-001 containment were child-process
+only; the parent environment is unchanged. No real Provider or production database
+was used. The external manifest includes raw logs, command/exit metadata, source
+epochs, reuse applicability, restoration and exact patch identities.
+
+The sole operative independent implementation-review success token is
+`PHASE_3_3_S5_OBJECTIVE_MECHANICS_PROMPT_CONTEXT_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`.
+Both APPROVED and APPROVED_WITH_DEFERRED_FINDINGS must emit that token and bind
+the complete candidate; the plan-review token is historical and non-operative.
+This implementation session claims neither disposition. Next is one substantive
+independent implementation review. No staging, commit, push or later-slice
+activation is authorized. DF-001 remains deferred with its documented
+process-local containment; no new finding is deferred. Guardrail impact: None.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1454,10 +1529,11 @@ foundation implements its standalone codec/validation evidence. This does not
 select or implement the illustrative `[RUN_PROTOCOL]` prompt block above; no
 `RUN_PROTOCOL` block exists in the implemented prompt today. In particular,
 `resource_pressure=<scarce|fluid|generous>` is not an S2 output, alias, band,
-or currently authoritative field. It is only an unfixed illustration of the
-later S5-owned prompt projection and S6-owned public/client representation. No
-numeric threshold or band exists, and any later projection must preserve the
-exact numeric S2 value without changing, rounding, clamping, or replacing it.
+or authoritative input field. That illustration did not establish thresholds.
+The published S5 plan now fixes the separate internal projection implemented
+above: Generous=0..30, Fluid=35..65, Scarce=70..100 on the numeric S2 lattice.
+The exact S2 value is preserved without rounding, clamping or replacement.
+Public/client representation remains S6-owned.
 
 ## Lifecycle
 
@@ -1481,10 +1557,10 @@ exact numeric S2 value without changing, rounding, clamping, or replacing it.
 ## Deterministic requirements
 
 - Resolution order, defaults, override precedence, and validation are stable.
-- The proposed S2 resolver uses canonical input and a deterministic fingerprint
+- The published S2 resolver uses canonical input and a deterministic fingerprint
   and consumes no seed; later-world seed behavior remains S7 work.
-- The proposed S2 resolver produces only exact numeric `resource_pressure`;
-  categorical mechanics/prompt projection remains S5 work and public/client
+- The published S2 resolver produces only exact numeric `resource_pressure`;
+  categorical mechanics/prompt projection is in the S5 candidate and public/client
   representation remains S6 work.
 - No setting depends on unordered collection iteration, wall-clock time, or a
   Provider-selected random value.
@@ -1550,7 +1626,7 @@ Phase 3.3 is acceptable only when:
   representation is frozen in the independently approved published S3 plan;
   its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
   independently approved with DF-001 deferred. S4 internal implementation is
-  independently approved and published at `34dc752`. Remaining runtime integration is S5-S7 work.
+  independently approved and published at `34dc752`. S5 internal integration is a review candidate; S6/S7 runtime work remains later.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; exact proposed bands now appear in its planning candidate,
   with no implementation or approval implied.
@@ -1582,7 +1658,7 @@ Phase 3.3 is acceptable only when:
 - [Published P3.3-S2 deterministic profile-resolution plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
 - [Published P3.3-S3 persistence plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
 - [Published P3.3-S4 native admission and entry-world plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
-- [Current P3.3-S5 mechanics and prompt-context plan candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+- [Published P3.3-S5 mechanics and prompt-context plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 - [Frozen Phase 3.3 implementation plan](phase_3_3_run_protocol_implementation_plan.md)
 - [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 - [Narrative Provider boundary](narrative_provider.md)

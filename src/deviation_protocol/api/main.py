@@ -910,6 +910,7 @@ def build_default_services(
         uow_factory=uow_factory,
         catalog=catalog,
         scenario_catalog=scenario_catalog,
+        native_coordinator=_build_native_turn_coordinator(catalog, scenario_catalog),
         narrative_provider=provider,
         provider_name="deepseek",
         model_name=(
@@ -947,6 +948,11 @@ def build_default_services(
         engine=engine,
         narrative_provider=provider,
     )
+
+
+def _build_native_turn_coordinator(catalog, scenario_catalog):
+    from deviation_protocol.application.native_turn_mechanics import NativeTurnMechanicsCoordinator
+    return NativeTurnMechanicsCoordinator(catalog, scenario_catalog)
 
 
 def create_app(*, services: ApiServices | None = None) -> FastAPI:

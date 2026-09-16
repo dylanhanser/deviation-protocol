@@ -470,6 +470,10 @@ class RunRepository(ABC):
 
 
 class RunSessionParticipationRepository(ABC):
+    async def find_attachment_run_ids(self, session_id: str) -> tuple[RunId, ...]:
+        """Read reverse receipt evidence; unsupported adapters must fail closed."""
+        raise NotImplementedError
+
     @abstractmethod
     async def get(
         self, session_id: str

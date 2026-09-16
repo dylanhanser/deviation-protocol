@@ -47,10 +47,11 @@ wording is historical. S4 internal component implementation was independently
 approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; its earlier
 `CHANGES_REQUIRED` migration-disposal review remains history. DF-001 remains
 deferred. The [S5 mechanics and prompt-context plan](docs/phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
-is the corrected documentation candidate awaiting focused re-review after
-`CHANGES_REQUIRED` with one resource-call finding. S5 implementation has not
-started; S5-S7 implementation remains
-unauthorized, and Phase 3.3 remains incomplete.
+was independently approved with DF-001 deferred and published at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`.
+Its candidate-time review wording is historical. The authorized S5 implementation
+candidate now connects internal native admission, mechanics, prompt compilation,
+atomic turns, reload/replay and authored endings; it awaits substantive independent
+implementation review. S6/S7 remain unauthorized and Phase 3.3 remains incomplete.
 
 ## Phase 3.3 current status and ordered priority
 
@@ -191,9 +192,10 @@ are recorded below; earlier conclusions for unchanged content remain applicable.
 See [historical candidate evidence and limits](docs/run_protocol.md#p33-s4-implementation-candidate-evidence).
 This is internal component implementation, not public native activation or
 Phase 3.3 completion. S4 publication is complete; DF-001 remains deferred.
-S5 is the current planning subject and its implementation has not started.
-S5-S7 implementation remains unauthorized. No separate S4 closeout or
-additional approval stage is due.
+S5 is now an implementation candidate under its approved, published plan.
+Its internal integration and verification are recorded in the
+[S5 evidence](docs/run_protocol.md#p33-s5-implementation-candidate-evidence).
+S6/S7 remain unauthorized. No separate S4 closeout or extra approval stage is due.
 Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
@@ -714,7 +716,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 corrected documentation plan candidate awaiting focused re-review after CHANGES_REQUIRED (one finding), implementation not started; S5-S7 implementation unauthorized; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
+| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 internal implementation candidate awaiting independent review; S6/S7 unauthorized; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1240,10 +1242,8 @@ See [published evidence](docs/run_protocol.md#p33-s3-published-implementation-ev
 The [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md)
 was independently approved with DF-001 deferred and published at `42411b2`.
 S4 implementation was independently approved and published at
-`34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains deferred. S5 is the
-current planning subject, with a corrected documentation candidate awaiting
-focused re-review after `CHANGES_REQUIRED` with one finding; implementation
-has not started. S5-S7 implementation remains
+`34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains deferred. S5 has an independently approved plan published at `ff866d2` and an internal
+implementation candidate awaiting independent implementation review. S6/S7 remain
 unauthorized; Phase 3.3 remains incomplete.**
 
 The authoritative readiness reconstruction completed with classification that
@@ -1282,10 +1282,11 @@ Server-owned mechanics policies remain independently testable from prompt
 construction; presentation changes expression only, relationship overlay cannot
 mutate Phase 3.4 state, compiled context grants no mechanics/canon authority,
 Provider calls remain outside database transactions, and the slice uses no real
-Provider. The current [S5 plan candidate](docs/phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
-awaits focused re-review of the positive-depletion resource-call correction and
-its direct dependencies by the previous independent reviewer, preserving earlier
-conclusions; implementation has not started.
+Provider. The [published S5 plan](docs/phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+is frozen; its corrected resource contract is implemented. The implementation
+candidate is unapproved pending one substantive independent review, with the
+sole operative implementation-review success token defined in
+[the current evidence and review boundary](docs/run_protocol.md#p33-s5-implementation-candidate-evidence).
 
 P3.3-S7 important-NPC priority may consume only already-authorized logical-
 identity and authored-world predicates from separately published owning
@@ -1648,7 +1649,7 @@ manually.
 - Approved and published P3.3-S4 plan at `42411b2`; internal implementation
   independently approved and published at `34dc752`:
   [`docs/phase_3_3_s4_native_run_admission_entry_world_plan.md`](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md).
-- Current S5 documentation candidate; implementation has not started:
+- Published, frozen S5 plan; internal implementation candidate awaits review:
   [Objective mechanics and trusted prompt-context plan](docs/phase_3_3_s5_objective_mechanics_prompt_context_plan.md).
 - Approved, published, byte-preserved, and frozen Phase 3.3 repository
   implementation plan; P3.3-G0 is complete, the first P3.3-S1 implementation

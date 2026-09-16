@@ -53,8 +53,9 @@ published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-ti
 wording is historical. S4 implementation was independently approved and
 published at `34dc752295ba270617e5d29020f3a0c0b133544e`. Its earlier
 `CHANGES_REQUIRED` migration-disposal review remains history. DF-001 remains
-deferred. S5 is the current planning subject; implementation has not started.
-S5-S7 implementation remains unauthorized and Phase 3.3 remains incomplete.
+deferred. The S5 plan is independently approved and published at `ff866d2`.
+The S5 internal implementation candidate awaits independent review; S6/S7 remain
+unauthorized and Phase 3.3 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -107,27 +108,51 @@ Public routes/OpenAPI, Demo/Web entry and public recovery remain S6-owned;
 mechanics/prompt compilation remain S5-owned; later worlds/continuity remain
 S7-owned. This internal component is not a complete player-facing native flow.
 
-## P3.3-S5 planning boundary
+## P3.3-S5 internal implementation candidate
 
-The [S5 documentation candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
-proposes a same-UoW admitted-family loader and five pure objective policies
-connected to the production `DurableNarrativeTurnOrchestrator`, existing
-GameState resource operations and StoryDirector clock advancement. Native
-outcome selection would become deterministic before rendering. Existing
-Session state/events/snapshots and narrative-job JSON hold the proposed effects
-and detached evidence; no new persistence family or migration is proposed.
+The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+is frozen at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`. Its earlier
+CHANGES_REQUIRED and candidate-time status are history. The current implementation
+is unapproved pending independent review; [evidence and limits](run_protocol.md#p33-s5-implementation-candidate-evidence)
+separate internal integration from S6 public activation.
 
-Its pure compiler would emit closed canonical `run-prompt-context/v1` JSON
-outside every active UoW, AsyncSession and lock, then attach it to the existing
-PromptBuilder as data. Presentation grants no mechanical authority. These are
-proposals awaiting focused re-review after `CHANGES_REQUIRED` with one finding,
-not implemented capabilities. The corrected resource plan calls the unchanged
-positive-amount `consume_resource` API exactly once only for positive actual
-depletion and emits the successful-spend event then. Zero actual depletion
-skips that call and event, retaining the computed charge separately and
-continuing Director advancement and all other legitimate turn effects.
-Legacy and Demo behavior, S4 bindings, character authority and fixed scenario
-facts remain unchanged; S6/S7 and Phase 3.4 ownership remain as above.
+Normal `build_default_services` installs `NativeTurnMechanicsCoordinator`.
+After committed replay lookup, the turn UoW loads the Session participation,
+reads indexed reverse receipt evidence, and reuses complete S3/S4 reconstruction.
+Missing native evidence cannot become a legacy or standalone Session. The
+coordinator validates original snapshot types, admitted character/world/Run
+associations, safe Frame and action binding, then computes a detached decision.
+Native selection uses authored priority/ASCII ID and SUCCESS, AMBIGUOUS,
+NO_EFFECT, FAILURE preference; the renderer receives one candidate/result.
+
+Five independent domain policies use the approved integer rules: q(x)=x//50;
+resource charge saturates at current composure; social, adverse-result,
+discovery and conflict costs add to each original authored clock component.
+All components read the original state. Positive depletion calls the existing
+resource API once and emits one successful-spend draft. Zero depletion skips
+both while continuing Director advancement and the mechanics audit. The
+Director validates the bound plan and applies one clock vector at its existing
+advance point, preserving authored thresholds, clues, transitions and endings.
+Existing Session events, memory, snapshot, response, job and version commit
+atomically. No new persistence family, schema or migration exists.
+
+Native jobs retain a strict `native-turn-request/v1` JSON evidence envelope.
+After claim, a short ordinary UoW freshly reconstructs and detaches inputs.
+Only after its AsyncSession closes does the pure compiler emit at most 1,024
+canonical UTF-8 bytes of `run-prompt-context/v1`; PromptBuilder and Provider
+follow outside transactions/locks. Finalize reconstructs and compares decisions
+without compiling under lock. Validated-proposal resume needs no Provider
+recall; committed replay performs no fresh mechanics. Pre-S5 active native jobs
+without evidence become stale. Legacy JSON, fingerprints and unattached prompts
+retain their prior bytes and semantics.
+
+Presentation only controls permitted expression. The private nonserialized
+request attachment exposes exact objective numbers, presentation enums, selected
+result and internal pressure label, with no binding IDs, hidden state or authority.
+The overlay does not read or create Phase 3.4 relationship/residence state.
+S4 rows and character authority remain immutable; a Session ending does not
+transition its Run. S6 owns public discovery/admission/API/OpenAPI/Demo/Web and
+recovery projection; S7 owns later worlds and continuity.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -204,7 +229,7 @@ or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
-described above; S5-S7 remain unimplemented and unauthorized; the
+described above; S5 is an internal implementation candidate and S6/S7 remain unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1

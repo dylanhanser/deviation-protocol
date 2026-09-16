@@ -56,10 +56,14 @@ from deviation_protocol.application.narrative_outcome_policy import (
     NarrativeEventIssuer,
     NarrativeOutcomePolicy,
     allowed_narrative_outcomes,
+    select_native_outcome,
     proposal_digest,
     state_fingerprint,
 )
 from deviation_protocol.application.narrative_validation import NarrativeProposalValidator
+from deviation_protocol.application.native_turn_mechanics import (
+    parse_job_request, native_request_envelope, canonical,
+)
 from deviation_protocol.application.resolution import PlayerFeedback, ResolutionResult, ResolutionStatus
 from deviation_protocol.application.scenario_event_bridge import bind_public_decision_frame
 from deviation_protocol.application.story_director import StoryDirectorError
@@ -121,9 +125,14 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
         if claimed.status is NarrativeJobStatus.PROPOSAL_VALIDATED:
             return await self._finalize_or_record(claimed, submission)
 
-        request = NarrativeRequest.model_validate(
-            claimed.narrative_request, strict=False
-        )
+        try:
+            request = await self._detach_request(claimed, submission)
+        except NarrativeJobStaleError:
+            await self._set_terminal_status(claimed, NarrativeJobStatus.STALE, "NARRATIVE_JOB_STALE")
+            raise
+        except NarrativeRequestRejectedError as exc:
+            await self._record_provider_failure(claimed, exc)
+            raise
         assert self.narrative_provider is not None
         try:
             untrusted = await self.narrative_provider.generate(request)
@@ -137,6 +146,12 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             await self._record_provider_failure(claimed, exc)
             raise NarrativeProviderUnavailableError() from None
         try:
+            if getattr(request, "_compiled_run_protocol_context", None) is not None:
+                from deviation_protocol.application.narrative_models import UntrustedNarrativeProposal
+                from deviation_protocol.domain.run import _validate_actual_pydantic_state
+                if type(untrusted) is not UntrustedNarrativeProposal:
+                    raise NarrativeProposalRejectedError()
+                _validate_actual_pydantic_state(untrusted, path="native proposal", visited=set())
             validated = self.proposal_validator.validate(
                 untrusted,
                 request=request,
@@ -270,6 +285,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 submission.session_id,
             )
             visible_npcs = self._visible_runtime_npc_ids(state, definition)
+            native_family = await self.native_coordinator.load(uow, game_session, state, definition) if self.native_coordinator is not None else None
             trusted = self.context_factory.create_trusted(
                 submission,
                 state=state,
@@ -291,6 +307,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 resolution,
                 definition,
                 state_version=game_session.state_version,
+                native_family=native_family,
             )
             active = await uow.narrative_jobs.get_active_for_session(
                 submission.session_id
@@ -331,6 +348,11 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             )
             if not allowed:
                 raise NarrativeOutcomeUnavailableError(submission.session_id)
+            native_plan = None
+            if native_family is not None:
+                allowed = select_native_outcome(allowed)
+                inputs = self.native_coordinator.bind(native_family, state, submission, game_session.state_version, frame)
+                native_plan = self.native_coordinator.decide(inputs, state, definition, submission, selected=allowed[0])
             recent = await uow.narrative_jobs.recent_committed_texts(
                 submission.session_id, limit=6
             )
@@ -351,6 +373,8 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             )
             now = self._now()
             request_json = request.model_dump(mode="json")
+            if native_plan is not None:
+                request_json = native_request_envelope(request, native_plan)
             job = NarrativeJob(
                 job_id=self._generated_id(self.job_id_generator, "job"),
                 session_id=submission.session_id,
@@ -373,6 +397,73 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             await uow.narrative_jobs.add(job)
             await uow.commit()
             return _Prepared(job=job, submission=submission)
+
+    async def _revalidate_native(self, uow, game_session, state, definition,
+                                 submission, frame, request, envelope):
+        family = await self.native_coordinator.load(uow, game_session, state, definition) if self.native_coordinator is not None else None
+        if family is None:
+            if envelope is not None:
+                raise NarrativeJobStaleError(submission.session_id)
+            return None
+        if envelope is None:
+            raise NarrativeJobStaleError(submission.session_id)
+        if request.player_intent != NarrativePlayerIntent.from_submission(submission):
+            raise NarrativeJobStaleError(submission.session_id)
+        allowed = select_native_outcome(allowed_narrative_outcomes(submission=submission,
+            state=state, state_version=game_session.state_version, definition=definition, frame=frame))
+        if not allowed or request.outcome_candidates != (allowed[0].candidate,):
+            raise NarrativeJobStaleError(submission.session_id)
+        inputs = self.native_coordinator.bind(family, state, submission, game_session.state_version, frame)
+        decision = self.native_coordinator.decide(inputs, state, definition, submission, selected=allowed[0])
+        if canonical(native_request_envelope(request, decision)) != canonical(envelope):
+            raise NarrativeJobStaleError(submission.session_id)
+        return decision
+
+    async def _detach_request(self, job, submission):
+        request, envelope = parse_job_request(job.narrative_request)
+        if self.native_coordinator is None and envelope is None:
+            return request
+        async with self.uow_factory() as uow:
+            if not await uow.sessions.lock_for_turn(submission.session_id):
+                raise NarrativeJobStaleError(submission.session_id)
+            current = await uow.narrative_jobs.get(job.job_id)
+            game_session = await uow.sessions.get(submission.session_id)
+            snapshot = await uow.sessions.get_latest_snapshot(submission.session_id)
+            if (current is None or not self._same_lease(current, job)
+                    or self._lease_expired(current, self._now())
+                    or game_session is None or snapshot is None
+                    or game_session.state_version != job.prepared_state_version
+                    or snapshot.state_version != job.prepared_state_version
+                    or self._json_digest(current.narrative_request) != job.request_fingerprint):
+                raise NarrativeJobStaleError(submission.session_id)
+            state = self._load_state(snapshot.state, submission.session_id)
+            definition = self._scenario_definition(state, game_session.scenario_id,
+                game_session.scenario_version, submission.session_id)
+            if definition is None or state_fingerprint(state) != job.state_fingerprint:
+                raise NarrativeJobStaleError(submission.session_id)
+            character = self.catalog.character(state.player.character_definition_id)
+            frame = bind_public_decision_frame(self.story_director.plan_frame(state, definition,
+                profession_tags=frozenset(character.tags) & set(definition.available_profession_tags)),
+                session_id=submission.session_id, state_version=game_session.state_version,
+                scenario_content_version=definition.content_version)
+            if frame != request.frame or request.player_memory != self.memory_projector.project(state, self.scenario_catalog):
+                raise NarrativeJobStaleError(submission.session_id)
+            decision = await self._revalidate_native(uow, game_session, state, definition,
+                submission, frame, request, envelope)
+        # The UoW has rolled back its read transaction and closed its AsyncSession.
+        # No compiler invocation exists in prepare, claim or finalize.
+        if decision is not None:
+            from deviation_protocol.application.run_protocol_prompt_context import (
+                compile_run_protocol_context, RunPromptContextError,
+            )
+            try:
+                request = request.with_compiled_run_protocol_context(
+                    compile_run_protocol_context(decision.inputs, decision))
+            except RunPromptContextError as error:
+                rejection = NarrativeRequestRejectedError()
+                rejection.internal_reason = error.reason
+                raise rejection from None
+        return request
 
     async def _commit_local_result(
         self,
@@ -623,11 +714,11 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             )
             if frame is None or current.validated_proposal is None or current.validated_proposal_digest is None:
                 raise NarrativeJobStaleError(submission.session_id)
-            persisted_request = NarrativeRequest.model_validate(
-                current.narrative_request, strict=False
-            )
+            persisted_request, envelope = parse_job_request(current.narrative_request)
+            native_plan = await self._revalidate_native(uow, game_session, state, definition,
+                submission, frame, persisted_request, envelope)
             if (
-                self._json_digest(persisted_request.model_dump(mode="json"))
+                self._json_digest(current.narrative_request)
                 != current.request_fingerprint
                 or persisted_request.frame != frame
                 or persisted_request.player_memory
@@ -651,6 +742,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 resolution_status=resolution.status,
                 expected_state_fingerprint=current.state_fingerprint,
                 expected_proposal_digest=current.validated_proposal_digest,
+                native_selection=native_plan is not None,
             )
             sealed = self.narrative_event_issuer.issue(
                 authorized,
@@ -678,12 +770,14 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             character = self.catalog.character(state.player.character_definition_id)
             if character is None:
                 raise CandidateStateInvalidError(submission.session_id)
+            candidate, resource_events = self.native_coordinator.apply_resource(state, native_plan) if native_plan is not None else (state, ())
             directed = self.story_director.advance_after_verified_result(
-                state,
+                candidate,
                 definition,
                 (sealed,),
                 profession_tags=frozenset(character.tags)
                 & set(definition.available_profession_tags),
+                native_plan=native_plan,
             )
             generated = tuple(
                 DomainEventDraft(
@@ -720,7 +814,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 result_code="NARRATIVE_OUTCOME_COMMITTED",
                 updated_state=directed.candidate_state,
                 state_changed=True,
-                events=(accepted, *generated),
+                events=(*resource_events, accepted, *generated, *self._native_audit(native_plan)),
                 feedback=PlayerFeedback(
                     "NARRATIVE_OUTCOME_COMMITTED",
                     {"outcome_result": authorized.result_name},
@@ -863,7 +957,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
 
     @staticmethod
     def _submission_from_job(job: NarrativeJob) -> ActionSubmission:
-        request = NarrativeRequest.model_validate(job.narrative_request, strict=False)
+        request, _ = parse_job_request(job.narrative_request)
         intent = request.player_intent
         return ActionSubmission(
             session_id=job.session_id,
@@ -882,7 +976,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
 
     @staticmethod
     def _pending_response(job: NarrativeJob) -> TurnResponse:
-        request = NarrativeRequest.model_validate(job.narrative_request, strict=False)
+        request, _ = parse_job_request(job.narrative_request)
         return TurnResponse(
             session_id=job.session_id,
             client_request_id=job.client_request_id,

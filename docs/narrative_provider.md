@@ -33,6 +33,41 @@ Provider selection and narrative authority are separate:
 - style settings change presentation only and cannot rewrite established
   facts.
 
+## S5 native context and rendering boundary
+
+Production native turns reconstruct complete S3/S4 admission in the turn UoW
+and choose a single authored rule/result before rendering. The job stores
+`native-turn-request/v1` evidence in its existing bounded JSON field; the
+fingerprint covers the entire envelope. Legacy job bytes and fingerprints
+remain unchanged. Active old native jobs without evidence become stale;
+committed responses still replay exactly.
+
+After claim, a short UoW revalidates and detaches trusted inputs. Compilation,
+PromptBuilder and Provider entry occur only after that UoW exits and its
+AsyncSession closes. A private `with_compiled_run_protocol_context` attachment
+holds authenticated compiler bytes without adding a serialized request field.
+The compiler uses sorted keys, compact UTF-8 JSON, no whitespace/BOM/final LF,
+no float/coercion and a 1,024-byte ceiling. Its closed fields are schema,
+mechanics_version, five exact objectives, three presentation enums,
+resource_pressure_label and selected_result. Binding IDs, snapshots, private
+NPC state, hidden clues/clocks and character/controller details are excluded.
+
+PromptBuilder authenticates the attachment and adds its object only as
+`server_public_context.run_protocol_context`, under existing total prompt budgets.
+Without the attachment the legacy prompt remains byte-identical. Grim/balanced/
+heroic, lawful/deviant/chaotic and off/veiled/charged affect permitted expression
+only, within the safe Frame and character authority. No Phase 3.4 relationship
+or residence data is read, created or anticipated. Numeric objectives and labels
+are descriptive data to the renderer; all mechanics remain server-owned and
+work without compilation. A model cannot select a different native result.
+Extra or malformed native proposal state rejects before mutation.
+
+Finalize rechecks native evidence and the complete decision under the existing
+Session transaction, without compilation under lock. Mechanics, events, memory,
+snapshot, response, job and version commit together; resume never recalls the
+Provider after validated proposal persistence. Evidence and readiness limits are
+recorded in [the S5 implementation record](run_protocol.md#p33-s5-implementation-candidate-evidence).
+
 ## Future Provider and narrative controls
 
 Phase 4.0's accepted design introduces a self-controlled **Production
@@ -42,10 +77,10 @@ That network component is not the application `NarrativeProvider` interface and
 is not implemented. Its canonical decision is
 [ADR 0001](decisions/0001-production-provider-distribution.md).
 
-Phase 3.3's approved [Run Protocol design](run_protocol.md) will add structured,
-versioned presentation controls after engine-owned difficulty, character, and
-permitted pre-game overrides are resolved. No `RUN_PROTOCOL` block exists in
-the implemented prompt today.
+Phase 3.3 S5 now has an internal implementation candidate under its
+[approved, published plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md).
+It uses canonical `run-prompt-context/v1` JSON, never an illustrative
+`[RUN_PROTOCOL]` block. The candidate awaits independent implementation review.
 
 Phase 3.4's approved
 [NPC Relationship and Temporary Residence design](npc_relationship_residence.md)

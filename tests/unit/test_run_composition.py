@@ -54,6 +54,9 @@ def test_native_normal_composition_is_internal_lazy_and_demo_absent(monkeypatch)
     monkeypatch.setattr(main, "create_engine", lambda: engine)
     services = main.build_default_services(player_character_controller_bindings=(_CONTROLLER_BINDING,))
     native = services.native_run_admission_service
+    from deviation_protocol.application.native_turn_mechanics import NativeTurnMechanicsCoordinator
+    assert type(services.turn_orchestrator.native_coordinator) is NativeTurnMechanicsCoordinator
+    assert services.turn_orchestrator.native_coordinator.catalog is services.session_service.catalog
     assert type(native) is NativeRunAdmissionService
     assert type(native.uow_factory) is SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
     assert native.uow_factory.engine is engine

@@ -3064,6 +3064,14 @@ class SqlAlchemyRunSessionParticipationRepository(
     _SqlAlchemyRunRepositorySupport,
     RunSessionParticipationRepository,
 ):
+    async def find_attachment_run_ids(self, session_id: str) -> tuple[RunId, ...]:
+        result = await self._session.scalars(
+            select(RunMutationReceiptRow.result_run_id)
+            .where(RunMutationReceiptRow.participation_session_id == session_id)
+            .distinct().order_by(RunMutationReceiptRow.result_run_id).limit(2)
+        )
+        return tuple(RunId(value=value) for value in result.all())
+
     async def get(
         self,
         session_id: str,

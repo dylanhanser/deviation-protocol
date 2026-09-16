@@ -107,6 +107,15 @@ class NarrativePlayerIntent(NarrativeBoundaryModel):
 class NarrativeRequest(NarrativeBoundaryModel):
     """Vendor-neutral, player-safe, bounded input to a narrative provider."""
 
+    def with_compiled_run_protocol_context(self, context):
+        from deviation_protocol.application.run_protocol_prompt_context import CompiledRunProtocolContextV1
+        if type(context) is not CompiledRunProtocolContextV1:
+            raise NarrativeRequestRejectedError()
+        context.validated_object()
+        detached = NarrativeRequest.model_validate(self.model_dump(mode="python"))
+        object.__setattr__(detached, "_compiled_run_protocol_context", context)
+        return detached
+
     frame: NarrativeFrame
     player_memory: PlayerMemoryProjection = PlayerMemoryProjection()
     player_intent: NarrativePlayerIntent

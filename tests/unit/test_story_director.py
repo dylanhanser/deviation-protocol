@@ -274,6 +274,61 @@ def state_for(catalog: ScenarioCatalog) -> GameState:
     return state
 
 
+def test_native_non_hospital_vector_preserves_authored_clock_threshold_and_clue_order():
+    from deviation_protocol.application.native_turn_mechanics import (
+        NativeTurnMechanicsCoordinator, TrustedNativeTurnInputs, _mint, canonical,
+    )
+    from deviation_protocol.application.narrative_outcome_policy import state_fingerprint
+    from deviation_protocol.domain.entry_world import AuthoredEntryWorldV1
+    from deviation_protocol.domain.run_protocol_mechanics import MechanicsCatalogueEntry
+    from tests.unit.test_native_turn_mechanics import fixture_inputs
+
+    payload = mini_catalog().model_dump(mode="json")
+    payload["content_catalog"]["characters"][0]["resource_caps"] = [{"key": "focus", "value": 6}]
+    scenario = payload["scenarios"][0]
+    scenario["threat_clocks"][0]["thresholds"].append({"threshold": 3, "event_type": "storm.danger"})
+    scenario["threat_clocks"].append(dict(clock_id="alpine_air", minimum=0, maximum=5,
+        initial=0, player_visible=False, thresholds=[
+            {"threshold": 1, "event_type": "air.warning"}, {"threshold": 3, "event_type": "air.danger"}]))
+    scenario["phases"][0]["action_time_costs"][0]["clock_advances"].append(
+        {"clock_id": "alpine_air", "amount": 1})
+    catalog = ScenarioCatalog.model_validate(payload)
+    definition = catalog.scenarios[0]
+    world = AuthoredEntryWorldV1.model_validate(dict(entry_world_id={"value": "world.alpine"},
+        entry_world_version={"value": 1}, scenario_id="alpine_signal",
+        scenario_content_version="alpine-signal-1", default_character_definition_id="character.alpine.scout"))
+    coordinator = NativeTurnMechanicsCoordinator(catalog.content_catalog, catalog,
+        catalogue=(MechanicsCatalogueEntry("world.alpine", 1, "alpine_signal", "alpine-signal-1",
+            "character.alpine.scout", "focus"),), worlds=(world,))
+    director = DeterministicStoryDirector()
+    state = director.start_scenario(state_for(catalog), definition).candidate_state
+    before = state.to_snapshot()
+    fixture = fixture_inputs()
+    binding = json.loads(fixture.inputs.binding_bytes)
+    binding.update(player_id=state.player.player_id, scenario_id=definition.scenario_id,
+        scenario_content_version=definition.content_version, state_fingerprint=state_fingerprint(state),
+        entry_world={"entry_world_id": {"value": "world.alpine"}, "entry_world_version": {"value": 1}})
+    fields = dict(binding_bytes=canonical(binding), snapshot_bytes=canonical(before),
+        objectives=(100, 0, 100, 100, 100), presentation=("balanced", "lawful", "off"), resource_id="focus")
+    inputs = _mint(TrustedNativeTurnInputs, **fields, _original=tuple(fields.values()))
+    event = VerifiedScenarioEvent(event_id="event.signal", event_type="signal.verified",
+        action_type="investigate", discovered_clue_ids=("alpine.clue.signal_trace",))
+    decision = coordinator.decide(inputs, state, definition, fixture.submission, event=event)
+    assert [(c.clock_id, c.base, c.conflict, c.after) for c in decision.clocks] == [
+        ("alpine_storm", 2, 2, 3), ("alpine_air", 1, 2, 3)]
+    assert all((c.social, c.severity, c.opacity) == (0, 0, 0) for c in decision.clocks)
+    assert [c["clock_id"] for c in decision.evidence()["clocks"]] == ["alpine_air", "alpine_storm"]
+    candidate, spend_events = coordinator.apply_resource(state, decision)
+    assert spend_events == ()
+    result = director.advance_after_verified_result(candidate, definition, (event,), native_plan=decision)
+    assert [e.event_type for e in result.generated_events] == [
+        "storm.warning", "storm.danger", "air.warning", "air.danger", "signal.group.completed"]
+    assert result.candidate_state.scenario_runtime.phase_beat_index == 1
+    assert result.frame.mode is FrameMode.DECISION
+    assert result.candidate_state.player.resources["focus"].current == 6
+    assert state.to_snapshot() == before
+
+
 def test_non_hospital_scenario_uses_same_loader_catalog_and_director_end_to_end(
     tmp_path: Path,
 ) -> None:

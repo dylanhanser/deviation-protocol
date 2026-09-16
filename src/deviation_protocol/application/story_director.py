@@ -49,6 +49,21 @@ class StoryDirectorError(ValueError):
     """A verified result or scenario state cannot be advanced safely."""
 
 
+def validate_reveals(runtime, definition, clue_ids, event_type, profession_tags):
+    """Pure preflight shared by native decision planning and event application."""
+    phase = definition.phase(runtime.current_phase_id)
+    known = {item.clue_id for item in definition.clues}
+    for clue_id in clue_ids:
+        if clue_id not in known:
+            raise StoryDirectorError("clue is not discoverable in this phase")
+        clue = definition.clue(clue_id)
+        if (clue_id not in phase.allowed_clue_ids or phase.phase_id not in clue.allowed_phase_ids
+                or event_type not in clue.source_event_types
+                or (clue.required_any_profession_tags and not
+                    (profession_tags & set(clue.required_any_profession_tags)))):
+            raise StoryDirectorError("unauthorized clue reveal")
+
+
 @dataclass(frozen=True, slots=True)
 class _GeneratedScenarioEvent:
     event_id: str
@@ -133,6 +148,7 @@ class DeterministicStoryDirector:
         verified_events: Sequence[VerifiedScenarioEvent] = (),
         *,
         profession_tags: Iterable[str] = (),
+        native_plan=None,
     ) -> StoryDirectorResult:
         events = tuple(verified_events)
         if len(events) > 64:
@@ -144,6 +160,9 @@ class DeterministicStoryDirector:
             raise StoryDirectorError(
                 "scenario events must come from the server verification boundary"
             )
+        if native_plan is not None:
+            from deviation_protocol.application.native_turn_mechanics import validate_director_plan
+            native_advances = validate_director_plan(native_plan, state, definition, events)
         original_runtime = self._runtime(state, definition)
         if original_runtime.ending_status is not EndingStatus.ACTIVE:
             raise StoryDirectorError("ended scenario cannot advance")
@@ -232,7 +251,9 @@ class DeterministicStoryDirector:
             *(event.event_id for event in events),
         )
         runtime.phase_beat_index += 1
-        if action_events:
+        if native_plan is not None:
+            generated.extend(self._advance_clocks(runtime, definition, native_advances))
+        elif action_events:
             action_type = action_events[0].action_type
             assert action_type is not None
             if action_type not in phase.allowed_action_types:
@@ -370,19 +391,8 @@ class DeterministicStoryDirector:
             dynamic_key_max_length=definition.dynamic_fact_key_max_length,
             dynamic_value_max_length=definition.dynamic_fact_value_max_length,
         )
-        known_clue_ids = {item.clue_id for item in definition.clues}
+        validate_reveals(runtime, definition, event.discovered_clue_ids, event.event_type, profession_tags)
         for clue_id in event.discovered_clue_ids:
-            if clue_id not in known_clue_ids:
-                raise StoryDirectorError(f"clue {clue_id!r} is not discoverable in this phase")
-            clue = definition.clue(clue_id)
-            if clue_id not in phase.allowed_clue_ids or phase.phase_id not in clue.allowed_phase_ids:
-                raise StoryDirectorError(f"clue {clue_id!r} is not discoverable in this phase")
-            if event.event_type not in clue.source_event_types:
-                raise StoryDirectorError(f"event cannot discover clue {clue_id!r}")
-            if clue.required_any_profession_tags and not (
-                profession_tags & set(clue.required_any_profession_tags)
-            ):
-                raise StoryDirectorError(f"profession tag required for clue {clue_id!r}")
             runtime.discovered_clue_ids = runtime.discovered_clue_ids | {clue_id}
 
         for binding in event.deferred_bindings:
