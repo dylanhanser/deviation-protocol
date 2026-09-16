@@ -41,20 +41,20 @@ connection, separately from transaction completion. Both branches pass with the
 shared lock and fail the exclusion assertion with controlled different locks;
 normal and mutated variations restore rows, schema, revision, and locks.
 
-S3 introduced no production writer. The S4 candidate below now owns production
+S3 introduced no production writer. Published S4 below owns production
 native insertion and admission; S3 component fixtures retain their own helper. Run-entry caller authorization and Session
 behavior are unchanged. The component neither establishes an integrated playable
 game nor grants later-slice authority. Phase 3.3 remains incomplete.
 
-## P3.3-S4 internal admission implementation candidate
+## P3.3-S4 published internal admission component
 
 The corrected S4 plan was independently approved with DF-001 deferred and
 published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-time
-wording is historical. Separately authorized S4 implementation is now an
-internal component candidate awaiting focused independent re-review after a
-`CHANGES_REQUIRED` review with one migration-disposal finding. The correction
-remains unapproved, uncommitted and unpublished. S5-S7 remain unimplemented
-and unauthorized, and Phase 3.3 remains incomplete.
+wording is historical. S4 implementation was independently approved and
+published at `34dc752295ba270617e5d29020f3a0c0b133544e`. Its earlier
+`CHANGES_REQUIRED` migration-disposal review remains history. DF-001 remains
+deferred. S5 is the current planning subject; implementation has not started.
+S5-S7 implementation remains unauthorized and Phase 3.3 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -102,10 +102,32 @@ evidence because existing Session/event columns have that precision. This keeps
 all family timestamps equal without changing old schema (DB-001).
 
 Verification and external evidence are recorded in
-[the S4 candidate evidence](run_protocol.md#p33-s4-implementation-candidate-evidence).
+[the preserved S4 candidate evidence](run_protocol.md#p33-s4-implementation-candidate-evidence).
 Public routes/OpenAPI, Demo/Web entry and public recovery remain S6-owned;
 mechanics/prompt compilation remain S5-owned; later worlds/continuity remain
 S7-owned. This internal component is not a complete player-facing native flow.
+
+## P3.3-S5 planning boundary
+
+The [S5 documentation candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+proposes a same-UoW admitted-family loader and five pure objective policies
+connected to the production `DurableNarrativeTurnOrchestrator`, existing
+GameState resource operations and StoryDirector clock advancement. Native
+outcome selection would become deterministic before rendering. Existing
+Session state/events/snapshots and narrative-job JSON hold the proposed effects
+and detached evidence; no new persistence family or migration is proposed.
+
+Its pure compiler would emit closed canonical `run-prompt-context/v1` JSON
+outside every active UoW, AsyncSession and lock, then attach it to the existing
+PromptBuilder as data. Presentation grants no mechanical authority. These are
+proposals awaiting focused re-review after `CHANGES_REQUIRED` with one finding,
+not implemented capabilities. The corrected resource plan calls the unchanged
+positive-amount `consume_resource` API exactly once only for positive actual
+depletion and emits the successful-spend event then. Zero actual depletion
+skips that call and event, retaining the computed charge separately and
+continuing Director advancement and all other legitimate turn effects.
+Legacy and Demo behavior, S4 bindings, character authority and fixed scenario
+facts remain unchanged; S6/S7 and Phase 3.4 ownership remain as above.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -181,7 +203,7 @@ objective numeric mechanics, native admission, entry-world freeze, public API
 or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
-resolution. S3's published component and the S4 implementation candidate are
+resolution. S3's published component and the published S4 implementation are
 described above; S5-S7 remain unimplemented and unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
@@ -1075,8 +1097,8 @@ components described above:
 
 - Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
   published S1/S2 components supply representation and deterministic resolution;
-  published S3 supplies durable binding reconstruction. The S4 candidate adds
-  internal admission/world freezing and awaits independent review; mechanics
+  published S3 supplies durable binding reconstruction. Published S4 adds
+  independently approved internal admission/world freezing; mechanics
   and public activation remain later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).

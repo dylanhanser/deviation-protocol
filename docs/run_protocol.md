@@ -19,10 +19,10 @@ historical. S3 implementation and migration `20260828_0006` are independently
 approved with DF-001 deferred and published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. The corrected S4 plan was independently approved with DF-001 deferred and
 published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-time
-wording is historical. Separately authorized S4 implementation is now an
-internal component candidate awaiting substantive independent implementation
-review; it is not approved, committed or published. S5-S7 remain unimplemented
-and unauthorized, and Phase 3.3 remains incomplete.**
+wording is historical. S4 internal implementation was independently approved
+and published at `34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains
+deferred. S5 is the current planning subject; implementation has not started.
+S5-S7 implementation remains unauthorized, and Phase 3.3 remains incomplete.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
 [PLANS.md](../PLANS.md#immediate-delivery-priority)
@@ -325,8 +325,12 @@ The dedicated S3 plan is independently approved and published at `465c53d`;
 S3 implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
 approved with DF-001 deferred. The
 [Published S4 native admission/entry-world plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
-was independently approved and published at `42411b2`. S4 is now an
-implementation candidate awaiting focused independent re-review; S5-S7 remain unauthorized.
+was independently approved and published at `42411b2`. S4 implementation is
+independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`.
+The [S5 plan candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+is awaiting focused re-review after `CHANGES_REQUIRED` with one finding;
+implementation has not started.
+S5-S7 implementation remains unauthorized; DF-001 remains deferred.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -626,7 +630,7 @@ Status: **Approved product design — not implemented**
 `death_certificate_v1` is the current canonical Demo and vertical-slice
 scenario. It is not permanently designated as the production entry world.
 
-The S4 implementation candidate supplies the exact internal catalogue: `world.death_certificate`
+The published S4 implementation supplies the exact internal catalogue: `world.death_certificate`
 version 1 maps to scenario `death_certificate`, content
 `death-certificate-1.1.0`, default character
 `character.death_certificate.investigator`. This reuses approved authored content
@@ -727,9 +731,10 @@ P3.3-S5 owns the future separately reviewed exact numeric-to-categorical
 mechanics/prompt projection. P3.3-S6 owns any separately reviewed public API,
 OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
 slice may change, round, clamp, or replace the numeric S2 value; each may only
-project from it. Until P3.3-S5 and P3.3-S6 are each independently planned,
-approved, implemented, and published, no categorical projection is
-authoritative and no exact threshold or band mapping exists.
+project from it. The current S5 plan proposes exact internal bands, but they
+are not approved or implemented. S5's internal projection and S6's public
+representation each require their own approval, implementation and publication;
+neither grants authority to the other surface.
 
 Numeric resource pressure is an engine-owned world/difficulty input. A model
 may narrate confirmed effects supplied by later trusted mechanics/prompt
@@ -1095,8 +1100,9 @@ earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
 The implementation and migration `20260828_0006` subsequently received independent
 approval with DF-001 deferred and were published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4's plan was approved and published at `42411b2`; its separately authorized
-implementation is a candidate awaiting focused independent re-review. S5-S7 remain
-unimplemented and unauthorized. Phase 3.3 remains incomplete. No separate S3 publication-closeout task is required.
+implementation is independently approved and published at `34dc752`. S5 is the
+current planning subject; S5-S7 implementation remains unstarted and unauthorized.
+Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
 
@@ -1180,14 +1186,15 @@ There is no new integrated-play, user-trial, release, or Phase 3.3 completion
 claim. S3's implementation review and publication are complete; no Provider/Live
 call, browser session or production database change is claimed by these records.
 S4's plan was subsequently approved and published at `42411b2`. Its
-implementation candidate and current evidence appear below; S3 remains closed.
+published implementation and preserved evidence appear below; S3 remains closed.
 Guardrail impact: None.
 
-### P3.3-S4 native admission and entry-world implementation candidate
+### P3.3-S4 published native admission and entry-world component
 
 The [bounded S4 plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
 was independently approved with DF-001 deferred and published at `42411b2`.
-The implementation candidate supplies one production-composed internal application service. It accepts
+The implementation published at `34dc752295ba270617e5d29020f3a0c0b133544e`
+supplies one production-composed internal application service. It accepts
 trusted-caller intent, revalidates character ownership, resolves S1/S2 input,
 looks up the explicit authored world reference, and atomically persists Run
 revisions 1/2/3, immutable protocol/world bindings at 3, native admission evidence
@@ -1219,14 +1226,19 @@ failure/cancellation, schema and legacy-preservation evidence, including that
 A/B detached/owned-replay rejection. Both equality checks are mandatory.
 
 The earlier plan review finding is closed by the corrected approved plan and
-both implemented comparisons. The implementation remains an unstaged,
-uncommitted, unpublished candidate awaiting focused independent re-review after
-a `CHANGES_REQUIRED` implementation review with one migration-disposal finding.
+both implemented comparisons. The subsequent `CHANGES_REQUIRED` implementation
+review identified one migration-disposal finding; its correction was independently
+approved and published with S4 at `34dc752`. Earlier reviews remain history.
 S4 does not expose native API/OpenAPI, Demo or Web entry (S6), apply objective
 mechanics or compile prompts (S5), or implement later worlds/visits/continuity
 (S7). It adds no story canon or public/default entry-world designation.
 
 ### P3.3-S4 implementation candidate evidence
+
+This heading and the evidence below preserve the original candidate records and
+their locatable references. S4 subsequently received independent approval and
+was published at `34dc752295ba270617e5d29020f3a0c0b133544e`. No new execution
+or retroactive expansion of earlier test selections is claimed here.
 
 The external evidence bundle is `s4-implementation-20260917`; the handoff gives
 its absolute location and manifest. It retains exact commands, full output and
@@ -1316,8 +1328,42 @@ are retained in the correction manifest. Prior admission/timestamp, broad-suite
 and exhaustive S2 evidence is reused for unchanged content after source,
 dependency and environment checks; Offline/Full and exhaustive S2 were not rerun
 and do not prove the changed migration. DB-001's enforcement reference is
-updated without adding a rule. DF-001 remains deferred. This correction is ready
-for focused re-review, not independently approved.
+updated without adding a rule. DF-001 remains deferred. At that historical
+checkpoint the correction was ready for focused re-review; it subsequently
+received independent approval and publication with S4 at `34dc752`.
+
+### P3.3-S5 current planning candidate
+
+The [bounded S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
+proposes real native-turn integration through the existing production durable
+narrative orchestrator: complete S4 reconstruction, deterministic server-owned
+outcome selection, five independent mechanics policies and one atomic Session
+commit. Proposed balance uses existing composure depletion and authored clock
+costs; it adds no relationship state, schema or scenario-fact rewrite.
+
+The independent review returned `CHANGES_REQUIRED` with one finding: an
+unconditional call to the existing positive-amount resource API would reject
+zero depletion. The corrected plan requires one `consume_resource` call and
+one successful-spend event only for positive actual depletion; zero skips both
+without rejection or early return, preserving Director advancement and other
+legitimate effects. Computed charge, saturation, atomicity and replay semantics
+are unchanged. Integration acceptance covers Easier default zero charge,
+exhausted composure with a positive charge, and a positive-depletion control.
+The corrected candidate remains unapproved pending focused re-review by the
+previous independent reviewer of this correction and its direct dependencies,
+preserving earlier conclusions. DF-001 remains deferred; no new finding is
+deferred.
+
+The proposed pure compiler emits canonical `run-prompt-context/v1` JSON after
+all UoWs, AsyncSessions and locks have ended. It projects exact numeric pressure
+to internal Generous `0..30`, Fluid `35..65`, Scarce `70..100` labels on the S2
+lattice. These are new proposals awaiting plan approval, not implemented or
+previously approved thresholds. Numeric S2 values remain exact. Presentation
+and compiled text grant no mechanical or canon authority; public labels remain
+S6-owned. The plan specifies native/legacy separation, detached evidence,
+outside-transaction compilation, focused tests and real-MySQL atomicity proof.
+No runtime evidence is claimed by this documentation candidate. S5 implementation
+has not started; Phase 3.3 remains incomplete.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1503,19 +1549,19 @@ Phase 3.3 is acceptable only when:
   budget are frozen by the published S2 plan and implementation. Durable S3
   representation is frozen in the independently approved published S3 plan;
   its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
-  independently approved with DF-001 deferred. S4 is an internal implementation
-  candidate awaiting focused independent re-review. Remaining runtime integration is S5-S7 work.
+  independently approved with DF-001 deferred. S4 internal implementation is
+  independently approved and published at `34dc752`. Remaining runtime integration is S5-S7 work.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
-  prompt projection; no threshold or band exists before its separately
-  reviewed plan and implementation.
+  prompt projection; exact proposed bands now appear in its planning candidate,
+  with no implementation or approval implied.
 - P3.3-S6 owns every public API, OpenAPI, Demo, Web, projection, recovery, and
   client representation of those labels; it may not replace the numeric S2
   value.
 - Compatibility and migration policy for future protocol versions.
 - World/profile discovery and unlock policy.
 - Public entry-world catalogue exposure/expansion (S6); S4's bounded internal
-  catalogue and explicit world/scenario mapping are implemented in its internal
-  candidate awaiting focused independent re-review.
+  catalogue and explicit world/scenario mapping are implemented and published
+  at `34dc752`; public activation remains deferred.
 - Later-world weighting algorithm and general anti-repeat rules.
 - Progression constraints and priority-injection rules for required story
   progression and major hidden settings; important-NPC integration remains
@@ -1536,6 +1582,7 @@ Phase 3.3 is acceptable only when:
 - [Published P3.3-S2 deterministic profile-resolution plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
 - [Published P3.3-S3 persistence plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
 - [Published P3.3-S4 native admission and entry-world plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
+- [Current P3.3-S5 mechanics and prompt-context plan candidate](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 - [Frozen Phase 3.3 implementation plan](phase_3_3_run_protocol_implementation_plan.md)
 - [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 - [Narrative Provider boundary](narrative_provider.md)
