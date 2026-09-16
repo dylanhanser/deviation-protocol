@@ -1340,6 +1340,28 @@ class SessionService:
     ) -> GameState:
         """Validate P8 entry evidence without consulting mutable catalogue data."""
 
+        return self._validate_entry_replay_fields(persisted, snapshot, initialization_event, evidence,
+            session_creation_request_id, participation=participation,
+            applicable_character_reference=applicable_character_reference, transaction_time=transaction_time,
+            evidence_type=RunEntryCreationEvidence)
+
+    def validate_native_run_entry_replay_initialization(
+        self, persisted, snapshot, initialization_event, evidence, session_creation_request_id,
+        *, participation, applicable_character_reference, transaction_time,
+    ):
+        from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
+        state = self._validate_entry_replay_fields(persisted, snapshot, initialization_event, evidence,
+            session_creation_request_id, participation=participation,
+            applicable_character_reference=applicable_character_reference, transaction_time=transaction_time,
+            evidence_type=NativeRunEntryCreationEvidenceV1)
+        if persisted.session.player_id != evidence.player_id:
+            raise SnapshotSessionMismatchError(persisted.session.session_id)
+        return state
+
+    def _validate_entry_replay_fields(
+        self, persisted, snapshot, initialization_event, evidence, session_creation_request_id,
+        *, participation, applicable_character_reference, transaction_time, evidence_type,
+    ):
         if (
             type(persisted) is not PersistedSession
             or type(snapshot) is not PersistedSnapshot
@@ -1349,7 +1371,7 @@ class SessionService:
             or type(initialization_event.payload) is not dict
         ):
             raise SnapshotInvalidError("run-entry")
-        evidence = revalidate_run_model(evidence, RunEntryCreationEvidence)
+        evidence = revalidate_run_model(evidence, evidence_type)
         participation = revalidate_run_model(
             participation, RunSessionParticipationReference
         )

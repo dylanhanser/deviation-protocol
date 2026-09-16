@@ -28,8 +28,9 @@ repairs or writes data. Existing Run-entry authorization remains service-owned.
 
 `RunProtocolBindingRow` and migration `20260828_0006` add only the independent
 19-column table, four checks, composite revision FK, and supporting index.
-`SqlAlchemyRunProtocolBindingRepository` exposes only `get_classified` and
-`get_classified_for_update`; UoW construction supplies the same session without
+`SqlAlchemyRunProtocolBindingRepository` retains `get_classified` and
+`get_classified_for_update`; S4 adds the guarded `add_native` staging port.
+Ordinary UoW construction supplies the same session without
 starting another transaction. The latter read locks rows in the frozen order.
 The downgrade holds its connection-owned advisory lock across the current-read
 empty probe and all DDL, preserves primary failures over cleanup, and discards
@@ -40,40 +41,71 @@ connection, separately from transaction completion. Both branches pass with the
 shared lock and fail the exclusion assertion with controlled different locks;
 normal and mutated variations restore rows, schema, revision, and locks.
 
-Production native writes/admission remain S4-owned. Test insertion exists only
-in the authorized integration helper. Run-entry caller authorization and Session
+S3 introduced no production writer. The S4 candidate below now owns production
+native insertion and admission; S3 component fixtures retain their own helper. Run-entry caller authorization and Session
 behavior are unchanged. The component neither establishes an integrated playable
 game nor grants later-slice authority. Phase 3.3 remains incomplete.
 
-## P3.3-S4 planned internal admission boundary
+## P3.3-S4 internal admission implementation candidate
 
-The [S4 plan candidate](phase_3_3_s4_native_run_admission_entry_world_plan.md)
-is the current planning subject, unapproved pending focused re-review after
-one `CHANGES_REQUIRED` receipt-to-protocol binding finding;
-implementation has not started. Its proposed design adds a production-composed
-internal native admission service, separately versioned creation evidence and
-an immutable authored world binding at Run revision 3. Revisions 1/2/3 retain
-their existing meanings. A dedicated UoW pins the physical connection and holds
-the S3 shared named lock through the single admission commit/rollback and checked
-release. One additive migration supplies world storage; complete reconstruction
-distinguishes admission from S3 protocol-component proof.
+The corrected S4 plan was independently approved with DF-001 deferred and
+published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-time
+wording is historical. Separately authorized S4 implementation is now an
+internal component candidate awaiting focused independent re-review after a
+`CHANGES_REQUIRED` review with one migration-disposal finding. The correction
+remains unapproved, uncommitted and unpublished. S5-S7 remain unimplemented
+and unauthorized, and Phase 3.3 remains incomplete.
 
-After individual receipt and S3 binding validation, complete reconstruction
-must require both strict receipt `resolution_input_hex` decoding byte-equal to
-binding `resolution_input_canonical`, and receipt `resolution_fingerprint`
-equal to the binding fingerprint in its existing lowercase-hex representation.
-The repository-owned admitted-family validator enforces both before any trusted
-result, for detached reconstruction and authorized owned replay. Either mismatch
-raises existing `RunProtocolBindingStoredIntegrityError` with no cause and no
-repair/writes; successful S3 internal consistency alone cannot prove receipt
-agreement. The S4 plan specifies the focused valid-A/B substitution regression.
+`NativeRunAdmissionService.enter` is available from normal `build_default_services`
+and the explicit native builder, with no connection opened during construction.
+The internal service authorizes the controller and owned character, compares
+native replay intent before current eligibility, resolves S1/S2 proposals, and
+looks up the explicit authored world. `world.death_certificate` version 1 maps
+to `death_certificate` / `death-certificate-1.1.0` and its approved investigator.
+World identity remains separate from scenario identity; no default or public
+world selection is introduced.
 
-The proposed internal catalogue reuses existing approved scenario content via
-an explicit world ID/version association. Scenario identity is not world identity,
-and the Demo scenario is not designated a permanent/default public entry world.
-These are proposed S4 contracts, not implemented capabilities. Public routes,
-API/OpenAPI, Demo/Web activation and public recovery remain S6-owned; mechanics
-and prompt compilation remain S5-owned; later-world continuity remains S7-owned.
+One application commit owns revisions 1/2/3, creation and mutation receipts,
+sole participation, initialized Session/event/snapshot, and protocol/world
+bindings at revision 3. Character rows are locked and never revised. Native
+creation evidence uses its own 0x8a family, version, fingerprint and deterministic
+ID prefix. Existing P8 evidence and revision semantics are unchanged.
+
+The dedicated native UoW binds its Session to an explicit connection transaction
+with `rollback_only`, and retains that physical connection through commit or
+rollback and checked release of the shared S3 named lock. Ordinary gameplay/P8
+UoWs retain their behavior. Cleanup preserves primary exceptions and cancellation,
+awaits retained cleanup work with a five-second rollback/release deadline, and
+discards unsafe owners. Unacknowledged commit is outcome-unknown; an explicit
+same-command retry reauthorizes and reconstructs any committed result.
+
+`NativeRunAdmissionV1` is distinct from S3 component-only binding proof. Complete
+reconstruction first validates each family, then checks both native receipt
+resolution-input byte equality and fingerprint equality with the stored protocol.
+Either mismatch raises exactly `RunProtocolBindingStoredIntegrityError` with no
+cause. Detached classification and owned replay share this check, never repair
+rows, and return the original admitted result after Session progression.
+
+Migration `20260916_0007` adds only the 11-column world-binding table, its checks,
+index and restrictive FKs. Downgrade holds the shared lock and uses current
+locking world and native-evidence probes before DDL; admitted data refuses
+forward-destructive recovery. Older migration bytes are unchanged. Historical
+S3 tests still exercise 005/006 and restore 007 for the new classifier.
+On failed migration invalidation, retained pool/driver handles allow detachment
+before synchronous asyncmy transport close and detached-proxy invalidation.
+Wrapper closure alone does not prove termination or advisory-lock release. If
+physical close also fails, the detached owner cannot return to pool reuse and
+the original error retains the disposal failures; termination is not claimed.
+
+Native admission chooses whole-second UTC transaction time before constructing
+evidence because existing Session/event columns have that precision. This keeps
+all family timestamps equal without changing old schema (DB-001).
+
+Verification and external evidence are recorded in
+[the S4 candidate evidence](run_protocol.md#p33-s4-implementation-candidate-evidence).
+Public routes/OpenAPI, Demo/Web entry and public recovery remain S6-owned;
+mechanics/prompt compilation remain S5-owned; later worlds/continuity remain
+S7-owned. This internal component is not a complete player-facing native flow.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -149,8 +181,8 @@ objective numeric mechanics, native admission, entry-world freeze, public API
 or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
-resolution. S3's published component is described above; S4 planning is current,
-S4-S7 implementation remains unauthorized; the
+resolution. S3's published component and the S4 implementation candidate are
+described above; S5-S7 remain unimplemented and unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1043,9 +1075,9 @@ components described above:
 
 - Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
   published S1/S2 components supply representation and deterministic resolution;
-  published S3 supplies durable binding reconstruction. S4 admission/world
-  freezing is the current plan candidate, not implemented; mechanics and public
-  activation remain later work: [`run_protocol.md`](run_protocol.md).
+  published S3 supplies durable binding reconstruction. The S4 candidate adds
+  internal admission/world freezing and awaits independent review; mechanics
+  and public activation remain later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider

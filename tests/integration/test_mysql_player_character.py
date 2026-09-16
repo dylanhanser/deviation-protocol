@@ -115,7 +115,7 @@ MIGRATION_PATH = (
 )
 MIGRATION_REVISION = "20260728_0004"
 MIGRATION_PARENT = "20260719_0003"
-CURRENT_HEAD_REVISION = "20260828_0006"
+CURRENT_HEAD_REVISION = "20260916_0007"
 
 LEGACY_MAPPED_TABLES = {
     "domain_events",
@@ -831,7 +831,7 @@ def test_phase_2_metadata_has_exact_six_table_contract() -> None:
         LEGACY_MAPPED_TABLES
         | PHASE_2_TABLE_SET
         | MINIMUM_RUN_CORE_TABLES
-        | {"run_protocol_bindings"}
+        | {"run_protocol_bindings", "run_entry_world_bindings"}
     )
 
     for table_name in PHASE_2_TABLES:
@@ -904,6 +904,7 @@ def test_migration_is_one_linear_head_after_0003() -> None:
         item.revision for item in scripts.walk_revisions()
     ) == (
         CURRENT_HEAD_REVISION,
+        "20260828_0006",
         "20260729_0005",
         "20260728_0004",
         "20260719_0003",

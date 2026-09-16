@@ -115,7 +115,7 @@ def test_s3_v33():
 
     assert RunProtocolBindingRepository.__abstractmethods__ == {"get_classified", "get_classified_for_update"}
     public = {name for name in vars(SqlAlchemyRunProtocolBindingRepository) if not name.startswith("_")}
-    assert public == {"get_classified", "get_classified_for_update"}
+    assert public == {"get_classified", "get_classified_for_update", "add_native"}
     schema = main.create_app().openapi()
     assert all("protocol-binding" not in path and "native" not in path for path in schema["paths"])
     assert all("NativeRunProtocolBinding" not in name for name in schema["components"]["schemas"])
@@ -136,6 +136,34 @@ async def test_s3_v36():
     with pytest.raises(TypeError):
         await SqlAlchemyRunProtocolBindingRepository(session).get_classified(run_id=None)
     session.execute.assert_not_awaited()
+
+
+async def test_native_writers_reject_unguarded_use_before_sql():
+    from deviation_protocol.infrastructure.repositories import SqlAlchemyRunProtocolBindingRepository, SqlAlchemyRunEntryWorldBindingRepository
+    session = AsyncMock()
+    for repository in (SqlAlchemyRunProtocolBindingRepository(session), SqlAlchemyRunEntryWorldBindingRepository(session, native_guard=None)):
+        with pytest.raises(RuntimeError, match="pinned admission lock owner"):
+            await repository.add_native(object(), created_at=object())
+    session.execute.assert_not_awaited()
+    session.flush.assert_not_awaited()
+
+
+@pytest.mark.parametrize("code", [1062, 3819, 1452])
+async def test_native_insert_translates_only_numeric_duplicate_flush(code):
+    from unittest.mock import Mock
+    from asyncmy.errors import IntegrityError as DriverIntegrityError
+    from sqlalchemy.exc import IntegrityError
+    from deviation_protocol.application.ports import NativeRunAdmissionWriteConflictError
+    from deviation_protocol.infrastructure.repositories import _flush_native_binding
+    session = AsyncMock()
+    session.add = Mock()
+    failure = IntegrityError("insert", {}, DriverIntegrityError(code, "localized text is irrelevant"))
+    session.flush.side_effect = failure
+    row = object()
+    with pytest.raises(NativeRunAdmissionWriteConflictError if code == 1062 else IntegrityError) as caught:
+        await _flush_native_binding(session, row)
+    assert (caught.value.__cause__ is failure) if code == 1062 else (caught.value is failure)
+    session.flush.assert_awaited_once_with([row])
 
 
 def _active_character():

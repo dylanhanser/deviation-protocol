@@ -70,4 +70,60 @@ class NativeRunProtocolBindingV1(BaseModel):
         return revalidate_run_model(value, expected)
 
 
-_ClassifiedRun = LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1
+from deviation_protocol.domain.entry_world import AuthoredEntryWorldV1
+
+
+class RunEntryWorldBindingV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True,
+                              revalidate_instances="always")
+
+    run_id: RunId
+    continuous_story_line_id: ContinuousStoryLineId
+    bound_state_version: RunStateVersion
+    entry_world: AuthoredEntryWorldV1
+
+    @field_validator("run_id", "continuous_story_line_id", "bound_state_version", "entry_world", mode="before")
+    @classmethod
+    def _original(cls, value, info):
+        expected = {"run_id": RunId, "continuous_story_line_id": ContinuousStoryLineId,
+                    "bound_state_version": RunStateVersion, "entry_world": AuthoredEntryWorldV1}[info.field_name]
+        return revalidate_run_model(value, expected)
+
+    @model_validator(mode="after")
+    def _version(self):
+        if self.bound_state_version.value != 3:
+            raise ValueError("entry-world binding requires revision three")
+        return self
+
+
+class NativeRunAdmissionV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True,
+                              revalidate_instances="always")
+
+    canonical_run: CanonicalRun
+    protocol_binding: NativeRunProtocolBindingV1
+    world_binding: RunEntryWorldBindingV1
+
+    @field_validator("canonical_run", "protocol_binding", "world_binding", mode="before")
+    @classmethod
+    def _original(cls, value, info):
+        expected = {"canonical_run": CanonicalRun, "protocol_binding": NativeRunProtocolBindingV1,
+                    "world_binding": RunEntryWorldBindingV1}[info.field_name]
+        return revalidate_run_model(value, expected)
+
+    @model_validator(mode="after")
+    def _association(self):
+        run = validate_canonical_run(self.canonical_run)
+        if (run.state_version.value != 3 or run.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                or run.player_character_binding is None
+                or len(run.trusted_participation_references) != 1):
+            raise ValueError("native admission requires complete active revision three")
+        for binding in (self.protocol_binding, self.world_binding):
+            if (binding.run_id != run.run_id
+                    or binding.continuous_story_line_id != run.continuous_story_line_id
+                    or binding.bound_state_version != run.state_version):
+                raise ValueError("native admission binding association")
+        return self
+
+
+_ClassifiedRun = LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1

@@ -45,9 +45,12 @@ from deviation_protocol.domain.run import (
     RunSessionParticipationReference,
 )
 if TYPE_CHECKING:
+    from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
     from deviation_protocol.domain.run_protocol_binding import (
         LegacyRunCompatibilityV1,
         NativeRunProtocolBindingV1,
+        NativeRunAdmissionV1,
+        RunEntryWorldBindingV1,
     )
 
 
@@ -399,16 +402,19 @@ class ContinuousStoryLineIdIssuer(Protocol):
 
 
 class RunProtocolBindingRepository(ABC):
+    async def add_native(self, binding: NativeRunProtocolBindingV1, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
     @abstractmethod
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | None:
         raise NotImplementedError
 
     @abstractmethod
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | None:
         raise NotImplementedError
 
 
@@ -481,6 +487,9 @@ class RunSessionParticipationRepository(ABC):
 
 
 class RunCreationReceiptRepository(ABC):
+    async def add_native_with_evidence(self, receipt: StoredRunSuccessReceipt, evidence: NativeRunEntryCreationEvidenceV1, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
     @abstractmethod
     async def get(self, key: RunReceiptKey) -> StoredRunSuccessReceipt | None:
         raise NotImplementedError
@@ -510,7 +519,7 @@ class RunCreationReceiptRepository(ABC):
 @dataclass(frozen=True, slots=True)
 class StoredRunCreationEvidence:
     receipt: StoredRunSuccessReceipt
-    evidence: CreateRunCommand | RunEntryCreationEvidence
+    evidence: CreateRunCommand | RunEntryCreationEvidence | NativeRunEntryCreationEvidenceV1
     evidence_canonical: bytes
 
 
@@ -564,6 +573,32 @@ class UnitOfWork(ABC):
 
 class UnitOfWorkFactory(Protocol):
     def __call__(self) -> UnitOfWork: ...
+
+
+class NativeRunAdmissionWriteConflictError(RuntimeError):
+    """A single native binding insert encountered numeric duplicate key 1062."""
+
+
+class NativeRunAdmissionLockError(RuntimeError):
+    """Native connection-owned advisory lock could not be proven safe."""
+
+
+class NativeRunAdmissionOutcomeUnknownError(RuntimeError):
+    """Commit was issued but acknowledgement was lost; explicit retry only."""
+
+
+class RunEntryWorldBindingRepository(ABC):
+    @abstractmethod
+    async def add_native(self, binding: RunEntryWorldBindingV1, *, created_at: datetime) -> None:
+        raise NotImplementedError
+
+
+class NativeRunAdmissionUnitOfWork(UnitOfWork):
+    run_entry_world_bindings: RunEntryWorldBindingRepository
+
+
+class NativeRunAdmissionUnitOfWorkFactory(Protocol):
+    def __call__(self) -> NativeRunAdmissionUnitOfWork: ...
 
 
 class TurnOrchestrator(Protocol):

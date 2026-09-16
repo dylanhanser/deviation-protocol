@@ -227,7 +227,7 @@ def test_run_migration_matches_shared_metadata_and_is_linear(
     )
 
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["20260828_0006"]
+    assert scripts.get_heads() == ["20260916_0007"]
     revision = scripts.get_revision("20260729_0005")
     assert revision is not None
     assert revision.down_revision == "20260728_0004"
@@ -303,7 +303,7 @@ def test_mysql_run_migration_upgrades_only_the_designated_test_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", _safe_database_url())
-    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260828_0006")
+    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260916_0007")
 
 
 @pytest.mark.integration
@@ -354,8 +354,8 @@ async def test_mysql_run_schema_is_exact_and_binding_seam_is_nullable(
             ).scalars()
         )
 
-    assert revision == "20260828_0006"
-    assert tables == set(RUN_TABLES) | {"run_protocol_bindings"}
+    assert revision == "20260916_0007"
+    assert tables == set(RUN_TABLES) | {"run_protocol_bindings", "run_entry_world_bindings"}
     assert game_session_run_columns == set()
     expected_binding_columns = {
         "binding_player_character_id",

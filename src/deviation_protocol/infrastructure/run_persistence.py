@@ -324,6 +324,30 @@ def run_entry_creation_evidence_from_storage(value: bytes) -> RunEntryCreationEv
     return evidence
 
 
+def native_run_entry_creation_evidence_from_storage(value: bytes):
+    from deviation_protocol.application.native_run_admission import (
+        NativeRunEntryCreationEvidenceV1, NATIVE_EVIDENCE_MAGIC,
+        native_run_entry_evidence_bytes,
+    )
+    if type(value) is not bytes or not 14 <= len(value) <= 4096:
+        raise _fail("native creation evidence byte bounds")
+    if not value.startswith(NATIVE_EVIDENCE_MAGIC):
+        raise _fail("native creation evidence magic")
+    if value[12] != 1:
+        raise _fail("unsupported native creation evidence version")
+    payload = value[13:]
+    _strict_object(payload)
+    try:
+        evidence = NativeRunEntryCreationEvidenceV1.model_validate_json(payload, strict=True)
+        revalidate_run_model(evidence, NativeRunEntryCreationEvidenceV1)
+        encoded = native_run_entry_evidence_bytes(evidence)
+    except (TypeError, ValueError) as error:
+        raise _fail("invalid native creation evidence") from error
+    if encoded != value:
+        raise _fail("noncanonical native creation evidence")
+    return evidence
+
+
 def creation_evidence_from_storage(
     value: bytes,
 ) -> CreateRunCommand | RunEntryCreationEvidence:
@@ -332,6 +356,8 @@ def creation_evidence_from_storage(
         raise _fail("Run creation evidence is empty or invalid")
     if value[0] == 0x89:
         return run_entry_creation_evidence_from_storage(value)
+    if value[0] == 0x8A:
+        return native_run_entry_creation_evidence_from_storage(value)
     if value[0] == 0x7B:
         return creation_operation_evidence_from_storage(value)
     raise _fail("Run creation evidence has no admitted family")
@@ -624,7 +650,10 @@ def creation_receipt_from_storage(
     command = creation_evidence_from_storage(
         stored.operation_evidence_canonical
     )
-    if isinstance(command, RunEntryCreationEvidence):
+    if stored.operation_evidence_canonical[0] == 0x8A:
+        from deviation_protocol.application.native_run_admission import native_run_entry_creation_fingerprint
+        _, fingerprint = native_run_entry_creation_fingerprint(command)
+    elif isinstance(command, RunEntryCreationEvidence):
         _, fingerprint = run_entry_creation_fingerprint(command)
     else:
         _, fingerprint = create_run_fingerprint(command)
@@ -970,7 +999,7 @@ def validate_stored_run_record_set(
         != initial.creation_provenance.operation_id
         or (
             creation_command.trusted_run_source.source_reference
-            if isinstance(creation_command, RunEntryCreationEvidence)
+            if type(creation_command) is not CreateRunCommand
             else creation_command.source_reference
         )
         != initial.creation_provenance.source_reference

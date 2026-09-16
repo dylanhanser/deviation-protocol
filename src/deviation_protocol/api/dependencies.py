@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 from fastapi import Request
 from sqlalchemy.ext.asyncio import AsyncEngine
@@ -12,6 +12,8 @@ from deviation_protocol.application.player_character_service import (
 )
 from deviation_protocol.application.ports import TurnOrchestrator
 from deviation_protocol.application.run_entry_service import RunEntryService
+if TYPE_CHECKING:
+    from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
 from deviation_protocol.application.run_service import RunService
 from deviation_protocol.application.session_service import SessionService
 from deviation_protocol.application.narrative_models import NarrativeProvider
@@ -24,6 +26,11 @@ class ApiServices:
     player_character_service: PlayerCharacterService | None = None
     run_service: RunService | None = None
     run_entry_service: RunEntryService | None = None
+    if TYPE_CHECKING:
+        native_run_admission_service: NativeRunAdmissionService | None = None
+    else:
+        # Runtime introspection remains usable without importing S2 into Demo.
+        native_run_admission_service: RunEntryService | None = None
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
 

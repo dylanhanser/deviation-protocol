@@ -46,6 +46,39 @@ _CONTROLLER_BINDING = ConfiguredControllerBinding(
 _SOURCE = RunAuthoritySourceRef(value="source.production-run")
 
 
+def test_native_normal_composition_is_internal_lazy_and_demo_absent(monkeypatch):
+    from unittest.mock import Mock
+    from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
+    from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
+    engine = Mock()
+    monkeypatch.setattr(main, "create_engine", lambda: engine)
+    services = main.build_default_services(player_character_controller_bindings=(_CONTROLLER_BINDING,))
+    native = services.native_run_admission_service
+    assert type(native) is NativeRunAdmissionService
+    assert type(native.uow_factory) is SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
+    assert native.uow_factory.engine is engine
+    assert native.session_service is services.session_service
+    assert native.controller_binding_resolver is services.run_service.controller_binding_resolver
+    assert native.source_reference == _SOURCE
+    engine.connect.assert_not_called()
+    schema = main.create_app(services=services).openapi()
+    from dataclasses import replace
+    assert main.create_app(services=replace(services, native_run_admission_service=None)).openapi() == schema
+    assert ApiServices.__dataclass_fields__["native_run_admission_service"].default is None
+
+
+def test_legacy_demo_import_does_not_load_native_resolution_or_emit_diagnostics():
+    import os
+    import subprocess
+    import sys
+    environment = os.environ.copy()
+    for name in ("DATABASE_URL", "TEST_DATABASE_URL", "DEEPSEEK_API_KEY", "RUN_LIVE_DEEPSEEK_TEST"):
+        environment.pop(name, None)
+    child = subprocess.run([sys.executable, "-c", "import sys; import deviation_protocol.api.demo_composition; assert 'deviation_protocol.application.native_run_admission' not in sys.modules"],
+                           env=environment, capture_output=True, timeout=15)
+    assert child.returncode == 0 and child.stdout == child.stderr == b""
+
+
 def _build_run_service(uow_factory) -> RunService:
     resolver = object()
     evidence = object()

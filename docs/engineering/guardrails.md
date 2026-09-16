@@ -91,6 +91,10 @@ Observed failure:
 - MySQL authentication required an undeclared runtime dependency.
 - Idempotency, snapshot CAS, rollback, and detached version restoration had
   incomplete edge cases.
+- Native admission with the production clock failed reconstruction because Run
+  timestamps retained microseconds while existing Session/event columns did not.
+- Combined rollback/invalidation failure left the native connection wrapper open
+  after its driver was closed.
 
 Rule:
 
@@ -100,11 +104,21 @@ Rule:
 - Repositories do not commit.
 - State, snapshot, events, response, job state, and version commit atomically.
 - Idempotency binds the complete request and uses locks plus unique constraints.
+- When equality spans persisted timestamps, choose one transaction timestamp
+  at a precision supported by every participating column before constructing
+  evidence. Do not repair or relax equality after database truncation.
+- Disposal failure must still remove the retained physical owner from pool reuse
+  and close its wrappers, preserving the original error and cleanup evidence.
 
 Enforcement:
 
 - Repository, UoW, idempotency, rollback, and real MySQL tests
 - Alembic consistency checks
+- Native admission through normal production composition with a fractional
+  clock and real MySQL, followed by complete reconstruction and owned replay
+- Migration 007 live-owner invalidation/disposal regression:
+  `test_007_failed_invalidation_terminates_live_owner` (including physical-close
+  failure, independent owner/lock observation and usable subsequent checkout)
 
 ## DB-002: Ending candidates require post-event memory validation
 

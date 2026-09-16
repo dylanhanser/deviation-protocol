@@ -87,6 +87,32 @@ class RunProtocolBindingRow(Base):
     created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
 
 
+class RunEntryWorldBindingRow(Base):
+    __tablename__ = "run_entry_world_bindings"
+    __table_args__ = (
+        PrimaryKeyConstraint("run_id", name="pk_run_entry_world_bindings"),
+        CheckConstraint("CHAR_LENGTH(run_id) >= 1 AND run_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(continuous_story_line_id) >= 1 AND continuous_story_line_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(entry_world_id) >= 1 AND entry_world_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(scenario_id) >= 1 AND scenario_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(scenario_content_version) >= 1 AND scenario_content_version REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(default_character_definition_id) >= 1 AND default_character_definition_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$'", name="ck_run_entry_world_bindings_identity"),
+        CheckConstraint('bound_state_version = 3 AND binding_record_version = 1 AND entry_world_version BETWEEN 1 AND 9223372036854775807', name="ck_run_entry_world_bindings_versions"),
+        CheckConstraint("binding_epoch = 'run-entry-world-binding'", name="ck_run_entry_world_bindings_epoch"),
+        ForeignKeyConstraint(["run_id"], ["run_protocol_bindings.run_id"], name="fk_run_entry_world_bindings_protocol", ondelete="RESTRICT", onupdate="RESTRICT"),
+        ForeignKeyConstraint(["run_id", "continuous_story_line_id", "bound_state_version"], ["run_revisions.run_id", "run_revisions.continuous_story_line_id", "run_revisions.state_version"], name="fk_run_entry_world_bindings_revision", ondelete="RESTRICT", onupdate="RESTRICT"),
+        Index("ix_run_entry_world_bindings_revision", "run_id", "continuous_story_line_id", "bound_state_version"),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    run_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    continuous_story_line_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    bound_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    binding_epoch: Mapped[str] = mapped_column(_ascii_varchar(64), nullable=False)
+    binding_record_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    entry_world_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    entry_world_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    scenario_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    scenario_content_version: Mapped[str] = mapped_column(_ascii_varchar(32), nullable=False)
+    default_character_definition_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
+
+
 class GameSessionRow(Base):
     __tablename__ = "game_sessions"
     __table_args__ = (

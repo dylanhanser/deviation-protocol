@@ -113,6 +113,7 @@ from deviation_protocol.infrastructure.orm_models import (
     RunMutationReceiptRow,
     RunRevisionRow,
     RunProtocolBindingRow,
+    RunEntryWorldBindingRow,
     RunSessionParticipationRow,
     TurnRequestRow,
     utc_now,
@@ -169,9 +170,45 @@ if TYPE_CHECKING:
     )
 
 
-class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
-    def __init__(self, session: AsyncSession) -> None:
+def _require_native_writer(guard):
+    if guard is None or guard() is not True:
+        raise RuntimeError("native writer requires the pinned admission lock owner")
+
+
+async def _flush_native_binding(session, row):
+    from sqlalchemy.exc import IntegrityError
+    from deviation_protocol.application.ports import NativeRunAdmissionWriteConflictError
+    session.add(row)
+    try:
+        await session.flush([row])
+    except IntegrityError as error:
+        if (type(error.orig).__module__.startswith("asyncmy") and error.orig.args
+                and type(error.orig.args[0]) is int and error.orig.args[0] == 1062):
+            raise NativeRunAdmissionWriteConflictError("native binding duplicate") from error
+        raise
+
+
+class SqlAlchemyRunEntryWorldBindingRepository:
+    def __init__(self, session, *, native_guard):
         self._session = session
+        self._native_guard = native_guard
+
+    async def add_native(self, binding, *, created_at):
+        from deviation_protocol.infrastructure.run_protocol_binding_persistence import _world_binding_values
+        _require_native_writer(self._native_guard)
+        await _flush_native_binding(self._session, RunEntryWorldBindingRow(**_world_binding_values(binding, created_at=created_at)))
+
+
+class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
+    def __init__(self, session: AsyncSession, *, native_guard=None) -> None:
+        self._session = session
+        self._native_guard = native_guard
+
+    async def add_native(self, binding, *, created_at):
+        from deviation_protocol.infrastructure import run_protocol_binding_persistence as codec
+        _require_native_writer(self._native_guard)
+        values = codec._native_binding_values(binding, created_at=created_at)
+        await _flush_native_binding(self._session, RunProtocolBindingRow(**values))
 
     async def get_classified(
         self, *, run_id: RunId
@@ -233,6 +270,7 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
                 (RunCreationReceiptRow, RunCreationReceiptRow.result_run_id),
                 (RunMutationReceiptRow, RunMutationReceiptRow.run_id),
                 (RunProtocolBindingRow, RunProtocolBindingRow.run_id),
+                (RunEntryWorldBindingRow, RunEntryWorldBindingRow.run_id),
             ):
                 orphan = await self._read(select(model).where(column == run_id.value).limit(1), locking=locking)
                 binding_storage._require(orphan is None, "orphan Run family evidence")
@@ -283,6 +321,24 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
             referenced_player_character_revision=immutable,
         )
         native_row = await self._read(select(RunProtocolBindingRow).where(RunProtocolBindingRow.run_id == run_id.value), locking=locking)
+        world_row = await self._read(select(RunEntryWorldBindingRow).where(RunEntryWorldBindingRow.run_id == run_id.value), locking=locking)
+        from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
+        evidence = creation_evidence_from_storage(creation.operation_evidence_canonical)
+        if type(evidence) is NativeRunEntryCreationEvidenceV1:
+            binding_storage._require(native_row is not None and world_row is not None, "incomplete native bindings")
+            stored = binding_storage._stored_binding_from_row(native_row, self._session)
+            protocol = binding_storage._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=None)
+            world = binding_storage._reconstruct_world_binding(binding_storage._stored_world_from_row(world_row, self._session), run)
+            request_id = self._codec(binding_storage._native_entry_evidence, run, revisions, creation, mutations, participations, evidence, protocol, world, stored)
+            binding_storage._require(immutable is not None, "native immutable character missing")
+            character_row = await self._read(select(PlayerCharacterCurrentRow).where(PlayerCharacterCurrentRow.player_character_id == immutable.player_character_id.value), locking=locking)
+            controller_row = await self._read(select(PlayerCharacterControllerBindingRow).where(PlayerCharacterControllerBindingRow.controller_binding == immutable.controller_binding.value), locking=locking)
+            self._codec(binding_storage._validate_native_character, run, evidence, immutable, character_row, controller_row)
+            participation = participations[0]
+            session_row = await self._read(select(GameSessionRow).where(GameSessionRow.session_id == participation.session_id), locking=locking)
+            event_row = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == participation.session_id, DomainEventRow.sequence_no == 1), locking=locking)
+            snapshot_row = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == participation.session_id), locking=locking)
+            return self._codec(binding_storage._complete_native_admission, run, protocol, world, evidence, request_id, participation, session_row, event_row, snapshot_row)
         legacy = self._codec(binding_storage._legacy_entry_evidence, run, revisions, creation, mutations, participations)
         legacy_proof = None
         if legacy is not None:
@@ -299,6 +355,7 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
             event_row = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == participation.session_id, DomainEventRow.sequence_no == 1), locking=locking)
             snapshot_row = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == participation.session_id), locking=locking)
             legacy_proof = self._codec(binding_storage._validate_legacy_session, run, evidence, creation_request_id, participation, session_row, event_row, snapshot_row)
+        binding_storage._require(world_row is None, "world row on non-admission family")
         if native_row is not None:
             stored = binding_storage._stored_binding_from_row(native_row, self._session)
             return binding_storage._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=legacy_proof)
@@ -3159,6 +3216,16 @@ class SqlAlchemyRunCreationReceiptRepository(
         *,
         created_at: datetime,
     ) -> None:
+        evidence_bytes, fingerprint = run_entry_creation_fingerprint(evidence)
+        await self._add_entry_evidence(receipt, evidence, evidence_bytes, fingerprint, created_at=created_at)
+
+    async def add_native_with_evidence(self, receipt, evidence, *, created_at):
+        from deviation_protocol.application.native_run_admission import native_run_entry_creation_fingerprint
+        _require_native_writer(self._session.info.get("native_admission_guard"))
+        evidence_bytes, fingerprint = native_run_entry_creation_fingerprint(evidence)
+        await self._add_entry_evidence(receipt, evidence, evidence_bytes, fingerprint, created_at=created_at)
+
+    async def _add_entry_evidence(self, receipt, evidence, evidence_bytes, fingerprint, *, created_at):
         """Persist the validated P8 composite in the existing receipt column."""
         if (
             receipt.key.operation_namespace
@@ -3166,7 +3233,6 @@ class SqlAlchemyRunCreationReceiptRepository(
             or receipt.command_kind is not RunMutationKind.CREATE
         ):
             raise ValueError("Run creation receipt repository rejects command")
-        evidence_bytes, fingerprint = run_entry_creation_fingerprint(evidence)
         if receipt.fingerprint != fingerprint:
             raise RunStoredRecordIntegrityError(
                 "P8 receipt fingerprint does not bind composite evidence"

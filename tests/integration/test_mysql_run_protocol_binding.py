@@ -30,7 +30,8 @@ from tests.unit.test_run_protocol_binding_persistence import literal, native_fam
 pytestmark = pytest.mark.integration
 LOCK = "deviation_protocol:p33:s3:run_protocol_bindings:ddl_write:v1"
 REFUSAL = "Refusing to downgrade P3.3-S3: native Run Protocol binding data exists; recovery must be forward-only"
-HEAD = "20260828_0006"
+HEAD = "20260828_0006"  # Historical S3 migration target, not current repository head.
+CURRENT_HEAD = "20260916_0007"
 BASE = "20260729_0005"
 TABLE = "run_protocol_bindings"
 SCRIPT = ScriptDirectory.from_config(Config(str(Path(__file__).parents[2] / "alembic.ini")))
@@ -180,24 +181,39 @@ async def _restore(engine):
         await connection.commit()
 
 
+async def _schema_target(connection, target):
+    def execute(sync):
+        context = MigrationContext.configure(sync, opts={"fn": lambda revisions, context:
+            SCRIPT._downgrade_revs(target, revisions) if target == HEAD else SCRIPT._upgrade_revs(target, revisions)})
+        with Operations.context(context), context.begin_transaction():
+            context.run_migrations()
+    await connection.run_sync(execute)
+    await connection.commit()
+
+
 @pytest.fixture
-async def s3db(mysql_engine):
+async def s3db(mysql_engine, request):
+    historical = int(request.node.originalname.split("_v")[1].split("_")[0]) >= 29
     async with mysql_engine.connect() as connection:
         assert str(await connection.scalar(sa.text("SELECT VERSION()"))).startswith("8.")
         assert await connection.scalar(sa.text("SELECT DATABASE()")) == "deviation_protocol_test"
         revision = await connection.scalar(sa.text("SELECT version_num FROM alembic_version"))
-        assert revision in (BASE, HEAD)
-        if revision == BASE:
-            await connection.rollback()
-            await _migrate(connection, "upgrade")
-            await connection.commit()
+        assert revision in (BASE, HEAD, CURRENT_HEAD)
+        await connection.rollback()
+        if revision != CURRENT_HEAD:
+            await _schema_target(connection, CURRENT_HEAD)
+        if historical:
+            await _schema_target(connection, HEAD)
         assert await connection.scalar(sa.text("SELECT COUNT(*) FROM run_protocol_bindings")) == 0
     try:
         yield mysql_engine
     finally:
         await _restore(mysql_engine)
+        async with mysql_engine.connect() as connection:
+            await _schema_target(connection, CURRENT_HEAD)
         signature, revision = await _observe(mysql_engine)
-        assert signature is not None and revision == HEAD
+        assert signature is not None and revision == CURRENT_HEAD
+
 
 
 @asynccontextmanager
@@ -402,7 +418,7 @@ async def test_s3_v27(s3db):
 async def _old_rows(connection):
     snapshot = {}
     for table in orm.Base.metadata.sorted_tables:
-        if table.name == TABLE:
+        if table.name in (TABLE, "run_entry_world_bindings"):
             continue
         rows = (await connection.execute(sa.select(table))).all()
         snapshot[table.name] = sorted(
@@ -476,6 +492,8 @@ async def test_s3_v29(s3db):
                 "WHERE CONSTRAINT_SCHEMA=DATABASE() AND CONSTRAINT_NAME='fk_run_protocol_bindings_revision'"
             ))).one()
             assert tuple(rules) == ("RESTRICT", "RESTRICT")
+        async with s3db.connect() as connection:
+            await _schema_target(connection, CURRENT_HEAD)
         async with AsyncSession(s3db) as session:
             result = await SqlAlchemyRunProtocolBindingRepository(session).get_classified(run_id=run.run_id)
             assert type(result) is LegacyRunCompatibilityV1

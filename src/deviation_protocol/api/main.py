@@ -860,6 +860,20 @@ def build_run_entry_service(
     )
 
 
+def build_native_run_admission_service(*, engine, run_service: RunService, session_service: SessionService):
+    from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
+    from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
+    return NativeRunAdmissionService(
+        uow_factory=SqlAlchemyNativeRunAdmissionUnitOfWorkFactory(engine),
+        run_id_issuer=run_service.run_id_issuer,
+        continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
+        source_reference=run_service.source_reference, clock=run_service.clock,
+        controller_binding_resolver=run_service.controller_binding_resolver,
+        player_character_binding_evidence=run_service.player_character_binding_evidence,
+        session_service=session_service,
+    )
+
+
 def build_default_services(
     *,
     player_character_controller_bindings: (
@@ -926,6 +940,9 @@ def build_default_services(
         run_entry_service=build_run_entry_service(
             run_service=run_service,
             session_service=session_service,
+        ),
+        native_run_admission_service=build_native_run_admission_service(
+            engine=engine, run_service=run_service, session_service=session_service,
         ),
         engine=engine,
         narrative_provider=provider,
