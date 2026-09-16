@@ -96,6 +96,48 @@ CHARACTER_REFERENCE = ApplicableCharacterReference(
 )
 
 
+async def test_s3_v23():
+    session = AsyncMock()
+    session.execute.return_value = SimpleNamespace(rowcount=0)
+    adapter = SqlAlchemyRunRepository(session)
+    successor = _bound()
+    adapter._run_at_revision = AsyncMock(return_value=successor)
+    assert await adapter.compare_and_swap_current(successor, expected_state_version=1, updated_at=NOW) is False
+    assert session.execute.await_count == 1
+    session.add.assert_not_called()
+
+
+def test_s3_v33():
+    from deviation_protocol.api import main
+    from deviation_protocol.application.ports import RunProtocolBindingRepository
+    from deviation_protocol.infrastructure.repositories import SqlAlchemyRunProtocolBindingRepository
+    from tests.unit.test_run_composition import test_run_composition_activates_only_authorized_player_character_routes
+
+    assert RunProtocolBindingRepository.__abstractmethods__ == {"get_classified", "get_classified_for_update"}
+    public = {name for name in vars(SqlAlchemyRunProtocolBindingRepository) if not name.startswith("_")}
+    assert public == {"get_classified", "get_classified_for_update"}
+    schema = main.create_app().openapi()
+    assert all("protocol-binding" not in path and "native" not in path for path in schema["paths"])
+    assert all("NativeRunProtocolBinding" not in name for name in schema["components"]["schemas"])
+    test_run_composition_activates_only_authorized_player_character_routes()
+
+
+async def test_s3_v34():
+    from deviation_protocol.infrastructure.repositories import SqlAlchemyRunProtocolBindingRepository
+    session = AsyncMock()
+    with pytest.raises(TypeError):
+        await SqlAlchemyRunProtocolBindingRepository(session).get_classified(run_id=RUN_ID, entry_world_id="forbidden")
+    session.execute.assert_not_awaited()
+
+
+async def test_s3_v36():
+    from deviation_protocol.infrastructure.repositories import SqlAlchemyRunProtocolBindingRepository
+    session = AsyncMock()
+    with pytest.raises(TypeError):
+        await SqlAlchemyRunProtocolBindingRepository(session).get_classified(run_id=None)
+    session.execute.assert_not_awaited()
+
+
 def _active_character():
     return CreatePlayerCharacterPolicy().create(
         player_character_id=PLAYER_CHARACTER_ID,

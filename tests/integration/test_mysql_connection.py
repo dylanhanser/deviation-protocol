@@ -100,7 +100,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             )
         ).all()
 
-    assert revision == "20260729_0005"
+    assert revision == "20260828_0006"
     table_details = {row[0]: (row[1], row[2]) for row in tables}
     expected_tables = {
         "alembic_version",
@@ -120,6 +120,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
         "run_session_participations",
         "run_creation_receipts",
         "run_mutation_receipts",
+        "run_protocol_bindings",
     }
     assert set(table_details) == expected_tables
     assert all(engine == "InnoDB" for engine, _ in table_details.values())
@@ -184,6 +185,7 @@ async def test_migrated_mysql_schema_is_present(mysql_engine: AsyncEngine) -> No
             "RESTRICT",
         ),
         ("run_current", "run_revisions", "RESTRICT"),
+        ("run_protocol_bindings", "run_revisions", "RESTRICT"),
         ("run_current", "player_character_revisions", "RESTRICT"),
         ("run_revisions", "player_character_revisions", "RESTRICT"),
         ("run_session_participations", "game_sessions", "RESTRICT"),

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKeyConstraint,
     Index,
     Integer,
+    PrimaryKeyConstraint,
     String,
     Text,
     UniqueConstraint,
@@ -45,6 +46,45 @@ def _legacy_session_id_varchar() -> mysql.VARCHAR:
         charset="utf8mb4",
         collation="utf8mb4_0900_ai_ci",
     )
+
+
+class RunProtocolBindingRow(Base):
+    __tablename__ = "run_protocol_bindings"
+    __table_args__ = (
+        PrimaryKeyConstraint("run_id", name="pk_run_protocol_bindings"),
+        CheckConstraint("CHAR_LENGTH(run_id) >= 1 AND run_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND CHAR_LENGTH(continuous_story_line_id) >= 1 AND continuous_story_line_id REGEXP '^[A-Za-z0-9][A-Za-z0-9_.:-]*$' AND bound_state_version BETWEEN 1 AND 9223372036854775807", name="ck_run_protocol_bindings_identity_version"),
+        CheckConstraint("family_discriminator = 'phase_3_3_native' AND binding_epoch = 'run-protocol-binding' AND binding_record_version = 1 AND envelope_epoch = 'run-protocol-envelope' AND envelope_record_version = 1 AND resolver_epoch = 'run-protocol-resolution' AND resolver_record_version = 1", name="ck_run_protocol_bindings_discriminators"),
+        CheckConstraint("OCTET_LENGTH(envelope_canonical) BETWEEN 1 AND 1024 AND OCTET_LENGTH(resolution_input_canonical) BETWEEN 1 AND 1024 AND OCTET_LENGTH(resolution_fingerprint) = 32", name="ck_run_protocol_bindings_payload_sizes"),
+        CheckConstraint("resource_pressure BETWEEN 0 AND 100 AND MOD(resource_pressure, 5) = 0 AND social_trust BETWEEN 0 AND 100 AND MOD(social_trust, 5) = 0 AND consequence_severity BETWEEN 0 AND 100 AND MOD(consequence_severity, 5) = 0 AND information_opacity BETWEEN 0 AND 100 AND MOD(information_opacity, 5) = 0 AND conflict_intensity BETWEEN 0 AND 100 AND MOD(conflict_intensity, 5) = 0", name="ck_run_protocol_bindings_objectives"),
+        Index("ix_run_protocol_bindings_revision", "run_id", "continuous_story_line_id", "bound_state_version"),
+        ForeignKeyConstraint(
+            ["run_id", "continuous_story_line_id", "bound_state_version"],
+            ["run_revisions.run_id", "run_revisions.continuous_story_line_id", "run_revisions.state_version"],
+            name="fk_run_protocol_bindings_revision",
+            ondelete="RESTRICT", onupdate="RESTRICT",
+        ),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+
+    run_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    continuous_story_line_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    bound_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    family_discriminator: Mapped[str] = mapped_column(_ascii_varchar(32), nullable=False)
+    binding_epoch: Mapped[str] = mapped_column(_ascii_varchar(64), nullable=False)
+    binding_record_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    envelope_epoch: Mapped[str] = mapped_column(_ascii_varchar(64), nullable=False)
+    envelope_record_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    envelope_canonical: Mapped[bytes] = mapped_column(mysql.BLOB, nullable=False)
+    resolver_epoch: Mapped[str] = mapped_column(_ascii_varchar(64), nullable=False)
+    resolver_record_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    resolution_input_canonical: Mapped[bytes] = mapped_column(mysql.BLOB, nullable=False)
+    resource_pressure: Mapped[int] = mapped_column(mysql.SMALLINT(unsigned=True), nullable=False)
+    social_trust: Mapped[int] = mapped_column(mysql.SMALLINT(unsigned=True), nullable=False)
+    consequence_severity: Mapped[int] = mapped_column(mysql.SMALLINT(unsigned=True), nullable=False)
+    information_opacity: Mapped[int] = mapped_column(mysql.SMALLINT(unsigned=True), nullable=False)
+    conflict_intensity: Mapped[int] = mapped_column(mysql.SMALLINT(unsigned=True), nullable=False)
+    resolution_fingerprint: Mapped[bytes] = mapped_column(mysql.BINARY(32), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
 
 
 class GameSessionRow(Base):

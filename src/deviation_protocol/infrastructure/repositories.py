@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from uuid import uuid4
 
 from sqlalchemy import String, and_, cast, func, or_, select, update
@@ -29,6 +29,7 @@ from deviation_protocol.application.ports import (
     RunPlayerCharacterBindingUniquenessConflictError,
     RunReceiptUniquenessConflictError,
     RunRepository,
+    RunProtocolBindingRepository,
     RunSessionAttachmentLockEvidence,
     RunSessionParticipationRepository,
     RunSessionParticipationUniquenessConflictError,
@@ -111,6 +112,7 @@ from deviation_protocol.infrastructure.orm_models import (
     RunCurrentRow,
     RunMutationReceiptRow,
     RunRevisionRow,
+    RunProtocolBindingRow,
     RunSessionParticipationRow,
     TurnRequestRow,
     utc_now,
@@ -158,6 +160,151 @@ from deviation_protocol.infrastructure.run_persistence import (
     run_receipt_to_storage_bytes,
     validate_stored_run_record_set,
 )
+
+
+if TYPE_CHECKING:
+    from deviation_protocol.domain.run_protocol_binding import (
+        LegacyRunCompatibilityV1,
+        NativeRunProtocolBindingV1,
+    )
+
+
+class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
+    def __init__(self, session: AsyncSession) -> None:
+        self._session = session
+
+    async def get_classified(
+        self, *, run_id: RunId
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+        return await self._classify(run_id, locking=False)
+
+    async def get_classified_for_update(
+        self, *, run_id: RunId
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+        return await self._classify(run_id, locking=True)
+
+    async def _read(self, statement, *, locking, many=False):
+        from deviation_protocol.infrastructure import run_protocol_binding_persistence as binding_storage
+        from asyncmy.errors import Error as DriverError
+        from sqlalchemy.exc import SQLAlchemyError
+
+        if locking:
+            statement = statement.with_for_update()
+        try:
+            with self._session.no_autoflush:
+                result = await self._session.execute(statement)
+                return tuple(result.scalars().all()) if many else result.scalar_one_or_none()
+        except (SQLAlchemyError, DriverError) as error:
+            raise binding_storage.RunProtocolBindingRepositoryError("stored family read failed") from error
+
+    @staticmethod
+    def _codec(function, *args, **kwargs):
+        from deviation_protocol.infrastructure import run_protocol_binding_persistence as binding_storage
+        from deviation_protocol.application.errors import (
+            SnapshotNotFoundError, SnapshotInvalidError,
+            SnapshotSchemaVersionMismatchError, SnapshotStateVersionMismatchError,
+            SnapshotSessionMismatchError, SnapshotContentVersionMismatchError,
+        )
+        from deviation_protocol.domain.state import DomainRuleViolation
+
+        try:
+            return function(*args, **kwargs)
+        except (binding_storage.RunProtocolBindingStoredIntegrityError, binding_storage.RunProtocolBindingRepositoryError):
+            raise
+        except (
+            TypeError, ValueError, AttributeError, DomainRuleViolation,
+            SnapshotNotFoundError, SnapshotInvalidError, SnapshotSchemaVersionMismatchError,
+            SnapshotStateVersionMismatchError, SnapshotSessionMismatchError,
+            SnapshotContentVersionMismatchError,
+        ) as error:
+            raise binding_storage.RunProtocolBindingStoredIntegrityError("stored family validation failed") from error
+
+    async def _classify(self, run_id, *, locking):
+        from deviation_protocol.infrastructure import run_protocol_binding_persistence as binding_storage
+        from deviation_protocol.domain.run import revalidate_run_model
+        from deviation_protocol.domain.player_character import PlayerCharacterLifecycle
+
+        revalidate_run_model(run_id, RunId)
+        current_row = await self._read(select(RunCurrentRow).where(RunCurrentRow.run_id == run_id.value), locking=locking)
+        if current_row is None:
+            for model, column in (
+                (RunRevisionRow, RunRevisionRow.run_id),
+                (RunSessionParticipationRow, RunSessionParticipationRow.run_id),
+                (RunCreationReceiptRow, RunCreationReceiptRow.result_run_id),
+                (RunMutationReceiptRow, RunMutationReceiptRow.run_id),
+                (RunProtocolBindingRow, RunProtocolBindingRow.run_id),
+            ):
+                orphan = await self._read(select(model).where(column == run_id.value).limit(1), locking=locking)
+                binding_storage._require(orphan is None, "orphan Run family evidence")
+            return None
+        revision_rows = await self._read(
+            select(RunRevisionRow).where(RunRevisionRow.run_id == run_id.value).order_by(RunRevisionRow.state_version),
+            locking=locking, many=True,
+        )
+        participation_rows = await self._read(
+            select(RunSessionParticipationRow).where(RunSessionParticipationRow.run_id == run_id.value).order_by(RunSessionParticipationRow.joined_state_version, RunSessionParticipationRow.session_id),
+            locking=locking, many=True,
+        )
+        creation_row = await self._read(
+            select(RunCreationReceiptRow).where(RunCreationReceiptRow.result_run_id == run_id.value), locking=locking,
+        )
+        mutation_rows = await self._read(
+            select(RunMutationReceiptRow).where(RunMutationReceiptRow.run_id == run_id.value).order_by(RunMutationReceiptRow.resulting_state_version, RunMutationReceiptRow.operation_id),
+            locking=locking, many=True,
+        )
+        current = self._codec(binding_storage._stored_record, current_row, StoredCurrentRunRecord)
+        revisions = tuple(self._codec(binding_storage._stored_record, row, StoredRunRevisionRecord) for row in revision_rows)
+        participations = tuple(self._codec(binding_storage._stored_record, row, StoredRunSessionParticipationRecord) for row in participation_rows)
+        creation = self._codec(binding_storage._stored_record, creation_row, StoredRunCreationReceiptRecord) if creation_row is not None else None
+        mutations = tuple(self._codec(binding_storage._stored_record, row, StoredRunMutationReceiptRecord) for row in mutation_rows)
+        binding_storage._require(current.run_id == run_id, "current Run identity mismatch")
+        reference = self._codec(binding_storage._reference_from_current, current)
+        immutable = None
+        if reference is not None:
+            immutable_row = await self._read(
+                select(PlayerCharacterRevisionRow).where(
+                    PlayerCharacterRevisionRow.player_character_id == reference.player_character_id.value,
+                    PlayerCharacterRevisionRow.record_revision == reference.record_revision.value,
+                ), locking=locking,
+            )
+            binding_storage._require(immutable_row is not None, "missing immutable character revision")
+            stored_character = self._codec(binding_storage._stored_record, immutable_row, StoredPlayerCharacterRevisionRecord)
+            immutable = self._codec(canonical_record_from_revision_storage, stored_character)
+            binding_storage._require(
+                immutable.player_character_id == reference.player_character_id
+                and immutable.contract_version == reference.contract_version
+                and immutable.record_revision == reference.record_revision
+                and immutable.lifecycle is PlayerCharacterLifecycle.ACTIVE,
+                "immutable character association",
+            )
+        run = self._codec(
+            validate_stored_run_record_set, creation_receipt=creation, mutation_receipts=mutations,
+            revisions=revisions, current=current, participations=participations,
+            referenced_player_character_revision=immutable,
+        )
+        native_row = await self._read(select(RunProtocolBindingRow).where(RunProtocolBindingRow.run_id == run_id.value), locking=locking)
+        legacy = self._codec(binding_storage._legacy_entry_evidence, run, revisions, creation, mutations, participations)
+        legacy_proof = None
+        if legacy is not None:
+            evidence, creation_request_id = legacy
+            character_row = await self._read(
+                select(PlayerCharacterCurrentRow).where(PlayerCharacterCurrentRow.player_character_id == immutable.player_character_id.value), locking=locking,
+            )
+            controller_row = await self._read(
+                select(PlayerCharacterControllerBindingRow).where(PlayerCharacterControllerBindingRow.controller_binding == immutable.controller_binding.value), locking=locking,
+            )
+            self._codec(binding_storage._validate_legacy_character, run, evidence, immutable, character_row, controller_row)
+            participation = participations[0]
+            session_row = await self._read(select(GameSessionRow).where(GameSessionRow.session_id == participation.session_id), locking=locking)
+            event_row = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == participation.session_id, DomainEventRow.sequence_no == 1), locking=locking)
+            snapshot_row = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == participation.session_id), locking=locking)
+            legacy_proof = self._codec(binding_storage._validate_legacy_session, run, evidence, creation_request_id, participation, session_row, event_row, snapshot_row)
+        if native_row is not None:
+            stored = binding_storage._stored_binding_from_row(native_row, self._session)
+            return binding_storage._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=legacy_proof)
+        binding_storage._require(legacy_proof is not None, "existing Run has no complete family proof")
+        return legacy_proof
+
 
 
 def _as_utc(value: datetime) -> datetime:

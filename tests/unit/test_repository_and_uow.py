@@ -28,9 +28,38 @@ from deviation_protocol.infrastructure.repositories import (
     SqlAlchemyRunCreationReceiptRepository,
     SqlAlchemyRunMutationReceiptRepository,
     SqlAlchemyRunRepository,
+    SqlAlchemyRunProtocolBindingRepository,
     SqlAlchemyRunSessionParticipationRepository,
 )
 from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyUnitOfWork
+
+
+@pytest.mark.parametrize("cancel", (False, True))
+async def test_s3_read_uses_same_session_and_uncommitted_exit_closes(cancel):
+    from contextlib import nullcontext
+    from deviation_protocol.domain.run import RunId
+
+    session = AsyncMock()
+    session.no_autoflush = nullcontext()
+    failure = asyncio.CancelledError()
+    if cancel:
+        session.execute.side_effect = failure
+    else:
+        session.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: None)
+    unit = SqlAlchemyUnitOfWork(lambda: session)
+    if cancel:
+        with pytest.raises(asyncio.CancelledError) as caught:
+            async with unit:
+                assert unit.run_protocol_bindings._session is session
+                await unit.run_protocol_bindings.get_classified_for_update(run_id=RunId(value="run.s3"))
+        assert caught.value is failure
+    else:
+        async with unit:
+            assert await unit.run_protocol_bindings.get_classified(run_id=RunId(value="run.s3")) is None
+    session.rollback.assert_awaited_once()
+    session.close.assert_awaited_once()
+    session.commit.assert_not_awaited()
+    session.flush.assert_not_awaited()
 
 
 @pytest.mark.asyncio
@@ -238,6 +267,8 @@ async def test_unit_of_work_exposes_all_player_character_repositories_on_same_se
             SqlAlchemyPlayerCharacterMutationReceiptRepository,
         )
         assert isinstance(uow.runs, SqlAlchemyRunRepository)
+        assert isinstance(uow.run_protocol_bindings, SqlAlchemyRunProtocolBindingRepository)
+        assert uow.run_protocol_bindings._session is session
         assert isinstance(
             uow.run_participations,
             SqlAlchemyRunSessionParticipationRepository,

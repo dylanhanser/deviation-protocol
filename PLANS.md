@@ -31,7 +31,7 @@ owns disposition, deferral, stabilization, review, and verification rules; its
 [prospective S3 applicability](docs/engineering/codex_workflow.md#prospective-amendment-and-s3-applicability)
 preserves frozen technical requirements. Confirmed non-blocking debt belongs in
 the [deferred-findings register](docs/engineering/deferred_findings.md).
-This amendment is a current **uncommitted, unpublished documentation change**.
+The workflow amendment is published at `67a5d50197b580f6c9c1a407f17e14c0bde2b44c`.
 
 Use existing ownership: Phase 8's Session-backed entry and minimum loop are
 complete at P8-S6; P3.3-S3 next supplies durable protocol representation and
@@ -39,7 +39,8 @@ legacy/native reconstruction. The published allocation assigns native admission
 and entry-world freezing to S4, objective mechanics/trusted prompt compilation
 to S5, API/Demo/Web/projection/recovery parity to S6, and later-world continuity
 to S7. These are remaining roadmap responsibilities, not newly invented slices
-or authorization for S4-S7. S3 implementation requires separate authorization.
+or authorization for S4-S7. S3 implementation is separately authorized in the
+current task; no staging, commit, push, or later-slice authority is included.
 
 ## Phase 3.3 current status and ordered priority
 
@@ -155,8 +156,18 @@ exact; existing service and composition regressions run unchanged. None of the
 three earlier reviews was approval; their `CHANGES_REQUIRED` verdicts remain
 accurate history, and their corrected findings are historical closures, not
 open debt. The later independent approval and publication establish current
-plan status. No S3 implementation has begun and
-no migration has been created or executed. P3.3-S4 through P3.3-S7 remain
+plan status. S3 implementation is now an unapproved local candidate based on
+`67a5d50197b580f6c9c1a407f17e14c0bde2b44c`. The read-only persistence component
+and migration `20260828_0006` exist; migration tests have run only on the
+authorized `deviation_protocol_test` database. Mandatory verification is complete
+with a freshly recorded exhaustive S2 proof reused in subsequent aggregates.
+Both independently reproduced implementation findings are corrected. The user explicitly
+authorized three additional integration-test paths for stale head/schema-inventory expectations;
+those narrow corrections pass all 46 affected tests. The original 15 paths and
+conditional deferred-findings register remain the rest of the candidate scope.
+Focused independent re-review remains pending, not approved.
+See [current S3 evidence](docs/run_protocol.md#p33-s3-implementation-candidate-evidence).
+P3.3-S4 through P3.3-S7 remain
 unauthorized; Phase 3.3 remains incomplete, and plan approval alone grants no
 implementation or Git authority.
 Phase 3.4 remains later. Phase 6 is paused under
@@ -679,7 +690,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1 published and closed; S2 plan published at `2f3f84a4` and implementation at `20eab60a`; S3 plan independently approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`; earlier `CHANGES_REQUIRED` reviews remain history; S3 implementation has not started and no migration exists; S4-S7 remain unauthorized; Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), and [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md) |
+| Phase 3.3 | **G0 complete; S1 published and closed; S2 plan published at `2f3f84a4` and implementation at `20eab60a`; S3 plan independently approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`; earlier `CHANGES_REQUIRED` reviews remain history; S3 local implementation/migration candidate has both independent-review findings corrected and complete replacement evidence; focused independent re-review is pending; S4-S7 remain unauthorized; Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), and [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1199,7 +1210,14 @@ published at `20eab60a99c093f2ccf0224dee200e142fc194b6`. The S3 plan is
 independently approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`
 (`docs(run): approve Phase 3.3 S3 persistence plan`). Earlier `CHANGES_REQUIRED`
 reviews remain accurate history; frozen candidate-time wording is historical.
-S3 implementation has not started and no migration has been created or executed.
+S3 is an unapproved local implementation candidate; migration `20260828_0006`
+has been exercised only on the authorized test database. Required verification
+is complete with a newly recorded exhaustive S2 proof and explicit reuse in
+subsequent aggregates. The missing legacy common binding-time check and the
+confounded V32 lock-exclusion proof are corrected. Focused independent re-review
+of those fixes, direct dependencies, and previously unverified evidence remains
+pending; unaffected earlier review conclusions remain applicable. See the
+[current correction evidence](docs/run_protocol.md#p33-s3-implementation-candidate-evidence).
 P3.3-S4 through P3.3-S7
 remain unauthorized, and Phase 3.3 remains incomplete. Plan approval alone
 grants no implementation or Git authority.**
@@ -1510,7 +1528,7 @@ real-MySQL verification.
   resolver, canonical input, fingerprint, contract, and path decisions are
   frozen by the published S2 plan and implementation. The P3.3-S3 durable
   persistence plan was independently approved and published at
-  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3 implementation has not started;
+  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3 is a local unapproved candidate;
   public/categorical activation and every S4-S7 integration remain deferred
   and unauthorized.
 - Public discovery shape, authored-world catalogues/weighting, visits/regions/
@@ -1518,9 +1536,9 @@ real-MySQL verification.
   anti-repeat, anti-farming, recovery priority, world-line transition, and
   later physical schema choices remain owned by S4-S7. The S3 persistence
   schema is frozen by its plan, independently approved and published at
-  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3 implementation has not started;
-  S1 serialization and compatibility semantics remain published but are not
-  yet durable Run authority.
+  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3's local persistence candidate
+  has complete required verification and awaits focused independent re-review; no production
+  native admission or durable native-write authority is activated.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,
@@ -1593,8 +1611,8 @@ manually.
 - P3.3-S3 persistence and legacy/native compatibility plan, independently
   approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814` after three
   historical `CHANGES_REQUIRED` reviews (five, five Medium, then three findings);
-  S3 implementation has not started and no migration has been created or
-  executed:
+  S3 now has an unapproved local persistence/migration candidate, with required
+  verification complete and focused independent re-review pending:
   [`docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md`](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md).
 - Approved, published, byte-preserved, and frozen Phase 3.3 repository
   implementation plan; P3.3-G0 is complete, the first P3.3-S1 implementation

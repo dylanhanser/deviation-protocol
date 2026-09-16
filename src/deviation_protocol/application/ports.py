@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
 from types import TracebackType
-from typing import Any, Mapping, Protocol, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Protocol, Sequence
 
 from deviation_protocol.application.action_context import TrustedResolutionContext
 from deviation_protocol.application.action_gateway import ActionRoute
@@ -44,6 +44,11 @@ from deviation_protocol.domain.run import (
     RunId,
     RunSessionParticipationReference,
 )
+if TYPE_CHECKING:
+    from deviation_protocol.domain.run_protocol_binding import (
+        LegacyRunCompatibilityV1,
+        NativeRunProtocolBindingV1,
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -393,6 +398,20 @@ class ContinuousStoryLineIdIssuer(Protocol):
     def issue(self) -> ContinuousStoryLineId: ...
 
 
+class RunProtocolBindingRepository(ABC):
+    @abstractmethod
+    async def get_classified(
+        self, *, run_id: RunId
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def get_classified_for_update(
+        self, *, run_id: RunId
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+        raise NotImplementedError
+
+
 class RunRepository(ABC):
     @abstractmethod
     async def get(self, run_id: RunId) -> CanonicalRun | None:
@@ -519,6 +538,7 @@ class UnitOfWork(ABC):
     run_participations: RunSessionParticipationRepository
     run_creation_receipts: RunCreationReceiptRepository
     run_mutation_receipts: RunMutationReceiptRepository
+    run_protocol_bindings: RunProtocolBindingRepository
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":

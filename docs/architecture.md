@@ -4,6 +4,48 @@ This document describes implemented architecture first. Sections named for
 earlier phases preserve the implementation history of those boundaries; they
 do not make later accepted designs current capabilities.
 
+## P3.3-S3 local persistence implementation candidate
+
+The approved plan at `465c53d24ea96e64988dce8ef4c8a015d0e72814` is implemented
+locally on baseline `67a5d50197b580f6c9c1a407f17e14c0bde2b44c`. Required
+verification is complete with a freshly recorded exhaustive S2 proof reused
+only in subsequent aggregates. Two independent-review findings are corrected;
+focused independent re-review remains pending, not approved.
+See [current evidence and authorized scope](run_protocol.md#p33-s3-implementation-candidate-evidence).
+The user-authorized extension adds only three integration-test paths for stale
+migration-head/schema-inventory expectations; no production change accompanies
+the extension, and historical migration-state assertions remain intact.
+
+`domain.run_protocol_binding` contains immutable legacy/native result carriers.
+`infrastructure.run_protocol_binding_persistence` owns the frozen 19-field
+stored carrier, four classified exceptions, strict S1/S2 reconstruction, and
+stored-only legacy checks. The adapter directly reads the Run family, preloads
+the immutable character revision before complete Run validation, then proves
+legacy membership or reconstructs explicit native binding state. Missing
+binding state never implies legacy. Legacy character binding time must equal
+the common entry creation time, even when the Run history is otherwise internally
+consistent; mismatch raises S3 stored-integrity with no direct cause. No read
+repairs or writes data. Existing Run-entry authorization remains service-owned.
+
+`RunProtocolBindingRow` and migration `20260828_0006` add only the independent
+19-column table, four checks, composite revision FK, and supporting index.
+`SqlAlchemyRunProtocolBindingRepository` exposes only `get_classified` and
+`get_classified_for_update`; UoW construction supplies the same session without
+starting another transaction. The latter read locks rows in the frozen order.
+The downgrade holds its connection-owned advisory lock across the current-read
+empty probe and all DDL, preserves primary failures over cleanup, and discards
+lost connections without reconnecting. Only compliant lock-taking writers are
+excluded; arbitrary SQL writers are not blocked by this advisory protocol.
+V32 observes a writer waiting in server-side GET_LOCK from an independent third
+connection, separately from transaction completion. Both branches pass with the
+shared lock and fail the exclusion assertion with controlled different locks;
+normal and mutated variations restore rows, schema, revision, and locks.
+
+Production native writes/admission remain S4-owned. Test insertion exists only
+in the authorized integration helper. Run-entry caller authorization and Session
+behavior are unchanged. The component neither establishes an integrated playable
+game nor grants publication, commit, push, or later-slice authority.
+
 ## P3.3-S1 implemented no-migration foundation
 
 P3.3-G0 was independently approved, committed, published, frozen, and
@@ -77,8 +119,8 @@ catalogue or lookup, defaults or overrides, deterministic profile resolution,
 objective numeric mechanics, native admission, entry-world freeze, public API
 or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
-separate P3.3-S2 implementation candidate below adds only pure numeric profile
-resolution. P3.3-S3 through P3.3-S7 remain unimplemented and unauthorized; the
+separate published P3.3-S2 implementation adds only pure numeric profile
+resolution. S3's local candidate is described above; S4-S7 remain unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -104,7 +146,11 @@ manually published, and confirmed at
 `2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe` before the present bounded
 implementation candidate began.
 
-## P3.3-S2 deterministic profile-resolution implementation candidate
+## P3.3-S2 historical implementation-candidate record
+
+The following authoring evidence is historical. The corrected implementation
+was subsequently approved and published at `20eab60a99c093f2ccf0224dee200e142fc194b6`;
+its old candidate-time restrictions are not the current S3 authorization state.
 
 `domain.run_protocol_resolution` is the current isolated S2 implementation
 candidate. It imports the published S1 domain module and no application or

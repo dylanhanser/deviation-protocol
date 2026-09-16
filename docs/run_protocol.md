@@ -15,14 +15,17 @@ implementation is independently approved and published at
 approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`
 (`docs(run): approve Phase 3.3 S3 persistence plan`). Earlier `CHANGES_REQUIRED`
 reviews remain accurate history; the frozen plan's candidate-time wording is
-historical. S3 implementation has not started and no migration has been created
-or executed.
+historical. S3 now has an unapproved local implementation candidate on baseline
+`67a5d50197b580f6c9c1a407f17e14c0bde2b44c`; migration `20260828_0006` has been
+created and exercised only on the authorized MySQL test database. Required
+verification is complete with documented exhaustive S2 evidence reuse;
+focused independent re-review remains pending, not approved.
 P3.3-S4 through P3.3-S7
 remain unauthorized, Phase 3.3 remains incomplete, and plan approval alone
 grants no implementation or Git authority.**
 
-The playable-loop-first workflow amendment is a current **uncommitted,
-unpublished documentation change**. See [PLANS.md](../PLANS.md#immediate-delivery-priority)
+The playable-loop-first workflow amendment is published at `67a5d501`. See
+[PLANS.md](../PLANS.md#immediate-delivery-priority)
 for delivery priority and the workflow's prospective S3 applicability; it
 changes no technical contract or feature ownership described here.
 
@@ -319,8 +322,8 @@ authorized, independently approved, and published as the bounded foundation
 described above, and its closeout is fully closed at `4d146679`. The exact S2
 plan and bounded implementation are published at `2f3f84a4` and `20eab60a`.
 The dedicated S3 plan is independently approved and published at `465c53d`;
-S3 implementation has not begun, no migration exists,
-and S4 through S7 remain unimplemented and unauthorized.
+S3 implementation is an unapproved local candidate with a tested additive
+migration. S4 through S7 remain unimplemented and unauthorized.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -988,7 +991,7 @@ warnings` result are historical pre-correction evidence only. The candidate
 was subsequently approved and published at `20eab60a`; the implementation
 activates no durable, runtime, public, or categorical representation.
 
-### Published P3.3-S3 plan — implementation not started
+### Published P3.3-S3 plan — implementation candidate
 
 The dedicated
 [P3.3-S3 persistence and legacy/native compatibility plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
@@ -1060,13 +1063,19 @@ V30-D2/D3 each retain one primary block with explicit independent (a) ordinary
 statement-failure, (b) during-statement disconnect, and (c) between-statement
 state-only variations. An observer inspects partial schema and server-session/
 lock termination before fixture restoration; client detection alone does not
-prove immediate lock release. All of this remains future test specification.
+prove immediate lock release. The local S3 candidate now implements these
+paths; its current verification evidence follows below.
 The plan's exact vector allocation assigns P=27 persistence-unit, R=4
 repository-unit, E=1 existing entry-service-unit, and M=24 real-MySQL
 blocks, with one uncounted existing composition secondary proof. Mandatory unit
 suites pass their assigned blocks; focused MySQL passes only M with zero
-environment skips; the union covers exactly 56. The 15-path future edit budget
-is unchanged; unchanged E/C regression files are execution-only. None of the
+environment skips; the union covers exactly 56. The 15-path implementation
+budget has a task-authorized conditional exception for genuine findings in
+`docs/engineering/deferred_findings.md`; that exception is used for DF-001.
+The user subsequently authorized three additional integration-test paths for
+stale migration-head/schema-inventory expectations, listed in the evidence
+section below. The frozen plan and production candidate remain unchanged.
+The E/C regression files remain unchanged and execution-only. None of the
 three prior reviews was approval. It creates no public/native
 admission, entry-world binding, objective mechanics, prompt compilation,
 API/OpenAPI, Demo, Web, Provider, visit, region, world-state, or continuity
@@ -1075,11 +1084,93 @@ authority.
 The exact three-document corrected plan was subsequently independently approved
 and published. Its frozen candidate-time lifecycle wording is historical;
 earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
-No S3 implementation has begun; migration
-`20260828_0006` is only
-a planned identity and has neither been created nor executed. P3.3-S4 through
-P3.3-S7 remain unauthorized, Phase 3.3 remains incomplete, and plan approval
+The local implementation and migration `20260828_0006` now exist and have
+complete required component/canonical evidence; this is not approval or publication.
+P3.3-S4 through P3.3-S7 remain unauthorized, Phase 3.3 remains incomplete, and plan approval
 alone grants no implementation or Git authority.
+
+### P3.3-S3 implementation candidate evidence
+
+The separately authorized local candidate implements frozen domain/stored
+carriers, exact four-exception ownership, L01-L04 loading, N01-N15 reconstruction,
+the 19-column mapping with four checks/composite FK/supporting index, two
+read-only repository methods, same-session UoW exposure, and additive migration
+`20260828_0006` over `20260729_0005`. No production binding writer, seed hook,
+duplicate-key translation, admission service, package export, or public route
+has been added. Canonical S1/S2 and existing service ownership are preserved.
+S3 types are imported lazily by read adapters so unrelated CLI commands do not
+eagerly import S2 and emit its existing model-definition warning.
+
+The independent implementation review returned `CHANGES_REQUIRED` for two
+reproduced defects: a missing common entry/binding timestamp check and a V32
+lock-exclusion assertion confounded by the transaction-close barrier. Both are
+corrected in this local candidate; focused independent re-review is pending.
+S3 now rejects an otherwise internally consistent legacy family when binding
+and entry creation times differ, with the exact S3 stored-integrity exception,
+no direct cause, no trusted classification, and no write. Existing Run-entry
+caller authorization and its stricter replay validation remain unchanged.
+Both read methods retain valid legacy behavior.
+
+V32 observes writer acquisition separately from transaction completion. A third
+physical MySQL connection observes the writer executing GET_LOCK in the server's
+User lock wait state and confirms the migration owns the shared named lock.
+The bounded observation precedes DDL release; it cannot pass for an unscheduled
+writer or a writer waiting only for transaction closure. The latter barrier
+remains in place. Both normal branches pass, and controlled test-local different
+lock names make each branch fail at the intended exclusion assertion. Each
+normal/mutated variation checks old-row column digests and schema signatures,
+revision 006, zero native rows, released locks, and unchanged migration bytes.
+
+The original 19-path scope remains: 15 implementation paths, the existing DF-001
+register, and three explicitly authorized integration-test expectation updates.
+Historical migration-state assertions remain intact. Allocation remains 36 IDs
+and 56 primary blocks (P=27/R=4/E=1/M=24); the two timestamp regression cases and
+external mutation/restoration checks add no primary blocks.
+
+The corrected candidate has fresh authoring evidence: 418 affected regressions;
+canonical MySQL 218 passed with zero skips; complete S2 23 passed with zero skips
+and 5,624,910 calls; canonical Offline 2,537 passed, 207 expected skips, one
+explicit deselection; canonical Full 2,742 passed, two expected skips, one
+explicit deselection. Canonical compilation, dependency checks,
+sanitized Alembic heads/history, and whitespace stages passed. MySQL includes
+all 24 S3 primary blocks and required existing Run/legacy suites. Detailed
+commands, selections, results, exit statuses, source/dependency identities,
+environment containment, and raw child output are retained in the external
+`s3-implementation-20260916-audit/correction` evidence bundle and its manifest.
+
+The earlier 2,667.82-second exhaustive S2 claim, detailed Offline child output,
+and standalone MySQL invocation record could not be substantiated from the
+supplied audit directory or its referenced records. They are historical author
+claims, not reused acceptance evidence. The fresh complete S2 run preserves all
+104,165 maps, 2,812,455 distinct inputs/primary calls and immediate repeats;
+a test-local forwarding counter independently records exactly 5,624,910 public
+resolver invocations. Published S1/S2 source and assertions are unchanged.
+
+The subsequent canonical Offline and Full runs explicitly deselect only
+`tests/unit/test_run_protocol_resolution.py::test_complete_direct_exhaustive_public_resolution_domain`
+and reuse that freshly recorded proof. They rerun the other 22 S2 tests and
+all other selected tests; the exhaustive case is not represented as executed
+in either aggregate. Source/dependency/environment records establish reuse
+applicability; final documentation-only synchronization does not alter tested
+behavior. Offline's 207 expected skips are 205 database tests, Live, and the
+Windows symlink-privilege case. Full skips only Live and that symlink case.
+The existing S2 model-field warning and unavailable Turkish locale are reported
+without claiming a substituted locale proof.
+
+DF-001 remains deferred with its existing process-local .NET language
+containment, owner, and post-playable stabilization reassessment before wider
+release. Its test is unchanged; no S3 acceptance evidence is waived. Initial
+external mutation-harness invocation/matcher errors are retained as failed
+attempts and are not counted as successful sensitivity evidence. No unrelated
+failure is attributed to DF-001.
+
+There is no new integrated-play, user-trial, release, or Phase 3.3 completion
+claim. No staging, commit, push, Provider/Live call, browser session, production
+database change, or S4-S7 implementation has occurred. Next is focused independent
+re-review of both corrections, their direct
+dependencies, and replacement evidence under the published risk-based workflow;
+this implementation session does not approve its own candidate.
+Guardrail impact: None.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1264,7 +1355,8 @@ Phase 3.3 is acceptable only when:
   precedence, resolver, canonical input, fingerprint, symbol contract, and path
   budget are frozen by the published S2 plan and implementation. Durable S3
   representation is frozen in the independently approved published S3 plan;
-  its implementation has not started. Runtime integration remains S4-S7 work.
+  its local implementation candidate has complete required verification and
+  awaits focused independent re-review. Runtime integration remains S4-S7 work.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; no threshold or band exists before its separately
   reviewed plan and implementation.
