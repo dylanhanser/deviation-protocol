@@ -34,13 +34,14 @@ the [deferred-findings register](docs/engineering/deferred_findings.md).
 The workflow amendment is published at `67a5d50197b580f6c9c1a407f17e14c0bde2b44c`.
 
 Use existing ownership: Phase 8's Session-backed entry and minimum loop are
-complete at P8-S6; P3.3-S3 next supplies durable protocol representation and
+complete at P8-S6; published P3.3-S3 supplies durable protocol representation and
 legacy/native reconstruction. The published allocation assigns native admission
 and entry-world freezing to S4, objective mechanics/trusted prompt compilation
 to S5, API/Demo/Web/projection/recovery parity to S6, and later-world continuity
 to S7. These are remaining roadmap responsibilities, not newly invented slices
-or authorization for S4-S7. S3 implementation is separately authorized in the
-current task; no staging, commit, push, or later-slice authority is included.
+or authorization for S4-S7 implementation. S3 implementation is published at
+`a53f8e65ad74c62bc6c40b9de26222eb889084f0`, approved with DF-001 deferred.
+S4 is the current documentation-planning subject; implementation has not started.
 
 ## Phase 3.3 current status and ordered priority
 
@@ -121,7 +122,7 @@ time wording remains frozen. The corrected exact five-path P3.3-S2
 implementation was independently approved, committed, manually published by
 the user, and confirmed at `20eab60a99c093f2ccf0224dee200e142fc194b6`
 (`feat(run): implement Phase 3.3 S2 profile resolution`). P3.3-S2 is published
-and closed. P3.3-S3 is the next sequential implementation subject. The dedicated
+and closed. The dedicated
 [P3.3-S3 persistence and legacy/native compatibility plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
 was independently approved and published at
 `465c53d24ea96e64988dce8ef4c8a015d0e72814`
@@ -156,20 +157,25 @@ exact; existing service and composition regressions run unchanged. None of the
 three earlier reviews was approval; their `CHANGES_REQUIRED` verdicts remain
 accurate history, and their corrected findings are historical closures, not
 open debt. The later independent approval and publication establish current
-plan status. S3 implementation is now an unapproved local candidate based on
-`67a5d50197b580f6c9c1a407f17e14c0bde2b44c`. The read-only persistence component
-and migration `20260828_0006` exist; migration tests have run only on the
-authorized `deviation_protocol_test` database. Mandatory verification is complete
-with a freshly recorded exhaustive S2 proof reused in subsequent aggregates.
-Both independently reproduced implementation findings are corrected. The user explicitly
-authorized three additional integration-test paths for stale head/schema-inventory expectations;
-those narrow corrections pass all 46 affected tests. The original 15 paths and
-conditional deferred-findings register remain the rest of the candidate scope.
-Focused independent re-review remains pending, not approved.
-See [current S3 evidence](docs/run_protocol.md#p33-s3-implementation-candidate-evidence).
-P3.3-S4 through P3.3-S7 remain
-unauthorized; Phase 3.3 remains incomplete, and plan approval alone grants no
-implementation or Git authority.
+plan status. S3 implementation was subsequently independently approved with
+DF-001 deferred and published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`.
+The read-only persistence component and migration `20260828_0006` are implemented;
+both reproduced implementation findings were corrected before approval.
+Accepted verification and evidence-reuse limitations remain recorded in the
+[S3 publication evidence](docs/run_protocol.md#p33-s3-published-implementation-evidence).
+The user-authorized three integration-test expectation corrections are included
+in the published implementation; earlier changes-required reviews remain history.
+The [S4 native admission and entry-world plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md)
+is the current corrected documentation candidate, unapproved pending focused
+independent re-review. Its review returned `CHANGES_REQUIRED` for one missing
+receipt-to-protocol binding: both canonical input bytes and fingerprint must
+match before complete reconstruction or owned replay returns a trusted result.
+The candidate now specifies those checks and the valid-A/B substitution
+regression; the previous reviewer should re-review the correction and direct
+dependencies, preserving conclusions for unchanged content.
+S4 implementation has not started; S4-S7 implementation remains
+unauthorized. Phase 3.3 remains incomplete. Plan approval alone grants no
+implementation or Git authority; no separate S3 publication-closeout task is due.
 Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
@@ -690,7 +696,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1 published and closed; S2 plan published at `2f3f84a4` and implementation at `20eab60a`; S3 plan independently approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`; earlier `CHANGES_REQUIRED` reviews remain history; S3 local implementation/migration candidate has both independent-review findings corrected and complete replacement evidence; focused independent re-review is pending; S4-S7 remain unauthorized; Phase 3.3 remains incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), and [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md) |
+| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 is the corrected plan candidate, unapproved pending focused independent re-review, implementation not started; S4-S7 implementation unauthorized; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [S4 plan candidate](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1210,17 +1216,14 @@ published at `20eab60a99c093f2ccf0224dee200e142fc194b6`. The S3 plan is
 independently approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`
 (`docs(run): approve Phase 3.3 S3 persistence plan`). Earlier `CHANGES_REQUIRED`
 reviews remain accurate history; frozen candidate-time wording is historical.
-S3 is an unapproved local implementation candidate; migration `20260828_0006`
-has been exercised only on the authorized test database. Required verification
-is complete with a newly recorded exhaustive S2 proof and explicit reuse in
-subsequent aggregates. The missing legacy common binding-time check and the
-confounded V32 lock-exclusion proof are corrected. Focused independent re-review
-of those fixes, direct dependencies, and previously unverified evidence remains
-pending; unaffected earlier review conclusions remain applicable. See the
-[current correction evidence](docs/run_protocol.md#p33-s3-implementation-candidate-evidence).
-P3.3-S4 through P3.3-S7
-remain unauthorized, and Phase 3.3 remains incomplete. Plan approval alone
-grants no implementation or Git authority.**
+S3 implementation and migration `20260828_0006` are independently approved with
+DF-001 deferred and published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`.
+See [published evidence](docs/run_protocol.md#p33-s3-published-implementation-evidence).
+The [S4 plan candidate](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md)
+is the current planning subject, unapproved pending focused independent re-review. S4
+implementation has not started; S4-S7 implementation remains unauthorized.
+Phase 3.3 remains incomplete. Plan approval alone grants no implementation or
+Git authority.**
 
 The authoritative readiness reconstruction completed with classification that
 a new frozen implementation plan was required. No defect was found. The
@@ -1356,9 +1359,12 @@ separation between objective difficulty, character definition, narrative
 presentation, and relationship atmosphere. It also owns the approved,
 not-implemented rule that a player chooses an entry world only from a small
 authored eligible set, freezes its ID/version at run start, and the engine
-selects later worlds deterministically from the eligible pool. Exact catalogues,
-weighting, anti-repeat, progression, and priority-injection rules remain
-Deferred. An important authored world may remain eligible for a meaningful,
+selects later worlds deterministically from the eligible pool. S4 proposes one
+versioned internally eligible world mapped explicitly to existing approved
+scenario content; it is neither implemented nor a permanent/default public
+entry-world designation. Public catalogue exposure remains S6-owned. Later-world
+weighting, anti-repeat, progression, and priority-injection remain Deferred.
+An important authored world may remain eligible for a meaningful,
 engine-selected revisit that preserves confirmed world/NPC state and
 consequences. Players cannot choose, request, approve, veto, or otherwise
 authorize it; the complete revisit decision remains engine-owned. Detailed
@@ -1389,12 +1395,12 @@ published P3.3-S1 standalone foundation marks the full Run Protocol implemented.
 Existing
 Phase 8 rows remain legacy Session-backed Runs with their current strict stored
 proof, revision/evidence/replay/recovery, and production/Demo/Web/Dynamic
-Narrative behavior. They receive no synthesized protocol or world state. Native
-protocol/profile binding, authored-world identity, deterministic resolution,
-objective mechanics application, trusted prompt-context compilation,
-later-world selection, visits/revisits, world-line transitions, narrative
-progression, and public Run Protocol behavior remain ordered future slices in
-the candidate plan.
+Narrative behavior. They receive no synthesized protocol or world state. S2
+implements deterministic resolution and S3 implements native protocol/profile
+binding persistence and reconstruction. Atomic native admission and authored-world
+freezing remain proposed S4 work; objective mechanics, trusted prompt compilation,
+public activation and later-world continuity remain ordered S5-S7 responsibilities
+under the published parent plan.
 
 ## Phase 3.4: NPC Relationship and Temporary Residence
 
@@ -1522,23 +1528,26 @@ real-MySQL verification.
   structured-character API work beyond Phase 8; Provider,
   narrative, scenario, world, NPC, memory, relationship, combat, content, and
   broader public gameplay integration.
-- The eligible initial-world catalogue and later-world weighting, anti-repeat,
-  progression, and priority-injection details.
+- Public initial-world catalogue exposure remains S6-owned. The S4 candidate
+  resolves the bounded internal catalogue and world/scenario association;
+  later-world weighting, anti-repeat, progression and priority injection remain
+  S7-owned and Deferred.
 - The exact P3.3-S2 numeric domains, profile defaults, override catalogue,
   resolver, canonical input, fingerprint, contract, and path decisions are
   frozen by the published S2 plan and implementation. The P3.3-S3 durable
   persistence plan was independently approved and published at
-  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3 is a local unapproved candidate;
-  public/categorical activation and every S4-S7 integration remain deferred
-  and unauthorized.
+  `465c53d24ea96e64988dce8ef4c8a015d0e72814`; implementation is published at
+  `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, approved with DF-001 deferred.
+  S4 is the current planning candidate, implementation not started;
+  public/categorical activation and later integration remain unimplemented.
 - Public discovery shape, authored-world catalogues/weighting, visits/regions/
   world state, mechanics application, trusted prompt compilation, progression,
   anti-repeat, anti-farming, recovery priority, world-line transition, and
   later physical schema choices remain owned by S4-S7. The S3 persistence
   schema is frozen by its plan, independently approved and published at
-  `465c53d24ea96e64988dce8ef4c8a015d0e72814`. S3's local persistence candidate
-  has complete required verification and awaits focused independent re-review; no production
-  native admission or durable native-write authority is activated.
+  `465c53d24ea96e64988dce8ef4c8a015d0e72814`, and implemented at `a53f8e65`.
+  S4 proposes the bounded admission/world schema and production composition;
+  no production native admission or durable native writer is implemented yet.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,
@@ -1611,9 +1620,12 @@ manually.
 - P3.3-S3 persistence and legacy/native compatibility plan, independently
   approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814` after three
   historical `CHANGES_REQUIRED` reviews (five, five Medium, then three findings);
-  S3 now has an unapproved local persistence/migration candidate, with required
-  verification complete and focused independent re-review pending:
+  implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
+  independently approved with DF-001 deferred:
   [`docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md`](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md).
+- Current corrected P3.3-S4 native admission/entry-world planning candidate,
+  unapproved pending focused independent re-review; implementation has not started:
+  [`docs/phase_3_3_s4_native_run_admission_entry_world_plan.md`](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md).
 - Approved, published, byte-preserved, and frozen Phase 3.3 repository
   implementation plan; P3.3-G0 is complete, the first P3.3-S1 implementation
   review and predecessor amendment are historical, and the corrected exact S1

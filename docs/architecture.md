@@ -4,14 +4,13 @@ This document describes implemented architecture first. Sections named for
 earlier phases preserve the implementation history of those boundaries; they
 do not make later accepted designs current capabilities.
 
-## P3.3-S3 local persistence implementation candidate
+## P3.3-S3 published persistence component
 
 The approved plan at `465c53d24ea96e64988dce8ef4c8a015d0e72814` is implemented
-locally on baseline `67a5d50197b580f6c9c1a407f17e14c0bde2b44c`. Required
-verification is complete with a freshly recorded exhaustive S2 proof reused
-only in subsequent aggregates. Two independent-review findings are corrected;
-focused independent re-review remains pending, not approved.
-See [current evidence and authorized scope](run_protocol.md#p33-s3-implementation-candidate-evidence).
+and published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently
+approved with DF-001 deferred. Both independent-review findings were corrected
+before approval. See [published evidence](run_protocol.md#p33-s3-published-implementation-evidence),
+including the recorded exhaustive S2 proof and its bounded reuse.
 The user-authorized extension adds only three integration-test paths for stale
 migration-head/schema-inventory expectations; no production change accompanies
 the extension, and historical migration-state assertions remain intact.
@@ -44,7 +43,37 @@ normal and mutated variations restore rows, schema, revision, and locks.
 Production native writes/admission remain S4-owned. Test insertion exists only
 in the authorized integration helper. Run-entry caller authorization and Session
 behavior are unchanged. The component neither establishes an integrated playable
-game nor grants publication, commit, push, or later-slice authority.
+game nor grants later-slice authority. Phase 3.3 remains incomplete.
+
+## P3.3-S4 planned internal admission boundary
+
+The [S4 plan candidate](phase_3_3_s4_native_run_admission_entry_world_plan.md)
+is the current planning subject, unapproved pending focused re-review after
+one `CHANGES_REQUIRED` receipt-to-protocol binding finding;
+implementation has not started. Its proposed design adds a production-composed
+internal native admission service, separately versioned creation evidence and
+an immutable authored world binding at Run revision 3. Revisions 1/2/3 retain
+their existing meanings. A dedicated UoW pins the physical connection and holds
+the S3 shared named lock through the single admission commit/rollback and checked
+release. One additive migration supplies world storage; complete reconstruction
+distinguishes admission from S3 protocol-component proof.
+
+After individual receipt and S3 binding validation, complete reconstruction
+must require both strict receipt `resolution_input_hex` decoding byte-equal to
+binding `resolution_input_canonical`, and receipt `resolution_fingerprint`
+equal to the binding fingerprint in its existing lowercase-hex representation.
+The repository-owned admitted-family validator enforces both before any trusted
+result, for detached reconstruction and authorized owned replay. Either mismatch
+raises existing `RunProtocolBindingStoredIntegrityError` with no cause and no
+repair/writes; successful S3 internal consistency alone cannot prove receipt
+agreement. The S4 plan specifies the focused valid-A/B substitution regression.
+
+The proposed internal catalogue reuses existing approved scenario content via
+an explicit world ID/version association. Scenario identity is not world identity,
+and the Demo scenario is not designated a permanent/default public entry world.
+These are proposed S4 contracts, not implemented capabilities. Public routes,
+API/OpenAPI, Demo/Web activation and public recovery remain S6-owned; mechanics
+and prompt compilation remain S5-owned; later-world continuity remains S7-owned.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -120,7 +149,8 @@ objective numeric mechanics, native admission, entry-world freeze, public API
 or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
-resolution. S3's local candidate is described above; S4-S7 remain unauthorized; the
+resolution. S3's published component is described above; S4 planning is current,
+S4-S7 implementation remains unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1008,14 +1038,14 @@ meaning comes from trusted server templates.
 
 ## Future-design boundaries
 
-These designs are accepted or approved for later phases and are not
-implemented beyond the explicitly bounded published P3.3-S1 foundation
-described above:
+These designs remain later work beyond the explicitly bounded published
+components described above:
 
 - Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
-  published S1 foundation supplies only standalone representation, validation,
-  canonical codec evidence, and a no-I/O stored-carrier seam; no durable or
-  runtime Run Protocol behavior exists: [`run_protocol.md`](run_protocol.md).
+  published S1/S2 components supply representation and deterministic resolution;
+  published S3 supplies durable binding reconstruction. S4 admission/world
+  freezing is the current plan candidate, not implemented; mechanics and public
+  activation remain later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider

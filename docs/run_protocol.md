@@ -15,14 +15,13 @@ implementation is independently approved and published at
 approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`
 (`docs(run): approve Phase 3.3 S3 persistence plan`). Earlier `CHANGES_REQUIRED`
 reviews remain accurate history; the frozen plan's candidate-time wording is
-historical. S3 now has an unapproved local implementation candidate on baseline
-`67a5d50197b580f6c9c1a407f17e14c0bde2b44c`; migration `20260828_0006` has been
-created and exercised only on the authorized MySQL test database. Required
-verification is complete with documented exhaustive S2 evidence reuse;
-focused independent re-review remains pending, not approved.
-P3.3-S4 through P3.3-S7
-remain unauthorized, Phase 3.3 remains incomplete, and plan approval alone
-grants no implementation or Git authority.**
+historical. S3 implementation and migration `20260828_0006` are independently
+approved with DF-001 deferred and published at
+`a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4 is the current documentation
+planning subject, unapproved pending focused independent re-review after one
+`CHANGES_REQUIRED` receipt-to-protocol binding finding; implementation
+has not started. S4-S7 implementation remains unauthorized, Phase 3.3 remains
+incomplete, and plan approval alone grants no implementation or Git authority.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
 [PLANS.md](../PLANS.md#immediate-delivery-priority)
@@ -322,8 +321,11 @@ authorized, independently approved, and published as the bounded foundation
 described above, and its closeout is fully closed at `4d146679`. The exact S2
 plan and bounded implementation are published at `2f3f84a4` and `20eab60a`.
 The dedicated S3 plan is independently approved and published at `465c53d`;
-S3 implementation is an unapproved local candidate with a tested additive
-migration. S4 through S7 remain unimplemented and unauthorized.
+S3 implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
+approved with DF-001 deferred. The
+[S4 native admission/entry-world candidate](phase_3_3_s4_native_run_admission_entry_world_plan.md)
+is unapproved pending focused independent re-review. S4 implementation has not started;
+S4-S7 implementation remains unauthorized.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
 review before implementation. It owns deterministic application by
@@ -623,8 +625,13 @@ Status: **Approved product design — not implemented**
 `death_certificate_v1` is the current canonical Demo and vertical-slice
 scenario. It is not permanently designated as the production entry world.
 
-The exact eligible initial-world catalogue, weighting algorithm, anti-repeat
-rules, progression constraints, and priority-injection rules remain Deferred.
+The S4 candidate proposes the exact internal catalogue: `world.death_certificate`
+version 1 maps to scenario `death_certificate`, content
+`death-certificate-1.1.0`, default character
+`character.death_certificate.investigator`. This reuses approved authored content
+without new story canon and is neither implemented nor a permanent/default
+public-world choice. Public catalogue exposure belongs to S6. Later-world
+weighting, anti-repeat, progression and priority-injection remain Deferred.
 
 ### Important-world revisits
 
@@ -991,7 +998,7 @@ warnings` result are historical pre-correction evidence only. The candidate
 was subsequently approved and published at `20eab60a`; the implementation
 activates no durable, runtime, public, or categorical representation.
 
-### Published P3.3-S3 plan — implementation candidate
+### Published P3.3-S3 plan and implementation
 
 The dedicated
 [P3.3-S3 persistence and legacy/native compatibility plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
@@ -1063,8 +1070,8 @@ V30-D2/D3 each retain one primary block with explicit independent (a) ordinary
 statement-failure, (b) during-statement disconnect, and (c) between-statement
 state-only variations. An observer inspects partial schema and server-session/
 lock termination before fixture restoration; client detection alone does not
-prove immediate lock release. The local S3 candidate now implements these
-paths; its current verification evidence follows below.
+prove immediate lock release. The published S3 implementation includes these
+paths; its accepted verification evidence follows below.
 The plan's exact vector allocation assigns P=27 persistence-unit, R=4
 repository-unit, E=1 existing entry-service-unit, and M=24 real-MySQL
 blocks, with one uncounted existing composition secondary proof. Mandatory unit
@@ -1074,7 +1081,8 @@ budget has a task-authorized conditional exception for genuine findings in
 `docs/engineering/deferred_findings.md`; that exception is used for DF-001.
 The user subsequently authorized three additional integration-test paths for
 stale migration-head/schema-inventory expectations, listed in the evidence
-section below. The frozen plan and production candidate remain unchanged.
+section below. That test-only scope extension left the frozen plan and production
+implementation unchanged.
 The E/C regression files remain unchanged and execution-only. None of the
 three prior reviews was approval. It creates no public/native
 admission, entry-world binding, objective mechanics, prompt compilation,
@@ -1084,14 +1092,17 @@ authority.
 The exact three-document corrected plan was subsequently independently approved
 and published. Its frozen candidate-time lifecycle wording is historical;
 earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
-The local implementation and migration `20260828_0006` now exist and have
-complete required component/canonical evidence; this is not approval or publication.
-P3.3-S4 through P3.3-S7 remain unauthorized, Phase 3.3 remains incomplete, and plan approval
-alone grants no implementation or Git authority.
+The implementation and migration `20260828_0006` subsequently received independent
+approval with DF-001 deferred and were published at
+`a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4 planning is current; its
+implementation has not started. S4-S7 implementation remains unauthorized,
+Phase 3.3 remains incomplete, and plan approval alone grants no implementation
+or Git authority. No separate S3 publication-closeout task is required.
 
-### P3.3-S3 implementation candidate evidence
+### P3.3-S3 published implementation evidence
 
-The separately authorized local candidate implements frozen domain/stored
+The implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`
+was independently approved with DF-001 deferred. It implements frozen domain/stored
 carriers, exact four-exception ownership, L01-L04 loading, N01-N15 reconstruction,
 the 19-column mapping with four checks/composite FK/supporting index, two
 read-only repository methods, same-session UoW exposure, and additive migration
@@ -1104,7 +1115,8 @@ eagerly import S2 and emit its existing model-definition warning.
 The independent implementation review returned `CHANGES_REQUIRED` for two
 reproduced defects: a missing common entry/binding timestamp check and a V32
 lock-exclusion assertion confounded by the transaction-close barrier. Both are
-corrected in this local candidate; focused independent re-review is pending.
+corrected before the subsequent independent approval and publication. That
+earlier changes-required verdict remains accurate review history.
 S3 now rejects an otherwise internally consistent legacy family when binding
 and entry creation times differ, with the exact S3 stored-integrity exception,
 no direct cause, no trusted classification, and no write. Existing Run-entry
@@ -1121,13 +1133,14 @@ lock names make each branch fail at the intended exclusion assertion. Each
 normal/mutated variation checks old-row column digests and schema signatures,
 revision 006, zero native rows, released locks, and unchanged migration bytes.
 
-The original 19-path scope remains: 15 implementation paths, the existing DF-001
+The published 19-path scope comprised 15 implementation paths, the existing DF-001
 register, and three explicitly authorized integration-test expectation updates.
 Historical migration-state assertions remain intact. Allocation remains 36 IDs
 and 56 primary blocks (P=27/R=4/E=1/M=24); the two timestamp regression cases and
 external mutation/restoration checks add no primary blocks.
 
-The corrected candidate has fresh authoring evidence: 418 affected regressions;
+The corrected candidate's recorded authoring evidence, retained for the approved
+publication, is: 418 affected regressions;
 canonical MySQL 218 passed with zero skips; complete S2 23 passed with zero skips
 and 5,624,910 calls; canonical Offline 2,537 passed, 207 expected skips, one
 explicit deselection; canonical Full 2,742 passed, two expected skips, one
@@ -1165,12 +1178,55 @@ attempts and are not counted as successful sensitivity evidence. No unrelated
 failure is attributed to DF-001.
 
 There is no new integrated-play, user-trial, release, or Phase 3.3 completion
-claim. No staging, commit, push, Provider/Live call, browser session, production
-database change, or S4-S7 implementation has occurred. Next is focused independent
-re-review of both corrections, their direct
-dependencies, and replacement evidence under the published risk-based workflow;
-this implementation session does not approve its own candidate.
+claim. S3's implementation review and publication are complete; no Provider/Live
+call, browser session or production database change is claimed by these records.
+S4 is the current documentation-planning subject, and S4-S7 implementation has
+not started. The next step is focused independent re-review of the corrected S4 plan
+candidate, not a restarted S3 review or publication-closeout task.
 Guardrail impact: None.
+
+### P3.3-S4 native admission and entry-world planning candidate
+
+The [bounded S4 plan](phase_3_3_s4_native_run_admission_entry_world_plan.md)
+proposes one usable production-composed internal application service. It accepts
+trusted-caller intent, revalidates character ownership, resolves S1/S2 input,
+looks up the explicit authored world reference, and atomically persists Run
+revisions 1/2/3, immutable protocol/world bindings at 3, native admission evidence
+and the complete first Session family. Native evidence has its own discriminator,
+version, ID-derivation prefix and fingerprint; legacy P8 V1 bytes and revision
+semantics remain unchanged. Replay reauthorizes ownership and reconstructs the
+same admitted result without new writes or synthesized legacy evidence.
+
+Complete admission reconstruction must enforce both receipt-to-protocol
+equalities after individual receipt and S3 validation: strictly decoded receipt
+`resolution_input_hex` bytes equal binding `resolution_input_canonical`, and
+receipt `resolution_fingerprint` equals the binding's existing 32-byte
+`resolution_fingerprint.hex()`. The admitted-family persistence validator owns
+these checks for detached classification and owned replay before any trusted
+result; either mismatch raises `RunProtocolBindingStoredIntegrityError` with
+`__cause__ is None`, passed through replay unchanged, with no repair or writes.
+Caller authorization and individual S1/S2/S3 failure ownership remain unchanged.
+S3 internal consistency is insufficient: the plan's A/B regression retains
+receipt A and all associations while substituting valid B input/objectives/
+fingerprint, and requires complete reconstruction and replay of intent A to
+reject the stored mismatch with that exact outcome.
+
+A pinned physical connection owns the transaction and S3 shared named lock
+through commit/rollback and checked release. The proposed successor migration
+`20260916_0007` adds only `run_entry_world_bindings` and refuses destructive
+downgrade when native admission evidence exists. Its complete acceptance matrix
+requires real-MySQL atomicity, concurrency, acquisition-state observation,
+failure/cancellation, schema and legacy-preservation evidence, including that
+A/B detached/owned-replay rejection. Both equality checks are mandatory.
+
+The plan review returned `CHANGES_REQUIRED` for this one missing cross-record
+binding. These corrected proposed contracts remain unapproved pending focused
+re-review by the previous independent reviewer, preserving prior conclusions
+for unchanged content. They still require separate implementation
+authorization; they are not current behavior. S4 does not expose native API,
+OpenAPI, Demo or Web entry (S6), apply objective mechanics or compile prompts
+(S5), or implement later worlds/visits/continuity (S7). It adds no story canon
+and does not permanently designate the Demo scenario as the public entry world.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1355,8 +1411,9 @@ Phase 3.3 is acceptable only when:
   precedence, resolver, canonical input, fingerprint, symbol contract, and path
   budget are frozen by the published S2 plan and implementation. Durable S3
   representation is frozen in the independently approved published S3 plan;
-  its local implementation candidate has complete required verification and
-  awaits focused independent re-review. Runtime integration remains S4-S7 work.
+  its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
+  independently approved with DF-001 deferred. S4 is the current planning
+  candidate; implementation has not started. Runtime integration remains S4-S7 work.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; no threshold or band exists before its separately
   reviewed plan and implementation.
@@ -1365,7 +1422,8 @@ Phase 3.3 is acceptable only when:
   value.
 - Compatibility and migration policy for future protocol versions.
 - World/profile discovery and unlock policy.
-- Exact eligible initial-world catalogue.
+- Public entry-world catalogue exposure/expansion (S6); S4's bounded internal
+  catalogue and explicit world/scenario mapping are proposed in its plan candidate.
 - Later-world weighting algorithm and general anti-repeat rules.
 - Progression constraints and priority-injection rules for required story
   progression and major hidden settings; important-NPC integration remains
@@ -1384,6 +1442,8 @@ Phase 3.3 is acceptable only when:
 
 - [Project roadmap](../PLANS.md)
 - [Published P3.3-S2 deterministic profile-resolution plan](phase_3_3_s2_deterministic_profile_resolution_plan.md)
+- [Published P3.3-S3 persistence plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
+- [P3.3-S4 native admission and entry-world plan candidate](phase_3_3_s4_native_run_admission_entry_world_plan.md)
 - [Frozen Phase 3.3 implementation plan](phase_3_3_run_protocol_implementation_plan.md)
 - [Minimum Run Core Implementation Plan](minimum_run_core_implementation_plan.md)
 - [Narrative Provider boundary](narrative_provider.md)
