@@ -32,7 +32,7 @@
 
 - Never read, commit, or print secrets from `.env`.
 - Keep `RUN_LIVE_DEEPSEEK_TEST` disabled for normal development, testing, review, CI, and Codex runs. A real model call requires explicit user opt-in.
-- For tasks explicitly marked offline or no-database, run `.\scripts\verify.ps1 -Mode Offline`; it launches a sanitized child process and runs strict offline diagnostics there. If Offline mode is unavailable, stop and report it instead of running Full or MySQL verification.
+- When runtime verification is required for an offline or no-database task, run `.\scripts\verify.ps1 -Mode Offline`; it launches a sanitized child process and runs strict offline diagnostics there. Documentation-only work requires no runtime verification by default. If required Offline mode is unavailable, stop and report it instead of running Full or MySQL verification.
 - Use `.\scripts\doctor.ps1 -Strict -RequireOffline` only when intentionally verifying that the current process environment is already clean.
 - Use MySQL 8 with SQLAlchemy `AsyncSession` and `asyncmy`; never add a SQLite fallback.
 - When database models change, check the matching Alembic migration.
@@ -49,7 +49,10 @@
 
 ## Verification and issue recording
 
-- After changes, run the full tests, `compileall`, and relevant Alembic checks.
+- Prioritize the playable flow and use the risk-based findings, deferral, review,
+  and proportionate verification policy in `docs/engineering/codex_workflow.md`.
+  Full tests, `compileall`, and Alembic checks are required only when applicable
+  to the change or specifically required by its technical contract.
 - For planning, review, approval, staging, or commit work, follow the
   pending-plan baseline-invalidation and approval-token-consistency rules in
   `docs/engineering/codex_workflow.md`. Never preserve a locked candidate hash
@@ -59,7 +62,8 @@
 - Before independent audit, describing a phase as complete, or requesting
   authorization to commit, complete the canonical documentation-synchronization
   checklist in `docs/engineering/codex_workflow.md`.
-- Add a regression test for every confirmed defect.
+- Add meaningful regression coverage for every fixed code defect. Recording a
+  deferred defect alone requires neither its fix nor an artificial test.
 - When a confirmed defect establishes or changes a reusable engineering or safety rule, update `docs/engineering/guardrails.md` in the same change.
 - When a confirmed failure concerns Codex sessions, environment setup, review procedure, or Git handoff, update `docs/engineering/codex_workflow.md`.
 - Do not add speculative, unconfirmed, or purely one-off observations to the guardrail documents.

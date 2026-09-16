@@ -6,6 +6,41 @@ run for this repository.
 Technical safety rules are recorded in
 `docs/engineering/guardrails.md`.
 
+## Playable-loop-first delivery
+
+Prioritize an end-to-end playable flow: entry/creation -> core play ->
+persistence -> reload/recovery -> ending, followed by real user feedback.
+Use the published roadmap for feature ownership; this priority creates no new
+slice or implementation authorization. Distinguish component implementation,
+demonstrated integrated play, limited user-trial readiness, and broader release
+readiness using the evidence definitions in [PLANS.md](../../PLANS.md#status-language).
+Never infer a later readiness level from an earlier one.
+
+After the playable milestone and before wider release, hold a stabilization
+checkpoint: reassess deferred findings against actual exposure and feedback,
+resolve release blockers, and record repair, containment, or further deferral
+decisions. Do not promise every optional improvement.
+
+### Prospective amendment and S3 applicability
+
+This user-authorized amendment governs prospective review disposition,
+non-blocking deferral, verification scheduling/reuse, and handoff, including
+upcoming implementation of the [published S3 plan](../phase_3_3_s3_persistence_legacy_native_compatibility_plan.md).
+It supersedes conflicting process wording in earlier plans for those purposes
+only; historical reviews and exact candidate approvals are not rewritten or
+transferred to changed content. Frozen candidate-time lifecycle wording is
+history; current publication status belongs in PLANS.md and run_protocol.md.
+
+S3's schema, ownership, transaction safety, reconstruction, migration behavior,
+36-ID/56-block vector coverage, and exact implementation scope remain in force.
+All required S3 technical evidence, including section 14's named suites and
+checks, remains due. Scheduling or valid reuse must never turn missing evidence
+into a claimed pass. There is no automatic waiver of real-MySQL, concurrency,
+or data-preservation proofs. A change to a specific frozen technical requirement
+must be explicit and impact-assessed, never hidden behind generic workflow text.
+The existing S3 implementation success token remains the sole token when its
+gate becomes operative; no new approval stage is introduced.
+
 ## One phase per session
 
 Use a fresh Codex session for each implementation phase.
@@ -50,21 +85,29 @@ An implementation session must:
 
 1. read repository constraints and relevant documentation;
 2. confirm the expected working-tree state;
-3. run the required baseline tests;
+3. establish baseline evidence under the proportionate verification policy below;
 4. implement only the authorized phase;
-5. add regression tests for every confirmed defect or state mutation;
+5. add meaningful regression coverage for each fixed code defect and tests for
+   every state mutation;
 6. run the required final verification;
 7. report modified and untracked files;
-8. stop without staging, committing, or pushing unless explicitly authorized.
+8. stop without staging or committing unless explicitly authorized; never push.
 
 Do not begin the next phase during the current phase's implementation or
 review.
 
 Do not perform unrelated cleanup or refactoring.
 
+Fix an opportunistic defect only when directly related to the task, small in
+scope, low in regression risk, meaningfully verifiable at low cost, and adding
+no public contract, schema, or feature. Otherwise record eligible work in the
+deferred-findings register. Unrelated pre-existing non-blocking findings do not
+stop the current task: record them and continue within authorized scope.
+
 ## Independent review session
 
-Use a new session for independent review.
+Retain fresh independent review in a new session for material implementation,
+persistence, security, and authority changes.
 
 A review session must:
 
@@ -72,7 +115,7 @@ A review session must:
 - verify that implementation claims match actual code and tests;
 - reproduce deterministic defects before fixing them;
 - make only minimal in-scope fixes;
-- add regression tests for each confirmed fix;
+- add meaningful regression coverage for each fixed code defect;
 - report remaining limitations accurately;
 - avoid expanding into the next feature phase;
 - avoid `git add`, commit, or push.
@@ -86,6 +129,37 @@ Review prompts must distinguish between:
 
 A large passing test count does not replace architecture, authority, or
 transaction-boundary review.
+
+After correction, focus independent re-review on the findings, their direct
+dependencies, and regressions caused by the correction. Preserve prior evidence
+where it remains applicable. Report newly discovered concrete blockers; style
+preferences and speculative improvements do not become blockers.
+
+## Findings and milestone disposition
+
+A finding blocks the relevant milestone when evidence shows any of these:
+
+- The required playable flow cannot complete or recover.
+- Security, privacy, ownership, or trusted authority can be violated.
+- Stored state can be corrupted, lost, or incorrectly cross-bound.
+- Migration or transaction behavior can cause irreversible damage.
+- An exposed required feature produces materially wrong outcomes.
+- Essential evidence is missing for one of these risks.
+
+State concrete impact and a reachable path or applicable operational condition;
+severity labels alone do not decide disposition. Investigate plausible serious
+risks enough to classify them: absence of evidence does not establish safety.
+
+A confirmed finding may be deferred only when impact and exposure are understood,
+none of the blocking criteria applies at the stated milestone, necessary
+containment/workarounds are specified, and a repair or reassessment milestone
+and responsible role are recorded in the canonical
+[deferred-findings register](deferred_findings.md). If reachability or impact
+expands, or containment fails, reassess and escalate to a blocker when required.
+
+Approval may include documented deferred findings. It permits only the stated
+development milestone, not automatic production release. Required technical
+acceptance evidence remains due; deferral is not a waiver of a frozen contract.
 
 ## Pending-plan baseline invalidation
 
@@ -105,8 +179,15 @@ hash never takes priority over factual accuracy.
 ## Approval-token consistency
 
 Every approval-gated candidate must define exactly one operative success
-verdict. Historical, superseded, example, prohibited, and failure tokens must
+token. Historical, superseded, example, prohibited, and failure tokens must
 be explicitly non-operative; competing operative success tokens are prohibited.
+
+The report may separately state disposition `APPROVED` or
+`APPROVED_WITH_DEFERRED_FINDINGS`. Both successful dispositions must satisfy the
+candidate's stated success condition and emit its same exact operative success
+token. These disposition labels are not alternative operative tokens. Before
+review, ensure the candidate/protocol supports both dispositions under this
+policy without weakening its technical acceptance requirements.
 
 Approval applies only to the exact complete candidate and exact hashes reviewed.
 Any byte change to an approval-bound candidate file invalidates prior approval;
@@ -117,7 +198,7 @@ cannot satisfy the gate for a later corrected or expanded candidate.
 
 Before issuing a review prompt, compare the candidate's required approval token
 and condition with every successful verdict the review protocol can return. The
-exact required token must be reachable through the exact successful verdict. Do
+exact required token must be reachable through either successful disposition. Do
 not begin a review while the candidate contains an obsolete, unreachable, or
 differently named operative approval token.
 
@@ -125,7 +206,7 @@ Use this non-circular sequence for approval-gated documentation: (1) freeze the
 exact candidate and hashes; (2) conduct the independent read-only review; (3)
 obtain the required approval verdict; (4) obtain separate authorization for
 staging and commit; (5) verify staged and committed bytes and scope; (6)
-complete the authorized push workflow; (7) confirm the new clean pushed
+hand off to the user for manual push; (7) confirm the new clean pushed
 baseline; and (8) only then begin separately authorized implementation. A
 correction task is not the approval review. Do not commit before approval, or
 implement before the documentation is pushed and the new clean baseline is
@@ -187,11 +268,13 @@ and permits no unrelated dirty-worktree expansion.
 
 ## Environment startup
 
-On Windows:
+For tasks requiring project runtime verification on Windows (documentation-only
+work uses document checks without startup scripts):
 
 1. start from PowerShell 7+ using `pwsh`;
 2. enter the repository;
-3. run:
+3. for authorized non-offline runtime work, run the command below; for offline
+   work, follow Offline and database modes instead:
 
     .\scripts\doctor.ps1 -Strict
 
@@ -207,16 +290,21 @@ Chinese text must be read and written as UTF-8.
 
 ## Offline and database modes
 
-When a task explicitly prohibits database or model access, use:
+When runtime verification is required and the task prohibits database or model
+access, use the sanitized child process launched by:
 
-    .\scripts\doctor.ps1 -Strict -RequireOffline
     .\scripts\verify.ps1 -Mode Offline
 
-If these modes are not yet implemented, stop and report the missing tooling
+Use `.\scripts\doctor.ps1 -Strict -RequireOffline` only to verify intentionally
+that the current process is already clean. Do not run the general startup
+doctor first for an offline task. Documentation-only checks require neither
+script; they must not read secrets or invoke database or Provider code.
+
+If required Offline mode is unavailable, stop and report the missing tooling
 instead of running Full or MySQL verification with inherited environment
 variables.
 
-Offline work must not receive:
+Offline runtime verification must not receive:
 
 * `TEST_DATABASE_URL`;
 * `DATABASE_URL`;
@@ -274,8 +362,25 @@ manual guess, or retrospective reconstruction after a non-repeatable action.
 
 ## Baseline and final verification
 
-Use the repository scripts rather than reconstructing validation commands in
-every session.
+Choose verification by demonstrated impact and the applicable technical contract:
+
+| Change or milestone | Required verification |
+| --- | --- |
+| Documentation only | Relevant document checks, links, complete diff, tracked/new-file whitespace, UTF-8/LF, final newline, and scope; no project runtime verification by default |
+| Code | Focused behavioral tests and affected regressions; meaningful coverage for fixed code defects and state mutations |
+| Persistence, schema, or concurrency | Relevant real-MySQL, transaction, migration, and failure-path proof |
+| Shared or broad changes | Broaden regression coverage according to demonstrated impact |
+| Playable or release milestone | Integrated end-to-end proof and appropriate comprehensive verification |
+
+Reuse evidence only while relevant code, dependencies, environment assumptions,
+and test scope remain applicable; state the original result and why reuse is
+valid. Do not rerun expensive unchanged suites merely because prose changed.
+Do not silently skip a specifically required technical test, substitute SQLite
+or mocks for required real-MySQL evidence, or rely on future CI to omit necessary
+local verification. Missing required evidence remains missing until supplied.
+
+Use repository scripts for applicable runtime verification rather than
+reconstructing them in every session.
 
 Typical commands are:
 
@@ -319,9 +424,10 @@ safe checkpoint and start a new session that reads the repository state.
 
 Before handoff, classify every confirmed issue:
 
-### Code regression
+### Fixed code defect
 
-Add or update a regression test.
+Add or update meaningful regression coverage. Deferral alone requires no fix
+or artificial test.
 
 ### Reusable engineering or safety rule
 
@@ -335,12 +441,14 @@ Update this file.
 
 ### Unresolved confirmed defect
 
-Report it explicitly as a blocker. Create an external tracked issue only when
-the user authorizes it.
+Classify it under Findings and milestone disposition above. Report blockers;
+record eligible non-blocking findings in the canonical deferred-findings
+register and continue. Create an external tracked issue only when authorized.
 
 ### Speculation or unconfirmed concern
 
-Do not add it to the repository.
+Do not record it as confirmed debt or a guardrail. Investigate plausible serious
+risks enough to classify them and report essential evidence gaps.
 
 Every implementation and review report must include:
 
@@ -363,8 +471,8 @@ as complete, and before requesting authorization to commit:
 4. Keep code, tests, `PLANS.md`, phase documentation, and applicable guardrails
    consistent.
 5. Record new constraints, decisions, limitations, and verification evidence.
-6. Distinguish **Implemented**, **Accepted design**, **Deferred**, and
-   **Planned phase**.
+6. Use PLANS.md status language, including its separate component, integrated
+   play, limited-trial, and broader-release evidence levels.
 7. Check whether a confirmed failure requires a guardrail update.
 8. Do not add speculative guardrails without a confirmed failure and an
    enforcement mechanism.
@@ -379,13 +487,17 @@ as complete, and before requesting authorization to commit:
     operation.
 15. Never push; the user performs every push manually.
 
+Do not create separate lifecycle-closeout tasks by default. Synchronize current
+status in the next relevant authorized documentation change; preserve historical
+approvals and frozen candidate bytes.
+
 ## Git handoff
 
 Codex does not stage unless explicitly authorized. Codex may create a local
 commit only when the user explicitly authorizes that exact commit operation.
 Codex never pushes; the user performs every push manually.
 
-Before user commit:
+For an explicitly authorized staging/commit operation:
 
 1. inspect `git status --short`;
 2. inspect all untracked files;
@@ -397,6 +509,10 @@ Before user commit:
     git status --short
 
 5. confirm no unrelated files are staged.
+
+The committing session must also verify committed bytes and scope against the
+reviewed candidate. A separate independent post-commit audit is not required
+by default; this does not remove pre-commit independent review requirements.
 
 Never commit:
 

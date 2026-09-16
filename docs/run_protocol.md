@@ -11,18 +11,20 @@ The exact P3.3-S2 deterministic profile-resolution plan is approved, committed,
 manually published by the user, and confirmed at
 `2f3f84a4d63d00d2e3bbbe0e4eb6dafd9c3435fe`. Its exact five-path
 implementation is independently approved and published at
-`20eab60a99c093f2ccf0224dee200e142fc194b6`. P3.3-S3 is the next sequential
-planning subject. Its dedicated plan is an unapproved, unstaged, uncommitted,
-unpublished third correction candidate after its first independent review
-returned `CHANGES_REQUIRED` with exactly five material findings. First correction
-completed; the second review returned `CHANGES_REQUIRED` with five Medium
-findings. Second correction completed; the third review returned
-`CHANGES_REQUIRED` with exactly three findings on stale-snapshot visibility,
-immutable-character preload order, and between-DDL state loss. None was approval; no S3
-implementation has begun and no migration has been created or executed.
+`20eab60a99c093f2ccf0224dee200e142fc194b6`. The S3 plan is independently
+approved and published at `465c53d24ea96e64988dce8ef4c8a015d0e72814`
+(`docs(run): approve Phase 3.3 S3 persistence plan`). Earlier `CHANGES_REQUIRED`
+reviews remain accurate history; the frozen plan's candidate-time wording is
+historical. S3 implementation has not started and no migration has been created
+or executed.
 P3.3-S4 through P3.3-S7
 remain unauthorized, Phase 3.3 remains incomplete, and plan approval alone
 grants no implementation or Git authority.**
+
+The playable-loop-first workflow amendment is a current **uncommitted,
+unpublished documentation change**. See [PLANS.md](../PLANS.md#immediate-delivery-priority)
+for delivery priority and the workflow's prospective S3 applicability; it
+changes no technical contract or feature ownership described here.
 
 Phase ownership: **Phase 3.3**
 
@@ -87,7 +89,7 @@ constructible lifecycle remains `pre_first_turn`.**
 
 - Completing Phase 3.3 or implementing P3.3-S3 through P3.3-S7 through the
   bounded P3.3-S1 foundation, its completed closeout, the published S2 plan and
-  implementation, or the present documentation-only S3 plan candidate.
+  implementation, or the published documentation-only S3 plan.
 - Letting prose or model preference change resources, success, betrayal, death,
   relationship progression, or permanent facts.
 - Replacing scenario-authored facts, character definitions, or engine rules.
@@ -316,8 +318,8 @@ allocation did not authorize any implementation slice. P3.3-S1 was separately
 authorized, independently approved, and published as the bounded foundation
 described above, and its closeout is fully closed at `4d146679`. The exact S2
 plan and bounded implementation are published at `2f3f84a4` and `20eab60a`.
-The dedicated S3 plan is an unapproved, unstaged, uncommitted, unpublished
-documentation candidate; S3 implementation has not begun, no migration exists,
+The dedicated S3 plan is independently approved and published at `465c53d`;
+S3 implementation has not begun, no migration exists,
 and S4 through S7 remain unimplemented and unauthorized.
 
 P3.3-S5 must receive its own bounded implementation plan and independent
@@ -986,11 +988,15 @@ warnings` result are historical pre-correction evidence only. The candidate
 was subsequently approved and published at `20eab60a`; the implementation
 activates no durable, runtime, public, or categorical representation.
 
-### Current P3.3-S3 third correction candidate — unapproved
+### Published P3.3-S3 plan — implementation not started
 
 The dedicated
 [P3.3-S3 persistence and legacy/native compatibility plan](phase_3_3_s3_persistence_legacy_native_compatibility_plan.md)
-is the next sequential planning subject. Its first independent review returned
+is independently approved and published at
+`465c53d24ea96e64988dce8ef4c8a015d0e72814`
+(`docs(run): approve Phase 3.3 S3 persistence plan`). The following correction
+history preserves the earlier verdicts; fixed planning findings are historical
+closures, not deferred debt. Its first independent review returned
 `CHANGES_REQUIRED` with exactly five material findings: a hidden production test
 writer, an unimplementable/conflated legacy proof, a race-unsafe downgrade,
 unsupported 1062 key identification, and non-executable vectors. The first
@@ -1042,7 +1048,7 @@ flush; V03 uses isolated literal in-memory inputs twice with no I/O.
 The third review returned `CHANGES_REQUIRED` with exactly three findings:
 stale-snapshot downgrade visibility, complete Run validation before its required
 immutable-character load, and missing state-only between-DDL loss branches.
-This third correction supplies the current-read/old-snapshot V31-B proof and
+The published third correction specifies the current-read/old-snapshot V31-B proof and
 the L01-L04 immutable-preload sequence, synchronized with V01-A/V13/V14/V29.
 After acknowledged FK removal, state-only loss before index removal raises
 `RuntimeError("P3.3-S3 downgrade BODY_CONNECTION_LOST_BEFORE_INDEX")`; after
@@ -1066,8 +1072,10 @@ admission, entry-world binding, objective mechanics, prompt compilation,
 API/OpenAPI, Demo, Web, Provider, visit, region, world-state, or continuity
 authority.
 
-The exact three-document third correction candidate is unapproved, unstaged,
-uncommitted, and unpublished. No S3 implementation has begun; migration
+The exact three-document corrected plan was subsequently independently approved
+and published. Its frozen candidate-time lifecycle wording is historical;
+earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
+No S3 implementation has begun; migration
 `20260828_0006` is only
 a planned identity and has neither been created nor executed. P3.3-S4 through
 P3.3-S7 remain unauthorized, Phase 3.3 remains incomplete, and plan approval
@@ -1255,8 +1263,8 @@ Phase 3.3 is acceptable only when:
 - The exact S2 numeric domains, profile defaults, override catalogue,
   precedence, resolver, canonical input, fingerprint, symbol contract, and path
   budget are frozen by the published S2 plan and implementation. Durable S3
-  representation is frozen only in the current unapproved documentation
-  candidate; runtime integration remains S4-S7 work.
+  representation is frozen in the independently approved published S3 plan;
+  its implementation has not started. Runtime integration remains S4-S7 work.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; no threshold or band exists before its separately
   reviewed plan and implementation.
