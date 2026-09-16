@@ -36,6 +36,52 @@ validation completed locally (canonical Offline 1,814 passed/124 expected skips,
   Demo, public Run, frontend, Web, administration, production-authentication,
   deployment, release, or Provider activation followed from Phase 5.
 
+## Proposed P3.3-S6 native public extension
+
+Status: **Unapproved documentation proposal; not implemented.** S5 internal
+mechanics and trusted context are independently approved with DF-001 deferred
+and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. Public native
+activation belongs to the [S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md),
+which owns the exact DTOs, validation/error tables, implementation inventory,
+acceptance and sole operative review gate. The existing contracts below remain
+implemented behavior. Plan approval authorizes no implementation or Git writes.
+
+| Proposed public surface | Closed projection / compatibility decision |
+| --- | --- |
+| `GET /v1/run-entry-options` | `schema_version=run-entry-options/v1`, `native_entry_available`, `profiles`, `entry_worlds`, `presentation_options`. No query/body/private character data. Exact S2 three profiles/defaults/ranges; one S4 authored world. HTTP 200/422/500. |
+| `POST /v1/runs/native` | Required exact Idempotency-Key and strict 4,096-byte JSON body containing only player_character_id, expected_record_revision, profile_ref, entry_world, overrides, presentation. Calls existing S4 admission once. First success/replay HTTP 200: session_id, scenario_id, scenario_content_version, run_context. Error statuses 404/409/422/500/503 use ErrorResponse. |
+| Optional `PlayerSessionView.run_context` | `schema_version=public-run-context/v1`, run_id, admitted four-field player_character projection, entry_world pair, profile_ref pair, exact five objectives, three presentation fields and resource_pressure_label. Reconstructed in the View read UoW; omitted for positively established legacy/standalone Sessions. No recovery write. |
+
+Public numbers remain exact S2 integers. Proposed output labels reuse published
+S5 bands: Generous 0..30, Fluid 35..65, Scarce 70..100 on the step-5 lattice.
+Labels are never input aliases. World exposure is exactly
+`world.death_certificate@1`, backed by `death_certificate` /
+`death-certificate-1.1.0`, with existing public title/hook and all three profiles
+eligible. No implicit profile/world selection, unlock rule, new content or
+permanent default-world authority is introduced.
+
+Legacy `POST /v1/runs`, standalone `/v1/sessions`, existing idempotency evidence,
+action/status contracts and legacy View bytes remain unchanged. Native POST
+cannot fall back to legacy. Dynamic Demo advertises native entry unavailable
+and retains its current legacy/suggestion flow. Deterministic native Demo uses
+real S4/S5 application behavior with process-local transactional adapters.
+
+The proposed Web primary journey explicitly selects character/profile/world,
+reviews overrides/presentation, retains the exact key/serialized body before
+POST, validates admission, stores the existing Session recovery record before
+View, then uses authoritative actions/recovery/ending. Native uncertainty permits
+only explicit exact retry, retaining the attempt after every tainted non-success.
+Pending admission remains memory-only, with its pre-storage reload limitation
+stated explicitly. Confirmed Session recovery is GET-only; no automatic entry or
+action replay, replacement Session, or new browser storage family. Public fields
+exclude internal evidence, compiled context, private state and hidden information;
+presentation and model output create no mechanics or canon authority.
+
+The proposal changes neither production Provider integration nor S7 continuity
+or Phase 3.4 relationship/residence state. Phase 3.3 remains incomplete. Browser
+evidence requires separate explicit authorization; automated contract evidence
+remains mandatory. Current S6 work is documentation planning only.
+
 ## Owned Player Character read
 
 The normal application exposes `GET /v1/player-characters/{player_character_id}`
@@ -863,11 +909,10 @@ objective.
 
 ## Phase 8 Player Character discovery and Run entry
 
-Status: **P8-S5 consumption of the existing Player Character, Run-entry, and
-Session gameplay contracts is implemented, independently approved, committed,
-published, and complete. P8-S6 fresh contract evidence has passed; its
-documentation implementation candidate remains unapproved, uncommitted,
-unpublished, and Phase 8-incomplete.**
+Status: **Phase 8 is implemented and complete at the independently approved
+published P8-S6 closure baseline `7dae3f5bbd3055e60e33b8ce6b1e05ce75f4824d`;
+no P8-S7 exists.** The candidate-time history below is retained; it does not
+reopen that closure or establish native S6 activation.
 
 The dedicated authority is the
 [Phase 8 Structured Player Character Run Entry and Minimum Playable Loop plan](structured_player_character_run_playable_loop_plan.md).
@@ -921,9 +966,10 @@ action/request-status recovery, and terminal rendering; the legacy
 `POST /v1/sessions` operation remains available but unused by that primary
 journey. Error, non-enumeration, response-identity, strict action/status DTO,
 uncertain-POST no-auto-retry, GET-only confirmed-202 recovery, and privacy
-semantics remain unchanged. These current documentation bytes are only the
-unapproved, unstaged, uncommitted, and unpublished P8-S6 implementation
-candidate. Phase 8 and the overall project remain incomplete. Phase 5 remains
+semantics remain unchanged. At that historical handoff the documentation bytes
+were the unapproved, unstaged, uncommitted and unpublished P8-S6 implementation
+candidate; Phase 8 was then incomplete. Subsequent approved publication at the
+closure baseline above completed Phase 8. The overall project remains incomplete. Phase 5 remains
 complete at P5-S3; no P5-S4 exists. Existing Phase 6 and Phase 7 allocations
 remain planned and unimplemented, and neither is a Phase 8 prerequisite.
 

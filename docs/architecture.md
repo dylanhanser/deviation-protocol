@@ -54,8 +54,9 @@ wording is historical. S4 implementation was independently approved and
 published at `34dc752295ba270617e5d29020f3a0c0b133544e`. Its earlier
 `CHANGES_REQUIRED` migration-disposal review remains history. DF-001 remains
 deferred. The S5 plan is independently approved and published at `ff866d2`.
-The S5 internal implementation candidate awaits independent review; S6/S7 remain
-unauthorized and Phase 3.3 remains incomplete.
+S5 implementation is independently approved with DF-001 deferred and published
+at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 is now a documentation planning
+candidate; S6 implementation and S7 remain unauthorized. Phase 3.3 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -108,12 +109,13 @@ Public routes/OpenAPI, Demo/Web entry and public recovery remain S6-owned;
 mechanics/prompt compilation remain S5-owned; later worlds/continuity remain
 S7-owned. This internal component is not a complete player-facing native flow.
 
-## P3.3-S5 internal implementation candidate
+## P3.3-S5 published internal implementation
 
 The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 is frozen at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`. Its earlier
-CHANGES_REQUIRED and candidate-time status are history. The current implementation
-is unapproved pending independent review; [evidence and limits](run_protocol.md#p33-s5-implementation-candidate-evidence)
+CHANGES_REQUIRED and candidate-time status are history. Implementation was
+independently approved with DF-001 deferred and published at
+`86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; [evidence and limits](run_protocol.md#p33-s5-implementation-candidate-evidence)
 separate internal integration from S6 public activation.
 
 Normal `build_default_services` installs `NativeTurnMechanicsCoordinator`.
@@ -153,6 +155,27 @@ The overlay does not read or create Phase 3.4 relationship/residence state.
 S4 rows and character authority remain immutable; a Session ending does not
 transition its Run. S6 owns public discovery/admission/API/OpenAPI/Demo/Web and
 recovery projection; S7 owns later worlds and continuity.
+
+## Proposed P3.3-S6 public flow
+
+The [S6 plan candidate](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
+is documentation only and unapproved. It proposes additive options discovery
+and `POST /v1/runs/native`, backed by the existing production S4 service and
+unchanged S5 turn coordinator. Legacy entry contracts remain valid. Native
+Session View recovery adds a closed immutable setup projection in the existing
+read UoW, using complete reconstruction, reverse evidence and current ownership;
+missing native evidence cannot become legacy omission.
+
+Deterministic Demo needs protocol/world maps, native receipt/classification
+adapters and a native rendering delegate alongside its frozen legacy script.
+These mirror existing persistent families within its atomic process store;
+they add no SQL schema or external fallback. Web explicitly selects a profile
+and world, confirms permitted overrides, freezes exact admission evidence,
+stores validated Session identity before View and keeps recovery GET-only.
+Dynamic Demo remains explicitly legacy-only. The plan specifies separate
+automated public/MySQL/Demo/Web evidence and separately authorized browser work.
+S6 implementation has not started; neither this proposal nor published S5
+completes Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -229,7 +252,8 @@ or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
-described above; S5 is an internal implementation candidate and S6/S7 remain unauthorized; the
+described above; S5 internal implementation is published, S6 is a planning
+candidate and S6/S7 implementation remains unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1

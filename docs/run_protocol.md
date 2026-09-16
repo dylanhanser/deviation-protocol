@@ -22,8 +22,10 @@ published at `42411b27537bbcd7c6a88f6cc0e4c5e8ca871fcd`. Its frozen candidate-ti
 wording is historical. S4 internal implementation was independently approved
 and published at `34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains
 deferred. The S5 plan was independently approved and published at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`.
-S5 now has an internal implementation candidate awaiting independent review.
-S6/S7 remain unauthorized and Phase 3.3 remains incomplete.**
+S5 implementation is independently approved with DF-001 deferred and published
+at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 is the current documentation
+planning candidate; S6 implementation has not started and S7 remains later.
+Phase 3.3 remains incomplete.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
 [PLANS.md](../PLANS.md#immediate-delivery-priority)
@@ -77,6 +79,26 @@ and P4-S1b at `8eabf9d4c3c592ea1de50f443f1816de9a46dc8f`. The completed binding
 is internal-only; no public route exists, the reserved public
 `RunService.bind_player_character(...)` command remains rejected, and the
 constructible lifecycle remains `pre_first_turn`.**
+
+## Current P3.3-S6 planning boundary
+
+The [S6 public API, Demo, Web, projection and recovery plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
+is the current unapproved documentation candidate. It proposes an explicit
+character -> profile/world -> permitted overrides/presentation -> native S4
+admission -> authoritative Session View -> S5 play -> reload/recovery -> authored
+Session ending journey. Existing legacy entry remains compatible. Discovery and
+native POST are additive; View exposes only allowlisted frozen setup, including
+exact numeric pressure and the approved S5 output bands. No public field becomes
+mechanics, catalogue, relationship or canon authority.
+
+The plan owns exact contracts, Demo adapters, Web uncertainty and GET-only
+recovery, dependency-derived paths, verification allocation and review tokens.
+[Public contract status](public_client_contract.md#proposed-p33-s6-native-public-extension)
+distinguishes the proposal from implemented behavior. S6 implementation has not
+started; next is one substantive independent plan review. Approval grants no
+implementation or Git writes. DF-001 remains deferred. No separate S5 closeout,
+new story/world content, production Provider, S7 continuity or Phase 3.4 state
+is included. Phase 3.3 remains incomplete and no release readiness is claimed.
 
 ## Goals
 
@@ -330,8 +352,9 @@ was independently approved and published at `42411b2`. S4 implementation is
 independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`.
 The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 is independently approved at `ff866d2`; its candidate-time wording is historical.
-The S5 implementation candidate awaits independent review. S6/S7 remain
-unauthorized; DF-001 remains deferred.
+S5 implementation is independently approved and published at `86c258e9`.
+S6 is a planning candidate, with implementation unauthorized; S7 remains later.
+DF-001 remains deferred.
 
 P3.3-S5 owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
@@ -732,7 +755,7 @@ mechanics/prompt projection. P3.3-S6 owns any separately reviewed public API,
 OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
 slice may change, round, clamp, or replace the numeric S2 value; each may only
 project from it. The approved S5 internal bands are Generous 0..30, Fluid
-35..65 and Scarce 70..100 on the S2 lattice. The S5 implementation candidate
+35..65 and Scarce 70..100 on the S2 lattice. Published S5
 uses these bands only in trusted context. S6 public representation still requires
 its own approval, implementation and publication; internal labels do not activate it.
 
@@ -1100,8 +1123,9 @@ earlier `CHANGES_REQUIRED` reviews do not describe the current approval state.
 The implementation and migration `20260828_0006` subsequently received independent
 approval with DF-001 deferred and were published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4's plan was approved and published at `42411b2`; its separately authorized
-implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and an internal implementation
-candidate awaiting independent review; S6/S7 remain unauthorized.
+implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and independently approved
+implementation published at `86c258e9`. S6 is the current planning candidate;
+S6/S7 implementation remains unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -1343,7 +1367,8 @@ and actual depletion are distinct; only positive depletion calls `consume_resour
 and emits `RunProtocolResourceSpent`. Both zero cases still advance the Director
 and commit legitimate effects. The positive-amount resource API is unchanged.
 
-The current unapproved candidate implements the five pure policies, trusted
+The independently approved implementation, published at
+`86c258e9ad2e64199cabf8650bf6f3a7b5f04d87` with DF-001 deferred, implements the five pure policies, trusted
 native coordinator, native job evidence codec, canonical compiler, production
 composition, atomic native turns, replay/reload and authored endings. Gameplay
 uses the exact approved coefficients and catalogue association. The integration
@@ -1431,13 +1456,13 @@ only; the parent environment is unchanged. No real Provider or production databa
 was used. The external manifest includes raw logs, command/exit metadata, source
 epochs, reuse applicability, restoration and exact patch identities.
 
-The sole operative independent implementation-review success token is
-`PHASE_3_3_S5_OBJECTIVE_MECHANICS_PROMPT_CONTEXT_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`.
-Both APPROVED and APPROVED_WITH_DEFERRED_FINDINGS must emit that token and bind
-the complete candidate; the plan-review token is historical and non-operative.
-This implementation session claims neither disposition. Next is one substantive
-independent implementation review. No staging, commit, push or later-slice
-activation is authorized. DF-001 remains deferred with its documented
+Historical candidate handoff defined
+`PHASE_3_3_S5_OBJECTIVE_MECHANICS_PROMPT_CONTEXT_IMPLEMENTATION_INDEPENDENT_REVIEW_APPROVED`
+for both successful dispositions and requested substantive independent review;
+that session did not claim approval. Subsequent independent approval with DF-001
+deferred and publication at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87` close that
+implementation gate. The token and candidate evidence above are historical, not
+an operative S6 gate. No separate closeout is due. DF-001 retains its documented
 process-local containment; no new finding is deferred. Guardrail impact: None.
 
 ### Extreme — Silent Hunting Ground
@@ -1560,7 +1585,7 @@ Public/client representation remains S6-owned.
 - The published S2 resolver uses canonical input and a deterministic fingerprint
   and consumes no seed; later-world seed behavior remains S7 work.
 - The published S2 resolver produces only exact numeric `resource_pressure`;
-  categorical mechanics/prompt projection is in the S5 candidate and public/client
+  categorical mechanics/prompt projection is published in S5 and public/client
   representation remains S6 work.
 - No setting depends on unordered collection iteration, wall-clock time, or a
   Provider-selected random value.
@@ -1626,16 +1651,17 @@ Phase 3.3 is acceptable only when:
   representation is frozen in the independently approved published S3 plan;
   its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
   independently approved with DF-001 deferred. S4 internal implementation is
-  independently approved and published at `34dc752`. S5 internal integration is a review candidate; S6/S7 runtime work remains later.
+  independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
+  S6 planning is current and S6/S7 runtime work remains later.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
-  prompt projection; exact proposed bands now appear in its planning candidate,
-  with no implementation or approval implied.
+  prompt projection; its approved bands and implementation are published.
+  S6 proposes the same bands for public output, with exact numeric values preserved.
 - P3.3-S6 owns every public API, OpenAPI, Demo, Web, projection, recovery, and
   client representation of those labels; it may not replace the numeric S2
   value.
 - Compatibility and migration policy for future protocol versions.
-- World/profile discovery and unlock policy.
-- Public entry-world catalogue exposure/expansion (S6); S4's bounded internal
+- S6 world/profile discovery is proposed in the dedicated plan; later unlock policy remains S7.
+- Public entry-world catalogue exposure (S6; no expansion in this slice); S4's bounded internal
   catalogue and explicit world/scenario mapping are implemented and published
   at `34dc752`; public activation remains deferred.
 - Later-world weighting algorithm and general anti-repeat rules.

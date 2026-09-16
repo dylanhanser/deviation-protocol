@@ -77,10 +77,11 @@ That network component is not the application `NarrativeProvider` interface and
 is not implemented. Its canonical decision is
 [ADR 0001](decisions/0001-production-provider-distribution.md).
 
-Phase 3.3 S5 now has an internal implementation candidate under its
-[approved, published plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md).
+Phase 3.3 S5 internal implementation is independently approved with DF-001
+deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87` under its
+[frozen plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md).
 It uses canonical `run-prompt-context/v1` JSON, never an illustrative
-`[RUN_PROTOCOL]` block. The candidate awaits independent implementation review.
+`[RUN_PROTOCOL]` block. This publication adds no public native activation.
 
 Phase 3.4's approved
 [NPC Relationship and Temporary Residence design](npc_relationship_residence.md)
