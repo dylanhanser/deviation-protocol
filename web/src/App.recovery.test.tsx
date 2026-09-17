@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { StrictMode } from "react";
@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
+import { playerSessionViewSchema } from "./api/schemas";
 import type {
   EligiblePlayerCharacterCollection,
   PlayerSessionView,
@@ -27,8 +28,380 @@ import {
   runEntryRequestFixture,
   runEntryResponseFixture,
   scenarioCatalogFixture,
+  runOptionsFixture,
+  nativeEntryFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
+
+async function selectNativeSetup() {
+  fireEvent.click(screen.getByRole("button",{name:"原生 Run 设置"}));
+  await screen.findByLabelText("选择难度");
+  fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
+  fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
+  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
+}
+
+describe("native admission and storage recovery", () => {
+  describe("S6 correction: confirmed native association", () => {
+    const cases = ["missing context", "mismatched context", "changed scenario", "changed content", "matching View"] as const;
+
+    function recoveryView(kind: typeof cases[number]): PlayerSessionView {
+      const view: PlayerSessionView = {
+        ...activeViewFixture,
+        run_context: nativeEntryFixture().run_context,
+      };
+      if (kind === "missing context") delete view.run_context;
+      if (kind === "mismatched context" && view.run_context) {
+        view.run_context = {...view.run_context, run_id: "run.other"};
+      }
+      if (kind === "changed scenario") {
+        view.narrative_frame = {...view.narrative_frame, scenario_id: "scenario.other"};
+      }
+      if (kind === "changed content") {
+        view.metadata = {...view.metadata, content_version: "other-version"};
+        view.player_state = {...view.player_state, content_version: "other-version"};
+      }
+      expect(playerSessionViewSchema.safeParse(view).success).toBe(true);
+      return view;
+    }
+
+    function expectNoLoadedGameplay() {
+      expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
+      expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+      expect(screen.queryByRole("region", {name: "Run 设置"})).not.toBeInTheDocument();
+    }
+
+    it.each([...cases, "changed Session"] as const)("direct automatic storage recovery validates the admission: %s", async (kind) => {
+      const storage = new FaultInjectingStorage();
+      const restore = installSessionStorage(storage);
+      const events: string[] = [];
+      let unexpectedPosts = 0;
+      const rejected = kind === "changed Session"
+        ? withSessionId(recoveryView("matching View"), "session-other")
+        : recoveryView(kind);
+      // Both content-version fields agree: rejection must be about admission,
+      // not an internally inconsistent public View fixture.
+      expect(playerSessionViewSchema.safeParse(rejected).success).toBe(true);
+      let returnedView = rejected;
+      server.use(
+        scenarioHandler(),
+        ...postGuards(() => { unexpectedPosts++; }),
+        http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+        http.post(`${apiOrigin}/v1/runs/native`, () => {
+          events.push("admission");
+          storage.failSet = true;
+          return HttpResponse.json(nativeEntryFixture());
+        }),
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
+          expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+          events.push("view after storage");
+          return HttpResponse.json(returnedView);
+        }),
+      );
+      try {
+        renderRecoveryApp();
+        await screen.findByLabelText("Player Character");
+        await selectNativeSetup();
+        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await screen.findByRole("button", {name: "重试保存进度"});
+        expect(events).toEqual(["admission"]);
+        expectNoLoadedGameplay();
+        storage.failSet = false;
+        fireEvent.click(screen.getByRole("button", {name: "重试保存进度"}));
+        if (kind !== "matching View") {
+          await screen.findByRole("heading", {name: "自动恢复已暂停"});
+          expect(screen.getByText(/CONTRACT_MISMATCH/)).toBeVisible();
+          expectNoLoadedGameplay();
+          expect(events).toEqual(["admission", "view after storage"]);
+          // A rejected View cannot become the expected association: the same
+          // mismatch is still rejected on GET-only retry.
+          fireEvent.click(screen.getByRole("button", {name: "手动重试安全 GET"}));
+          await waitFor(() => expect(events).toHaveLength(3));
+          await screen.findByRole("heading", {name: "自动恢复已暂停"});
+          expectNoLoadedGameplay();
+          returnedView = recoveryView("matching View");
+          fireEvent.click(screen.getByRole("button", {name: "手动重试安全 GET"}));
+        }
+        await screen.findByText("当前 Session：session-public-1");
+        expect(screen.getByRole("region", {name: "Run 设置"})).toBeVisible();
+        expect(events).toEqual(["admission", ...Array<string>(kind === "matching View" ? 1 : 3).fill("view after storage")]);
+        expect(unexpectedPosts).toBe(0);
+        expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+        expect(storage.length).toBe(1);
+      } finally { restore(); }
+    });
+
+    it.each(["client replacement", "unmount"])("ignores a direct automatic recovery View after %s even if abort is ignored", async (transition) => {
+      const storage = new FaultInjectingStorage();
+      const restore = installSessionStorage(storage);
+      const late = deferred<PlayerSessionView>();
+      const oldClient = new PublicApiClient({baseUrl: `${apiOrigin}/`});
+      const oldView = vi.spyOn(oldClient, "getSessionView").mockImplementation(() => {
+        expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+        return late.promise;
+      });
+      let posts = 0;
+      const replacementView = recoveryView("mismatched context");
+      replacementView.run_context = {
+        ...nativeEntryFixture().run_context,
+        objectives: {...nativeEntryFixture().run_context.objectives, resource_pressure: 30},
+      };
+      expect(playerSessionViewSchema.safeParse(replacementView).success).toBe(true);
+      server.use(
+        scenarioHandler(),
+        ...postGuards(() => { posts++; }),
+        http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+        http.post(`${apiOrigin}/v1/runs/native`, () => {
+          posts++;
+          storage.failSet = true;
+          return HttpResponse.json(nativeEntryFixture());
+        }),
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => HttpResponse.json(replacementView)),
+      );
+      try {
+        const rendered = renderRecoveryApp({client: oldClient});
+        await screen.findByLabelText("Player Character");
+        await selectNativeSetup();
+        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await screen.findByRole("button", {name: "重试保存进度"});
+        expect(oldView).not.toHaveBeenCalled();
+        storage.failSet = false;
+        fireEvent.click(screen.getByRole("button", {name: "重试保存进度"}));
+        await waitFor(() => expect(oldView).toHaveBeenCalledTimes(1));
+        if (transition === "unmount") rendered.unmount();
+        else {
+          rendered.rerender(<App client={testClient} />);
+          await screen.findByText("当前 Session：session-public-1");
+          expect(screen.getByRole("region", {name: "Run 设置"})).toHaveTextContent("资源压力30");
+        }
+        expect(oldView.mock.calls[0]?.[1]?.aborted).toBe(true);
+        const writes = vi.spyOn(storage, "setItem");
+        await act(async () => {
+          late.resolve(recoveryView("matching View"));
+          await late.promise;
+        });
+        expect(writes).not.toHaveBeenCalled();
+        if (transition === "unmount") expectNoLoadedGameplay();
+        else {
+          expect(screen.getByRole("region", {name: "Run 设置"})).toHaveTextContent("资源压力30");
+          // A stale completion must not overwrite the newer client's binding.
+          fireEvent.click(screen.getByRole("button", {name: "读取 PlayerSessionView"}));
+          await screen.findByText("当前 Session：session-public-1");
+          expect(screen.getByRole("region", {name: "Run 设置"})).toHaveTextContent("资源压力30");
+          expect(screen.queryByText(/CONTRACT_MISMATCH/)).not.toBeInTheDocument();
+        }
+        expect(posts).toBe(1);
+        expect(oldView).toHaveBeenCalledTimes(1);
+      } finally { restore(); }
+    });
+
+    it.each(cases)("storage failure, safe clear and storage-only retry: %s", async (kind) => {
+      const storage = new FaultInjectingStorage();
+      const restore = installSessionStorage(storage);
+      const events: string[] = [];
+      let unexpectedPosts = 0;
+      server.use(
+        scenarioHandler(),
+        ...postGuards(() => { unexpectedPosts++; }),
+        http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+        http.post(`${apiOrigin}/v1/runs/native`, () => {
+          events.push("admission");
+          storage.failSet = true;
+          return HttpResponse.json(nativeEntryFixture());
+        }),
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
+          expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+          events.push("view after storage");
+          return HttpResponse.json(recoveryView(kind));
+        }),
+      );
+      try {
+        renderRecoveryApp();
+        await screen.findByLabelText("Player Character");
+        await selectNativeSetup();
+        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await screen.findByRole("button", {name: "重试保存进度"});
+        expect(events).toEqual(["admission"]);
+        expectNoLoadedGameplay();
+        fireEvent.click(screen.getByRole("button", {name: "重试安全清除恢复记录"}));
+        expect(storedRecoveryRecord()).toBeNull();
+        storage.failSet = false;
+        fireEvent.click(screen.getByRole("button", {name: "重试保存进度"}));
+        expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+        expect(storage.length).toBe(1);
+        expect(events).toEqual(["admission"]);
+        expectNoLoadedGameplay();
+        fireEvent.click(await screen.findByRole("button", {name: "重试读取权威 View"}));
+        if (kind === "matching View") {
+          await screen.findByText("当前 Session：session-public-1");
+          expect(screen.getByRole("region", {name: "Run 设置"})).toBeVisible();
+        } else {
+          await screen.findByText(/权威 View 读取失败：.*CONTRACT_MISMATCH/);
+          expectNoLoadedGameplay();
+        }
+        expect(events).toEqual(["admission", "view after storage"]);
+        expect(unexpectedPosts).toBe(0);
+      } finally { restore(); }
+    });
+
+    it.each(cases)("same-Session manual read retains the admitted association: %s", async (kind) => {
+      let posts = 0;
+      let views = 0;
+      let unexpectedPosts = 0;
+      server.use(
+        scenarioHandler(),
+        ...postGuards(() => { unexpectedPosts++; }),
+        http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+        http.post(`${apiOrigin}/v1/runs/native`, () => {
+          posts++;
+          return HttpResponse.json(nativeEntryFixture());
+        }),
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
+          views++;
+          if (views === 1) {
+            expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
+            return HttpResponse.error();
+          }
+          return HttpResponse.json(recoveryView(kind));
+        }),
+      );
+      renderRecoveryApp();
+      await screen.findByLabelText("Player Character");
+      await selectNativeSetup();
+      fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+      await screen.findByRole("button", {name: "重试读取权威 View"});
+      fireEvent.change(screen.getByLabelText("Session ID"), {target: {value: "  session-public-1  "}});
+      fireEvent.click(screen.getByRole("button", {name: "读取 PlayerSessionView"}));
+      if (kind === "matching View") {
+        await screen.findByText("当前 Session：session-public-1");
+      } else {
+        await screen.findByText(/CONTRACT_MISMATCH/);
+        expectNoLoadedGameplay();
+      }
+      expect(posts).toBe(1);
+      expect(views).toBe(2);
+      expect(unexpectedPosts).toBe(0);
+    });
+
+    it.each(["legacy", "native"])("manual Session replacement accepts its own %s association", async (mode) => {
+      let posts = 0;
+      let unexpectedPosts = 0;
+      const replacement = withSessionId(
+        recoveryView(mode === "legacy" ? "missing context" : "mismatched context"), "session-other",
+      );
+      server.use(
+        scenarioHandler(),
+        ...postGuards(() => { unexpectedPosts++; }),
+        http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+        http.post(`${apiOrigin}/v1/runs/native`, () => {
+          posts++;
+          return HttpResponse.json(nativeEntryFixture());
+        }),
+        http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => HttpResponse.json(recoveryView("matching View"))),
+        http.get(`${apiOrigin}/v1/sessions/session-other/view`, () => HttpResponse.json(replacement)),
+      );
+      renderRecoveryApp();
+      await screen.findByLabelText("Player Character");
+      await selectNativeSetup();
+      fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+      await screen.findByText("当前 Session：session-public-1");
+      fireEvent.change(screen.getByLabelText("Session ID"), {target: {value: "session-other"}});
+      fireEvent.click(screen.getByRole("button", {name: "读取 PlayerSessionView"}));
+      await screen.findByText("当前 Session：session-other");
+      expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-other"});
+      expect(screen.queryByText(/CONTRACT_MISMATCH/)).not.toBeInTheDocument();
+      expect(posts).toBe(1);
+      expect(unexpectedPosts).toBe(0);
+    });
+  });
+
+  it.each(["client replacement", "unmount"])("ignores native completion after %s even when abort is ignored", async (transition) => {
+    const late=deferred<ReturnType<typeof nativeEntryFixture>>();
+    const oldClient=new PublicApiClient({baseUrl:`${apiOrigin}/`});
+    const post=vi.spyOn(oldClient,"enterNativeRun").mockImplementation(()=>late.promise);
+    let views=0;
+    server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,()=>HttpResponse.json(runOptionsFixture)),
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>{views++;return HttpResponse.json({...activeViewFixture,run_context:nativeEntryFixture().run_context});}));
+    const rendered=renderRecoveryApp({client:oldClient});
+    await screen.findByLabelText("Player Character"); await selectNativeSetup();
+    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+    await waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
+    if (transition==="unmount") rendered.unmount();
+    else rendered.rerender(<App client={testClient} />);
+    await act(async()=>{late.resolve(nativeEntryFixture());await late.promise;});
+    expect(storedRecoveryRecord()).toBeNull();expect(views).toBe(0);
+    expect(screen.queryByText("当前 Session：session-public-1")).not.toBeInTheDocument();
+  });
+  it("requires explicit choices, freezes retries through tainted errors, and stores before View", async () => {
+    const requests: {body:string;key:string|null}[]=[];
+    let views=0;
+    const response=nativeEntryFixture();
+    server.use(scenarioHandler(), http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
+      http.post(`${apiOrigin}/v1/runs/native`,async ({request}) => {
+        requests.push({body:await request.text(),key:request.headers.get("Idempotency-Key")});
+        if (requests.length===1) return HttpResponse.error();
+        if (requests.length===2) return HttpResponse.json(errorFixture("INVALID_RUN_PROTOCOL","Run settings are not available"),{status:422});
+        return HttpResponse.json(response);
+      }),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
+        views++; expect(storedRecoveryRecord()).toEqual({version:1,session_id:"session-public-1"});
+        return HttpResponse.json({...activeViewFixture,run_context:response.run_context});
+      }));
+    renderRecoveryApp();
+    await screen.findByLabelText("Player Character");
+    await selectNativeSetup();
+    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+    const retry=await screen.findByRole("button",{name:"手动重试完全相同的操作"});
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(requests).toHaveLength(1);
+    expect(screen.getByLabelText("选择难度")).toBeDisabled();
+    fireEvent.click(retry);
+    await waitFor(() => expect(requests).toHaveLength(2));
+    await waitFor(() => expect(retry).toBeEnabled());
+    expect(screen.getByLabelText("选择难度")).toBeDisabled();
+    fireEvent.click(retry);
+    await screen.findByText("当前 Session：session-public-1");
+    expect(requests).toHaveLength(3); expect(requests[0]).toEqual(requests[1]); expect(requests[0]).toEqual(requests[2]);
+    expect(views).toBe(1);
+    expect(screen.getByRole("region",{name:"Run 设置"})).toHaveTextContent("Generous");
+  });
+
+  it("retains admission success for storage-only retry without a second POST", async () => {
+    let posts=0,views=0;
+    const response=nativeEntryFixture();
+    const storage=new FaultInjectingStorage(); const restore=installSessionStorage(storage);
+    server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
+      http.post(`${apiOrigin}/v1/runs/native`,() => {posts++; storage.failSet=true; return HttpResponse.json(response);}),
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {views++; return HttpResponse.json({...activeViewFixture,run_context:response.run_context});}));
+    try {
+      renderRecoveryApp(); await screen.findByLabelText("Player Character"); await selectNativeSetup();
+      fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+      await screen.findByRole("button",{name:"重试保存进度"});
+      expect(posts).toBe(1); expect(views).toBe(0);
+      storage.failSet=false;
+      fireEvent.click(screen.getByRole("button",{name:"重试保存进度"}));
+      await waitFor(() => expect(storedRecoveryRecord()).toEqual({version:1,session_id:"session-public-1"}));
+      if (views===0) fireEvent.click(await screen.findByRole("button",{name:/手动重试.*View/}));
+      await screen.findByText("当前 Session：session-public-1");
+      expect(posts).toBe(1); expect(views).toBe(1);
+    } finally {restore();}
+  });
+
+  it("learns native context with GET-only reload and pauses on backend restart", async () => {
+    seedRecoveryRecord("session-public-1"); let posts=0,gets=0;
+    const response=nativeEntryFixture();
+    server.use(scenarioHandler(),...postGuards(() => {posts++;}),http.post(`${apiOrigin}/v1/runs/native`,() => {posts++;return HttpResponse.json(response);}),
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json({...activeViewFixture,run_context:response.run_context});}));
+    const page=renderRecoveryApp(); await screen.findByText("当前 Session：session-public-1");
+    expect(screen.getByRole("region",{name:"Run 设置"})).toBeVisible(); page.unmount();
+    server.use(http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json(errorFixture("SESSION_NOT_FOUND","Session was not found"),{status:404});}));
+    renderRecoveryApp(); await screen.findByRole("heading",{name:"自动恢复已暂停"});
+    expect(storedRecoveryRecord()).not.toBeNull(); expect(posts).toBe(0);expect(gets).toBe(2);
+    fireEvent.click(screen.getByRole("button",{name:"清除本标签页 Session"}));
+    expect(storedRecoveryRecord()).toBeNull(); expect(posts).toBe(0);
+  });
+});
 
 const apiOrigin = "http://recovery-ui.test";
 const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
@@ -104,7 +477,9 @@ function renderRecoveryApp(
         : { pollWait: options.pollWait })}
     />
   );
-  return render(options.strictMode === true ? <StrictMode>{app}</StrictMode> : app);
+  const rendered = render(options.strictMode === true ? <StrictMode>{app}</StrictMode> : app);
+  fireEvent.click(screen.getByRole("button", {name:"传统副本模式"}));
+  return rendered;
 }
 
 function seedRecoveryRecord(
@@ -361,6 +736,8 @@ describe("same-tab Session reload recovery", () => {
     expect(
       await screen.findByText(/恢复记录在服务器返回 404 后失效/),
     ).toBeVisible();
+    expect(storedRecoveryRecord()).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", {name:"清除本标签页 Session"}));
     expect(storedRecoveryRecord()).toBeNull();
     expect(posts).toBe(0);
     expect(
@@ -822,6 +1199,9 @@ describe("same-tab Session reload recovery", () => {
       expect(
         await screen.findByText(/恢复记录在服务器返回 404 后失效/),
       ).toBeVisible();
+      expect(storedRecoveryRecord()).not.toBeNull();
+      fireEvent.click(screen.getByRole("button", {name:"清除本标签页 Session"}));
+      fireEvent.click(screen.getByRole("button", {name:"传统副本模式"}));
       expect(
         globalThis.sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY),
       ).toBeNull();
@@ -1079,6 +1459,9 @@ describe("same-tab Session reload recovery", () => {
       expect(
         await screen.findByText(/恢复身份与已保存记录不匹配/),
       ).toBeVisible();
+      expect(storedRecoveryRecord()).not.toBeNull();
+      fireEvent.click(screen.getByRole("button", {name:"清除本标签页 Session"}));
+      fireEvent.click(screen.getByRole("button", {name:"传统副本模式"}));
       expect(storedRecoveryRecord()).toBeNull();
       expect(
         screen.queryByRole("button", { name: "手动重试安全 GET" }),
@@ -1147,6 +1530,8 @@ describe("same-tab Session reload recovery", () => {
     );
     try {
       renderRecoveryApp();
+      await screen.findByText(/恢复身份与已保存记录不匹配/);
+      fireEvent.click(screen.getByRole("button", {name:"清除本标签页 Session"}));
 
       expect(
         await screen.findByRole("heading", { name: "sessionStorage 安全锁定" }),
@@ -1272,11 +1657,13 @@ describe("same-tab Session reload recovery", () => {
     const newRead = deferred<PlayerSessionView>();
     const oldClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => oldRead.promise,
     } as unknown as PublicApiClient;
     const newClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => newRead.promise,
     } as unknown as PublicApiClient;
@@ -1641,6 +2028,7 @@ describe("Player Character and Run-entry mutation recovery", () => {
     let newRunCalls = 0;
     const oldClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => ({
         eligible_player_characters: [],
         truncated: false,
@@ -1656,6 +2044,7 @@ describe("Player Character and Run-entry mutation recovery", () => {
     } as unknown as PublicApiClient;
     const newClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () =>
         eligiblePlayerCharactersFixture,
       createPlayerCharacter: async () => {
@@ -1736,6 +2125,7 @@ describe("Player Character and Run-entry mutation recovery", () => {
     let newEntryCalls = 0;
     const oldClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       enterRun: async () => {
         oldEntryCalls += 1;
@@ -1744,6 +2134,7 @@ describe("Player Character and Run-entry mutation recovery", () => {
     } as unknown as PublicApiClient;
     const newClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       enterRun: async () => {
         newEntryCalls += 1;

@@ -905,12 +905,13 @@ def build_default_services(
         if deepseek_settings is not None
         else None
     )
+    native_coordinator = _build_native_turn_coordinator(catalog, scenario_catalog)
     orchestrator = DurableNarrativeTurnOrchestrator(
         resolver=DeterministicRuleResolver(),
         uow_factory=uow_factory,
         catalog=catalog,
         scenario_catalog=scenario_catalog,
-        native_coordinator=_build_native_turn_coordinator(catalog, scenario_catalog),
+        native_coordinator=native_coordinator,
         narrative_provider=provider,
         provider_name="deepseek",
         model_name=(
@@ -927,6 +928,8 @@ def build_default_services(
         uow_factory=uow_factory,
         catalog=catalog,
         scenario_catalog=scenario_catalog,
+        native_view_coordinator=native_coordinator,
+        native_controller_resolver=controller_binding_resolver,
     )
     run_service = build_run_service(
         uow_factory=uow_factory,
@@ -976,6 +979,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         lifespan=lifespan,
     )
     install_exception_handlers(app)
+    from deviation_protocol.api.run_protocol_routes import install_run_protocol_routes
+    install_run_protocol_routes(app)
 
     # Starlette does not dispatch an empty path parameter to an APIRoute, so the
     # normal parameter validation handler cannot see this one malformed spelling

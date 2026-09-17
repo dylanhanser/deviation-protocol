@@ -47,6 +47,13 @@ export function formatApiClientError(error: unknown): string {
     return "发生未知错误，请稍后重试。";
   }
   if (error.kind === "api") {
+    const nativeCopy: Record<string, string> = {
+      INVALID_RUN_PROTOCOL: "所选难度设置不可用，请刷新可用选项。",
+      INVALID_ENTRY_WORLD: "所选起始世界不可用，请刷新可用选项。",
+      NATIVE_RUN_ENTRY_NOT_AVAILABLE: "当前环境不支持原生进入，请刷新可用选项。",
+    };
+    const copy = error.errorCode ? nativeCopy[error.errorCode] : undefined;
+    if (copy) return copy;
     const status = error.status === undefined ? "" : `HTTP ${error.status} · `;
     const code = error.errorCode === undefined ? "" : `${error.errorCode} · `;
     return `${status}${code}${error.message}`;

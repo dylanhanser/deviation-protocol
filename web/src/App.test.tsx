@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, delay, http } from "msw";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
+import { ApiClientError } from "./api/errors";
 import {
   SESSION_RECOVERY_STORAGE_KEY,
   readSessionRecoveryRecord,
@@ -19,11 +20,169 @@ import {
   runEntryRequestFixture,
   runEntryResponseFixture,
   scenarioCatalogFixture,
+  runOptionsFixture,
+  nativeEntryFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
 const apiOrigin = "http://ui-api.test";
 const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
+
+describe("S6 correction: late eligible characters", () => {
+  function deferredCharacters() {
+    let resolve!: (value: typeof eligiblePlayerCharactersFixture) => void;
+    const promise = new Promise<typeof eligiblePlayerCharactersFixture>((done) => { resolve = done; });
+    return {promise, resolve};
+  }
+
+  function setupClient() {
+    const client = new PublicApiClient({baseUrl: `${apiOrigin}/`});
+    vi.spyOn(client, "listScenarios").mockResolvedValue(scenarioCatalogFixture);
+    vi.spyOn(client, "listRunEntryOptions").mockResolvedValue(runOptionsFixture);
+    vi.spyOn(client, "enterNativeRun").mockResolvedValue(nativeEntryFixture());
+    vi.spyOn(client, "getSessionView").mockResolvedValue({...activeViewFixture, run_context: nativeEntryFixture().run_context});
+    return client;
+  }
+
+  async function chooseNativeWorld() {
+    fireEvent.click(screen.getByRole("button", {name: "原生 Run 设置"}));
+    await screen.findByLabelText("选择难度");
+    fireEvent.change(screen.getByLabelText("选择难度"), {target: {value: "difficulty.open-expedition"}});
+    fireEvent.change(screen.getByLabelText("选择起始世界"), {target: {value: "world.death_certificate"}});
+  }
+
+  function expectExplicitSelectionRequired(client: PublicApiClient) {
+    expect(screen.getByRole("button", {name: "确认并开始"})).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    expect(client.enterNativeRun).not.toHaveBeenCalled();
+  }
+
+  it.each(["initial load", "refresh"])("does not select the first character after delayed %s in native mode", async (kind) => {
+    const client = setupClient();
+    const late = deferredCharacters();
+    const list = vi.spyOn(client, "listEligiblePlayerCharacters");
+    if (kind === "refresh") list.mockRejectedValueOnce(new ApiClientError("eligible list unavailable", {kind: "network"}));
+    list.mockReturnValue(late.promise);
+    render(<App client={client} />);
+    await chooseNativeWorld();
+    if (kind === "refresh") {
+      fireEvent.click(await screen.findByRole("button", {name: "重试 eligible Player Character GET"}));
+      await waitFor(() => expect(list).toHaveBeenCalledTimes(2));
+    }
+    expectExplicitSelectionRequired(client);
+    await act(async () => { late.resolve(eligiblePlayerCharactersFixture); await late.promise; });
+    expect(await screen.findByLabelText("Player Character")).toHaveValue("");
+    expectExplicitSelectionRequired(client);
+    expect(screen.getByLabelText("选择难度")).toHaveValue("difficulty.open-expedition");
+    expect(screen.getByLabelText("选择起始世界")).toHaveValue("world.death_certificate");
+    fireEvent.change(screen.getByLabelText("Player Character"), {target: {value: playerCharacterFixture.player_character_id.value}});
+    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    expect(client.enterNativeRun).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    await screen.findByText("当前 Session：session-public-1");
+    expect(client.enterNativeRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores an obsolete list after client replacement and a newer explicit native selection", async () => {
+    const oldClient = setupClient();
+    const oldList = deferredCharacters();
+    vi.spyOn(oldClient, "listEligiblePlayerCharacters").mockReturnValue(oldList.promise);
+    const page = render(<App client={oldClient} />);
+    await chooseNativeWorld();
+    const newClient = setupClient();
+    const newList = deferredCharacters();
+    vi.spyOn(newClient, "listEligiblePlayerCharacters").mockReturnValue(newList.promise);
+    page.rerender(<App client={newClient} />);
+    await chooseNativeWorld();
+    expectExplicitSelectionRequired(newClient);
+    await act(async () => { newList.resolve(eligiblePlayerCharactersFixture); await newList.promise; });
+    expect(await screen.findByLabelText("Player Character")).toHaveValue("");
+    expectExplicitSelectionRequired(newClient);
+    fireEvent.change(screen.getByLabelText("Player Character"), {target: {value: playerCharacterFixture.player_character_id.value}});
+    const obsolete = {...playerCharacterFixture, player_character_id: {value: "pc.obsolete"}};
+    await act(async () => {
+      oldList.resolve({eligible_player_characters: [obsolete], truncated: true});
+      await oldList.promise;
+    });
+    expect(screen.getByLabelText("Player Character")).toHaveValue(playerCharacterFixture.player_character_id.value);
+    expect(screen.queryByText(/pc.obsolete/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    expect(oldClient.enterNativeRun).not.toHaveBeenCalled();
+    expect(newClient.enterNativeRun).not.toHaveBeenCalled();
+  });
+
+  it("retains an explicit still-valid character while refreshing native options", async () => {
+    const client = setupClient();
+    vi.spyOn(client, "listEligiblePlayerCharacters").mockResolvedValue(eligiblePlayerCharactersFixture);
+    render(<App client={client} />);
+    await screen.findByLabelText("Player Character");
+    await chooseNativeWorld();
+    expectExplicitSelectionRequired(client);
+    fireEvent.change(screen.getByLabelText("Player Character"), {target: {value: playerCharacterFixture.player_character_id.value}});
+    fireEvent.click(screen.getByRole("button", {name: "刷新可用选项"}));
+    await waitFor(() => expect(client.listRunEntryOptions).toHaveBeenCalledTimes(2));
+    await screen.findByLabelText("选择难度");
+    expect(screen.getByLabelText("Player Character")).toHaveValue(playerCharacterFixture.player_character_id.value);
+    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    expect(client.enterNativeRun).not.toHaveBeenCalled();
+  });
+
+  it("preserves legacy first-character selection when a delayed list completes in legacy mode", async () => {
+    const client = setupClient();
+    const late = deferredCharacters();
+    vi.spyOn(client, "listEligiblePlayerCharacters").mockReturnValue(late.promise);
+    render(<App client={client} />);
+    await chooseNativeWorld();
+    fireEvent.click(screen.getByRole("button", {name: "传统副本模式"}));
+    await act(async () => { late.resolve(eligiblePlayerCharactersFixture); await late.promise; });
+    expect(await screen.findByLabelText("Player Character")).toHaveValue(playerCharacterFixture.player_character_id.value);
+    expect(await screen.findByRole("button", {name: "进入 Run"})).toBeEnabled();
+    expect(client.enterNativeRun).not.toHaveBeenCalled();
+  });
+
+  it("retains explicitly created character selection when entering native setup", async () => {
+    const client = setupClient();
+    vi.spyOn(client, "listEligiblePlayerCharacters").mockResolvedValue({eligible_player_characters: [], truncated: false});
+    vi.spyOn(client, "createPlayerCharacter").mockResolvedValue(playerCharacterFixture);
+    render(<App client={client} />);
+    fireEvent.click(await screen.findByRole("button", {name: "创建最小 Player Character"}));
+    await screen.findByText(/已选择服务器返回的创建结果/);
+    await chooseNativeWorld();
+    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    expect(client.createPlayerCharacter).toHaveBeenCalledTimes(1);
+    expect(client.enterNativeRun).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    await screen.findByText("当前 Session：session-public-1");
+    expect(client.enterNativeRun).toHaveBeenCalledTimes(1);
+  });
+});
+
+it("native selections and exact override bounds require explicit confirmation",async () => {
+  let posts=0;
+  server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
+    http.post(`${apiOrigin}/v1/runs/native`,() => {posts++; return HttpResponse.json({},{status:500});}));
+  renderApp(); await screen.findByLabelText("Player Character");
+  fireEvent.click(screen.getByRole("button",{name:"原生 Run 设置"}));
+  await screen.findByLabelText("选择难度");
+  expect(screen.getByLabelText("选择难度")).toHaveValue("");
+  expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
+  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
+  fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
+  fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
+  fireEvent.click(screen.getByLabelText("调整资源压力"));
+  fireEvent.change(screen.getByLabelText("资源压力"),{target:{value:"31"}});
+  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("资源压力"),{target:{value:"30"}});
+  expect(screen.getByRole("button",{name:"确认并开始"})).toBeEnabled();
+  fireEvent.click(screen.getByRole("button",{name:"刷新可用选项"}));
+  await screen.findByLabelText("选择难度");
+  expect(screen.getByLabelText("资源压力")).toHaveValue(30);
+  fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.fragile-alliance"}});
+  expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
+  expect(screen.getByLabelText("调整资源压力")).not.toBeChecked();
+  expect(posts).toBe(0);
+});
 
 function scenarioHandler() {
   return http.get(`${apiOrigin}/v1/scenarios`, () =>
@@ -40,12 +199,14 @@ function eligibleHandler() {
 
 function renderApp(eligible = eligibleHandler()) {
   server.use(eligible);
-  return render(
+  const rendered = render(
     <App
       client={testClient}
       idempotencyKeyFactory={() => "web-mutation-ui-test"}
     />,
   );
+  fireEvent.click(screen.getByRole("button", {name:"传统副本模式"}));
+  return rendered;
 }
 
 function storedRecoveryRecord() {

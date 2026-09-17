@@ -73,6 +73,39 @@ class RunEntryResponse(BaseModel):
     player_character: PlayerCharacterSelfProjection
 
 
+from deviation_protocol.application.public_run_protocol import (
+    PublicRunModel, PublicProfileRef, PublicWorldRef, PublicRunPresentation,
+    PublicNativeRunContext, PositiveInt64, ObjectiveName, ObjectiveValue,
+)
+
+
+class NativeRunOverride(PublicRunModel):
+    parameter: ObjectiveName
+    value: ObjectiveValue
+
+
+class NativeRunEntryRequest(PublicRunModel):
+    player_character_id: SafeId128
+    expected_record_revision: PositiveInt64
+    profile_ref: PublicProfileRef
+    entry_world: PublicWorldRef
+    overrides: Annotated[tuple[NativeRunOverride, ...], Field(max_length=5)]
+    presentation: PublicRunPresentation
+
+    @model_validator(mode="after")
+    def unique_overrides(self):
+        if len({entry.parameter for entry in self.overrides}) != len(self.overrides):
+            raise ValueError("duplicate override parameter")
+        return self
+
+
+class NativeRunEntryResponse(PublicRunModel):
+    session_id: SafeId64
+    scenario_id: SafeId128
+    scenario_content_version: Annotated[str, Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
+    run_context: PublicNativeRunContext
+
+
 class StrictApiModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 

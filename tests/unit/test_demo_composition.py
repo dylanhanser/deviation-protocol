@@ -858,8 +858,13 @@ def _assert_only_jobs_changed(before: object, after: object) -> None:
     ) == before
 
 
+def _legacy_orchestrator(runtime):
+    # Test-only access to the unchanged canonical delegate behind S6 dispatch.
+    return runtime.services.turn_orchestrator._DemoNarrativeDispatcher__legacy
+
+
 def _runtime_guard(runtime: DemoRuntime) -> CanonicalDemoProviderGuard:
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     return orchestrator._guard()
 
@@ -974,7 +979,7 @@ async def _authorized_provider_transaction(
         identity=identity,
     )
     submission = _provider_submission(session_id, identity=identity)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     guard = _runtime_guard(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     async with guard.sequence_lock(session_id):
@@ -1006,7 +1011,7 @@ async def _attempt_reentrant_provider_use(
     session_id: str,
     identity: str,
 ) -> object:
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     submission = ActionSubmission(
         session_id=session_id,
@@ -1964,7 +1969,7 @@ def test_demo_composition_has_no_engine_or_external_provider_fallback(
         _runtime_guard(runtime), implementation
     )
     assert isinstance(
-        runtime.services.turn_orchestrator,
+        _legacy_orchestrator(runtime),
         CanonicalDemoNarrativeTurnOrchestrator,
     )
     assert runtime.store.snapshot().sessions == {}
@@ -2002,7 +2007,7 @@ def test_dedicated_demo_asgi_entrypoint_is_explicit_and_isolated(
 def test_production_composition_public_surface_exposes_no_authority_path() -> None:
     implementation = DeterministicDemoNarrativeProvider()
     runtime = build_demo_runtime(provider=implementation)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
 
     assert not hasattr(orchestrator, "canonical_provider_guard")
@@ -2062,7 +2067,7 @@ async def test_historical_public_authority_bypass_fails_then_request_calls_provi
                 identity=identity,
             )
             submission = _provider_submission(session_id, identity=identity)
-            orchestrator = runtime.services.turn_orchestrator
+            orchestrator = _legacy_orchestrator(runtime)
             assert isinstance(
                 orchestrator, CanonicalDemoNarrativeTurnOrchestrator
             )
@@ -2122,7 +2127,7 @@ async def test_originating_task_can_use_authorized_provider_allowance_exactly_on
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2163,7 +2168,7 @@ async def test_public_non_nested_authorization_runs_checkpoint_validation_once(
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2285,7 +2290,7 @@ async def test_same_session_handle_reentry_rejects_before_lock_and_preserves_out
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2361,7 +2366,7 @@ async def test_cross_session_handle_reentry_rejects_before_snapshot_work(
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2417,7 +2422,7 @@ async def test_consumed_outer_handle_reentry_rejects_without_restoring_allowance
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2477,7 +2482,7 @@ async def test_inherited_child_handle_attempts_reject_before_all_nested_work(
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     _assert_instrumented_uow_factory_is_composed(orchestrator, store)
 
@@ -2547,7 +2552,7 @@ async def test_checkpoint_factory_exception_precedes_context_install_and_cleans_
     store = CountingSnapshotStore(probe)
     runtime = build_demo_runtime(store=store, provider=implementation)
     app = create_app(services=runtime.services)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     guard = _runtime_guard(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
 
@@ -3441,7 +3446,7 @@ async def test_default_demo_completion_rejects_missing_provider_call_before_muta
 async def test_post_provider_proposal_validation_failure_preserves_progress_and_gameplay() -> None:
     provider = CountingProvider()
     runtime = build_demo_runtime(provider=provider)
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = _legacy_orchestrator(runtime)
     assert isinstance(orchestrator, CanonicalDemoNarrativeTurnOrchestrator)
     orchestrator.proposal_validator = RejectAfterProviderValidator()  # type: ignore[assignment]
     app = create_app(services=runtime.services)

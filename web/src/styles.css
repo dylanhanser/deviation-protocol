@@ -282,3 +282,7 @@ dd {
     border-radius: 0.5rem;
   }
 }
+/* Explicit setup keeps enabled overrides and catalogue constraints together. */
+.run-override { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 0.75rem; }
+.run-override input[type="number"] { width: 6rem; }
+button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }

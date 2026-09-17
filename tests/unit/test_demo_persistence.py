@@ -2508,6 +2508,8 @@ async def test_expanded_snapshot_is_complete_and_detached() -> None:
         "player_character_mutation_receipts",
         "run_revisions",
         "run_current",
+        "run_protocol_bindings",
+        "run_entry_world_bindings",
         "run_participations",
         "run_creation_receipts",
         "run_mutation_receipts",

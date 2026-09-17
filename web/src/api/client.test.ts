@@ -16,6 +16,8 @@ import {
 } from "./schemas";
 import {
   activeViewFixture,
+  nativeEntryFixture,
+  runOptionsFixture,
   committedActionResponseFixture,
   eligiblePlayerCharactersFixture,
   endedViewFixture,
@@ -33,6 +35,45 @@ import {
 import { server } from "../test/server";
 
 const apiOrigin = "http://api.test";
+
+describe("native public transport", () => {
+  function attempt() {
+    const context = nativeEntryFixture().run_context;
+    return client().freezeNativeEntry({player_character_id:context.player_character.player_character_id.value,
+      expected_record_revision:1, profile_ref:context.profile_ref, entry_world:context.entry_world,
+      overrides:[], presentation:context.presentation}, "native.client.fixed", runOptionsFixture.profiles[2]!,runOptionsFixture.entry_worlds[0]!);
+  }
+  it("discovers by GET and repeats the frozen POST bytes without implicit sends", async () => {
+    const sends: unknown[] = [];
+    server.use(http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
+      http.post(`${apiOrigin}/v1/runs/native`,async ({request}) => {
+        sends.push([request.url,request.headers.get("Idempotency-Key"),await request.text()]);
+        return sends.length === 1 ? HttpResponse.error() : HttpResponse.json(nativeEntryFixture());
+      }));
+    expect(await client().listRunEntryOptions()).toEqual(runOptionsFixture);
+    const frozen=attempt(); expect(sends).toEqual([]);
+    await expect(client().enterNativeRun(frozen)).rejects.toThrow();
+    expect(sends).toHaveLength(1);
+    await expect(client().enterNativeRun(frozen)).resolves.toEqual(nativeEntryFixture());
+    expect(sends).toEqual([[frozen.url,frozen.key,frozen.serializedBody],[frozen.url,frozen.key,frozen.serializedBody]]);
+  });
+  it.each(["character", "world", "profile", "scenario", "presentation", "values", "label", "private", "nested-private", "id-private", "revision-private"])("rejects crossed or malformed %s response", async (field) => {
+    const response = nativeEntryFixture();
+    if (field === "character") response.run_context.player_character.player_character_id.value="other-character";
+    if (field === "world") response.run_context.entry_world.entry_world_version=2;
+    if (field === "profile") response.run_context.profile_ref.profile_version=2;
+    if (field === "scenario") response.scenario_id="other-scenario";
+    if (field === "presentation") response.run_context.presentation.world_tone="grim";
+    if (field === "values") response.run_context.objectives.social_trust=75;
+    if (field === "label") response.run_context.resource_pressure_label="Scarce";
+    if (field === "nested-private") Object.assign(response.run_context.player_character,{controller_id:"private-canary"});
+    if (field === "id-private") Object.assign(response.run_context.player_character.player_character_id,{private_evidence:"private-canary"});
+    if (field === "revision-private") Object.assign(response.run_context.player_character.record_revision,{private_evidence:"private-canary"});
+    const payload = field === "private" ? {...response, controller_id:"private-canary"} : response;
+    server.use(http.post(`${apiOrigin}/v1/runs/native`,()=>HttpResponse.json(payload)));
+    await expect(client().enterNativeRun(attempt())).rejects.toThrow();
+  });
+});
 
 function client(baseUrl = `${apiOrigin}/`) {
   return new PublicApiClient({ baseUrl });

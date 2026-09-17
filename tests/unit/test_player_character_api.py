@@ -1485,7 +1485,7 @@ def test_retirement_openapi_and_route_inventory_are_exact() -> None:
         "PlayerCharacterSelfProjection",
     }
     assert "/v1/player-characters//retirement" not in schema["paths"]
-    assert not any(path.startswith("/v1/runs") for path in schema["paths"])
+    assert {path for path in schema["paths"] if path.startswith("/v1/runs")} == {"/v1/runs/native"}
     assert sum(
         isinstance(route, APIRoute)
         and route.path == retirement_path
@@ -3152,7 +3152,15 @@ def test_creation_openapi_injects_the_exact_validation_schema_inventory() -> Non
     }
 
     assert set(generated) == expected_generated_names
-    assert len(schemas) == 75
+    native_components = {
+        "FiveObjectives", "NativeRunEntryRequest", "NativeRunEntryResponse",
+        "NativeRunOverride", "PublicEntryWorld", "PublicNativeRunContext",
+        "PublicOverrideRule", "PublicPresentationOptions", "PublicProfileRef",
+        "PublicRunPresentation", "PublicRunProfile", "PublicWorldRef",
+        "RunEntryOptionsResponse",
+    }
+    assert native_components <= set(schemas)
+    assert len(set(schemas) - native_components) == 75
     assert all(schemas[name] == definition for name, definition in generated.items())
     assert "$defs" not in schemas["CharacterCreationCommand"]
     assert schemas["CharacterCreationCommand"]["required"] == [
@@ -3498,6 +3506,8 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
 
     assert public_routes == {
         ("/health", ("GET",)),
+        ("/v1/run-entry-options", ("GET",)),
+        ("/v1/runs/native", ("POST",)),
         ("/v1/player-characters", ("POST",)),
         ("/v1/player-characters/eligible-for-run-entry", ("GET",)),
         ("/v1/player-characters/{player_character_id}", ("GET",)),
@@ -3517,7 +3527,7 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
         ("/v1/sessions/{session_id}/actions", ("POST",)),
     }
     assert all(
-        (path == _ELIGIBLE_PATH or "run" not in path.casefold())
+        (path in {_ELIGIBLE_PATH, "/v1/run-entry-options", "/v1/runs/native"} or "run" not in path.casefold())
         and "mutation" not in path.casefold()
         and "bind" not in path.casefold()
         for path, _ in public_routes

@@ -34,6 +34,19 @@ class ApiServices:
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
 
+    def __post_init__(self):
+        if self.native_run_admission_service is not None:
+            from deviation_protocol.application.public_run_protocol import project_entry_options
+            coordinator = self.session_service.native_view_coordinator
+            if (coordinator is None or self.session_service.native_controller_resolver is None
+                    or getattr(self.turn_orchestrator, "native_coordinator", None) is not coordinator
+                    or self.native_run_admission_service.session_service is not self.session_service
+                    or self.native_run_admission_service.controller_binding_resolver is not self.session_service.native_controller_resolver):
+                raise ValueError("incomplete native public service graph")
+            project_entry_options(self.session_service, coordinator)
+        elif getattr(self.session_service, "native_view_coordinator", None) is not None:
+            raise ValueError("native View without native admission")
+
 
 def get_demo_dev_principal() -> RequestPrincipal:
     """Development-only fixed identity; replace/override before production use."""

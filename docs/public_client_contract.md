@@ -36,23 +36,26 @@ validation completed locally (canonical Offline 1,814 passed/124 expected skips,
   Demo, public Run, frontend, Web, administration, production-authentication,
   deployment, release, or Provider activation followed from Phase 5.
 
-## Proposed P3.3-S6 native public extension
+<a id="proposed-p33-s6-native-public-extension"></a>
 
-Status: **Unapproved documentation proposal; not implemented.** S5 internal
+## P3.3-S6 native public extension
+
+Status: **Implemented candidate; independent implementation review pending.** S5 internal
 mechanics and trusted context are independently approved with DF-001 deferred
 and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. Public native
-activation belongs to the [S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md),
+activation follows the approved and published [S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md),
 which owns the exact DTOs, validation/error tables, implementation inventory,
-acceptance and sole operative review gate. The existing contracts below remain
-implemented behavior. Plan approval authorizes no implementation or Git writes.
+acceptance and implementation-review gate. The plan was published at `4365721`;
+implementation was separately authorized. The existing contracts below remain
+implemented behavior; no candidate approval or Git operation is claimed.
 
-| Proposed public surface | Closed projection / compatibility decision |
+| Implemented public surface | Closed projection / compatibility decision |
 | --- | --- |
 | `GET /v1/run-entry-options` | `schema_version=run-entry-options/v1`, `native_entry_available`, `profiles`, `entry_worlds`, `presentation_options`. No query/body/private character data. Exact S2 three profiles/defaults/ranges; one S4 authored world. HTTP 200/422/500. |
 | `POST /v1/runs/native` | Required exact Idempotency-Key and strict 4,096-byte JSON body containing only player_character_id, expected_record_revision, profile_ref, entry_world, overrides, presentation. Calls existing S4 admission once. First success/replay HTTP 200: session_id, scenario_id, scenario_content_version, run_context. Error statuses 404/409/422/500/503 use ErrorResponse. |
 | Optional `PlayerSessionView.run_context` | `schema_version=public-run-context/v1`, run_id, admitted four-field player_character projection, entry_world pair, profile_ref pair, exact five objectives, three presentation fields and resource_pressure_label. Reconstructed in the View read UoW; omitted for positively established legacy/standalone Sessions. No recovery write. |
 
-Public numbers remain exact S2 integers. Proposed output labels reuse published
+Public numbers remain exact S2 integers. Output labels reuse published
 S5 bands: Generous 0..30, Fluid 35..65, Scarce 70..100 on the step-5 lattice.
 Labels are never input aliases. World exposure is exactly
 `world.death_certificate@1`, backed by `death_certificate` /
@@ -66,7 +69,7 @@ cannot fall back to legacy. Dynamic Demo advertises native entry unavailable
 and retains its current legacy/suggestion flow. Deterministic native Demo uses
 real S4/S5 application behavior with process-local transactional adapters.
 
-The proposed Web primary journey explicitly selects character/profile/world,
+The Web native journey explicitly selects character/profile/world,
 reviews overrides/presentation, retains the exact key/serialized body before
 POST, validates admission, stores the existing Session recovery record before
 View, then uses authoritative actions/recovery/ending. Native uncertainty permits
@@ -77,10 +80,72 @@ action replay, replacement Session, or new browser storage family. Public fields
 exclude internal evidence, compiled context, private state and hidden information;
 presentation and model output create no mechanics or canon authority.
 
-The proposal changes neither production Provider integration nor S7 continuity
+This candidate changes neither production Provider integration nor S7 continuity
 or Phase 3.4 relationship/residence state. Phase 3.3 remains incomplete. Browser
 evidence requires separate explicit authorization; automated contract evidence
-remains mandatory. Current S6 work is documentation planning only.
+is recorded in [the S6 evidence record](run_protocol.md#p33-s6-implementation-candidate-evidence).
+Browser evidence is omitted, not passed; no browser usability or wider-release
+readiness is claimed.
+
+The native transport rejects query parameters, duplicate raw Content-Type or
+Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
+null/missing/extra fields, coercion, booleans/floats for integers, duplicate
+override parameters, off-lattice values, and bodies over 4,096 bytes. IDs are
+1..128 ASCII characters matching `^[A-Za-z0-9][A-Za-z0-9_.:-]*$`; revision and
+profile/world versions are positive signed int64. There are zero to five
+explicit objective overrides, with exact integer 0..100 step-5 values. S2
+enforces selected-profile ranges; no alias, implicit choice, clamp or fallback.
+The Web additionally rejects integers outside JavaScript safe-integer bounds.
+
+Native decisions map to: 404 PLAYER_CHARACTER_NOT_FOUND; 409 IDEMPOTENCY_CONFLICT,
+PLAYER_CHARACTER_STALE, PLAYER_CHARACTER_NOT_ELIGIBLE or RUN_ENTRY_CONFLICT;
+422 REQUEST_VALIDATION_FAILED, INVALID_RUN_PROTOCOL, INVALID_ENTRY_WORLD or
+INVALID_SCENARIO_DEFINITION; 503 NATIVE_RUN_ENTRY_NOT_AVAILABLE. Corruption or
+unexpected implementation failures use sanitized 500. Every error uses the
+existing closed ErrorResponse. Transport rejection precedes application entry;
+accepted transport invokes shared S4 admission exactly once.
+
+View revalidates the native family and current controller ownership within the
+existing read UoW, including active and ended Sessions. Missing/foreign Session
+or unavailable/changed controller returns non-enumerating 404. Invalid native
+evidence yields safe SNAPSHOT_INVALID 409, with no repair or legacy omission.
+`run_context` is optional and omitted, never null, for proven legacy/standalone
+Views. Discovery/View neither compile nor render nor write.
+
+Web native and legacy modes are explicit. Native setup has no initial character,
+profile or world selection (a newly created character may be retained).
+Eligible-character GET completion uses the current mode and request generation:
+native mode never selects the first returned character implicitly; legacy mode
+keeps its existing first-character behavior. Explicit still-valid choices survive
+native options refresh; an eligible-character refresh clears the choice for
+reselection. Obsolete list completions cannot replace a newer selection.
+Matching version pairs and valid overrides survive catalogue refresh; removed versions
+or invalid values clear without clamping. Unresolved native attempts lock setup
+and retain exact URL, key and serialized body. A first documented rejection can
+return to explicit editing/refresh; any uncertain send taints the attempt and
+all later non-success responses retain it. A matching authoritative success is
+retained in memory until Session identity storage succeeds. Storage retry uses
+that response without another POST. Replaced clients/unmounted generations
+cannot write storage or UI even if their transport ignores abort.
+After a storage failure and safe-clear retry, storage-only retry reinstates the
+retained success's complete Session/scenario/content/native-context association
+before clearing the admission attempt. Manual reads of the same trimmed Session
+ID preserve its confirmed association; a genuine Session replacement clears the
+old binding under the existing foreground-operation ownership checks. Missing
+or mismatched context and changed scenario/content cannot load gameplay.
+Direct storage-only retry's automatic recovery and ordinary Session commits use
+the same complete association validation: Session, scenario, content version and
+immutable native context are compared before updating the binding or activating
+gameplay. A received View cannot supply its own expected identity; rejection
+retains the admission association for a later GET-only recovery attempt.
+
+Storage remains exactly `{version:1, session_id, client_request_id?}`. Native
+protocol/world/character/Run/key/body never enter it, URLs or logs. Pending entry
+is memory-only and cannot be recovered after reload before validated success
+and storage. Confirmed-202 and Session recovery use GET only. Native identity
+mismatch, malformed View or loss of previously known native context pauses
+controls; a restarted Demo returning 404 retains the local record for explicit
+clear. Ending a Session neither completes the Run nor releases its character.
 
 ## Owned Player Character read
 
@@ -1130,7 +1195,7 @@ validation body is not public contract.
 
 ### Client and recovery boundary
 
-The primary Web client now discovers public scenarios and eligible Player
+In explicit legacy mode, the Web client discovers public scenarios and eligible Player
 Characters, creates one minimal character through the existing route only when
 the eligible collection is empty, selects one exact eligible projection and one
 scenario, submits Run entry as one logical attempt, validates the response,

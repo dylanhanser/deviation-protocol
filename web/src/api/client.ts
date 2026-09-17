@@ -2,6 +2,9 @@ import type { z } from "zod";
 
 import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
 import { ApiClientError } from "./errors";
+import { assertNativeResponse, validateSetup, type FrozenNativeEntry } from "../runSetup";
+import { runEntryOptionsSchema, nativeRunEntryResponseSchema, type RunEntryOptions,
+  type NativeRunEntryRequest, type NativeRunEntryResponse, type PublicRunProfile, type PublicEntryWorld } from "./schemas";
 import type {
   InvalidResponseReason,
   ResponseIdentityMismatch,
@@ -117,6 +120,26 @@ export class PublicApiClient {
       200,
       publicScenarioCatalogSchema,
     );
+  }
+
+  listRunEntryOptions(signal?: AbortSignal): Promise<RunEntryOptions> {
+    return this.request("v1/run-entry-options", {method:"GET", ...(signal === undefined ? {} : {signal})}, 200, runEntryOptionsSchema);
+  }
+
+  freezeNativeEntry(request: NativeRunEntryRequest, key: string, profile: PublicRunProfile, world: PublicEntryWorld): FrozenNativeEntry {
+    const body = validateSetup(request, profile, world);
+    const frozen = {url:new URL("v1/runs/native", this.baseUrl).href, key:idempotencyKeySchema.parse(key),
+      serializedBody:JSON.stringify(body), profile:structuredClone(profile), world:structuredClone(world)};
+    function freeze(value: object): void { Object.freeze(value); Object.values(value).forEach((v: unknown) => {if (typeof v === "object" && v !== null) freeze(v);}); }
+    freeze(frozen);
+    return frozen;
+  }
+
+  async enterNativeRun(attempt: FrozenNativeEntry, signal?: AbortSignal): Promise<NativeRunEntryResponse> {
+    const result = await this.request(attempt.url, {method:"POST", headers:{"Content-Type":"application/json", "Idempotency-Key":attempt.key},
+      body:attempt.serializedBody, ...(signal === undefined ? {} : {signal})}, 200, nativeRunEntryResponseSchema);
+    assertNativeResponse(attempt, result);
+    return result;
   }
 
   createPlayerCharacter(

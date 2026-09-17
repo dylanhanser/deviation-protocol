@@ -55,8 +55,9 @@ published at `34dc752295ba270617e5d29020f3a0c0b133544e`. Its earlier
 `CHANGES_REQUIRED` migration-disposal review remains history. DF-001 remains
 deferred. The S5 plan is independently approved and published at `ff866d2`.
 S5 implementation is independently approved with DF-001 deferred and published
-at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 is now a documentation planning
-candidate; S6 implementation and S7 remain unauthorized. Phase 3.3 remains incomplete.
+at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published at `4365721`; its separately authorized
+implementation is a candidate awaiting independent implementation review. S7
+remains unauthorized. Phase 3.3 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -156,26 +157,39 @@ S4 rows and character authority remain immutable; a Session ending does not
 transition its Run. S6 owns public discovery/admission/API/OpenAPI/Demo/Web and
 recovery projection; S7 owns later worlds and continuity.
 
-## Proposed P3.3-S6 public flow
+## P3.3-S6 implemented public flow candidate
 
-The [S6 plan candidate](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
-is documentation only and unapproved. It proposes additive options discovery
-and `POST /v1/runs/native`, backed by the existing production S4 service and
+The [approved published S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
+is frozen at `4365721`. The implementation candidate exposes additive
+`GET /v1/run-entry-options` and `POST /v1/runs/native`, backed by the production
+S4 service and
 unchanged S5 turn coordinator. Legacy entry contracts remain valid. Native
 Session View recovery adds a closed immutable setup projection in the existing
 read UoW, using complete reconstruction, reverse evidence and current ownership;
 missing native evidence cannot become legacy omission.
 
-Deterministic Demo needs protocol/world maps, native receipt/classification
-adapters and a native rendering delegate alongside its frozen legacy script.
+Deterministic Demo now has protocol/world maps, native receipt/classification
+adapters and a native rendering delegate alongside its unchanged legacy script.
 These mirror existing persistent families within its atomic process store;
 they add no SQL schema or external fallback. Web explicitly selects a profile
 and world, confirms permitted overrides, freezes exact admission evidence,
 stores validated Session identity before View and keeps recovery GET-only.
 Dynamic Demo remains explicitly legacy-only. The plan specifies separate
 automated public/MySQL/Demo/Web evidence and separately authorized browser work.
-S6 implementation has not started; neither this proposal nor published S5
-completes Phase 3.3, S7, Phase 3.4 or wider-release readiness.
+The S6 candidate awaits one substantive independent implementation review.
+[Evidence and limits](run_protocol.md#p33-s6-implementation-candidate-evidence)
+separate automated ASGI/rendered MSW proof from omitted browser acceptance.
+It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
+
+Demo inserts require an explicit native-admission UoW capability. Both new maps
+participate in pending/trial/snapshot/commit/rollback/reset, using unchanged
+S3/S4 pure codecs and complete reconstruction. AUTH-002 denial precedes UoW
+or lock work. Native rendering consumes a task-bound request/job allowance once,
+checks authenticated compiled context, and calls PromptBuilder and the fake
+renderer after database/gameplay UoWs and locks close. Only per-Session
+orchestration sequencing spans rendering. Validated resume and committed replay
+bypass rendering. The shared active-authorization gate required no change to
+`demo_authority.py`. No SQL writer, schema, migration or S1-S5 algorithm changes.
 
 ## P3.3-S1 implemented no-migration foundation
 
@@ -252,8 +266,8 @@ or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
-described above; S5 internal implementation is published, S6 is a planning
-candidate and S6/S7 implementation remains unauthorized; the
+described above; S5 internal implementation is published, S6 public integration
+is an implementation candidate and S7 remains unauthorized; the
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1147,8 +1161,9 @@ components described above:
 - Phase 3.3 owns the frozen Run Protocol and difficulty/world profiles. Its
   published S1/S2 components supply representation and deterministic resolution;
   published S3 supplies durable binding reconstruction. Published S4 adds
-  independently approved internal admission/world freezing; mechanics
-  and public activation remain later work: [`run_protocol.md`](run_protocol.md).
+  independently approved internal admission/world freezing; published S5 applies
+  objective mechanics and compiles trusted context. S6 public activation is an
+  implementation candidate, while S7 continuity remains later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider
@@ -1156,9 +1171,9 @@ components described above:
   [`ADR 0001`](decisions/0001-production-provider-distribution.md).
 
 Current architecture does not implement player-selectable multi-Provider
-routing, commercial quota or billing, a frozen `RUN_PROTOCOL` prompt input,
-resolved or applied difficulty/world profiles, NPC residence mode, or
-unrestricted daily AI chat.
+routing, commercial quota or billing, NPC residence mode, or
+unrestricted daily AI chat. Resolved difficulty profiles are applied by S5,
+and its canonical `run-prompt-context/v1` carries permitted rendering data.
 The future selected Provider/model channel remains distinct from both the
 application `NarrativeProvider` abstraction and the future Production
 Distribution Gateway.
@@ -1191,10 +1206,12 @@ treats request status as a complete View.
 
 Recovery fails closed. A network error, malformed response, or unsafe result
 stops automatic recovery, keeps actions locked, and permits only a
-player-triggered retry of a safe GET. A recovery-endpoint 404 invalidates the
-record and returns to the initial Session/scenario UI without action controls.
-Corrupt, unsupported-version, or identity-mismatched records are cleared
-before use. Storage-access or mutation failure remains action-locked. The
+player-triggered retry of a safe GET. The original Phase 3.1c behavior cleared
+records on recovery 404 or response identity mismatch. S6 now pauses recovery
+and retains the validated record until explicit local clearing; native same-page
+confirmed-202 identity mismatch also retains its bound record. Corrupt or
+unsupported-version local records are still rejected before use. Storage-access
+or mutation failure remains action-locked. The
 foreground-operation lock, operation generation/token, and `AbortController`
 prevent obsolete recovery work from committing after invalidation, Session
 switch, or unmount.

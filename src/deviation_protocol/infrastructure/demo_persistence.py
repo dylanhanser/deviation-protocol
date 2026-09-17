@@ -133,6 +133,10 @@ from deviation_protocol.infrastructure.run_persistence import (
     run_receipt_to_storage_bytes,
     validate_stored_run_record_set,
 )
+from deviation_protocol.infrastructure import run_protocol_binding_persistence as native_storage
+
+
+_NATIVE_ADMISSION_CAPABILITY = object()
 
 
 _RunActiveBindingUniquenessConflictError = getattr(
@@ -178,6 +182,8 @@ class DemoStoreSnapshot:
     ]
     run_revisions: dict[tuple[str, int], StoredRunRevisionRecord]
     run_current: dict[str, StoredCurrentRunRecord]
+    run_protocol_bindings: dict[str, native_storage._StoredRunProtocolBindingV1]
+    run_entry_world_bindings: dict[str, native_storage._StoredRunEntryWorldBindingV1]
     run_participations: dict[str, StoredRunSessionParticipationRecord]
     run_creation_receipts: dict[
         tuple[str, str], StoredRunCreationReceiptRecord
@@ -218,6 +224,8 @@ class DemoProcessStore:
             tuple[str, int], StoredRunRevisionRecord
         ] = {}
         self._run_current: dict[str, StoredCurrentRunRecord] = {}
+        self._run_protocol_bindings = {}
+        self._run_entry_world_bindings = {}
         self._run_participations: dict[
             str, StoredRunSessionParticipationRecord
         ] = {}
@@ -236,6 +244,9 @@ class DemoProcessStore:
 
     def unit_of_work(self) -> DemoUnitOfWork:
         return DemoUnitOfWork(self)
+
+    def native_admission_unit_of_work(self) -> DemoUnitOfWork:
+        return DemoUnitOfWork(self, native_capability=_NATIVE_ADMISSION_CAPABILITY)
 
     @property
     def active_uows(self) -> int:
@@ -276,6 +287,8 @@ class DemoProcessStore:
             ),
             run_revisions=deepcopy(self._run_revisions),
             run_current=deepcopy(self._run_current),
+            run_protocol_bindings=deepcopy(self._run_protocol_bindings),
+            run_entry_world_bindings=deepcopy(self._run_entry_world_bindings),
             run_participations=deepcopy(self._run_participations),
             run_creation_receipts=deepcopy(self._run_creation_receipts),
             run_mutation_receipts=deepcopy(self._run_mutation_receipts),
@@ -323,6 +336,8 @@ class _AuthorityMaps:
     ]
     run_revisions: dict[tuple[str, int], StoredRunRevisionRecord]
     run_current: dict[str, StoredCurrentRunRecord]
+    run_protocol_bindings: dict[str, native_storage._StoredRunProtocolBindingV1]
+    run_entry_world_bindings: dict[str, native_storage._StoredRunEntryWorldBindingV1]
     run_participations: dict[str, StoredRunSessionParticipationRecord]
     run_creation_receipts: dict[
         tuple[str, str], StoredRunCreationReceiptRecord
@@ -597,6 +612,9 @@ def _run_from_maps(
     identity = run_id.value
     current = maps.run_current.get(identity)
     has_evidence = (
+        identity in maps.run_protocol_bindings
+        or identity in maps.run_entry_world_bindings
+        or
         any(key[0] == identity for key in maps.run_revisions)
         or any(item.run_id == run_id for item in maps.run_participations.values())
         or any(
@@ -1468,6 +1486,12 @@ class DemoRunSessionParticipationRepository(
         self._store = store
         self._uow = uow
 
+    async def find_attachment_run_ids(self, session_id: str) -> tuple[RunId, ...]:
+        self._uow._ensure_open()
+        values = {row.result_run_id.value for row in self._uow._visible_authority_maps().run_mutation_receipts.values()
+                  if row.participation_session_id == session_id}
+        return tuple(RunId(value=value) for value in sorted(values)[:2])
+
     async def get(
         self, session_id: str
     ) -> RunSessionParticipationReference | None:
@@ -1542,6 +1566,14 @@ class DemoRunCreationReceiptRepository(RunCreationReceiptRepository):
     def __init__(self, store: DemoProcessStore, uow: DemoUnitOfWork) -> None:
         self._store = store
         self._uow = uow
+
+    async def add_native_with_evidence(self, receipt, evidence, *, created_at):
+        self._uow._require_native_writer()
+        from deviation_protocol.application.native_run_admission import native_run_entry_creation_fingerprint
+        encoded, fingerprint = native_run_entry_creation_fingerprint(evidence)
+        if receipt.fingerprint != fingerprint:
+            raise RunStoredRecordIntegrityError("native receipt fingerprint mismatch")
+        await self._add_stored(receipt, operation_evidence_canonical=encoded, created_at=created_at)
 
     async def get(
         self, key: RunReceiptKey
@@ -2232,9 +2264,147 @@ class DemoNarrativeJobRepository(NarrativeJobRepository):
         return visible
 
 
+def _row_from_stored(stored):
+    """Detached row-shaped pure-codec input, preserving original scalar types."""
+    from dataclasses import fields
+    from types import SimpleNamespace
+    from pydantic import BaseModel
+    if stored is None:
+        return None
+    return SimpleNamespace(**{f.name: (getattr(stored, f.name).value
+        if isinstance(getattr(stored, f.name), BaseModel) else deepcopy(getattr(stored, f.name)))
+        for f in fields(stored)})
+
+
+def _classify_demo_run(maps, run_id, sessions, snapshots, events):
+    """Same prerequisite/branch order and pure codecs as SQL classification."""
+    from types import SimpleNamespace
+    from deviation_protocol.domain.run import revalidate_run_model
+    from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
+    b = native_storage
+    revalidate_run_model(run_id, RunId)
+    try:
+        current = maps.run_current.get(run_id.value)
+        if current is None:
+            return _run_from_maps(maps, run_id)  # Includes every orphan family.
+        reference = b._reference_from_current(current)
+        immutable = None
+        if reference is not None:
+            stored = maps.player_character_revisions.get((reference.player_character_id.value, reference.record_revision.value))
+            b._require(stored is not None, "missing immutable character revision")
+            immutable = canonical_record_from_revision_storage(stored)
+            b._require((immutable.player_character_id, immutable.contract_version, immutable.record_revision) == (
+                reference.player_character_id, reference.contract_version, reference.record_revision) and immutable.lifecycle is PlayerCharacterLifecycle.ACTIVE,
+                       "immutable character association")
+        run = _run_from_maps(maps, run_id)
+        revisions = tuple(v for k, v in sorted(maps.run_revisions.items()) if k[0] == run_id.value)
+        participations = tuple(sorted((v for v in maps.run_participations.values() if v.run_id == run_id),
+            key=lambda v: (v.joined_state_version, v.session_id)))
+        creation = next(v for v in maps.run_creation_receipts.values() if v.result_run_id == run_id)
+        mutations = tuple(sorted((v for v in maps.run_mutation_receipts.values() if v.run_id == run_id),
+            key=lambda v: (v.resulting_state_version, v.operation_id.value)))
+        stored = maps.run_protocol_bindings.get(run_id.value)
+        world_stored = maps.run_entry_world_bindings.get(run_id.value)
+        evidence = creation_evidence_from_storage(creation.operation_evidence_canonical)
+
+        def character_rows():
+            b._require(immutable is not None, "missing immutable character")
+            return (_row_from_stored(maps.player_character_current.get(immutable.player_character_id.value)),
+                    _row_from_stored(maps.controller_bindings.get(immutable.controller_binding.value)))
+
+        def session_rows(participation):
+            identity = participation.session_id
+            persisted, snapshot = sessions.get(identity), snapshots.get(identity)
+            event = next((v for v in events if v.session_id == identity and v.sequence_no == 1), None)
+            session_row = None
+            if persisted is not None:
+                game = persisted.session
+                session_row = SimpleNamespace(session_id=game.session_id, player_id=game.player_id,
+                    scenario_id=game.scenario_id, scenario_version=game.scenario_version, phase=game.phase,
+                    turn_number=game.turn_number, state_version=game.state_version, random_seed=game.random_seed,
+                    character_definition_id=persisted.character_definition_id,
+                    creation_client_request_id=persisted.creation_client_request_id,
+                    created_at=persisted.created_at, updated_at=persisted.updated_at)
+            event_row = None if event is None else SimpleNamespace(event_id=event.event_id, session_id=event.session_id,
+                turn_id=event.turn_id, sequence_no=event.sequence_no, event_type=event.event_type,
+                payload_json=deepcopy(event.payload), occurred_at=event.occurred_at)
+            snapshot_row = None if snapshot is None else SimpleNamespace(session_id=identity,
+                state_version=snapshot.state_version, state_json=deepcopy(snapshot.state),
+                updated_at=persisted.updated_at if persisted else None)
+            return session_row, event_row, snapshot_row
+
+        if type(evidence) is NativeRunEntryCreationEvidenceV1:
+            b._require(stored is not None and world_stored is not None, "incomplete native bindings")
+            protocol = b._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=None)
+            world = b._reconstruct_world_binding(world_stored, run)
+            request_id = b._native_entry_evidence(run, revisions, creation, mutations, participations,
+                                                evidence, protocol, world, stored)
+            b._validate_native_character(run, evidence, immutable, *character_rows())
+            return b._complete_native_admission(run, protocol, world, evidence, request_id,
+                                               participations[0], *session_rows(participations[0]))
+        legacy = b._legacy_entry_evidence(run, revisions, creation, mutations, participations)
+        proof = None
+        if legacy is not None:
+            evidence, request_id = legacy
+            b._validate_legacy_character(run, evidence, immutable, *character_rows())
+            proof = b._validate_legacy_session(run, evidence, request_id, participations[0], *session_rows(participations[0]))
+        b._require(world_stored is None, "world row on non-admission family")
+        if stored is not None:
+            return b._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=proof)
+        b._require(proof is not None, "existing Run has no complete family proof")
+        return proof
+    except (ValueError, TypeError, AttributeError, StopIteration) as error:
+        raise b.RunProtocolBindingStoredIntegrityError("invalid Demo Run family") from None
+
+
+class DemoRunProtocolBindingRepository(application_ports.RunProtocolBindingRepository):
+    def __init__(self, store, uow):
+        self._store, self._uow = store, uow
+
+    async def add_native(self, binding, *, created_at):
+        self._uow._require_native_writer()
+        stored = native_storage._StoredRunProtocolBindingV1(**native_storage._native_binding_values(binding, created_at=created_at))
+        if stored.run_id in self._uow._visible_authority_maps().run_protocol_bindings:
+            raise application_ports.NativeRunAdmissionWriteConflictError("native protocol conflict")
+        self._uow._pending_run_protocol_bindings[stored.run_id] = stored
+
+    async def get_classified(self, *, run_id):
+        self._uow._ensure_open()
+        sessions, snapshots = dict(self._store._sessions), dict(self._store._snapshots)
+        if self._uow._pending_session is not None:
+            pending = self._uow._pending_session
+            sessions[pending.session.session_id] = pending
+        if self._uow._pending_snapshot is not None:
+            identity, snapshot = self._uow._pending_snapshot
+            snapshots[identity] = snapshot
+        return _classify_demo_run(self._uow._visible_authority_maps(), run_id, sessions, snapshots,
+                                 (*self._store._events, *self._uow._pending_events))
+
+    async def get_classified_for_update(self, *, run_id):
+        await self._uow._acquire_run_lock(run_id.value)
+        return await self.get_classified(run_id=run_id)
+
+
+class DemoRunEntryWorldBindingRepository(application_ports.RunEntryWorldBindingRepository):
+    def __init__(self, store, uow):
+        self._store, self._uow = store, uow
+
+    async def add_native(self, binding, *, created_at):
+        self._uow._require_native_writer()
+        stored = native_storage._StoredRunEntryWorldBindingV1(**native_storage._world_binding_values(binding, created_at=created_at))
+        if stored.run_id in self._uow._visible_authority_maps().run_entry_world_bindings:
+            raise application_ports.NativeRunAdmissionWriteConflictError("native world conflict")
+        self._uow._pending_run_entry_world_bindings[stored.run_id] = stored
+
+
 class DemoUnitOfWork(UnitOfWork):
-    def __init__(self, store: DemoProcessStore) -> None:
+    def __init__(self, store: DemoProcessStore, *, native_capability=None) -> None:
         self._store = store
+        self._native_capability = native_capability
+        self.run_protocol_bindings = DemoRunProtocolBindingRepository(store, self)
+        self.run_entry_world_bindings = DemoRunEntryWorldBindingRepository(store, self)
+        self._pending_run_protocol_bindings = {}
+        self._pending_run_entry_world_bindings = {}
         self.sessions = DemoSessionRepository(store, self)
         self.turn_requests = DemoTurnRequestRepository(store, self)
         self.narrative_jobs = DemoNarrativeJobRepository(store, self)
@@ -2314,6 +2484,11 @@ class DemoUnitOfWork(UnitOfWork):
         self._entered = False
         self._closed = False
         self._committed = False
+
+    def _require_native_writer(self):
+        self._ensure_open()
+        if self._native_capability is not _NATIVE_ADMISSION_CAPABILITY:
+            raise RuntimeError("native insertion requires Demo admission UoW")
 
     async def __aenter__(self) -> DemoUnitOfWork:
         if self._entered or self._closed:
@@ -2439,6 +2614,8 @@ class DemoUnitOfWork(UnitOfWork):
             ),
             run_revisions=dict(self._store._run_revisions),
             run_current=dict(self._store._run_current),
+            run_protocol_bindings=dict(self._store._run_protocol_bindings),
+            run_entry_world_bindings=dict(self._store._run_entry_world_bindings),
             run_participations=dict(self._store._run_participations),
             run_creation_receipts=dict(self._store._run_creation_receipts),
             run_mutation_receipts=dict(self._store._run_mutation_receipts),
@@ -2461,6 +2638,8 @@ class DemoUnitOfWork(UnitOfWork):
         )
         maps.run_revisions.update(self._pending_run_revisions)
         maps.run_current.update(self._pending_run_current)
+        maps.run_protocol_bindings.update(self._pending_run_protocol_bindings)
+        maps.run_entry_world_bindings.update(self._pending_run_entry_world_bindings)
         maps.run_participations.update(self._pending_run_participations)
         maps.run_creation_receipts.update(self._pending_run_creation_receipts)
         maps.run_mutation_receipts.update(self._pending_run_mutation_receipts)
@@ -2522,6 +2701,8 @@ class DemoUnitOfWork(UnitOfWork):
             ),
             run_revisions=deepcopy(self._store._run_revisions),
             run_current=deepcopy(self._store._run_current),
+            run_protocol_bindings=deepcopy(self._store._run_protocol_bindings),
+            run_entry_world_bindings=deepcopy(self._store._run_entry_world_bindings),
             run_participations=deepcopy(self._store._run_participations),
             run_creation_receipts=deepcopy(
                 self._store._run_creation_receipts
@@ -2758,6 +2939,11 @@ class DemoUnitOfWork(UnitOfWork):
         )
         authority.run_revisions.update(deepcopy(self._pending_run_revisions))
         authority.run_current.update(deepcopy(self._pending_run_current))
+        for name in ("run_protocol_bindings", "run_entry_world_bindings"):
+            target, pending = getattr(authority, name), getattr(self, "_pending_" + name)
+            if set(target) & set(pending):
+                raise application_ports.NativeRunAdmissionWriteConflictError("native map conflict")
+            target.update(deepcopy(pending))
         authority.run_participations.update(
             deepcopy(self._pending_run_participations)
         )
@@ -2792,6 +2978,8 @@ class DemoUnitOfWork(UnitOfWork):
                 )
 
         run_ids = set(authority.run_current)
+        run_ids.update(authority.run_protocol_bindings)
+        run_ids.update(authority.run_entry_world_bindings)
         run_ids.update(key[0] for key in authority.run_revisions)
         run_ids.update(
             item.run_id.value for item in authority.run_participations.values()
@@ -2835,7 +3023,13 @@ class DemoUnitOfWork(UnitOfWork):
                     "Run participation refers to an unknown Session"
                 )
 
+        native_ids = {row.result_run_id.value for row in authority.run_creation_receipts.values()
+                      if row.operation_evidence_canonical.startswith(b"\x8a")}
+        for identity in sorted(native_ids | set(authority.run_protocol_bindings) | set(authority.run_entry_world_bindings)):
+            _classify_demo_run(authority, RunId(value=identity), sessions, snapshots, events)
         self._store._sessions = sessions
+        self._store._run_protocol_bindings = authority.run_protocol_bindings
+        self._store._run_entry_world_bindings = authority.run_entry_world_bindings
         self._store._snapshots = snapshots
         self._store._creation_keys = creation_keys
         self._store._turn_requests = turn_requests
@@ -2864,6 +3058,8 @@ class DemoUnitOfWork(UnitOfWork):
         self._clear_staged()
 
     def _clear_staged(self) -> None:
+        self._pending_run_protocol_bindings.clear()
+        self._pending_run_entry_world_bindings.clear()
         self._pending_session = None
         self._pending_snapshot = None
         self._pending_state_update = None

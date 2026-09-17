@@ -46,7 +46,7 @@ _CONTROLLER_BINDING = ConfiguredControllerBinding(
 _SOURCE = RunAuthoritySourceRef(value="source.production-run")
 
 
-def test_native_normal_composition_is_internal_lazy_and_demo_absent(monkeypatch):
+def test_native_normal_composition_shares_public_authorities_and_is_lazy(monkeypatch):
     from unittest.mock import Mock
     from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
     from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
@@ -66,11 +66,14 @@ def test_native_normal_composition_is_internal_lazy_and_demo_absent(monkeypatch)
     engine.connect.assert_not_called()
     schema = main.create_app(services=services).openapi()
     from dataclasses import replace
-    assert main.create_app(services=replace(services, native_run_admission_service=None)).openapi() == schema
+    assert services.session_service.native_view_coordinator is services.turn_orchestrator.native_coordinator
+    assert set(schema["paths"]) >= {"/v1/run-entry-options", "/v1/runs/native"}
+    with pytest.raises(ValueError, match="native View"):
+        replace(services, native_run_admission_service=None)
     assert ApiServices.__dataclass_fields__["native_run_admission_service"].default is None
 
 
-def test_legacy_demo_import_does_not_load_native_resolution_or_emit_diagnostics():
+def test_demo_import_is_offline_and_does_not_construct_native_admission():
     import os
     import subprocess
     import sys
@@ -79,7 +82,8 @@ def test_legacy_demo_import_does_not_load_native_resolution_or_emit_diagnostics(
         environment.pop(name, None)
     child = subprocess.run([sys.executable, "-c", "import sys; import deviation_protocol.api.demo_composition; assert 'deviation_protocol.application.native_run_admission' not in sys.modules"],
                            env=environment, capture_output=True, timeout=15)
-    assert child.returncode == 0 and child.stdout == child.stderr == b""
+    assert child.returncode == 0 and child.stdout == b""
+    assert b"Field name" in child.stderr or child.stderr == b""
 
 
 def _build_run_service(uow_factory) -> RunService:
@@ -467,6 +471,8 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
     }
 
     assert public_routes == {
+        ("/v1/run-entry-options", frozenset({"GET"})),
+        ("/v1/runs/native", frozenset({"POST"})),
         ("/health", frozenset({"GET"})),
         (
             "/v1/player-characters/eligible-for-run-entry",

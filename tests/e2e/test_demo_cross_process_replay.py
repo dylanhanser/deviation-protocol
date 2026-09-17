@@ -1855,6 +1855,8 @@ def test_raw_private_evidence_is_schema_complete_and_has_no_normalizer_dependenc
     )
     assert "_caller_identity_equivalence_representation" not in raw_names
     assert set(child_module.EXPECTED_PRIVATE_COMPONENTS) == {
+        "run_protocol_bindings",
+        "run_entry_world_bindings",
         "sessions",
         "snapshots",
         "creation_keys",

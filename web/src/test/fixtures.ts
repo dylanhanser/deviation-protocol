@@ -1,4 +1,5 @@
 import type {
+  RunEntryOptions, NativeRunEntryResponse,
   ActionResponse,
   EligiblePlayerCharacterCollection,
   MinimalPlayerCharacterCreationRequest,
@@ -10,6 +11,30 @@ import type {
   RunEntryResponse,
   SessionCreationResult,
 } from "../api/schemas";
+import { objectiveNames } from "../api/schemas";
+
+export const runOptionsFixture: RunEntryOptions = {
+  schema_version:"run-entry-options/v1", native_entry_available:true,
+  profiles: [
+    {id:"difficulty.silent-hunting-ground",label:"Extreme — Silent Hunting Ground",defaults:[95,10,95,90,90],ranges:[[80,100],[0,25],[80,100],[75,100],[75,100]]},
+    {id:"difficulty.fragile-alliance",label:"Standard — Fragile Alliance",defaults:[60,45,65,60,60],ranges:[[40,75],[30,65],[45,80],[40,75],[40,75]]},
+    {id:"difficulty.open-expedition",label:"Easier — Open Expedition",defaults:[25,70,35,30,35],ranges:[[10,40],[55,85],[20,50],[15,45],[20,50]]},
+  ].map((p) => ({profile_ref:{profile_id:p.id,profile_version:1},label:p.label,
+    defaults:Object.fromEntries(objectiveNames.map((n,i) => [n,p.defaults[i]])) as RunEntryOptions["profiles"][number]["defaults"],
+    override_rules:objectiveNames.map((parameter,i) => ({parameter,minimum:p.ranges[i]![0]!,maximum:p.ranges[i]![1]!,step:5 as const}))})),
+  entry_worlds:[{entry_world:{entry_world_id:"world.death_certificate",entry_world_version:1},scenario_id:"scenario.public-alpha",
+    scenario_content_version:"public-alpha-1.0.0",title:"起始世界",hook:"已公开的场景说明。",
+    eligible_profiles:["difficulty.silent-hunting-ground","difficulty.fragile-alliance","difficulty.open-expedition"].map((profile_id) => ({profile_id,profile_version:1}))}],
+  presentation_options:{world_tone:["grim","balanced","heroic"],reality_boundary:["lawful","deviant","chaotic"],relationship_overlay:["off","veiled","charged"]},
+};
+
+export function nativeEntryFixture(): NativeRunEntryResponse {
+  const profile = runOptionsFixture.profiles[2]!;
+  return structuredClone({session_id:"session-public-1",scenario_id:"scenario.public-alpha",scenario_content_version:"public-alpha-1.0.0",
+    run_context:{schema_version:"public-run-context/v1",run_id:"run.native",player_character:structuredClone(playerCharacterFixture),
+      entry_world:runOptionsFixture.entry_worlds[0]!.entry_world,profile_ref:profile.profile_ref,objectives:profile.defaults,
+      presentation:{world_tone:"balanced",reality_boundary:"lawful",relationship_overlay:"off"},resource_pressure_label:"Generous"}});
+}
 
 export const minimalPlayerCharacterCreationFixture: MinimalPlayerCharacterCreationRequest = {
   contract_version: "structured-player-character/v1",

@@ -68,6 +68,26 @@ snapshot, response, job and version commit together; resume never recalls the
 Provider after validated proposal persistence. Evidence and readiness limits are
 recorded in [the S5 implementation record](run_protocol.md#p33-s5-implementation-candidate-evidence).
 
+## S6 deterministic native Demo rendering
+
+The separately authorized S6 candidate composes native S4 admission and S5
+mechanics in the in-memory Demo. The dispatcher proves the complete native or
+legacy family before choosing its delegate; the legacy script and historical
+replay trace stay intact. Native valid actions are not limited to that script.
+The private native allowance is task-bound, single-use, and bound to the
+prepared job, Session, turn, request and signature. It checks the authenticated
+compiled attachment and singleton selected result before invoking PromptBuilder
+and the existing deterministic renderer outside UoWs/gameplay locks. Nested or
+inherited authorization rejects before protected work. Failure/cancellation
+cannot restore consumed authority; validated resume and committed replay do
+not call rendering again. Dynamic Demo remains native-unavailable.
+
+This is fake deterministic expression, not production Provider activation.
+[Implementation evidence](run_protocol.md#p33-s6-implementation-candidate-evidence)
+records guard, corruption, atomicity, cross-process and public journey tests.
+The candidate awaits independent implementation review; browser evidence and
+real Provider/Live calls are omitted.
+
 ## Future Provider and narrative controls
 
 Phase 4.0's accepted design introduces a self-controlled **Production

@@ -646,9 +646,29 @@ def build_demo_runtime(
         controller_binding_resolver=controller_binding_resolver,
         player_character_binding_evidence=player_character_service,
     )
+    from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
+    from deviation_protocol.application.native_turn_mechanics import NativeTurnMechanicsCoordinator
+    from deviation_protocol.infrastructure.native_demo import build_native_demo_orchestrator, DemoNarrativeDispatcher
+    native_coordinator = NativeTurnMechanicsCoordinator(catalog, scenario_catalog)
+    session_service.native_view_coordinator = native_coordinator
+    session_service.native_controller_resolver = controller_binding_resolver
+    native = build_native_demo_orchestrator(store=runtime_store, provider=provider_delegate,
+        resolver=DeterministicRuleResolver(), uow_factory=runtime_store.unit_of_work,
+        catalog=catalog, scenario_catalog=scenario_catalog, native_coordinator=native_coordinator,
+        provider_name="deterministic-demo", model_name="deterministic-demo-v1",
+        scenario_event_issuer=DeterministicDemoScenarioEventIssuer(), clock=runtime_generators.clock,
+        event_id_generator=runtime_generators.event_id, job_id_generator=runtime_generators.job_id,
+        lease_token_generator=runtime_generators.lease_token, worker_id_generator=runtime_generators.worker_id)
+    dispatcher = DemoNarrativeDispatcher(legacy=orchestrator, native=native, session_service=session_service)
+    admission = NativeRunAdmissionService(uow_factory=runtime_store.native_admission_unit_of_work,
+        run_id_issuer=run_service.run_id_issuer, continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
+        source_reference=run_service.source_reference, clock=run_service.clock,
+        controller_binding_resolver=controller_binding_resolver,
+        player_character_binding_evidence=player_character_service, session_service=session_service)
     services = ApiServices(
         session_service=session_service,
-        turn_orchestrator=orchestrator,
+        turn_orchestrator=dispatcher,
+        native_run_admission_service=admission,
         player_character_service=player_character_service,
         run_service=run_service,
         run_entry_service=build_run_entry_service(

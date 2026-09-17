@@ -1007,9 +1007,72 @@ export const narrativeRequestStatusResponseSchema = z
     }
   });
 
+export const objectiveNames = ["resource_pressure", "social_trust", "consequence_severity", "information_opacity", "conflict_intensity"] as const;
+const objectiveValue = z.number().int().safe().min(0).max(100).multipleOf(5);
+export const fiveObjectivesSchema = z.strictObject({
+  resource_pressure: objectiveValue, social_trust: objectiveValue, consequence_severity: objectiveValue,
+  information_opacity: objectiveValue, conflict_intensity: objectiveValue,
+});
+export const publicProfileRefSchema = z.strictObject({ profile_id: safeId128Schema, profile_version: positiveSafeIntegerSchema });
+export const publicWorldRefSchema = z.strictObject({ entry_world_id: safeId128Schema, entry_world_version: positiveSafeIntegerSchema });
+export const runPresentationSchema = z.strictObject({
+  world_tone: z.enum(["grim", "balanced", "heroic"]), reality_boundary: z.enum(["lawful", "deviant", "chaotic"]),
+  relationship_overlay: z.enum(["off", "veiled", "charged"]),
+});
+export const publicNativeRunContextSchema = z.strictObject({
+  schema_version: z.literal("public-run-context/v1"), run_id: safeId128Schema,
+  player_character: playerCharacterSelfProjectionSchema.extend({
+    player_character_id: z.strictObject({ value: safeId128Schema }),
+    record_revision: z.strictObject({ value: positiveSafeIntegerSchema }),
+  }).strict(),
+  entry_world: publicWorldRefSchema, profile_ref: publicProfileRefSchema, objectives: fiveObjectivesSchema,
+  presentation: runPresentationSchema, resource_pressure_label: z.enum(["Generous", "Fluid", "Scarce"]),
+}).refine((value) => value.player_character.lifecycle === "active" && value.resource_pressure_label ===
+  (value.objectives.resource_pressure <= 30 ? "Generous" : value.objectives.resource_pressure <= 65 ? "Fluid" : "Scarce"));
+export const publicRunProfileSchema = z.strictObject({
+  profile_ref: publicProfileRefSchema, label: codePointBoundedStringSchema(1, 128, "profile label"), defaults: fiveObjectivesSchema,
+  override_rules: z.array(z.strictObject({ parameter: z.enum(objectiveNames), minimum: objectiveValue,
+    maximum: objectiveValue, step: z.literal(5) })).length(5),
+}).refine((p) => p.override_rules.every((r, i) => r.parameter === objectiveNames[i] && r.minimum <= p.defaults[r.parameter] && p.defaults[r.parameter] <= r.maximum));
+export const publicEntryWorldSchema = z.strictObject({
+  entry_world: publicWorldRefSchema, scenario_id: safeId128Schema,
+  scenario_content_version: z.string().min(1).max(32).regex(safeIdPattern),
+  title: codePointBoundedStringSchema(1,120,"world title"), hook: codePointBoundedStringSchema(1,300,"world hook"),
+  eligible_profiles: z.array(publicProfileRefSchema).length(3),
+});
+export const runEntryOptionsSchema = z.strictObject({
+  schema_version: z.literal("run-entry-options/v1"), native_entry_available: z.boolean(),
+  profiles: z.array(publicRunProfileSchema).max(3), entry_worlds: z.array(publicEntryWorldSchema).max(1),
+  presentation_options: z.strictObject({
+    world_tone: z.tuple([z.literal("grim"), z.literal("balanced"), z.literal("heroic")]),
+    reality_boundary: z.tuple([z.literal("lawful"), z.literal("deviant"), z.literal("chaotic")]),
+    relationship_overlay: z.tuple([z.literal("off"), z.literal("veiled"), z.literal("charged")]),
+  }),
+}).refine((c) => c.native_entry_available ? c.profiles.length === 3 && c.entry_worlds.length === 1 &&
+  new Set(c.profiles.map((p) => JSON.stringify(p.profile_ref))).size === 3 &&
+  c.entry_worlds.every((w) => w.eligible_profiles.every((p,i) => p.profile_id === c.profiles[i]?.profile_ref.profile_id && p.profile_version === c.profiles[i]?.profile_ref.profile_version))
+  : c.profiles.length === 0 && c.entry_worlds.length === 0);
+export const nativeRunEntryRequestSchema = z.strictObject({
+  player_character_id: safeId128Schema, expected_record_revision: positiveSafeIntegerSchema,
+  profile_ref: publicProfileRefSchema, entry_world: publicWorldRefSchema,
+  overrides: z.array(z.strictObject({parameter: z.enum(objectiveNames), value: objectiveValue})).max(5),
+  presentation: runPresentationSchema,
+}).refine((v) => new Set(v.overrides.map((o) => o.parameter)).size === v.overrides.length);
+export const nativeRunEntryResponseSchema = z.strictObject({
+  session_id: safeId64Schema, scenario_id: safeId128Schema,
+  scenario_content_version: z.string().min(1).max(32).regex(safeIdPattern), run_context: publicNativeRunContextSchema,
+});
+export type RunEntryOptions = z.infer<typeof runEntryOptionsSchema>;
+export type PublicRunProfile = z.infer<typeof publicRunProfileSchema>;
+export type PublicEntryWorld = z.infer<typeof publicEntryWorldSchema>;
+export type PublicNativeRunContext = z.infer<typeof publicNativeRunContextSchema>;
+export type NativeRunEntryRequest = z.infer<typeof nativeRunEntryRequestSchema>;
+export type NativeRunEntryResponse = z.infer<typeof nativeRunEntryResponseSchema>;
+
 export const playerSessionViewSchema = z
   .object({
     metadata: sessionMetadataSchema,
+    run_context: publicNativeRunContextSchema.optional(),
     narrative_frame: narrativeFrameSchema,
     player_state: playerVisibleStateProjectionSchema,
     player_memory: playerMemoryProjectionSchema,

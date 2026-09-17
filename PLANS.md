@@ -53,8 +53,17 @@ approved with DF-001 deferred and published at
 `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. It connects internal native admission,
 mechanics, prompt compilation, atomic turns, reload/replay and authored endings.
 The [S6 public flow plan](docs/phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
-is the current unapproved documentation candidate; S6 implementation has not
-started, S7 remains later, and Phase 3.3 remains incomplete.
+was independently approved with DF-001 deferred and published at
+`4365721abe2eeff9bf21cb766b5c43f28eab5d58`. Its frozen candidate wording is
+historical. Separately authorized S6 implementation now connects public native
+entry, deterministic Demo, Web setup, View, play and recovery. It is an
+unapproved implementation candidate. Independent review returned `CHANGES_REQUIRED`
+for native identity loss through recovery and implicit selection from late
+character lists. Focused re-review closed character selection but returned a
+second `CHANGES_REQUIRED` for automatic recovery's scenario/content binding.
+That bounded correction awaits the same independent reviewer's focused re-review;
+S7 remains later and Phase 3.3 remains incomplete.
+See [S6 implementation and evidence](docs/run_protocol.md#p33-s6-implementation-candidate-evidence).
 
 ## Phase 3.3 current status and ordered priority
 
@@ -199,8 +208,8 @@ S5 implementation is independently approved with DF-001 deferred and published
 at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87` under its frozen approved plan.
 Its internal integration and verification are recorded in the
 [S5 evidence](docs/run_protocol.md#p33-s5-implementation-candidate-evidence).
-S6 is the current planning subject; implementation remains unauthorized. S7 is
-later. No separate S4/S5 closeout or extra approval stage is due.
+S6 is an implemented candidate under its approved, published plan; independent
+implementation review is next. S7 is later. No separate S4/S5 closeout or extra approval stage is due.
 Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
@@ -721,7 +730,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan candidate awaiting independent review, implementation not started; S7 later; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
+| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation received two CHANGES_REQUIRED reviews; character selection closed; automatic-recovery binding correction awaiting focused independent re-review; automated integrated flow evidence only, browser omitted; S7 later; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1249,7 +1258,11 @@ was independently approved with DF-001 deferred and published at `42411b2`.
 S4 implementation was independently approved and published at
 `34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains deferred. S5 has an independently approved plan published at `ff866d2`
 and independently approved implementation published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`.
-S6 has an unapproved planning candidate; S6 implementation and S7 remain
+S6 plan is independently approved and published at `4365721`; separately
+authorized S6 implementation received two `CHANGES_REQUIRED` reviews: initially
+two Web findings, then only automatic recovery's scenario/content binding.
+Character selection is closed; the corrected recovery candidate awaits focused
+independent re-review. S7 remains
 unauthorized. Phase 3.3 remains incomplete.**
 
 The authoritative readiness reconstruction completed with classification that
@@ -1292,8 +1305,10 @@ Provider. The [published S5 plan](docs/phase_3_3_s5_objective_mechanics_prompt_c
 is frozen; its corrected resource contract is implemented and published.
 [Historical evidence and current publication](docs/run_protocol.md#p33-s5-implementation-candidate-evidence)
 retain the verification limits. The [S6 plan](docs/phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
-owns proposed public routes, Demo/Web integration, recovery, inventory and the
-sole operative plan-review gate; plan approval authorizes no implementation or Git writes.
+owns the implemented public routes, Demo/Web integration, recovery, inventory
+and acceptance. Its implementation-review token is now operative; no
+implementation approval, Git writes, browser acceptance or release readiness
+is claimed.
 
 P3.3-S7 important-NPC priority may consume only already-authorized logical-
 identity and authored-world predicates from separately published owning
@@ -1558,8 +1573,8 @@ real-MySQL verification.
   structured-character API work beyond Phase 8; Provider,
   narrative, scenario, world, NPC, memory, relationship, combat, content, and
   broader public gameplay integration.
-- Public initial-world catalogue exposure remains S6-owned. The published S4 implementation
-  supplies the bounded internal catalogue and world/scenario association;
+- Public initial-world catalogue exposure is implemented in the S6 candidate,
+  using the published S4 catalogue and world/scenario association;
   later-world weighting, anti-repeat, progression and priority injection remain
   S7-owned and Deferred.
 - The exact P3.3-S2 numeric domains, profile defaults, override catalogue,
@@ -1569,15 +1584,17 @@ real-MySQL verification.
   `465c53d24ea96e64988dce8ef4c8a015d0e72814`; implementation is published at
   `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, approved with DF-001 deferred.
   S4 is independently approved and published at `34dc752`;
-  public/categorical activation and later integration remain unimplemented.
-- Public discovery shape, authored-world catalogues/weighting, visits/regions/
-  world state, mechanics application, trusted prompt compilation, progression,
-  anti-repeat, anti-farming, recovery priority, world-line transition, and
-  later physical schema choices remain owned by S5-S7. The S3 persistence
+  S5 mechanics are published and S6 public/categorical activation is an
+  implementation candidate; later continuity remains unimplemented.
+- Later authored-world weighting, visits/regions/world state, progression,
+  anti-repeat, anti-farming, continuity recovery priority, world-line transition
+  and their physical schema choices remain S7-owned. S5 mechanics and trusted
+  compilation are published; S6 public discovery and Session recovery are
+  implemented in the current candidate. The S3 persistence
   schema is frozen by its plan, independently approved and published at
   `465c53d24ea96e64988dce8ef4c8a015d0e72814`, and implemented at `a53f8e65`.
   Published S4 implements the bounded admission/world schema and production
-  composition; public native admission remains S6-owned and inactive.
+  composition; S6 now connects its public native admission route.
 - Exact Phase 3.4 relationship thresholds, residence duration, memory schema,
   and dialogue allowance.
 - The Phase 4.0 gateway implementation, model catalogue, pricing/quota formula,

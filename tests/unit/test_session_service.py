@@ -1024,3 +1024,29 @@ async def test_run_entry_snapshot_strict_and_semantic_negative_matrix(
         )
     with pytest.raises(SnapshotSessionMismatchError):
         validate(started=replace(event, sequence_no=2))
+@pytest.mark.asyncio
+async def test_native_view_rechecks_current_controller_with_no_write_or_lock(monkeypatch):
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock
+    import httpx
+    from deviation_protocol.api.demo_composition import build_demo_runtime
+    from deviation_protocol.api.main import create_app
+    from deviation_protocol.domain.player_character import ControllerBindingRef
+    from deviation_protocol.infrastructure.demo_persistence import DemoUnitOfWork
+    from tests.unit.test_native_demo import admit
+    runtime=build_demo_runtime(); app=create_app(services=runtime.services); app.state.api_services=runtime.services
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app),base_url="http://test") as client:
+        entered,_=await admit(client); sid=entered["session_id"]
+        baseline=runtime.store.snapshot()
+        async def forbidden(*args,**kwargs): pytest.fail("View attempted a lock or commit")
+        monkeypatch.setattr(DemoUnitOfWork,"commit",forbidden)
+        monkeypatch.setattr(DemoUnitOfWork,"_acquire_session_lock",forbidden)
+        monkeypatch.setattr(DemoUnitOfWork,"_acquire_run_lock",forbidden)
+        monkeypatch.setattr(DemoUnitOfWork,"_acquire_player_character_lock",forbidden)
+        assert (await client.get(f"/v1/sessions/{sid}/view")).json()["run_context"]==entered["run_context"]
+        for controller in (None,ControllerBindingRef(value="controller.other")):
+            runtime.services.session_service.native_controller_resolver=SimpleNamespace(resolve=AsyncMock(return_value=controller))
+            result=await client.get(f"/v1/sessions/{sid}/view")
+            assert result.status_code==404
+            assert result.json()=={"error":{"error_code":"SESSION_NOT_FOUND","message":"Session was not found"}}
+        assert runtime.store.snapshot()==baseline

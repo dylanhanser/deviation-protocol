@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
 import { publicApiClient, type PublicApiClient } from "./api/client";
 import { ApiClientError, formatApiClientError } from "./api/errors";
+import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPresentation, type FrozenNativeEntry } from "./runSetup";
+import { objectiveNames, type RunEntryOptions, type NativeRunEntryResponse, type PublicNativeRunContext } from "./api/schemas";
 import {
   actionRequestSchema,
   idempotencyKeySchema,
@@ -64,7 +66,12 @@ interface RunEntryAttempt extends MutationAttemptBase {
   entrySuccessAwaitingStorage: boolean;
 }
 
-type MutationAttempt = PlayerCharacterCreateAttempt | RunEntryAttempt;
+interface NativeEntryAttempt extends MutationAttemptBase {
+  kind: "native-entry";
+  frozen: FrozenNativeEntry;
+  retainedResponse?: NativeRunEntryResponse;
+}
+type MutationAttempt = PlayerCharacterCreateAttempt | RunEntryAttempt | NativeEntryAttempt;
 
 type ViewStaleKind =
   | "transport-uncertain"
@@ -82,6 +89,29 @@ interface LoadedSession {
   sessionId: string;
   view: PlayerSessionView;
   stale: ViewStaleState | null;
+}
+
+interface NativeViewAssociation {
+  sessionId: string;
+  context: PublicNativeRunContext;
+  scenarioId: string;
+  contentVersion: string;
+}
+
+function assertViewAssociation(
+  sessionId: string,
+  view: PlayerSessionView,
+  expected: NativeViewAssociation | null,
+): void {
+  if (view.metadata.session_id !== sessionId) {
+    throw new ApiClientError("View Session association changed", {kind:"invalid-response", reason:"CONTRACT_MISMATCH"});
+  }
+  if (expected === null) return;
+  assertNativeView(view, expected.context);
+  if (sessionId !== expected.sessionId || view.narrative_frame.scenario_id !== expected.scenarioId ||
+      view.metadata.content_version !== expected.contentVersion) {
+    throw new ApiClientError("Native View association changed", {kind:"invalid-response", reason:"CONTRACT_MISMATCH"});
+  }
 }
 
 interface DynamicNarrativeActionEvidence {
@@ -141,9 +171,9 @@ const CONFIRMED_VIEW_UNAVAILABLE_MESSAGE =
 const RECOVERY_INTERRUPTED_MESSAGE =
   "自动恢复已停止，行动保持锁定。只能手动重试安全 GET；客户端不会 POST、重放行动或生成新的 request ID。";
 const RECOVERY_NOT_FOUND_MESSAGE =
-  "已保存的同标签页恢复记录在服务器返回 404 后失效，现已清除。请创建 Session 或手动读取其他 Session。";
+  "恢复记录在服务器返回 404 后失效；读取已暂停。请显式清除此标签页进度后重新选择。";
 const RECOVERY_IDENTITY_MISMATCH_MESSAGE =
-  "服务器返回的恢复身份与已保存记录不匹配，原恢复记录已失效并清除。请创建 Session 或手动读取其他 Session。";
+  "服务器返回的恢复身份与已保存记录不匹配，读取已暂停。可重试 GET 或显式清除此标签页进度。";
 const RECOVERY_STORAGE_FAILURE_MESSAGE =
   "本标签页 sessionStorage 无法安全访问或更新。Session、View 与行动控件已锁定；客户端不会 POST、重放行动或生成新的恢复身份。";
 const DETERMINISTIC_DEMO_WARNING =
@@ -339,6 +369,13 @@ function ViewSummary({ loaded }: { loaded: LoadedSession }) {
           <dd>{view.scenario_status}</dd>
         </div>
       </dl>
+
+      {view.run_context ? <section aria-label="Run 设置">
+        <h3>本次 Run 设置</h3>
+        <p>资源环境：{view.run_context.resource_pressure_label}</p>
+        <dl className="compact-list">{objectiveNames.map((name) => <div key={name}><dt>{objectiveLabels[name]}</dt><dd>{view.run_context?.objectives[name]}</dd></div>)}</dl>
+        <p>表现：{view.run_context.presentation.world_tone} / {view.run_context.presentation.reality_boundary} / {view.run_context.presentation.relationship_overlay}</p>
+      </section> : null}
 
       <section aria-labelledby="scene-heading">
         <h3 id="scene-heading">当前场景：{view.presentation.scene_title}</h3>
@@ -682,6 +719,28 @@ export default function App({
   actionIdentityFactory = newActionIdentity,
   pollWait = waitForPollingDelay,
 }: AppProps) {
+  const [entryMode, setEntryMode] = useState<"native" | "legacy" | null>(null);
+  const entryModeRef = useRef(entryMode);
+  useLayoutEffect(() => {
+    entryModeRef.current = entryMode;
+  }, [entryMode]);
+  const [runOptions, setRunOptions] = useState<RunEntryOptions | null>(null);
+  const [optionsError, setOptionsError] = useState<string | null>(null);
+  const [optionsRefresh, setOptionsRefresh] = useState(0);
+  const [profileId, setProfileId] = useState("");
+  const [worldId, setWorldId] = useState("");
+  const [overrides, setOverrides] = useState<Record<string,string>>({});
+  const [runPresentation, setRunPresentation] = useState({...proposedPresentation});
+  const previousCatalogue = useRef<RunEntryOptions | null>(null);
+  const choices = useRef({profileId,worldId,overrides});
+  const nativeExpected = useRef<NativeViewAssociation | null>(null);
+  const latestClient = useRef(client);
+  useLayoutEffect(() => {
+    choices.current = {profileId,worldId,overrides};
+    latestClient.current = client;
+  }, [client,profileId,worldId,overrides]);
+  const selectedProfile = runOptions?.profiles.find((p) => p.profile_ref.profile_id === profileId);
+  const selectedWorld = runOptions?.entry_worlds.find((w) => w.entry_world.entry_world_id === worldId);
   const [scenarios, setScenarios] = useState<PublicScenarioDescription[] | null>(
     null,
   );
@@ -778,7 +837,7 @@ export default function App({
     setManualSessionId("");
     setOperationError(null);
     setRecoveryInterruption(null);
-  }, []);
+  }, [setManualSessionId]);
 
   const enterRecoveryStorageFailure = useCallback(
     (failure: SessionRecoveryStorageFailure) => {
@@ -808,13 +867,16 @@ export default function App({
     [enterRecoveryStorageFailure],
   );
 
-  const clearRecoveryForSessionTransition = useCallback((): boolean => {
+  const clearRecoveryForSessionTransition = useCallback((nextSessionId?: string): boolean => {
     const result = clearSessionRecoveryRecord();
     if (!result.ok) {
       enterRecoveryStorageFailure(result.failure);
       return false;
     }
     recoveryRecordRef.current = null;
+    if (nativeExpected.current?.sessionId !== nextSessionId) {
+      nativeExpected.current = null;
+    }
     setRecoveryRecord(null);
     loadedSessionRef.current = null;
     setLoadedSession(null);
@@ -829,6 +891,7 @@ export default function App({
     recoveryRecordRef.current = null;
     setRecoveryRecord(null);
     clearSessionUiState();
+    nativeExpected.current = null;
     if (!result.ok) {
       setRecoveryStorageFailure({ failure: result.failure });
       return false;
@@ -836,6 +899,30 @@ export default function App({
     setRecoveryStorageFailure(null);
     return true;
   }, [clearSessionUiState, invalidateForegroundOperation]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    void client.listRunEntryOptions(controller.signal).then((options) => {
+      if (!active) return;
+      const old = previousCatalogue.current;
+      const selected = choices.current;
+      const priorProfile = old?.profiles.find((p) => p.profile_ref.profile_id === selected.profileId);
+      const profile = options.profiles.find((p) => p.profile_ref.profile_id === priorProfile?.profile_ref.profile_id && p.profile_ref.profile_version === priorProfile.profile_ref.profile_version);
+      const priorWorld = old?.entry_worlds.find((w) => w.entry_world.entry_world_id === selected.worldId);
+      const world = options.entry_worlds.find((w) => w.entry_world.entry_world_id === priorWorld?.entry_world.entry_world_id && w.entry_world.entry_world_version === priorWorld.entry_world.entry_world_version &&
+        w.eligible_profiles.some((p) => p.profile_id === profile?.profile_ref.profile_id && p.profile_version === profile.profile_ref.profile_version));
+      setRunOptions(options);
+      setOptionsError(null);
+      setProfileId(profile?.profile_ref.profile_id ?? ""); setWorldId(world?.entry_world.entry_world_id ?? "");
+      setOverrides(Object.fromEntries(Object.entries(selected.overrides).filter(([name,value]) => {
+        const r=profile?.override_rules.find((r) => r.parameter === name); const number=Number(value);
+        return r && value.trim() !== "" && Number.isSafeInteger(number) && number % 5 === 0 && r.minimum <= number && number <= r.maximum;
+      })));
+      previousCatalogue.current = options;
+    }).catch((error: unknown) => {if (active) setOptionsError(formatApiClientError(error));});
+    return () => {active = false; controller.abort();};
+  }, [client, optionsRefresh]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -877,10 +964,14 @@ export default function App({
         setEligibleCharacters(collection.eligible_player_characters);
         setEligibleTruncated(collection.truncated);
         setCreatedPlayerCharacter(null);
-        setSelectedPlayerCharacterId(
-          collection.eligible_player_characters[0]?.player_character_id.value ??
-            "",
-        );
+        setSelectedPlayerCharacterId((current) => {
+          if (entryModeRef.current === "native") {
+            return collection.eligible_player_characters.some(
+              (character) => character.player_character_id.value === current,
+            ) ? current : "";
+          }
+          return collection.eligible_player_characters[0]?.player_character_id.value ?? "";
+        });
       })
       .catch((error: unknown) => {
         if (
@@ -899,6 +990,9 @@ export default function App({
 
   useEffect(() => {
     if (previousClientRef.current !== client) {
+      nativeExpected.current = null;
+      previousCatalogue.current = null;
+      setRunOptions(null); setProfileId(""); setWorldId(""); setOverrides({}); setEntryMode(null);
       const attempt = mutationAttemptRef.current;
       if (attempt?.inFlight === true) {
         replaceMutationAttempt({
@@ -951,6 +1045,7 @@ export default function App({
     foregroundOperationRef.current = operation;
 
     const isCurrent = () =>
+      latestClient.current === client &&
       foregroundOperationRef.current?.id === operation.id &&
       !operation.controller.signal.aborted;
 
@@ -971,6 +1066,9 @@ export default function App({
       if (!isCurrent()) {
         return;
       }
+      assertViewAssociation(record.session_id, restoredView, nativeExpected.current);
+      if (restoredView.run_context) nativeExpected.current = {sessionId:record.session_id, context:restoredView.run_context,
+        scenarioId:restoredView.narrative_frame.scenario_id, contentVersion:restoredView.metadata.content_version};
       if (!persistRecoveryRecord(record.session_id)) {
         return;
       }
@@ -1046,18 +1144,14 @@ export default function App({
           error.kind === "api" &&
           error.status === 404
         ) {
-          if (explicitlyAbandonSession()) {
-            setOperationError(RECOVERY_NOT_FOUND_MESSAGE);
-          }
+          setRecoveryInterruption({message:RECOVERY_NOT_FOUND_MESSAGE});
           return;
         }
         if (
           error instanceof ApiClientError &&
           error.kind === "identity-mismatch"
         ) {
-          if (explicitlyAbandonSession()) {
-            setOperationError(RECOVERY_IDENTITY_MISMATCH_MESSAGE);
-          }
+          setRecoveryInterruption({message:RECOVERY_IDENTITY_MISMATCH_MESSAGE});
           return;
         }
         setRecoveryInterruption({
@@ -1107,6 +1201,9 @@ export default function App({
     view: PlayerSessionView,
     response: ActionResponse | null = null,
   ) {
+    assertViewAssociation(sessionId, view, nativeExpected.current);
+    if (view.run_context) nativeExpected.current = {sessionId, context:view.run_context,
+      scenarioId:view.narrative_frame.scenario_id, contentVersion:view.metadata.content_version};
     const next = { sessionId, view, stale: null };
     loadedSessionRef.current = next;
     setLoadedSession(next);
@@ -1124,6 +1221,7 @@ export default function App({
     view: PlayerSessionView,
     response: ActionResponse | null = null,
   ): boolean {
+    assertNativeView(view, nativeExpected.current?.sessionId === sessionId ? nativeExpected.current.context : undefined);
     if (!persistRecoveryRecord(sessionId)) {
       return false;
     }
@@ -1133,7 +1231,7 @@ export default function App({
 
   function beginForegroundOperation(
     kind: ForegroundOperationKind,
-    options: { clearSession: boolean },
+    options: { clearSession: boolean; nextSessionId?: string },
   ): ForegroundOperation | null {
     if (foregroundOperationRef.current !== null) {
       return null;
@@ -1141,7 +1239,7 @@ export default function App({
     if (recoveryStorageFailure !== null) {
       return null;
     }
-    if (options.clearSession && !clearRecoveryForSessionTransition()) {
+    if (options.clearSession && !clearRecoveryForSessionTransition(options.nextSessionId)) {
       return null;
     }
     const operation = {
@@ -1159,6 +1257,7 @@ export default function App({
 
   function isCurrentOperation(operation: ForegroundOperation): boolean {
     return (
+      latestClient.current === client &&
       foregroundOperationRef.current?.id === operation.id &&
       !operation.controller.signal.aborted
     );
@@ -1264,6 +1363,21 @@ export default function App({
     if (current === null || current.generation !== attempt.generation) {
       return;
     }
+    if (current.kind === "native-entry") {
+      if (nativeFailureIsUncertain(current.uncertaintyTainted, error)) {
+        retainUncertainMutation(current.generation, error); return;
+      }
+      clearMutationAttempt(current.generation);
+      setOperationError(formatApiClientError(error));
+      if (error instanceof ApiClientError) {
+        if (["PLAYER_CHARACTER_NOT_FOUND","PLAYER_CHARACTER_STALE","PLAYER_CHARACTER_NOT_ELIGIBLE","RUN_ENTRY_CONFLICT"].includes(error.errorCode ?? "")) {
+          setSelectedPlayerCharacterId(""); setCreatedPlayerCharacter(null); setRequiredCatalogRefresh("eligible");
+        } else if (["INVALID_RUN_PROTOCOL","INVALID_ENTRY_WORLD","INVALID_SCENARIO_DEFINITION","NATIVE_RUN_ENTRY_NOT_AVAILABLE"].includes(error.errorCode ?? "")) {
+          setRunOptions(null); setProfileId(""); setWorldId(""); setOverrides({}); setOptionsError("请刷新可用选项后重新确认。");
+        }
+      }
+      return;
+    }
 
     const documented404 = isDocumentedApiResult(
       error,
@@ -1366,13 +1480,16 @@ export default function App({
         return;
       }
 
-      const entered = await client.enterRun(
-        attempt.exactFrozenBody,
-        attempt.idempotencyKey,
-        operation.controller.signal,
-      );
+      const entered = attempt.kind === "native-entry"
+        ? attempt.retainedResponse ?? await client.enterNativeRun(attempt.frozen, operation.controller.signal)
+        : await client.enterRun(attempt.exactFrozenBody, attempt.idempotencyKey, operation.controller.signal);
       if (!isCurrentOperation(operation)) {
         return;
+      }
+      if (attempt.kind === "native-entry" && "run_context" in entered) {
+        updateMutationAttempt(attempt.generation, (current) => current.kind === "native-entry" ? {...current, retainedResponse:entered} : current);
+        nativeExpected.current = {sessionId:entered.session_id, context:entered.run_context,
+          scenarioId:entered.scenario_id, contentVersion:entered.scenario_content_version};
       }
       if (!persistRecoveryRecord(entered.session_id)) {
         updateMutationAttempt(attempt.generation, (current) => ({
@@ -1501,6 +1618,7 @@ export default function App({
       recoveryInterruption !== null ||
       recoveryStorageFailure !== null ||
       requiredCatalogRefresh !== null ||
+      entryMode !== "legacy" ||
       selectedScenario === undefined ||
       selectedPlayerCharacter === undefined
     ) {
@@ -1536,6 +1654,38 @@ export default function App({
       },
       "entering",
     );
+  }
+
+  function handleNativeEntry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (entryMode !== "native" || !selectedProfile || !selectedWorld || !selectedPlayerCharacter ||
+        foregroundOperationRef.current || mutationAttemptRef.current || recoveryRecordRef.current || recoveryStorageFailure ||
+        recoveryInterruption || requiredCatalogRefresh || !runOptions?.native_entry_available) return;
+    const key = buildMutationIdentity();
+    if (key === null) return;
+    try {
+      if (Object.values(overrides).some((v) => v.trim() === "")) throw new Error("empty override");
+      const frozen = client.freezeNativeEntry({player_character_id:selectedPlayerCharacter.player_character_id.value,
+        expected_record_revision:selectedPlayerCharacter.record_revision.value, profile_ref:selectedProfile.profile_ref,
+        entry_world:selectedWorld.entry_world, overrides:objectiveNames.filter((n) => n in overrides).map((n) => ({parameter:n,value:Number(overrides[n])})),
+        presentation:runPresentation}, key, selectedProfile, selectedWorld);
+      const generation = ++mutationGenerationRef.current;
+      installAndSendMutation({kind:"native-entry", generation, idempotencyKey:key, frozen, uncertaintyTainted:false, inFlight:true}, "entering");
+    } catch {setOperationError("请检查难度范围与步长；请求未发送。");}
+  }
+
+  function handleNativeStorageRetry() {
+    const attempt = mutationAttemptRef.current;
+    if (attempt?.kind !== "native-entry" || !attempt.retainedResponse || foregroundOperationRef.current) return;
+    const response = attempt.retainedResponse;
+    if (!persistRecoveryRecord(response.session_id)) return;
+    nativeExpected.current = {sessionId:response.session_id, context:response.run_context,
+      scenarioId:response.scenario_id, contentVersion:response.scenario_content_version};
+    setRecoveryStorageFailure(null);
+    if (!clearMutationAttempt(attempt.generation)) return;
+    setManualSessionId(response.session_id);
+    setCreatedSessionWithoutView(response.session_id);
+    setOperationError("进度已保存，请重新读取进度。");
   }
 
   function handleMutationRetry() {
@@ -1585,6 +1735,7 @@ export default function App({
     }
     const operation = beginForegroundOperation("reading", {
       clearSession: true,
+      nextSessionId: parsedSessionId.data,
     });
     if (operation === null) {
       return;
@@ -1833,7 +1984,12 @@ export default function App({
         error instanceof ApiClientError &&
         error.kind === "identity-mismatch"
       ) {
-        if (explicitlyAbandonSession()) {
+        if (nativeExpected.current?.sessionId === current.sessionId) {
+          markCurrentViewStale(operation, current.sessionId, {
+            kind: "pending-status-unknown",
+            message: RECOVERY_IDENTITY_MISMATCH_MESSAGE,
+          });
+        } else if (explicitlyAbandonSession()) {
           setOperationError(RECOVERY_IDENTITY_MISMATCH_MESSAGE);
         }
       } else if (stage === "posting" && isTransportUncertain(error)) {
@@ -1938,6 +2094,45 @@ export default function App({
         {operationStatus}
       </p>
 
+      <section className="panel" aria-label="进入方式">
+        <p>进入请求尚未确认并保存时仅保存在内存中；刷新页面将无法恢复该请求。已保存的进度仅限此标签页。</p>
+        <fieldset disabled={prePlayControlsDisabled}>
+          <legend>选择进入方式</legend>
+          <button type="button" aria-pressed={entryMode === "native"} onClick={() => {setEntryMode("native"); if (!createdPlayerCharacter) setSelectedPlayerCharacterId("");}}>原生 Run 设置</button>
+          <button type="button" aria-pressed={entryMode === "legacy"} onClick={() => setEntryMode("legacy")}>传统副本模式</button>
+        </fieldset>
+        {optionsError ? <p role="alert">{optionsError}</p> : runOptions === null ? <p>正在加载进入选项…</p> : null}
+        {runOptions?.native_entry_available === false ? <p>当前环境不支持原生进入，可显式选择传统副本模式。</p> : null}
+        <button type="button" disabled={mutationAttempt !== null || foregroundOperation !== null || recoveryRecord !== null || recoveryStorageFailure !== null}
+          onClick={() => {setRunOptions(null); setOptionsError(null); setOptionsRefresh((v) => v + 1);}}>刷新可用选项</button>
+        {entryMode === "native" && runOptions?.native_entry_available ? <form onSubmit={handleNativeEntry}>
+          <fieldset disabled={prePlayControlsDisabled}>
+            <legend>确认原生 Run 设置</legend>
+            <label>选择难度<select value={profileId} onChange={(e) => {setProfileId(e.target.value); setWorldId(""); setOverrides({});}}>
+              <option value="">请选择难度</option>{runOptions.profiles.map((p) => <option key={p.profile_ref.profile_id} value={p.profile_ref.profile_id}>{p.label}</option>)}
+            </select></label>
+            <label>选择起始世界<select value={worldId} disabled={!selectedProfile} onChange={(e) => setWorldId(e.target.value)}>
+              <option value="">请选择起始世界</option>{runOptions.entry_worlds.filter((w) => w.eligible_profiles.some((p) => p.profile_id === selectedProfile?.profile_ref.profile_id && p.profile_version === selectedProfile.profile_ref.profile_version)).map((w) => <option key={w.entry_world.entry_world_id} value={w.entry_world.entry_world_id}>{w.title}</option>)}
+            </select></label>
+            {selectedWorld ? <p>{selectedWorld.hook}</p> : null}
+            {selectedProfile?.override_rules.map((r) => <div className="run-override" key={r.parameter}>
+              <label><input type="checkbox" checked={r.parameter in overrides} onChange={(e) => setOverrides((old) => {const next = {...old}; if (e.target.checked) next[r.parameter] = String(selectedProfile.defaults[r.parameter]); else delete next[r.parameter]; return next;})}/>调整{objectiveLabels[r.parameter]}</label>
+              <label>{objectiveLabels[r.parameter]}<input type="number" min={r.minimum} max={r.maximum} step={r.step} disabled={!(r.parameter in overrides)}
+                value={overrides[r.parameter] ?? selectedProfile.defaults[r.parameter]} onChange={(e) => setOverrides({...overrides,[r.parameter]:e.target.value})}/></label>
+              <span>允许 {r.minimum}–{r.maximum}，步长 {r.step}</span>
+            </div>)}
+            <label>世界基调<select value={runPresentation.world_tone} onChange={(e) => setRunPresentation({...runPresentation,world_tone:e.target.value as typeof runPresentation.world_tone})}>{runOptions.presentation_options.world_tone.map((v) => <option key={v}>{v}</option>)}</select></label>
+            <label>现实边界<select value={runPresentation.reality_boundary} onChange={(e) => setRunPresentation({...runPresentation,reality_boundary:e.target.value as typeof runPresentation.reality_boundary})}>{runOptions.presentation_options.reality_boundary.map((v) => <option key={v}>{v}</option>)}</select></label>
+            <label>人际氛围<select value={runPresentation.relationship_overlay} onChange={(e) => setRunPresentation({...runPresentation,relationship_overlay:e.target.value as typeof runPresentation.relationship_overlay})}>{runOptions.presentation_options.relationship_overlay.map((v) => <option key={v}>{v}</option>)}</select></label>
+            <p>确认以上难度、世界、数值与表现设置后开始。表现设置仅影响叙述。</p>
+            <button type="submit" disabled={!selectedProfile || !selectedWorld || !selectedPlayerCharacter || Object.entries(overrides).some(([name,value]) => {
+              const r=selectedProfile?.override_rules.find((r) => r.parameter === name); const n=Number(value);
+              return !r || value.trim()==="" || !Number.isSafeInteger(n) || n % 5 !== 0 || n < r.minimum || n > r.maximum;
+            })}>确认并开始</button>
+          </fieldset>
+        </form> : null}
+      </section>
+
       <section className="panel" aria-labelledby="scenario-heading">
         <h2 id="scenario-heading">选择公开副本</h2>
         {scenarios === null && scenarioError === null ? (
@@ -2025,6 +2220,7 @@ export default function App({
                 setSelectedPlayerCharacterId(event.target.value)
               }
             >
+              {entryMode === "native" ? <option value="">请选择角色</option> : null}
               {eligibleCharacters.map((character) => (
                 <option
                   key={character.player_character_id.value}
@@ -2064,7 +2260,7 @@ export default function App({
           </button>
         ) : null}
         {selectedPlayerCharacter === undefined ||
-        selectedScenario === undefined ? null : (
+        selectedScenario === undefined || entryMode !== "legacy" ? null : (
           <form onSubmit={handleRunEntry}>
             <fieldset disabled={prePlayControlsDisabled}>
               <legend className="sr-only">进入 Run</legend>
@@ -2080,11 +2276,13 @@ export default function App({
         <section className="stale-warning" role="alert" aria-labelledby="mutation-retry-heading">
           <h2 id="mutation-retry-heading">操作结果尚未解决</h2>
           <p>
+            {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? "进入已确认，进度尚待保存；重试保存不会重新进入。" : null}
             {mutationAttempt.kind === "run-entry" &&
             mutationAttempt.entrySuccessAwaitingStorage
               ? "Run entry 已成功，但 Session ID 尚未安全保存。清除存储锁定后，只能用完全相同的操作进行 replay。"
               : MUTATION_UNCERTAIN_MESSAGE}
           </p>
+          {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? <button type="button" onClick={handleNativeStorageRetry}>重试保存进度</button> : null}
           {mutationAttempt.kind === "run-entry" ? (
             <p>{RUN_DISCOVERY_LIMIT_MESSAGE}</p>
           ) : null}

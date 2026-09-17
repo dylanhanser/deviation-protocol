@@ -21,7 +21,7 @@ import type {
   NarrativeRequestStatusResponse,
   PlayerSessionView,
 } from "./api/schemas";
-import { readSessionRecoveryRecord } from "./sessionRecovery";
+import { readSessionRecoveryRecord, writeSessionRecoveryRecord } from "./sessionRecovery";
 import {
   activeViewFixture,
   committedActionResponseFixture,
@@ -35,11 +35,56 @@ import {
   runEntryResponseFixture,
   scenarioCatalogFixture,
   synchronousActionResponseFixture,
+  runOptionsFixture,
+  nativeEntryFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
 const apiOrigin = "http://action-ui.test";
 const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
+
+it("pauses a native confirmed-202 identity mismatch while retaining GET recovery identity",async()=>{
+  writeSessionRecoveryRecord("session-public-1");let posts=0,reads=0;
+  server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>HttpResponse.json({...freeActionViewFixture(1),run_context:nativeEntryFixture().run_context})),
+    http.post(`${apiOrigin}/v1/sessions/session-public-1/actions`,()=>{posts++;return HttpResponse.json(pendingActionResponseFixture("opaque-request-1"),{status:202});}),
+    http.get(`${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,()=>{reads++;return HttpResponse.json({session_id:"foreign",client_request_id:"opaque-request-1",status:"PENDING",client_action:"POLL_SAME_REQUEST",error_code:null,retry_after_seconds:2,response:null});}));
+  renderActionApp();await screen.findByText("当前 Session：session-public-1");
+  fireEvent.click(screen.getByRole("button",{name:"提交继续"}));
+  await screen.findByText(/恢复身份与已保存记录不匹配/);
+  expect(storedRecoveryRecord()).toEqual({version:1,session_id:"session-public-1",client_request_id:"opaque-request-1"});
+  expect(screen.getByRole("button",{name:"提交继续"})).toBeDisabled();
+  expect(posts).toBe(1);expect(reads).toBe(1);
+});
+
+it.each([true,false])("native setup follows authoritative action affordances and rejects missing context: ending=%s",async (ending) => {
+  const admitted=nativeEntryFixture(); let views=0,entries=0,actions=0;
+  server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
+    http.post(`${apiOrigin}/v1/runs/native`,() => {entries++;return HttpResponse.json(admitted);}),
+    http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
+      views++;
+      if (views===1) return HttpResponse.json({...activeViewFixture,run_context:admitted.run_context});
+      return HttpResponse.json(ending?{...endedViewFixture("RESOLVED"),run_context:admitted.run_context}:freeActionViewFixture(7));
+    }),http.post(`${apiOrigin}/v1/sessions/session-public-1/actions`,() => {actions++;return HttpResponse.json(synchronousActionResponseFixture("opaque-request-1",7));}));
+  renderActionApp(); await screen.findByLabelText("Player Character");
+  fireEvent.click(screen.getByRole("button",{name:"原生 Run 设置"}));
+  await screen.findByLabelText("选择难度");
+  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
+  fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
+  fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
+  fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+  await screen.findByText("当前 Session：session-public-1");
+  fireEvent.click(screen.getByRole("button",{name:"检查灯塔信号"}));
+  await waitFor(() => expect(views).toBe(2));
+  if (ending) {
+    await screen.findByText("RESOLVED");
+    expect(screen.queryByRole("button",{name:"检查灯塔信号"})).not.toBeInTheDocument();
+  } else {
+    await screen.findByText(/新的完整 PlayerSessionView 获取失败/);
+    expect(screen.getByRole("button",{name:"检查灯塔信号"})).toBeDisabled();
+  }
+  expect(entries).toBe(1); expect(actions).toBe(1);
+});
 const exactDemoWarning =
   "Deterministic Demo  local only  temporary data  not a production Provider";
 const canonicalScenarioCatalog = {
@@ -122,7 +167,7 @@ function renderActionApp(
   } = {},
 ) {
   server.use(eligibleHandler(options.eligiblePlayerCharacters));
-  return render(
+  const rendered = render(
     <App
       client={options.client ?? testClient}
       idempotencyKeyFactory={
@@ -136,6 +181,8 @@ function renderActionApp(
         : { pollWait: options.pollWait })}
     />,
   );
+  fireEvent.click(screen.getByRole("button", {name:"传统副本模式"}));
+  return rendered;
 }
 
 function storedRecoveryRecord() {
@@ -449,6 +496,7 @@ function lateCompletionEvidenceClient() {
   const submittedRequestIds: string[] = [];
   const client = {
     listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
     listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
     getSessionView: async () => {
       const stateVersion = Math.min(viewReads, 1);
@@ -2758,6 +2806,7 @@ describe("committed Dynamic Narrative action evidence", () => {
     }));
     const oldClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         const stateVersion = oldViewReads;
@@ -2786,6 +2835,7 @@ describe("committed Dynamic Narrative action evidence", () => {
     } as unknown as PublicApiClient;
     const newClient = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         newViewReads += 1;
@@ -3831,6 +3881,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     }));
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         viewReads += 1;
@@ -3904,6 +3955,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     };
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async () => {
         viewReads += 1;
@@ -3961,6 +4013,7 @@ describe("foreground lock, operation identity and cancellation", () => {
     }));
     const client = {
       listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
       listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
       getSessionView: async (_sessionId: string, signal?: AbortSignal) => {
         viewReads += 1;
@@ -4069,11 +4122,13 @@ describe("foreground lock, operation identity and cancellation", () => {
       const newRead = deferred<PlayerSessionView>();
       const oldClient = {
         listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
         listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
         getSessionView: async () => oldRead.promise,
       } as unknown as PublicApiClient;
       const newClient = {
         listScenarios: async () => scenarioCatalogFixture,
+      listRunEntryOptions: () => testClient.listRunEntryOptions(),
         listEligiblePlayerCharacters: async () => eligiblePlayerCharactersFixture,
         getSessionView: async () => newRead.promise,
       } as unknown as PublicApiClient;

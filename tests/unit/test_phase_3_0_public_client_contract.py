@@ -37,6 +37,17 @@ from tests.unit.test_phase_2_4a_playtest import (
 SESSION_PATH = "/v1/sessions/playtest-session"
 
 
+def test_native_context_is_optional_non_null_and_closed_in_openapi():
+    app, _, _ = build_playtest()
+    schemas = app.openapi()["components"]["schemas"]
+    view = schemas["PlayerSessionView"]
+    assert "run_context" not in view["required"]
+    assert view["properties"]["run_context"] == {"$ref": "#/components/schemas/PublicNativeRunContext", "title": "Run Context"}
+    context = schemas["PublicNativeRunContext"]
+    assert context["additionalProperties"] is False
+    assert set(context["properties"]) == {"schema_version", "run_id", "player_character", "entry_world", "profile_ref", "objectives", "presentation", "resource_pressure_label"}
+
+
 def test_dynamic_suggestions_are_additive_and_deterministic_views_omit_them() -> None:
     deterministic = PublicActionAffordanceSet(
         mode=PublicActionMode.FREE_ACTIONS,

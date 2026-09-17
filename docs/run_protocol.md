@@ -23,8 +23,12 @@ wording is historical. S4 internal implementation was independently approved
 and published at `34dc752295ba270617e5d29020f3a0c0b133544e`. DF-001 remains
 deferred. The S5 plan was independently approved and published at `ff866d2fd40181e0bf27937d255d70ebd1ae1544`.
 S5 implementation is independently approved with DF-001 deferred and published
-at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 is the current documentation
-planning candidate; S6 implementation has not started and S7 remains later.
+at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published
+at `4365721`; separately authorized S6 implementation received `CHANGES_REQUIRED`
+for two Web findings. Focused re-review closed character selection and returned
+a second `CHANGES_REQUIRED` solely for automatic recovery's scenario/content
+binding. The corrected recovery candidate awaits focused independent re-review.
+S7 remains later.
 Phase 3.3 remains incomplete.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
@@ -80,10 +84,11 @@ is internal-only; no public route exists, the reserved public
 `RunService.bind_player_character(...)` command remains rejected, and the
 constructible lifecycle remains `pre_first_turn`.**
 
-## Current P3.3-S6 planning boundary
+## Current P3.3-S6 implementation boundary
 
 The [S6 public API, Demo, Web, projection and recovery plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
-is the current unapproved documentation candidate. It proposes an explicit
+was independently approved with DF-001 deferred and published at `4365721`.
+Its frozen candidate wording is historical. The implementation connects an explicit
 character -> profile/world -> permitted overrides/presentation -> native S4
 admission -> authoritative Session View -> S5 play -> reload/recovery -> authored
 Session ending journey. Existing legacy entry remains compatible. Discovery and
@@ -94,9 +99,11 @@ mechanics, catalogue, relationship or canon authority.
 The plan owns exact contracts, Demo adapters, Web uncertainty and GET-only
 recovery, dependency-derived paths, verification allocation and review tokens.
 [Public contract status](public_client_contract.md#proposed-p33-s6-native-public-extension)
-distinguishes the proposal from implemented behavior. S6 implementation has not
-started; next is one substantive independent plan review. Approval grants no
-implementation or Git writes. DF-001 remains deferred. No separate S5 closeout,
+describes the implemented candidate. The first `CHANGES_REQUIRED` covered two Web
+findings; focused re-review closed character selection but returned a second
+`CHANGES_REQUIRED` for automatic recovery's scenario/content binding. Next is
+focused re-review of that correction by the same independent reviewer. No candidate
+approval or Git writes are claimed. DF-001 remains deferred. No separate S5 closeout,
 new story/world content, production Provider, S7 continuity or Phase 3.4 state
 is included. Phase 3.3 remains incomplete and no release readiness is claimed.
 
@@ -353,7 +360,8 @@ independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544
 The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 is independently approved at `ff866d2`; its candidate-time wording is historical.
 S5 implementation is independently approved and published at `86c258e9`.
-S6 is a planning candidate, with implementation unauthorized; S7 remains later.
+S6 is an implemented public-flow candidate under its approved published plan;
+independent implementation review is next. S7 remains later.
 DF-001 remains deferred.
 
 P3.3-S5 owns deterministic application by
@@ -368,8 +376,8 @@ validated trusted protocol state to canonical context bytes or one exact
 deterministic structured representation fixed by that plan. It must not call a
 real Provider. Provider calls remain outside database transactions and locks.
 
-P3.3-S6 must receive its own bounded implementation plan and independent
-public-contract review before implementation. It alone owns any public API,
+P3.3-S6 received its bounded plan and independent public-contract approval at
+`4365721`; its separately authorized implementation is now a candidate. It owns public API,
 OpenAPI, Demo, Web, projection, recovery, or client representation of
 `Scarce`, `Fluid`, and `Generous`. S5 and S6 may only project from the exact
 numeric S2 value; neither may change, round, clamp, or replace it.
@@ -756,8 +764,9 @@ OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
 slice may change, round, clamp, or replace the numeric S2 value; each may only
 project from it. The approved S5 internal bands are Generous 0..30, Fluid
 35..65 and Scarce 70..100 on the S2 lattice. Published S5
-uses these bands only in trusted context. S6 public representation still requires
-its own approval, implementation and publication; internal labels do not activate it.
+uses these bands in trusted context. The S6 implementation candidate exposes
+the same exact numeric values and bands publicly, under its separately approved
+plan; implementation review and publication remain pending.
 
 Numeric resource pressure is an engine-owned world/difficulty input. A model
 may narrate confirmed effects supplied by later trusted mechanics/prompt
@@ -1124,8 +1133,8 @@ The implementation and migration `20260828_0006` subsequently received independe
 approval with DF-001 deferred and were published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4's plan was approved and published at `42411b2`; its separately authorized
 implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and independently approved
-implementation published at `86c258e9`. S6 is the current planning candidate;
-S6/S7 implementation remains unauthorized.
+implementation published at `86c258e9`. S6 plan is published at `4365721`;
+its implementation candidate awaits review. S7 remains unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -1465,6 +1474,272 @@ implementation gate. The token and candidate evidence above are historical, not
 an operative S6 gate. No separate closeout is due. DF-001 retains its documented
 process-local containment; no new finding is deferred. Guardrail impact: None.
 
+### P3.3-S6 implementation candidate evidence
+
+The approved S6 plan was published at
+`4365721abe2eeff9bf21cb766b5c43f28eab5d58`, parent
+`86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. Implementation began only after
+local `main`, HEAD and local `origin/main` matched that baseline at 0/0 with
+clean worktree/index and no conflicts, operations or locks; no fetch occurred.
+Frozen plan wording is historical. This is a separately authorized implementation
+candidate, not an approval, publication or Phase 3.3 completion.
+
+The delivered journey is explicit character selection/creation -> profile/world
+and optional overrides/presentation -> confirmation -> shared S4 native admission
+-> identity storage -> authoritative View -> public S5 actions -> fresh-service
+reload/replay and authored Session ending. Production and deterministic Demo
+support all three published defaults. Demo additionally proves an allowed
+override/presentation variation across independent processes and hash seeds.
+Web uses returned affordances and resources, locks ended actions, and preserves
+the exact version-1 recovery allowlist. Pending native entry is memory-only;
+reload before validated success and storage cannot recover that attempt.
+
+The public contract adds exactly options GET, native POST and optional
+omitted-not-null View context. Baseline OpenAPI comparison preserves all old
+paths, operation IDs, response status sets and component schemas except that
+optional View member. Closed DTOs and revalidated authority exclude internal
+binding, receipt, compiler, controller and hidden-state data. Corrupt native
+families cannot become legacy omission. Discovery/View are read-only and do not
+compile or render. Current ownership is checked in the existing View UoW.
+
+Demo adds only process-local representations of existing S3/S4 storage families.
+Its shared codecs, staged/trial maps and explicit writer capability preserve
+atomicity. AUTH-002 denial runs before protected work; native rendering is
+task-bound and single-use, outside gameplay locks/UoWs. Failure/cancellation,
+validated resume, committed replay and later independent use are covered.
+Ordinary valid actions need not follow the legacy script. The legacy golden
+trace and every historical component hash remain unchanged. Section 7's
+dependency-derived mechanical extensions are the legacy replay child's complete
+snapshot inventory and its parent's exact field-set assertion
+(`tests/e2e/support/demo_replay_child.py` and
+`tests/e2e/test_demo_cross_process_replay.py`); that replay suite owns verification.
+The two new maps are empty in legacy snapshots. The existing shared denial gate
+made an edit to `demo_authority.py` unnecessary.
+Broad regression also identified stale route/schema absence assertions in
+`tests/unit/test_player_character_api.py` and `tests/unit/test_run_repositories.py`.
+These dependency-derived mechanical extensions retain the old DTO/schema and
+repository boundaries while permitting exactly the approved S6 additions; the
+Player Character API and Run repository suites own their verification.
+
+External evidence directory:
+`C:\Users\dylanmonster\AppData\Local\Temp\deviation-protocol-s6-implementation-20260917-0bae04dac6a04caf9a16e6923dc5b8e6`.
+`candidate-manifest.json` binds the exact path inventory, complete per-file
+identities, all new-file patches and lexicographic aggregate patch. Raw logs,
+commands, exit statuses, source/dependency/environment identities and acceptance
+mapping are retained alongside it. Development failures and earlier focused
+passes are authoring evidence. Final-source applicability is recorded explicitly
+in `final-source-applicability.json`.
+
+- Broad canonical Offline: **2,730 passed, 385 skipped, one deselected, five
+  failed**. Four failures were stale inventory assertions; the fifth caught
+  infrastructure exception imports in the new application View helper. Those
+  imports were redundant with its existing ValueError boundary and were removed,
+  preserving safe corruption mapping and dependency direction. Final canonical
+  focused Offline reruns all five failures and the affected public/View/Demo
+  dependencies: **556 passed, 205 expected database skips, 2,360 deselected**,
+  exit 0 (`final-focused-offline.json` and its log).
+  The broad run is not represented as a passing final-source run.
+- Canonical MySQL: **332 passed, 16 deselected**, exit 0. The unchanged native
+  migration file's 48 cases are excluded before collection. All remaining S4/S5
+  runtime, admission/concurrency/rollback, public ASGI, lock-separation and
+  resource controls run against MySQL 8/asyncmy `deviation_protocol_test` only.
+  Final canonical focused MySQL after the View-helper correction passes
+  **130 tests, 266 deselected**, exit 0 (`final-focused-mysql.json` and its log).
+- Incoming-candidate Web: **293 passed, one existing opt-in Demo-presentation probe skipped**;
+  `npm run test:run`, `typecheck`, `lint` and `build` all exit 0. Rendered MSW
+  covers explicit setup through ending, exact retry bytes, tainted errors,
+  storage-only retry, stale generations, native context continuity and GET-only
+  restart/reload recovery. The skip is not browser evidence.
+- `compileall -q src tests alembic`, dependency consistency and linear Alembic
+  heads/history metadata pass through canonical verification. Head remains
+  `20260916_0007`. Online Alembic current/check is intentionally omitted because
+  its entry point is not TEST_DATABASE_URL-only; no new migration is applied.
+- `openapi-compatibility.json` compares actual baseline/current OpenAPI from
+  isolated imports. New native child ASGI journeys compare exact public trace
+  and complete detached storage across fresh processes; legacy cross-process
+  gameplay/replay remains covered. No HTTP listener or browser is used by the
+  native driver. Existing legacy loopback/script checks retain their scope.
+
+`s2-reuse-applicability.json` verifies the original S3 correction log, counter
+plugin, 5,624,910 resolver calls, source/tests, Python/Pydantic/dependencies,
+environment and exit status. Only
+`tests/unit/test_run_protocol_resolution.py::test_complete_direct_exhaustive_public_resolution_domain`
+is reused; all other S2 tests run. `migration-reuse-applicability.json` checks
+actual S4 broad evidence plus the later
+`s4-migration-disposal-correction-20260917/affected-migration-disposal` 91-case
+proof, including final migration/test bytes and unchanged native writer bodies.
+The older pre-correction migration evidence alone is not treated as final proof.
+Exact exclusions and reasons are retained in `mysql-selection.json`.
+
+The broad source snapshot predates five corrected paths: the new public View
+helper, the two mechanical inventory tests above, and Web `schemas.ts` /
+`client.test.ts`. Three failing regression cases proved that legacy nested
+character parsers stripped unknown fields; native context now rejects those
+fields at every nested character level without changing legacy parsing. The
+final full Web run supersedes its earlier 290-pass result. Final canonical
+focused Offline and MySQL runs verify the helper and its public admission,
+View, Demo and S5 gameplay dependencies at final code. Unchanged broad evidence
+remains applicable with these limits; no duplicate Full run or documentation-only
+runtime rerun is claimed.
+
+`database-before.json`, `database-after.json` and `database-final.json` have
+identical per-table counts and SHA-256 fingerprints, including the revision table. Authorized fixture
+mutations are restored; native fixture teardown verifies the shared lock is free.
+DF-001's documented globalization settings exist only in verification child
+processes, with parent settings unchanged. Its owner and post-playable
+reassessment milestone are unchanged; no additional finding is deferred.
+
+Automated integrated flow is demonstrated on public ASGI and rendered MSW
+surfaces. Browser evidence is omitted, not passed. No browser-verified usability,
+limited-trial or wider-release readiness is claimed. There are no real
+Provider/Live calls, dependency installations, production database operations,
+deployment, staging, commits or pushes. S1-S5 authority algorithms, SQL native
+writer/UoW/shared-lock topology, ORM, migrations, content, dependencies and
+recovery storage schema remain unchanged. Ending a Session does not complete
+its Run or detach its character; S7 continuity and Phase 3.4 state remain absent.
+
+#### S6 first bounded Web correction and focused re-review
+
+The independent review returned `CHANGES_REQUIRED` with two reproduced findings:
+
+1. Confirmed native identity was lost after admission storage failure -> safe
+   clear -> storage-only retry, and on manual reads of the same Session. A
+   legacy-shaped View could then load. Storage retry now reinstates the complete
+   retained Session/scenario/content/native-context association before releasing
+   the attempt. Same-Session manual reads preserve it; genuine replacements
+   clear the old association under existing operation-generation ownership.
+2. A late eligible-character GET could automatically select its first item after
+   switching to native mode. Completion now consults the current mode and keeps
+   the request's existing active-generation guard. Native entry still requires
+   explicit selection, with the existing explicit-creation exception; legacy
+   first-item selection remains unchanged.
+
+The incoming 42-path candidate was verified against its original manifest and
+complete patch before editing. External evidence and the byte-preserved incoming
+snapshot are in
+`C:\Users\dylanmonster\AppData\Local\Temp\deviation-s6-web-correction-20260917`.
+The reviewer's original three rendered cases fail against that incoming source
+(`incoming-review.log`, exit 1). Original independent reports are untouched.
+The same unmodified reviewer cases pass against the corrected source snapshot
+(`corrected-review.log`: three passed, exit 0).
+Production correction is confined to `web/src/App.tsx`; rendered regressions
+are added to existing App and recovery suites. The storage allowlist, memory-only
+pending entry, API, backend, Demo runtime, migrations, SQL UoWs, published plans,
+guardrails and DF-001 are unchanged.
+
+First-correction Web evidence uses installed dependencies and repository npm scripts
+with database/Provider/live environment variables removed. Vite's existing
+`deterministic-demo` mode disables env-file loading. No browser, network install,
+real Provider, database or Python broad suite ran in this correction task.
+
+- Targeted rendered corrections: **18 passed**, 80 excluded by the name filter.
+  Coverage includes missing/mismatched context, changed scenario/content, valid
+  storage recovery, same-Session manual reads, genuine native/legacy replacement,
+  late initial/refresh lists, obsolete client completion, explicit valid choice,
+  legacy behavior and explicit creation. Admission/storage/View ordering and
+  absence of gameplay on rejection are asserted.
+- Affected setup/client/App/recovery/action-loop/storage suites: **305 passed,
+  one existing opt-in probe skipped** (`affected.log`, exit 0).
+- Complete Web suite once after source stabilization: **311 passed, one existing
+  opt-in probe skipped** (`full-web.log`, exit 0). Typecheck, lint and build each
+  exit 0. Counts overlap and are not added together. This replaces the incoming
+  293-pass Web acceptance result; it is not browser evidence.
+
+All commands, logs, exit codes and source identities are external. Historical
+failures remain recorded: the incoming broad Offline five-failure result and
+earlier nested-parser failures above are unchanged history. Correction authoring
+also encountered a Python console-encoding error, a short-TEMP-path Vite setup
+resolution failure, and one test fixture using a non-retryable generic error
+instead of the intended network error. These are retained in the external logs;
+the corrected fixture preserves the assertions. None is attributed to DF-001.
+
+Accepted backend evidence above remains applicable: backend and Python tests,
+Demo, migrations, dependencies and verification scripts are byte-identical to
+the incoming snapshot. The original broad/focused applicability limits and S2 /
+migration reuse remain in force. No new backend pass count or stronger guarantee
+is claimed, and no Python/MySQL/S2/migration matrix is rerun.
+
+The external `candidate-manifest.json` and `complete.patch` identify the complete
+corrected candidate; `correction-delta.json` and `correction.patch` identify the
+exact incoming-to-corrected change. `unchanged-paths.json` verifies unaffected
+paths, and `handoff.md` supplies the focused review scope and evidence map.
+That candidate remained `CHANGES_REQUIRED` pending focused re-review. The next
+subsection records its result and the replacement recovery correction. No
+approval, staging, commit, push or extra post-commit audit is claimed or due.
+Guardrail impact: None; existing AUTH-002, API-001, DB-001/002, MODEL, STATE and
+PLAY constraints apply.
+
+#### S6 automatic-recovery association correction
+
+The focused independent re-review returned a second `CHANGES_REQUIRED`: character
+selection was closed, but direct admission success -> storage failure -> repaired
+storage -> storage-only retry -> automatic View recovery still accepted a different
+scenario or content version and replaced the confirmed identity with that View.
+Earlier applicable conclusions, including safe-clear retry, same-Session reads,
+genuine replacement and character selection, remain preserved. This correction
+does not claim independent closure of the remaining finding.
+
+`App.tsx` now shares the pure `assertViewAssociation` boundary between automatic
+recovery and `commitLoadedSession`. It checks the requested/confirmed Session,
+scenario, content version and complete native context before either path replaces
+the association or activates gameplay. The existing public schema also checks
+internal View consistency. Validation uses the retained admission expectations;
+the received View cannot establish its own comparison identity. Automatic recovery
+keeps its generation checks and validation -> binding -> storage -> current-generation
+check -> gameplay ordering; it does not call unrelated commit/storage effects to
+reuse validation. Bounded inspection confirmed that manual reads, entered-Session
+retry and action/status refresh reach the same commit validation; stale marking
+only changes the existing View's stale flag. No character handler changed.
+
+The incoming 42-path candidate, 270,520-byte complete patch with SHA-256
+`58d64cbb940753eec368b57ce5b082226577b7c350746738208149b79d117236`, was verified
+and snapshotted before edits. New external snapshots, logs, commands, exit statuses,
+source hashes, complete/delta manifests and patches are in
+`C:\Users\dylanmonster\AppData\Local\Temp\deviation-s6-auto-recovery-correction-20260917`.
+Original reports in the prior correction and focused-review directories are
+untouched. The latest reviewer's unchanged three cases reproduce **two failures
+and one matching pass** against the incoming snapshot (exit 1), and all **three
+pass** against the corrected snapshot (exit 0). Both negative fixtures explicitly
+pass `playerSessionViewSchema`; the content case changes both content-version
+fields consistently.
+
+New rendered regressions cover direct recovery with missing/mismatched context,
+changed Session/scenario/content and matching View, plus abort-insensitive late
+completion after client replacement/unmount. They assert one admission POST,
+one automatic View GET after successful storage, no gameplay on rejection,
+GET-only repeated rejection followed by matching recovery (the admission binding
+survives), and no stale-generation storage/UI/binding mutation. Existing safe-clear
+and manual-read content fixtures now also keep both content fields consistent and
+assert schema validity. All earlier character-selection regressions remain intact.
+
+Final replacement Web evidence uses installed dependencies, the same sanitized
+runner and repository npm scripts, with Vite env-file loading disabled:
+
+- Targeted correction regressions: **26 passed**, 80 filtered out.
+- Affected setup/client/App/recovery/action-loop/storage suites: **313 passed,
+  one existing opt-in probe skipped**.
+- Complete Web suite, once after code stabilization: **319 passed, one existing
+  opt-in probe skipped**. Typecheck, lint and build each exit 0.
+
+Counts overlap and are not added; these replace the first correction's Web
+acceptance evidence. Test authoring initially asserted a Run ID absent from the
+UI, then used an objective outside the schema's five-point increments; a typecheck
+also caught unchecked mock-call indexing. Their failing logs remain external.
+Assertions were retained with a schema-valid visible objective and safe indexing.
+These failures and all earlier verification failures remain history, with no
+attribution to DF-001.
+
+Backend/Demo/Python tests, migrations, SQL UoWs, dependencies, verification scripts,
+published plans, guardrails and DF-001 are byte-identical. Accepted backend evidence
+and its original broad/focused applicability limits remain valid; no Python broad
+suite, MySQL, exhaustive S2 or migration reruns or overlapping pass counts are
+added. No browser, database, real Provider, network install or Git write occurred.
+
+Disposition remains `CHANGES_REQUIRED`; next is the previous independent reviewer's
+focused re-review of this binding correction, direct dependencies and replacement
+Web evidence under the existing operative implementation token. No new approval
+stage or post-commit audit is introduced. Guardrail impact: None.
+
 ### Extreme — Silent Hunting Ground
 
 - Extreme scarcity.
@@ -1586,7 +1861,7 @@ Public/client representation remains S6-owned.
   and consumes no seed; later-world seed behavior remains S7 work.
 - The published S2 resolver produces only exact numeric `resource_pressure`;
   categorical mechanics/prompt projection is published in S5 and public/client
-  representation remains S6 work.
+  representation is implemented in the S6 candidate.
 - No setting depends on unordered collection iteration, wall-clock time, or a
   Provider-selected random value.
 - Entry-world identity remains frozen, and later-world selection is
@@ -1652,18 +1927,18 @@ Phase 3.3 is acceptable only when:
   its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
   independently approved with DF-001 deferred. S4 internal implementation is
   independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
-  S6 planning is current and S6/S7 runtime work remains later.
+  S6 public integration is an implementation candidate; S7 remains later.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
-  S6 proposes the same bands for public output, with exact numeric values preserved.
+  S6 implements the same bands for public output, with exact numeric values preserved.
 - P3.3-S6 owns every public API, OpenAPI, Demo, Web, projection, recovery, and
   client representation of those labels; it may not replace the numeric S2
   value.
 - Compatibility and migration policy for future protocol versions.
-- S6 world/profile discovery is proposed in the dedicated plan; later unlock policy remains S7.
+- S6 world/profile discovery is implemented under its published plan; later unlock policy remains S7.
 - Public entry-world catalogue exposure (S6; no expansion in this slice); S4's bounded internal
   catalogue and explicit world/scenario mapping are implemented and published
-  at `34dc752`; public activation remains deferred.
+  at `34dc752`; S6 public activation is an implementation candidate.
 - Later-world weighting algorithm and general anti-repeat rules.
 - Progression constraints and priority-injection rules for required story
   progression and major hidden settings; important-NPC integration remains

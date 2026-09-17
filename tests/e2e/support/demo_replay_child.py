@@ -14,6 +14,7 @@ from pathlib import Path
 import socket
 import sys
 import threading
+import warnings
 from datetime import datetime, timedelta, timezone
 from typing import Any, BinaryIO, TypeVar
 
@@ -26,7 +27,11 @@ SOURCE_ROOT = REPOSITORY_ROOT / "src"
 if str(SOURCE_ROOT) not in sys.path:
     sys.path.insert(0, str(SOURCE_ROOT))
 
-from deviation_protocol.api.demo_composition import build_demo_runtime  # noqa: E402
+with warnings.catch_warnings():
+    # S6's native import adds the unchanged S2 carrier; preserve the legacy
+    # child diagnostic contract without masking any runtime warning/error.
+    warnings.filterwarnings("ignore", message='Field name "schema" in "RunProtocolResolutionInputV1" shadows an attribute', category=UserWarning)
+    from deviation_protocol.api.demo_composition import build_demo_runtime  # noqa: E402
 from deviation_protocol.api.main import create_app  # noqa: E402
 from deviation_protocol.application.narrative_jobs import NarrativeJob  # noqa: E402
 from deviation_protocol.application.narrative_models import (  # noqa: E402
@@ -113,6 +118,8 @@ EXPECTED_DATACLASS_FIELDS = {
         "player_character_mutation_receipts",
         "run_revisions",
         "run_current",
+        "run_protocol_bindings",
+        "run_entry_world_bindings",
         "run_participations",
         "run_creation_receipts",
         "run_mutation_receipts",
@@ -439,6 +446,8 @@ EXPECTED_PRIVATE_COMPONENTS = frozenset(
         "player_character_mutation_receipts",
         "run_revisions",
         "run_current",
+        "run_protocol_bindings",
+        "run_entry_world_bindings",
         "run_participations",
         "run_creation_receipts",
         "run_mutation_receipts",
@@ -877,7 +886,7 @@ def _complete_raw_private_representation(runtime: Any) -> dict[str, Any]:
         DemoStoreSnapshot
     ]:
         raise RuntimeError("private Demo store snapshot schema differs")
-    orchestrator = runtime.services.turn_orchestrator
+    orchestrator = runtime.services.session_service
 
     sessions = [
         {
@@ -977,7 +986,11 @@ def _complete_raw_private_representation(runtime: Any) -> dict[str, Any]:
             }
         )
 
+    if snapshot.run_protocol_bindings or snapshot.run_entry_world_bindings:
+        raise RuntimeError("legacy replay unexpectedly contains native bindings")
     representation = {
+        "run_protocol_bindings": [],
+        "run_entry_world_bindings": [],
         "sessions": sessions,
         "snapshots": snapshots,
         "creation_keys": creation_keys,
@@ -1538,6 +1551,12 @@ def _sha256_private_json(value: Any) -> str:
     ).hexdigest()
 
 
+# S6 adds two empty native maps. Every historical component digest stays exact.
+for _family_digests in (EXPECTED_RAW_PRIVATE_COMPONENT_DIGESTS, EXPECTED_CALLER_EQUIVALENCE_COMPONENT_DIGESTS):
+    for _components in _family_digests.values():
+        _components.update({name: "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945" for name in ("run_protocol_bindings", "run_entry_world_bindings")})
+
+
 def _private_component_digests(
     representation: dict[str, Any],
 ) -> dict[str, str]:
@@ -1980,7 +1999,7 @@ async def _run(args: argparse.Namespace, trace_stream: BinaryIO, control_stream:
             store=store,
             generators=generators,
         )
-        provider = runtime.services.turn_orchestrator._guard()
+        provider = runtime.services.turn_orchestrator._DemoNarrativeDispatcher__legacy._guard()
         if not isinstance(provider, CanonicalDemoProviderGuard):
             raise RuntimeError("Demo orchestrator did not install its private Provider guard")
         app = create_app(services=runtime.services)
@@ -2079,6 +2098,8 @@ def _parse_args() -> argparse.Namespace:
             "player_character_mutation_receipt",
             "run_revision",
             "run_current",
+        "run_protocol_bindings",
+        "run_entry_world_bindings",
             "run_participation",
             "run_creation_receipt",
             "run_mutation_receipt",

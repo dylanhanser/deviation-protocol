@@ -117,7 +117,7 @@ def test_s3_v33():
     public = {name for name in vars(SqlAlchemyRunProtocolBindingRepository) if not name.startswith("_")}
     assert public == {"get_classified", "get_classified_for_update", "add_native"}
     schema = main.create_app().openapi()
-    assert all("protocol-binding" not in path and "native" not in path for path in schema["paths"])
+    assert all("protocol-binding" not in path and ("native" not in path or path == "/v1/runs/native") for path in schema["paths"])
     assert all("NativeRunProtocolBinding" not in name for name in schema["components"]["schemas"])
     test_run_composition_activates_only_authorized_player_character_routes()
 

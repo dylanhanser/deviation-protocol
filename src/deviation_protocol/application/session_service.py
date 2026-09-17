@@ -561,6 +561,10 @@ class NarrativeRequestStatusResult(BaseModel):
         return self
 
 
+from deviation_protocol.application.public_run_protocol import PublicNativeRunContext, read_native_context
+from pydantic.json_schema import SkipJsonSchema
+
+
 class PlayerSessionView(BaseModel):
     """Reconnect-safe aggregate built only from validated player projections."""
 
@@ -579,6 +583,7 @@ class PlayerSessionView(BaseModel):
         Annotated[str, Field(strict=True, min_length=1, max_length=10_000)], ...
     ] = Field(default=(), max_length=MAX_VIEW_RECENT_NARRATIVES)
     ending_id: str | None = None
+    run_context: PublicNativeRunContext | SkipJsonSchema[None] = None
 
     @model_validator(mode="after")
     def validate_view_shape(self) -> PlayerSessionView:
@@ -617,6 +622,8 @@ class PlayerSessionView(BaseModel):
         # The route excludes other None-valued presentation details for backward
         # compatibility, but this public lifecycle discriminator is always present.
         data["ending_status"] = self.ending_status
+        if self.run_context is None:
+            data.pop("run_context", None)
         return data
 
 
@@ -644,8 +651,12 @@ class SessionService:
     narrative_terminal_uncertainty_probe: (
         Callable[[str, str], Awaitable[bool]] | None
     ) = None
+    native_view_coordinator: Any = None
+    native_controller_resolver: Any = None
 
     def __post_init__(self) -> None:
+        if (self.native_view_coordinator is None) != (self.native_controller_resolver is None):
+            raise ValueError("native View requires controller and coordinator")
         if (
             self.scenario_catalog is not None
             and self.scenario_catalog.content_catalog != self.catalog
@@ -1116,6 +1127,10 @@ class SessionService:
                 definition = self._scenario_definition(runtime.scenario_id)
                 if definition is None:  # pragma: no cover - helper raises
                     raise SnapshotInvalidError(session_id)
+                run_context = None
+                if self.native_view_coordinator is not None:
+                    run_context = await read_native_context(uow, principal, persisted, state, definition,
+                        self.native_view_coordinator, self.native_controller_resolver)
                 character = self.catalog.character(
                     state.player.character_definition_id
                 )
@@ -1162,6 +1177,7 @@ class SessionService:
                 session_id, limit=MAX_VIEW_RECENT_NARRATIVES
             )
             return PlayerSessionView(
+                run_context=run_context,
                 metadata=self._metadata(persisted),
                 narrative_frame=frame,
                 player_state=projected,
