@@ -47,6 +47,8 @@ from deviation_protocol.domain.run import (
 if TYPE_CHECKING:
     from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
     from deviation_protocol.domain.run_protocol_binding import (
+        NativeRunTerminatedV1,
+        NativeRunExitEvidenceV1,
         LegacyRunCompatibilityV1,
         NativeRunProtocolBindingV1,
         NativeRunAdmissionV1,
@@ -408,13 +410,13 @@ class RunProtocolBindingRepository(ABC):
     @abstractmethod
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
         raise NotImplementedError
 
     @abstractmethod
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
         raise NotImplementedError
 
 
@@ -534,7 +536,7 @@ class RunMutationReceiptRepository(ABC):
 
     @abstractmethod
     async def add(
-        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime
+        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime, exit_evidence: NativeRunExitEvidenceV1 | None = None
     ) -> None:
         raise NotImplementedError
 

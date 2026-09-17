@@ -5,6 +5,30 @@ from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+
+class NativeRunExitRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    expected_run_state_version: int = Field(ge=1, le=2**63 - 1)
+    expected_session_state_version: int = Field(ge=0, le=2**63 - 1)
+
+
+class NativeRunStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    schema_version: Literal["native-run-status/v1"]
+    session_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    run_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    run_state_version: int = Field(ge=1, le=2**63 - 1)
+    session_state_version: int = Field(ge=0, le=2**63 - 1)
+    lifecycle_status: Literal["active", "terminated"]
+    can_exit: bool
+
+    @model_validator(mode="after")
+    def _state(self):
+        if (self.run_state_version != (3 if self.lifecycle_status == "active" else 4)
+                or self.lifecycle_status == "terminated" and self.can_exit):
+            raise ValueError("invalid native lifecycle projection")
+        return self
+
 from deviation_protocol.application.turn_response import TurnResponse
 from deviation_protocol.application.session_service import (
     NarrativeRequestStatusResult,

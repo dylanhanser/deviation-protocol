@@ -40,6 +40,7 @@ from deviation_protocol.domain.run import (
 
 
 CREATE_RUN_RESULT_SCHEMA_VERSION = "run.create-result/v1"
+TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-native-result/v1"
 ATTACH_SESSION_RESULT_SCHEMA_VERSION = "run.attach-session-result/v1"
 BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION = (
     "run.bind-player-character-result/v1"
@@ -56,6 +57,7 @@ class RunOperationNamespace(StrEnum):
     CREATE_V1 = "run.create/v1"
     ATTACH_SESSION_V1 = "run.attach-session/v1"
     BIND_PLAYER_CHARACTER_V1 = "run.bind-player-character/v1"
+    TERMINATE_NATIVE_V1 = "run.terminate-native/v1"
 
 
 class RunOperationFingerprint(_StrictFrozenModel):
@@ -213,7 +215,13 @@ class RunSafeResult(_StrictFrozenModel):
 
     @model_validator(mode="after")
     def validate_result_shape(self) -> RunSafeResult:
-        if self.result_schema_version == CREATE_RUN_RESULT_SCHEMA_VERSION:
+        if self.result_schema_version == TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+            if (self.lifecycle_status is not RunLifecycleStatus.TERMINATED
+                    or self.resulting_state_version.value != 4
+                    or self.participation_reference is not None
+                    or self.applicable_character_reference is not None):
+                raise ValueError("termination result requires exact terminal revision four")
+        elif self.result_schema_version == CREATE_RUN_RESULT_SCHEMA_VERSION:
             if (
                 self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN
                 or self.resulting_state_version.value != 1
@@ -272,6 +280,10 @@ class StoredRunSuccessReceipt(_StrictFrozenModel):
     @model_validator(mode="after")
     def validate_receipt_bindings(self) -> StoredRunSuccessReceipt:
         expected = {
+            RunMutationKind.TERMINATE_NATIVE_RUN: (
+                RunOperationNamespace.TERMINATE_NATIVE_V1,
+                TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+            ),
             RunMutationKind.CREATE: (
                 RunOperationNamespace.CREATE_V1,
                 CREATE_RUN_RESULT_SCHEMA_VERSION,

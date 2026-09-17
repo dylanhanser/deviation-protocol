@@ -63,9 +63,16 @@ local deterministic Demo browser journey demonstrated explicit setup, one native
 admission, ten UI actions and the version-10 FAILED ending 记录成为现实, with
 bounded same-tab/restart recovery evidence. This is not wider-release readiness.
 The [S7-1 post-ending Run exit plan](docs/phase_3_3_s7_1_post_ending_run_exit_plan.md)
-is the next unapproved documentation candidate; it includes the remaining S7
-dependency allocation. One independent plan review is next. DF-001 and the
-observed discovery-recovery DF-002 are deferred. Phase 3.3 remains incomplete.
+was independently approved with deferred findings and published at
+`9fab18d8de4ba05000e38ee37fa6a2e8da17940a`. Its frozen candidate-time wording
+is historical. The S7-1 implementation review returned `CHANGES_REQUIRED` with
+one nullable terminal-CHECK finding. Its bounded correction is a local candidate
+awaiting focused independent re-review by the previous reviewer. The implementation
+adds explicit native post-ending termination and a separately confirmed fresh journey with the same
+eligible character; [behavior and evidence](docs/run_protocol.md#p33-s7-1-implementation-candidate-evidence)
+define its bounded scope. DF-001 and DF-002 remain deferred, with DF-002
+reassessed at return-to-setup acceptance. S7-2 and later continuity remain
+unauthorized and unimplemented. Phase 3.3 remains incomplete.
 See [S6 implementation and evidence](docs/run_protocol.md#p33-s6-implementation-candidate-evidence).
 
 ## Phase 3.3 current status and ordered priority
@@ -213,8 +220,10 @@ Its internal integration and verification are recorded in the
 [S5 evidence](docs/run_protocol.md#p33-s5-implementation-candidate-evidence).
 S6 implementation is independently approved and published at `2f144599`; its
 bounded local browser evidence is recorded with the S6 evidence below. S7-1 is
-an unapproved post-ending Run exit plan candidate, with later continuity work
-allocated in that same document. No separate S6 closeout or decomposition gate is due.
+a local post-ending Run exit implementation candidate under the approved plan
+published at `9fab18d`; one independent implementation review is next. Later
+continuity remains allocated in the frozen plan and unauthorized.
+No separate S6 closeout or decomposition gate is due.
 Phase 3.4 remains later. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
@@ -735,7 +744,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation independently approved and published at `2f144599`; two CHANGES_REQUIRED reviews preserved as history; representative local deterministic Demo browser journey demonstrated with bounded recovery limitations; DF-001/DF-002 deferred; S7-1 post-ending Run exit plan candidate awaits one independent review; later S7 continuity allocated, unimplemented; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
+| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation independently approved and published at `2f144599`; two CHANGES_REQUIRED reviews preserved as history; representative local deterministic Demo browser journey demonstrated with bounded recovery limitations; DF-001/DF-002 deferred; S7-1 plan approved and published at `9fab18d`, local corrected implementation candidate with automated public-play evidence awaits focused re-review after one nullable terminal-CHECK CHANGES_REQUIRED finding; later S7 continuity allocated, unimplemented; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1267,8 +1276,10 @@ S6 plan is independently approved and published at `4365721`; S6 implementation
 is independently approved and published at `2f144599af5977e871c7a3466c52896b6a36510c`.
 Both earlier `CHANGES_REQUIRED` reviews remain history. Representative local
 Demo browser evidence supports the bounded journey, not wider-release readiness.
-The S7-1 post-ending Run exit plan and concise remaining allocation await one
-independent plan review; no S7 implementation is authorized. DF-001 and DF-002
+The S7-1 plan is independently approved and published at `9fab18d`; its local
+implementation review returned `CHANGES_REQUIRED` with one nullable terminal-CHECK
+finding; the corrected candidate awaits focused independent re-review.
+S7-2 and later remain unauthorized. DF-001 and reassessed DF-002
 remain deferred. Phase 3.3 remains incomplete.**
 
 The authoritative readiness reconstruction completed with classification that

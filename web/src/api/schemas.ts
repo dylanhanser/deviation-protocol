@@ -6,6 +6,21 @@ const safeId128Schema = z.string().min(1).max(128).regex(safeIdPattern);
 const positiveSafeIntegerSchema = z.number().int().positive().safe();
 const plainStringSchema = z.string();
 const nonNegativeIntegerSchema = z.number().int().nonnegative();
+export const nativeRunExitRequestSchema = z.object({
+  expected_run_state_version: positiveSafeIntegerSchema,
+  expected_session_state_version: nonNegativeIntegerSchema.safe(),
+}).strict();
+export const nativeRunStatusSchema = z.object({
+  schema_version: z.literal("native-run-status/v1"),
+  session_id: safeId64Schema,
+  run_id: safeId128Schema,
+  run_state_version: positiveSafeIntegerSchema,
+  session_state_version: nonNegativeIntegerSchema.safe(),
+  lifecycle_status: z.enum(["active", "terminated"]),
+  can_exit: z.boolean(),
+}).strict().refine((s) => s.lifecycle_status === "active"
+  ? s.run_state_version === 3 : s.run_state_version === 4 && !s.can_exit);
+export type NativeRunStatus = z.infer<typeof nativeRunStatusSchema>;
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
 function unicodeCodePointLength(value: string): number {

@@ -31,7 +31,7 @@ pytestmark = pytest.mark.integration
 LOCK = "deviation_protocol:p33:s3:run_protocol_bindings:ddl_write:v1"
 REFUSAL = "Refusing to downgrade P3.3-S3: native Run Protocol binding data exists; recovery must be forward-only"
 HEAD = "20260828_0006"  # Historical S3 migration target, not current repository head.
-CURRENT_HEAD = "20260916_0007"
+CURRENT_HEAD = "20260917_0008"
 BASE = "20260729_0005"
 TABLE = "run_protocol_bindings"
 SCRIPT = ScriptDirectory.from_config(Config(str(Path(__file__).parents[2] / "alembic.ini")))
@@ -198,7 +198,7 @@ async def s3db(mysql_engine, request):
         assert str(await connection.scalar(sa.text("SELECT VERSION()"))).startswith("8.")
         assert await connection.scalar(sa.text("SELECT DATABASE()")) == "deviation_protocol_test"
         revision = await connection.scalar(sa.text("SELECT version_num FROM alembic_version"))
-        assert revision in (BASE, HEAD, CURRENT_HEAD)
+        assert revision in (BASE, HEAD, "20260916_0007", CURRENT_HEAD)
         await connection.rollback()
         if revision != CURRENT_HEAD:
             await _schema_target(connection, CURRENT_HEAD)

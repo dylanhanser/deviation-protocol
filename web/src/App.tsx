@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
 import { publicApiClient, type PublicApiClient } from "./api/client";
+import { assertRunStatus, freezeRunExit, type FrozenRunExit } from "./runExit";
+import type { NativeRunStatus } from "./api/schemas";
 import { ApiClientError, formatApiClientError } from "./api/errors";
 import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPresentation, type FrozenNativeEntry } from "./runSetup";
 import { objectiveNames, type RunEntryOptions, type NativeRunEntryResponse, type PublicNativeRunContext } from "./api/schemas";
@@ -773,6 +775,12 @@ export default function App({
     );
   const [manualSessionId, setManualSessionId] = useState("");
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
+  const [runStatus, setRunStatus] = useState<NativeRunStatus | null>(null);
+  const [exitConfirm, setExitConfirm] = useState(false);
+  const [exitAttempt, setExitAttempt] = useState<FrozenRunExit | null>(null);
+  const exitAttemptRef = useRef<FrozenRunExit | null>(null);
+  const [exitError, setExitError] = useState<string | null>(null);
+  const [exitClearFailed, setExitClearFailed] = useState(false);
   const [committedActionResponse, setCommittedActionResponse] =
     useState<ActionResponse | null>(null);
   const [createdSessionWithoutView, setCreatedSessionWithoutView] = useState<
@@ -830,6 +838,8 @@ export default function App({
   }, []);
 
   const clearSessionUiState = useCallback(() => {
+    setRunStatus(null); setExitConfirm(false); setExitAttempt(null); exitAttemptRef.current = null;
+    setExitError(null); setExitClearFailed(false);
     loadedSessionRef.current = null;
     setLoadedSession(null);
     setCommittedActionResponse(null);
@@ -837,7 +847,7 @@ export default function App({
     setManualSessionId("");
     setOperationError(null);
     setRecoveryInterruption(null);
-  }, [setManualSessionId]);
+  }, [setManualSessionId, setRunStatus, setExitConfirm, setExitAttempt, setExitError, setExitClearFailed]);
 
   const enterRecoveryStorageFailure = useCallback(
     (failure: SessionRecoveryStorageFailure) => {
@@ -990,6 +1000,8 @@ export default function App({
 
   useEffect(() => {
     if (previousClientRef.current !== client) {
+      setRunStatus(null); setExitConfirm(false);
+      setExitError(null); setExitClearFailed(false);
       nativeExpected.current = null;
       previousCatalogue.current = null;
       setRunOptions(null); setProfileId(""); setWorldId(""); setOverrides({}); setEntryMode(null);
@@ -1018,6 +1030,28 @@ export default function App({
       previousClientRef.current = client;
     }
   }, [client, invalidateForegroundOperation, replaceMutationAttempt]);
+
+  useEffect(() => {
+    const current = loadedSession;
+    const controller = new AbortController();
+    let active = true;
+    const synchronize = async () => {
+      await Promise.resolve();
+      if (!active) return;
+      setRunStatus(null); setExitConfirm(false);
+      if (current?.view.run_context && current.view.scenario_status === "ENDED" && current.stale === null) {
+        const status = await client.getNativeRunStatus(current.sessionId, controller.signal);
+        if (!active || latestClient.current !== client || loadedSessionRef.current !== current) return;
+        assertRunStatus(current.view, status);
+        setRunStatus(status); setExitError(null);
+        if (status.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current = null;}
+      }
+    };
+    void synchronize().catch((error: unknown) => {
+      if (active && latestClient.current === client) setExitError(formatApiClientError(error));
+    });
+    return () => {active = false; controller.abort();};
+  }, [client, loadedSession]);
 
   useEffect(() => {
     return () => {
@@ -2032,6 +2066,72 @@ export default function App({
     );
   }
 
+  async function handleRunExit(retry = false) {
+    const current = loadedSessionRef.current;
+    if (!current || current.stale || exitClearFailed || foregroundOperationRef.current) return;
+    let attempt = exitAttemptRef.current;
+    if (!retry) {
+      if (attempt || !exitConfirm || !runStatus) return;
+      attempt = freezeRunExit(current.view, runStatus, idempotencyKeyFactory());
+      exitAttemptRef.current = attempt; setExitAttempt(attempt); setExitConfirm(false);
+    }
+    if (!attempt || attempt.sessionId !== current.sessionId || attempt.runId !== current.view.run_context?.run_id) return;
+    const operation = beginForegroundOperation("submitting", {clearSession:false});
+    if (!operation) return;
+    setExitError(null);
+    try {
+      const status = await client.exitNativeRun(attempt, operation.controller.signal);
+      if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
+      assertRunStatus(current.view, status);
+      setRunStatus(status); setExitAttempt(null); exitAttemptRef.current = null;
+    } catch (error) {
+      if (isCurrentOperation(operation)) {
+        setExitError(formatApiClientError(error));
+        // Retain the exact path/body/key even for a known rejection after an
+        // earlier uncertain dispatch. Reconciliation is always GET-only.
+      }
+    } finally {finishForegroundOperation(operation);}
+  }
+
+  async function reconcileRunExit() {
+    const current = loadedSessionRef.current;
+    if (!current || foregroundOperationRef.current || exitClearFailed) return;
+    const operation = beginForegroundOperation("reading", {clearSession:false});
+    if (!operation) return;
+    setRunStatus(null);
+    try {
+      const view = await client.getSessionView(current.sessionId, operation.controller.signal);
+      if (!isCurrentOperation(operation)) return;
+      assertViewAssociation(current.sessionId, view, nativeExpected.current);
+      // bind to the complete previously observed native context as well.
+      assertNativeView(view, current.view.run_context);
+      const status = await client.getNativeRunStatus(current.sessionId, operation.controller.signal);
+      if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
+      assertRunStatus(view, status);
+      commitLoadedSession(current.sessionId, view, null);
+      setRunStatus(status); setExitError(null);
+      if (status.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current = null;}
+    } catch (error) {
+      if (isCurrentOperation(operation)) setExitError(formatApiClientError(error));
+    } finally {finishForegroundOperation(operation);}
+  }
+
+  function returnToSetup() {
+    if (runStatus?.lifecycle_status !== "terminated" || foregroundOperationRef.current || !loadedSessionRef.current) return;
+    assertRunStatus(loadedSessionRef.current.view, runStatus);
+    const cleared = clearSessionRecoveryRecord();
+    if (!cleared.ok) {setExitClearFailed(true); return;}
+    invalidateForegroundOperation();
+    recoveryRecordRef.current = null; setRecoveryRecord(null); nativeExpected.current = null;
+    clearSessionUiState();
+    setEntryMode("native"); entryModeRef.current = "native";
+    setSelectedPlayerCharacterId(""); setCreatedPlayerCharacter(null);
+    setProfileId(""); setWorldId(""); setOverrides({}); setRunPresentation({...proposedPresentation});
+    choices.current = {profileId:"", worldId:"", overrides:{}}; previousCatalogue.current = null;
+    setEligibleCharacters(null); setEligibleError(null); setEligibleRefreshAttempt((n) => n + 1);
+    setRunOptions(null); setOptionsError(null); setOptionsRefresh((n) => n + 1);
+  }
+
   const operationStatus =
     recoveryStorageFailure !== null
       ? "sessionStorage 处于安全锁定状态；不能创建、读取或提交行动。"
@@ -2072,6 +2172,7 @@ export default function App({
   const isDeterministicDemo =
     import.meta.env.VITE_APP_MODE === "deterministic-demo";
   const prePlayControlsDisabled =
+    exitAttempt !== null || exitClearFailed ||
     foregroundOperation !== null ||
     mutationAttempt !== null ||
     recoveryInterruption !== null ||
@@ -2308,6 +2409,7 @@ export default function App({
           <fieldset
             disabled={
               foregroundOperation !== null ||
+              exitAttempt !== null || exitClearFailed ||
               mutationAttempt !== null ||
               recoveryInterruption !== null ||
               recoveryStorageFailure !== null
@@ -2326,6 +2428,7 @@ export default function App({
               type="submit"
               disabled={
                 foregroundOperation !== null ||
+                exitAttempt !== null || exitClearFailed ||
                 mutationAttempt !== null ||
                 recoveryInterruption !== null ||
                 recoveryStorageFailure !== null ||
@@ -2360,7 +2463,7 @@ export default function App({
         {recoveryStorageFailure === null &&
         recoveryInterruption === null &&
         recoveryRecord !== null ? (
-          <button type="button" onClick={handleExplicitSessionClear}>
+          <button type="button" disabled={exitAttempt !== null || exitClearFailed} onClick={handleExplicitSessionClear}>
             清除本标签页 Session
           </button>
         ) : null}
@@ -2417,6 +2520,32 @@ export default function App({
           </button>
         </section>
       )}
+
+      {loadedSession?.view.run_context && loadedSession.view.scenario_status === "ENDED" ? (
+        <section className="panel" aria-label="旅程状态">
+          {runStatus?.lifecycle_status === "terminated" ? <>
+            <p>本次旅程已永久结束。结局与历史仍可阅读。</p>
+            {exitClearFailed ? <p role="alert">恢复记录清除失败；请重试。清除成功前不能进入新旅程。</p> : null}
+            <button type="button" disabled={foregroundOperation !== null} onClick={returnToSetup}>
+              {exitClearFailed ? "重试清除并返回设置" : "返回设置"}
+            </button>
+          </> : <>
+            <button type="button" disabled={!runStatus?.can_exit || exitAttempt !== null || foregroundOperation !== null || loadedSession.stale !== null}
+              onClick={() => setExitConfirm(true)}>结束本次旅程</button>
+            {exitConfirm ? <div role="dialog" aria-label="确认结束旅程">
+              <p>本次旅程将永久结束，结局与历史保留。再次进入会创建新的旅程，不是继续当前旅程。</p>
+              <button type="button" onClick={() => void handleRunExit()}>确认永久结束</button>
+              <button type="button" onClick={() => setExitConfirm(false)}>取消结束</button>
+            </div> : null}
+            {exitAttempt ? <>
+              <p>结束请求尚未确认。可读取旅程状态，或手动重试原请求。</p>
+              <button type="button" disabled={foregroundOperation !== null} onClick={() => void handleRunExit(true)}>重试原结束请求</button>
+            </> : null}
+          </>}
+          {exitError ? <p role="alert">{exitError}</p> : null}
+          <button type="button" disabled={foregroundOperation !== null || exitClearFailed} onClick={() => void reconcileRunExit()}>读取旅程状态</button>
+        </section>
+      ) : null}
 
       {recoveryStorageFailure !== null || loadedSession === null ? null : (
         <ViewSummary loaded={loadedSession} />

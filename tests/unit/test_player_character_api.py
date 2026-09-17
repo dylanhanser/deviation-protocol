@@ -3157,7 +3157,7 @@ def test_creation_openapi_injects_the_exact_validation_schema_inventory() -> Non
         "NativeRunOverride", "PublicEntryWorld", "PublicNativeRunContext",
         "PublicOverrideRule", "PublicPresentationOptions", "PublicProfileRef",
         "PublicRunPresentation", "PublicRunProfile", "PublicWorldRef",
-        "RunEntryOptionsResponse",
+        "RunEntryOptionsResponse", "NativeRunExitRequest", "NativeRunStatusResponse",
     }
     assert native_components <= set(schemas)
     assert len(set(schemas) - native_components) == 75
@@ -3505,6 +3505,8 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
     }
 
     assert public_routes == {
+        ("/v1/sessions/{session_id}/run-status", ("GET",)),
+        ("/v1/sessions/{session_id}/run-exit", ("POST",)),
         ("/health", ("GET",)),
         ("/v1/run-entry-options", ("GET",)),
         ("/v1/runs/native", ("POST",)),
@@ -3527,7 +3529,8 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
         ("/v1/sessions/{session_id}/actions", ("POST",)),
     }
     assert all(
-        (path in {_ELIGIBLE_PATH, "/v1/run-entry-options", "/v1/runs/native"} or "run" not in path.casefold())
+        (path in {_ELIGIBLE_PATH, "/v1/run-entry-options", "/v1/runs/native",
+            "/v1/sessions/{session_id}/run-status", "/v1/sessions/{session_id}/run-exit"} or "run" not in path.casefold())
         and "mutation" not in path.casefold()
         and "bind" not in path.casefold()
         for path, _ in public_routes

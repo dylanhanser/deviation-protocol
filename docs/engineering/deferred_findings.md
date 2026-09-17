@@ -52,7 +52,7 @@ The already-fixed S3 planning findings remain historical closures, not open debt
 
 ### DF-002 — Partial discovery refresh after Demo startup race
 
-- **ID / status:** DF-002 / deferred for S7-1 planning and the bounded local
+- **ID / status:** DF-002 / reassessed and deferred for the S7-1 implementation candidate and bounded local
   playable milestone; no wider-release approval.
 - **Affected feature/path:** Web setup discovery recovery in `web/src/App.tsx`;
   the observed “刷新可用选项” action refreshes entry options while scenario and
@@ -65,6 +65,14 @@ The already-fixed S3 planning findings remain historical closures, not open debt
   `runtime-redacted.txt` record coupled backend/Web restart -> frontend ready
   before backend -> discovery/recovery 502 -> safe GET 404 -> explicit local
   clear -> partial options refresh -> successful full-page reload.
+  S7-1 rendered acceptance (`web/src/App.test.tsx`, case “reassesses DF-002”)
+  now injects independent entry-options and eligibility failures after terminal
+  return to setup. Options refresh leaves the separate eligibility error visible;
+  the existing explicit eligible-character GET retry restores that discovery.
+  Confirmation stays disabled with empty selections and neither admission nor
+  exit is dispatched. Terminal reload, exact exit retry and failed storage
+  removal/retry also pass in that suite. The external `web-stable.log` record is
+  linked from [S7-1 evidence](../run_protocol.md#p33-s7-1-implementation-candidate-evidence).
 - **User impact / exposure:** one additional explicit page reload in that
   observed local startup ordering. No automatic mutation, lost durable data or
   unrecoverable gameplay block was observed. This does not establish impact for
@@ -73,12 +81,16 @@ The already-fixed S3 planning findings remain historical closures, not open debt
   explicit native setup; no workflow blocking, authority, privacy or integrity
   failure was demonstrated for this milestone. The workarounds and limited
   exposure permit the next plan review under existing deferral policy.
+  Fresh rendered S7-1 evidence demonstrates recovery through the separate GET
+  controls after return to setup; required recovery is not waived by the prior
+  reload containment. The coupled browser startup timing has not been rerun.
 - **Containment/workaround:** once the backend is ready and missing-Session
   recovery has been explicitly cleared, reload the page to refresh all discovery.
   Do not treat partial entry-options refresh as a complete discovery retry.
   Keep native confirmation disabled until explicit eligible selections succeed.
-- **Repair/reassessment:** Web client maintainer; reassess at S7-1 return-to-setup
-  acceptance and the post-playable stabilization checkpoint before wider release,
+- **Repair/reassessment:** Web client maintainer; S7-1 return-to-setup reassessment
+  is recorded above. Reassess again at the post-playable stabilization checkpoint before wider release,
   or sooner if reachability/impact expands or reload fails to restore the flow.
   Escalate if containment fails under the workflow's blocking criteria.
-- **Closure evidence:** none; no code fix or browser rerun accompanies this entry.
+- **Closure evidence:** none; no general discovery-refresh fix or browser rerun
+  accompanies this reassessment. Separate error sections and GET retries remain.

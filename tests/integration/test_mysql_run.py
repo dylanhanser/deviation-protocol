@@ -213,6 +213,15 @@ def test_run_migration_matches_shared_metadata_and_is_linear(
         name for name in recorder.metadata.tables if name in RUN_TABLES
     ) == RUN_TABLES
     for table_name in RUN_TABLES:
+        # 005 remains immutable. Compare its historical checks to 008's exact
+        # predecessor, then apply only the three current-head amendments.
+        terminal = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini"))).get_revision("20260917_0008").module
+        table = recorder.metadata.tables[table_name]
+        for owner, name, old, new in terminal._CONSTRAINTS:
+            if owner == table_name:
+                constraint = next(c for c in table.constraints if c.name == name)
+                assert " ".join(str(constraint.sqltext).split()) == " ".join(old.split())
+                constraint.sqltext = sa.text(new)
         assert _table_signature(recorder.metadata.tables[table_name]) == (
             _table_signature(Base.metadata.tables[table_name])
         )
@@ -227,7 +236,7 @@ def test_run_migration_matches_shared_metadata_and_is_linear(
     )
 
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["20260916_0007"]
+    assert scripts.get_heads() == ["20260917_0008"]
     revision = scripts.get_revision("20260729_0005")
     assert revision is not None
     assert revision.down_revision == "20260728_0004"
@@ -303,7 +312,7 @@ def test_mysql_run_migration_upgrades_only_the_designated_test_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", _safe_database_url())
-    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260916_0007")
+    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260917_0008")
 
 
 @pytest.mark.integration
@@ -354,7 +363,7 @@ async def test_mysql_run_schema_is_exact_and_binding_seam_is_nullable(
             ).scalars()
         )
 
-    assert revision == "20260916_0007"
+    assert revision == "20260917_0008"
     assert tables == set(RUN_TABLES) | {"run_protocol_bindings", "run_entry_world_bindings"}
     assert game_session_run_columns == set()
     expected_binding_columns = {

@@ -9,6 +9,7 @@ import { ApiClientError } from "./api/errors";
 import {
   SESSION_RECOVERY_STORAGE_KEY,
   readSessionRecoveryRecord,
+  writeSessionRecoveryRecord,
 } from "./sessionRecovery";
 import {
   activeViewFixture,
@@ -27,6 +28,144 @@ import { server } from "./test/server";
 
 const apiOrigin = "http://ui-api.test";
 const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
+
+describe("S7-1 explicit exit and return to setup", () => {
+  function setup() {
+    const client = new PublicApiClient({baseUrl:`${apiOrigin}/`});
+    const view = {...endedViewFixture("FAILED"), run_context:nativeEntryFixture().run_context};
+    writeSessionRecoveryRecord(view.metadata.session_id);
+    vi.spyOn(client,"listScenarios").mockResolvedValue(scenarioCatalogFixture);
+    vi.spyOn(client,"listEligiblePlayerCharacters").mockResolvedValue(eligiblePlayerCharactersFixture);
+    vi.spyOn(client,"listRunEntryOptions").mockResolvedValue(runOptionsFixture);
+    vi.spyOn(client,"getSessionView").mockResolvedValue(view);
+    const active = {schema_version:"native-run-status/v1" as const, session_id:view.metadata.session_id,
+      run_id:view.run_context.run_id, session_state_version:view.metadata.state_version,
+      run_state_version:3, lifecycle_status:"active" as const, can_exit:true};
+    const terminal = {...active,run_state_version:4,lifecycle_status:"terminated" as const,can_exit:false};
+    const status = vi.spyOn(client,"getNativeRunStatus").mockResolvedValue(active);
+    const exit = vi.spyOn(client,"exitNativeRun").mockResolvedValue(terminal);
+    const entry = vi.spyOn(client,"enterNativeRun");
+    return {client,view,active,terminal,status,exit,entry};
+  }
+
+  it("confirms once, preserves history/storage, and requires explicit reselection after return", async () => {
+    const c = setup(); render(<App client={c.client} idempotencyKeyFactory={() => "exit.once"}/>);
+    const button = await screen.findByRole("button",{name:"结束本次旅程"});
+    await waitFor(() => expect(button).toBeEnabled());
+    fireEvent.click(button); fireEvent.click(screen.getByRole("button",{name:"取消结束"}));
+    expect(c.exit).not.toHaveBeenCalled();
+    fireEvent.click(button); fireEvent.click(screen.getByRole("button",{name:"确认永久结束"}));
+    await screen.findByRole("button",{name:"返回设置"});
+    expect(c.exit).toHaveBeenCalledTimes(1); expect(c.entry).not.toHaveBeenCalled();
+    expect(readSessionRecoveryRecord()).toEqual({ok:true,value:{version:1,session_id:c.view.metadata.session_id}});
+    fireEvent.click(screen.getByRole("button",{name:"返回设置"}));
+    await screen.findByLabelText("选择难度");
+    expect(screen.getByLabelText("选择难度")).toHaveValue("");
+    expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
+    expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+    expect(c.entry).not.toHaveBeenCalled();
+  });
+
+  it("reconciles a lost committed response using GET only", async () => {
+    const c = setup();
+    c.exit.mockImplementation(async () => {c.status.mockResolvedValue(c.terminal); throw new ApiClientError("lost",{kind:"network"});});
+    render(<App client={c.client} idempotencyKeyFactory={() => "exit.once"}/>);
+    await waitFor(() => expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"结束本次旅程"}));
+    fireEvent.click(screen.getByRole("button",{name:"确认永久结束"}));
+    await screen.findByRole("button",{name:"重试原结束请求"});
+    await waitFor(() => expect(screen.getByRole("button",{name:"读取旅程状态"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"读取旅程状态"}));
+    await screen.findByRole("button",{name:"返回设置"});
+    expect(c.exit).toHaveBeenCalledTimes(1); expect(c.entry).not.toHaveBeenCalled();
+  });
+
+  it("retries the exact exit and keeps storage-clear retry separate", async () => {
+    const c = setup(); c.exit.mockRejectedValueOnce(new ApiClientError("lost",{kind:"network"}));
+    render(<App client={c.client} idempotencyKeyFactory={() => "exit.once"}/>);
+    await waitFor(() => expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"结束本次旅程"}));
+    fireEvent.click(screen.getByRole("button",{name:"确认永久结束"}));
+    await waitFor(() => expect(screen.getByRole("button",{name:"重试原结束请求"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"重试原结束请求"}));
+    await screen.findByRole("button",{name:"返回设置"});
+    expect(c.exit.mock.calls[0]?.[0]).toBe(c.exit.mock.calls[1]?.[0]);
+    const remove = vi.spyOn(Storage.prototype,"removeItem").mockImplementationOnce(() => {throw new Error("blocked");});
+    fireEvent.click(screen.getByRole("button",{name:"返回设置"}));
+    await screen.findByRole("button",{name:"重试清除并返回设置"});
+    expect(screen.getByText(`当前 Session：${c.view.metadata.session_id}`)).toBeVisible();
+    expect(c.entry).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button",{name:"重试清除并返回设置"}));
+    await screen.findByLabelText("选择难度");
+    expect(c.exit).toHaveBeenCalledTimes(2); expect(remove).toHaveBeenCalledTimes(2);
+  });
+
+  it("reloads a terminal journey using only GET without preserving exit intent in storage", async () => {
+    const c = setup(); c.status.mockResolvedValue(c.terminal);
+    render(<App client={c.client}/>);
+    await screen.findByRole("button",{name:"返回设置"});
+    expect(c.exit).not.toHaveBeenCalled(); expect(c.entry).not.toHaveBeenCalled();
+    expect(readSessionRecoveryRecord()).toEqual({ok:true,value:{version:1,session_id:c.view.metadata.session_id}});
+  });
+
+  it.each(["session_id", "run_id", "session_state_version"] as const)("locks a mismatched status %s", async (field) => {
+    const c = setup(); c.status.mockResolvedValue({...c.active,[field]:field === "session_state_version" ? c.active.session_state_version + 1 : "other"});
+    render(<App client={c.client}/>);
+    await waitFor(() => expect(c.status).toHaveBeenCalled());
+    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
+    expect(c.exit).not.toHaveBeenCalled();
+  });
+
+  it("ignores an exit response after unmount and does not clear storage", async () => {
+    const c = setup(); let resolve!: (value:typeof c.terminal) => void;
+    c.exit.mockReturnValue(new Promise((done) => {resolve=done;}));
+    const mounted = render(<App client={c.client}/>);
+    await waitFor(() => expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"结束本次旅程"}));
+    fireEvent.click(screen.getByRole("button",{name:"确认永久结束"}));
+    await waitFor(() => expect(c.exit).toHaveBeenCalledTimes(1));
+    mounted.unmount();
+    await act(async () => {resolve(c.terminal);});
+    expect(readSessionRecoveryRecord()).toEqual({ok:true,value:{version:1,session_id:c.view.metadata.session_id}});
+    expect(c.entry).not.toHaveBeenCalled();
+  });
+
+  it("retains the exact uncertain request across client replacement and ignores the old response", async () => {
+    const c = setup(); let resolve!: (value:typeof c.terminal) => void;
+    c.exit.mockReturnValue(new Promise((done) => {resolve=done;}));
+    const mounted = render(<App client={c.client}/>);
+    await waitFor(() => expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"结束本次旅程"}));
+    fireEvent.click(screen.getByRole("button",{name:"确认永久结束"}));
+    await waitFor(() => expect(c.exit).toHaveBeenCalledTimes(1));
+    const next = setup();
+    mounted.rerender(<App client={next.client}/>);
+    await act(async () => {resolve(c.terminal);});
+    expect(screen.queryByRole("button",{name:"返回设置"})).not.toBeInTheDocument();
+    expect(next.exit).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByRole("button",{name:"重试原结束请求"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"重试原结束请求"}));
+    await screen.findByRole("button",{name:"返回设置"});
+    expect(next.exit.mock.calls[0]?.[0]).toBe(c.exit.mock.calls[0]?.[0]);
+  });
+
+  it("reassesses DF-002: separate GET retries restore return-to-setup discovery without admission", async () => {
+    const c = setup(); c.status.mockResolvedValue(c.terminal);
+    vi.mocked(c.client.listRunEntryOptions).mockResolvedValueOnce(runOptionsFixture).mockRejectedValueOnce(new ApiClientError("options unavailable",{kind:"network"})).mockResolvedValue(runOptionsFixture);
+    vi.mocked(c.client.listEligiblePlayerCharacters).mockResolvedValueOnce(eligiblePlayerCharactersFixture).mockRejectedValueOnce(new ApiClientError("characters unavailable",{kind:"network"})).mockResolvedValue(eligiblePlayerCharactersFixture);
+    render(<App client={c.client}/>);
+    fireEvent.click(await screen.findByRole("button",{name:"返回设置"}));
+    const retry = await screen.findByRole("button",{name:"重试 eligible Player Character GET"});
+    fireEvent.click(screen.getByRole("button",{name:"刷新可用选项"}));
+    await screen.findByLabelText("选择难度");
+    expect(retry).toBeVisible();
+    fireEvent.click(retry);
+    await waitFor(() => expect(screen.queryByRole("button",{name:"重试 eligible Player Character GET"})).not.toBeInTheDocument());
+    expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+    expect(screen.getByLabelText("选择难度")).toHaveValue("");
+    expect(c.entry).not.toHaveBeenCalled(); expect(c.exit).not.toHaveBeenCalled();
+  });
+});
 
 describe("S6 correction: late eligible characters", () => {
   function deferredCharacters() {

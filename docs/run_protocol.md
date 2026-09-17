@@ -29,8 +29,9 @@ for two Web findings. Focused re-review closed character selection and returned
 a second `CHANGES_REQUIRED` solely for automatic recovery's scenario/content
 binding. Subsequent independent approval and publication at
 `2f144599af5977e871c7a3466c52896b6a36510c` close S6 implementation. Its bounded
-local Demo browser journey passed. S7-1 is an unapproved post-ending Run exit
-plan candidate; remaining S7 work stays allocated and unimplemented. DF-002
+local Demo browser journey passed. S7-1's plan is independently approved and
+published at `9fab18d`; its local implementation candidate awaits one substantive
+independent implementation review. Later S7 work stays unauthorized and unimplemented. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
@@ -105,8 +106,9 @@ recovery, dependency-derived paths, verification allocation and review tokens.
 describes the implementation independently approved and published at `2f144599`.
 The two earlier `CHANGES_REQUIRED` reviews remain history; current approval and
 bounded browser evidence are recorded [below](#s6-publication-and-local-browser-evidence).
-The [S7-1 plan](phase_3_3_s7_1_post_ending_run_exit_plan.md) proposes the first
-post-ending Run transition but is unapproved and unimplemented. DF-001/DF-002
+The [S7-1 plan](phase_3_3_s7_1_post_ending_run_exit_plan.md) was independently
+approved and published at `9fab18d`. Its first post-ending Run transition is now
+a local implementation candidate; see [current evidence](#p33-s7-1-implementation-candidate-evidence). DF-001/DF-002
 remain deferred. No separate S6 closeout,
 new story/world content, production Provider, S7 continuity or Phase 3.4 state
 is included. Phase 3.3 remains incomplete and no release readiness is claimed.
@@ -365,7 +367,8 @@ The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 is independently approved at `ff866d2`; its candidate-time wording is historical.
 S5 implementation is independently approved and published at `86c258e9`.
 S6 public flow is independently approved and published at `2f144599`. S7-1
-post-ending Run exit is an unapproved plan candidate; later same-line continuity
+post-ending Run exit is a local implementation candidate under its approved
+published plan (`9fab18d`); later same-line continuity
 remains allocated to subsequent S7 subdivisions. DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
@@ -1139,7 +1142,8 @@ approval with DF-001 deferred and were published at
 implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and independently approved
 implementation published at `86c258e9`. S6 plan is published at `4365721`;
 its implementation is independently approved and published at `2f144599`. S7-1
-is now a plan candidate only; S7 implementation remains unauthorized.
+is a local implementation candidate under its approved published plan; S7-2 and
+later implementation remain unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -1795,10 +1799,12 @@ completion is claimed. Technical presentation U2 is a usability observation;
 the single ClientDisconnect R1 has no established reproducible cause and is not
 registered as a confirmed code defect.
 
-The [S7-1 plan candidate](phase_3_3_s7_1_post_ending_run_exit_plan.md) proposes an
-explicit post-ending native Run exit, historical binding and separately confirmed
-fresh admission. It is not implemented or approved and does not provide later-world
-continuation. Its same-document allocation preserves all remaining parent S7 work.
+The [published S7-1 plan](phase_3_3_s7_1_post_ending_run_exit_plan.md) was approved
+at `9fab18d`. The local implementation candidate supplies explicit native Run
+exit, historical binding and separately confirmed fresh admission. Its
+[automated evidence](#p33-s7-1-implementation-candidate-evidence) is distinct from
+the historical S6 browser evidence above. No S7-1 browser acceptance was authorized
+or performed. Later-world continuation remains unimplemented.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1988,7 +1994,8 @@ Phase 3.3 is acceptable only when:
   independently approved with DF-001 deferred. S4 internal implementation is
   independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
   S6 public integration is independently approved and published at `2f144599`;
-  S7-1 is a plan candidate, and later S7 continuity remains unimplemented.
+  S7-1 is a local implementation candidate under its approved published plan,
+  and later S7 continuity remains unauthorized and unimplemented.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2014,6 +2021,220 @@ Phase 3.3 is acceptable only when:
 - World-line transition representation.
 - How world-line consistency validation represents permanent canon approved
   after `Chaotic` presentation.
+
+## P3.3-S7-1 implementation candidate evidence
+
+The independently approved plan was published at baseline
+`9fab18d8de4ba05000e38ee37fa6a2e8da17940a` (parent `2f144599`). The local
+implementation delivers native admission -> actual public play -> valid Session
+ending -> explicitly confirmed irreversible Run exit -> readable old history ->
+refreshed eligibility -> separately confirmed admission with the same character
+-> first action in the new journey. The independent implementation review returned
+`CHANGES_REQUIRED` with one nullable terminal-CHECK finding. The bounded corrected
+candidate awaits focused re-review by the previous independent reviewer;
+[replacement evidence](#s7-1-nullable-terminal-check-correction) is recorded below.
+Neither S7 nor Phase 3.3 is complete; S7-2 and later continuity and content
+remain unauthorized. No browser acceptance, limited user trial,
+broader release, deployment or real Provider acceptance is claimed for S7-1.
+The frozen plan and historical reviews retain their candidate-time wording.
+
+The sole native transition is active revision 3 -> terminated revision 4. It
+preserves the strict `NativeRunAdmissionV1` prefix and adds the exact
+`NativeRunTerminatedV1` suffix, including the ended snapshot and completed-memory
+evidence. Only this Run's character binding becomes historical; the character
+lifecycle, old Session, protocol and entry world do not change. SQL and Demo
+classifiers, historical View, admission replay, action/status replay and
+eligibility all recognize the exact terminal family. Historical ownership does
+not require the old binding to occupy the current active uniqueness slot.
+
+The exit writer reuses the pinned native Unit of Work and shared advisory lock,
+locks character before Run, revalidates after locking, stages revision/binding,
+CAS and receipt atomically, reconstructs the candidate and commits once. Scoped
+receipt replay/conflict precedes new-operation eligibility/version checks.
+Turn readers acquire no reverse Run write lock. Uncertain commit or cleanup
+does not trigger compensation, retry or replacement admission. Demo uses its
+existing trial-store publication and enforces the same native writer guard.
+
+Migration `20260917_0008` amends only three named CHECK branches and matching
+ORM metadata. It adds no tables or columns. Upgrade and downgrade hold the
+same writer lock; downgrade uses current locking probes and refuses complete
+or partial terminal evidence before DDL. Each successful ALTER is durable at
+its own statement boundary. Failure records the completed constraint prefix,
+disposes of lost/uncertain owners and never reconnects to continue. Test-only
+restoration explicitly inspects and repairs the three known checks on a new
+connection; this is not MySQL DDL rollback.
+
+Public status/exit contracts and rendered recovery are specified in the
+[client contract](public_client_contract.md#p33-s7-1-session-scoped-native-run-exit).
+Immutable `public-run-context/v1`, View associations and Session storage v1 are
+unchanged. Exit retains history/storage. Return to setup is a separate local
+operation; failed removal blocks admission and storage retry never repeats
+exit. New character/profile/world selections and confirmation are explicit.
+
+### Fresh acceptance and retained records
+
+The following records describe the incoming implementation candidate, preserved
+as history. The correction below replaces its affected constraint evidence.
+Original terminal-family and migration evidence was freshly executed. Raw commands,
+source identities, logs and exit statuses are retained under
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-p33-s7-1-implementation-20260918`.
+The original `evidence-index.json` binds these records; `candidate-manifest.json`
+and `candidate.patch` bind that incoming unstaged candidate, not the corrected one. These external
+artifacts are local handoff evidence, not committed repository files.
+
+| Requirement | Actual evidence and boundary |
+| --- | --- |
+| E01 | `test_mysql_native_run_exit.py` public journeys use production ASGI, real test-MySQL repositories and actual authoritative actions to reach both authored endings. They then exit, read history/status, discover eligibility, admit the same character into distinct Run/line/Session identities and perform the first new action. No direct snapshot mutation supplies these endings. Rendering is deterministic and makes no Provider call. |
+| E02 | Both RESOLVED and FAILED journeys preserve canonical character lifecycle. API tests cover active/missing/malformed ending, incomplete memory, wrong scenario/content, Session/Run association and forged controller with no writes. A catalog-valid non-hospital alpine fixture proves the generic ending boundary at component level; it is a test-only authored fixture, not a second E01 public-play journey or new production content. |
+| E03 | SQL/Demo full reconstruction rejects partial terminal evidence, corrupted current/receipt fields and ending/catalog/memory associations. Demo parametrizes every stored current-row and mutation-receipt field; real SQL covers corruption at the repository boundary. Old revisions/admission and immutable binding/world bytes remain unchanged. Independent literal canonical bytes and fixed operation/request/evidence hashes prevent self-derived golden expectations. |
+| E04 | Real public journeys replay old exit, admission, action and committed request status after the second admission and compare original responses and unchanged second binding. Changed-body conflict and new-key terminal rejection are covered. `mysql-old-status-final` adds the final committed-status comparison to both ending journeys. |
+| E05 | Independent MySQL owners cover same/different-key exit, admission, retirement and final-turn races. Tests observe named-lock waiters or the actual waiting `SELECT ... FOR UPDATE` in PROCESSLIST before releasing the holder, then verify one terminal receipt/revision and preserved history. No timing-only or mocked substitute. Extra performance-schema privileges were unavailable and were not requested. |
+| E06 | SQL faults/cancellation after append, CAS, receipt and before commit prove atomic rollback. Committed/uncommitted acknowledgement loss, cancellation and postcommit cleanup failure prove explicit uncertainty, GET/exact replay and owner disposal. Demo trial-store fault tests prove matching publication atomicity. |
+| E07 | Real MySQL covers empty/populated upgrade and downgrade, old legacy/native row preservation, exact metadata, invalid partial branch rejection, terminal/partial refusal before DDL, stale repeatable-read snapshot and writer/downgrade serialization. Both directions inject failure/disconnect before each of three ALTERs, plus state-only connection loss immediately after each successful ALTER. Exact partial check definitions and completed-prefix diagnostics are asserted. Acquisition/release/disposal result and exception boundaries are fresh. |
+| E08 | Rendered App tests cover explicit confirm/cancel, click locking, response loss with GET reconciliation, exact retry, reload/client replacement/unmount, malformed/mismatched status, failed storage removal and storage-only retry, cleared selections and separate new admission confirmation. Existing S6 immutable associations, replacement/recovery and delayed selection tests pass unchanged. No browser was used. |
+| E09 | Closed DTO/OpenAPI/transport and key/value projection scans, unchanged old route/schema contracts, legacy/standalone behavior, Dynamic Demo unavailability and restarted-store 404 pass. Independent Demo processes repeat the full journey with identical complete store/result evidence while external I/O is denied. |
+
+| Execution record | Result / applicability |
+| --- | --- |
+| `canonical-offline-stable` | Canonical sanitized Offline: 2,837 passed, 444 skipped, one deselected; compileall, dependency check, Alembic head/history and diff check passed. Skips were 443 database-dependent cases and one disabled live opt-in. Two warnings: existing S2 model field and unavailable Turkish locale. |
+| `final-demo-guard` | 84 focused passes after the final Demo terminal-append guard and classifier type annotations; verifies the last runtime delta after the broad Offline run. Later changes are test assertions/documentation only. |
+| `final-canonical-golden` | Final independent literal operation/request/evidence golden case passes; includes a fixed evidence SHA-256 as well as byte equality. Canonical compileall, dependency and Alembic metadata checks also pass on the final test sources. |
+| `mysql-canonical-current` + `mysql-current-head-correction` | 223 passes plus five current-head tests rerun successfully after explicitly preparing schema 008. The first five failures were schema-head precondition mismatches; historical migration assertions were not weakened. |
+| `mysql-native-stable` | 168 native admission/mechanics/007-migration regression passes, isolated after explicit schema-007 preparation. |
+| `mysql-exit-stable` | 60 fresh exit/008 migration passes (27 exit and 33 migration), isolated from other schema-changing suites. |
+| `mysql-old-status-final` | Two ending journeys rerun successfully with final old committed-status replay assertions. Overlaps the 27 exit cases; do not add it to unique counts. |
+| `mysql-ddl-loss-after` | Six additional fresh upgrade/downgrade post-ALTER state-loss cases pass. Together the isolated MySQL groups cover 462 distinct integration cases; some are metadata-only tests, not 462 real-connection experiments. |
+| `metadata-008-02` | Real database at 008 has no Alembic metadata differences, all 18 tables empty and shared lock free. This uses a safe test-only live connection, not the general `.env`-loading Alembic online entry point. |
+| `database-restoration-handoff` | Test database restored to original revision 007, all 18 tables empty, shared lock free after final fault/journey tests. |
+| `web-stable` | Complete stabilized deterministic-demo Web suite: 340 passed, one existing skipped case, eight files. Earlier affected suites passed; counts overlap. |
+| `web-typecheck-final`, `web-lint-02`, `web-build-final` | Typecheck, lint and deterministic-demo production build pass. Build includes final TypeScript compilation. No browser or network installation. |
+| `s2-reuse-applicability.json` | Original exhaustive pure S2 node reused only after validating the original correction-run logs/proof/counters, six unchanged source identities, dependency/Python/platform identities and recorded 5,624,910 resolver calls. Original directory: `C:/Users/dylanmonster/AppData/Local/Temp/s3-implementation-20260916-audit/correction`. Other S3-S6 evidence is fresh here. |
+
+Earlier development failures remain in raw logs and are superseded only by
+identified corrected runs. In particular, an external helper import failure
+prevented schema preparation before `mysql-native-regressions`; the corrected
+preparation and `mysql-native-stable` establish the required result. Verification
+uses installed `.venv`, sanitized child environments and safe driver/database
+identity checks. No production database, real Provider/Live call, dependency
+installation or browser acceptance was used. Broad suites were not repeated
+solely for documentation changes.
+
+### Dependency inventory, findings and handoff
+
+Section 9 of the frozen plan governs scope. The following listed paths need no
+edit: `application/session_service.py`, `application/turn_orchestrator.py` and
+`application/narrative_turn_orchestrator.py` already delegate native family
+reads/replay and enforce ended guards; no turn algorithm or lock-order change
+is needed. `api/demo_composition.py` obtains exit from the normal `ApiServices`
+graph. `infrastructure/unit_of_work.py` already supplies the required pinned
+factory, writer lock, cancellation and disposal behavior.
+
+The listed existing unit suites `test_run.py`, `test_run_operations.py`,
+`test_run_persistence.py`, `test_run_protocol_binding.py`,
+`test_run_protocol_binding_persistence.py`, `test_run_repositories.py`,
+`test_native_run_admission.py`, `test_native_turn_mechanics.py`,
+`test_public_run_protocol.py`, `test_native_demo.py` and
+`test_demo_persistence.py` run unchanged. New exit suites own the new contracts.
+Web `api/client.test.ts`, `App.recovery.test.tsx`, `App.action-loop.test.tsx`
+and existing Session storage tests remain unchanged and pass.
+
+Three necessary inventory additions have bounded demonstrated dependencies:
+`tests/unit/test_player_character_api.py` owns exhaustive route/schema inventory
+assertions, so adding the two approved routes requires updating those expected
+sets while retaining all 75 old components. `docs/engineering/guardrails.md`
+records confirmed evidence-before-sort reconstruction and UTF-8 wrapper rules;
+`docs/engineering/codex_workflow.md` records the actual evidence-wrapper encoding
+failure. Repository AGENTS requires both reusable rules to be synchronized in
+the same change. These additions add no feature scope or architectural authority.
+
+DF-001 retains its existing disposition and process-local locale containment.
+DF-002 is reassessed and remains deferred: rendered return-to-setup tests prove
+separate eligibility/options GET recovery without automatic mutation or stale
+selection. Its historical startup browser race was not rerun, and no unrelated
+general discovery refresh fix is included. The confirmed Demo corruption defect
+(sorting malformed receipt evidence before validating it) is directly related
+and fixed with regression coverage; it is not deferred.
+
+The canonical documentation-synchronization checklist is complete: roadmap,
+architecture, public contracts, protocol/evidence and findings describe this
+candidate and its limits; frozen plans/reviews and prior migrations stay
+byte-identical. Original guardrail impact: ENV-001 updated; STATE-002 added. External
+candidate checks bind scope, references, UTF-8/LF, whitespace, modes, protected
+identities and unchanged baseline/ref/index state. No approval token is issued
+by implementation. That independent review returned `CHANGES_REQUIRED` with
+one finding; the correction and focused re-review boundary below supersede this
+incoming handoff. Staging, commit, push and deployment were not performed.
+
+### S7-1 nullable terminal-CHECK correction
+
+The previous independent review returned **CHANGES_REQUIRED, one finding**:
+MySQL accepted NULL `prior_state_version` or `binding_state` in a valid terminal
+row because CHECK accepts UNKNOWN. Application validation already rejected the
+malformed family; it did not satisfy the required database integrity backstop.
+This finding is corrected locally, with no approval issued. The replacement
+candidate awaits focused independent re-review of this correction, its direct
+dependencies and replacement evidence. Earlier conclusions remain applicable
+to byte-identical content; neither S7 nor Phase 3.3 is complete.
+
+The production delta is restricted to migration 008 and matching ORM checks:
+explicit `prior_state_version IS NOT NULL` and `binding_state IS NOT NULL` in
+both Run-table terminal branches. Exact prior/current 3/4 and historical-binding
+rules remain. The other required nullable operands already have explicit guards;
+the receipt branch uses nonnullable required columns and explicit NULL result
+fields. No predecessor branch, earlier migration, column nullability, receipt
+branch, lock, probe, DDL ordering or disposal code changed. DB-001 now records
+this confirmed SQL three-valued-logic rule and its meaningful regressions.
+ENV-001 and STATE-002 and both deferred-finding dispositions are preserved.
+
+External correction evidence is in
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-p33-s7-1-null-check-correction-20260918`.
+The original report in `deviation-p33-s7-1-independent-review-20260918` remains
+unchanged; a copy, incoming file snapshot, incoming manifest and regenerated
+incoming patch are preserved in the correction directory. Incoming verification
+matched 41 paths, +2,694/-191. Its **file-content aggregate** was 1,827,791 bytes,
+SHA-256 `9a00033d6e9f64bce7327d42a0656cdf7c02555d1bc9b9e23dcdf6a571de5c9a`:
+exact full-file bytes concatenated in lexicographic path order without separators.
+Its distinct **actual Git binary/full-index patch** was 250,281 bytes, SHA-256
+`c1144508210da967b2363d70748b5ee8dab5891d7c60bea9f8492d1e955d2605`.
+Historical measurements are preserved; the file-content aggregate is not a patch.
+
+| Replacement record | Result and limits |
+| --- | --- |
+| `incoming-null-probes` | Before correction, public play/exit produced a valid terminal family. Each of the four independent single-field NULL updates succeeded under enforced original constraints; each was rolled back and the complete scoped family compared unchanged. |
+| `corrected-null-regressions` | Four independent MySQL cases pass, each starting with a separately committed public terminal family. Each UPDATE changes only its target field and fails with error 3819 naming `ck_run_revisions_mutation_matrix` or `ck_run_current_mutation_matrix`. Enforcement is YES; clean transaction/rollback, unchanged family, successful status reconstruction and unchanged ended View are asserted. |
+| `affected-migration-valid-controls` | 47 passes: all 39 other migration cases, six SQL terminal-corruption/reconstruction cases and both RESOLVED/FAILED public exit/re-entry/replay journeys. Together with the four new cases, all 43 affected migration cases and 51 distinct MySQL nodes pass. Legacy/native predecessor rows survive downgrade/upgrade unchanged. Partial DDL, current probes, writer serialization and disposal cases remain successful. |
+| `metadata-and-restoration` | Safe test-only 008 install: Alembic `compare_metadata` has no differences, all three ORM expressions equal migration expressions, and installed CHECK expressions match after MySQL rendering normalization with enforcement YES. Exact initial schema restored afterward. |
+| `scope-and-evidence-reuse` | All 133 original evidence artifacts, dependency/environment identities and original S2 proof/log/counter records reverified. Only two production files changed, exclusively the four guards in each; migration control flow, predecessor branches and all application/classifier/Web sources remain identical to the incoming reviewed candidate. |
+
+The MySQL runs use the repository virtual environment and sanitized verification
+workflow after `mysql+asyncmy` / `deviation_protocol_test` preflight. Both run
+records retain raw commands, source hashes, logs and exit statuses (all zero),
+and complete compileall, dependency, Alembic head/history and whitespace checks.
+The existing S2 model-field warning remains; no new runtime warning appeared.
+No disabled CHECK enforcement, mocked rejection, browser, real Provider,
+production database, installation or unrelated network activity was used.
+
+Initial state was freshly observed, not inferred from the review: revision 007,
+all 18 application tables empty, shared lock free. `database-initial.json` and
+`database-final-restored.json` are byte-identical, including all CREATE TABLE
+statements, CHECK definitions/enforcement, table counts, schema version and
+shared-lock state. Fixtures were scoped and removed; suites sharing schema ran
+sequentially. Restoring the test fixture to 007 does not make it runtime-ready
+for terminal writes; runtime still requires corrected 008.
+
+Unaffected stable Offline and its final focused follow-ups, complete Web/lint/
+build, pure exhaustive S2, lifecycle and concurrency evidence are reused after
+identity/applicability checks. Changed schema evidence is fresh. No full 466-node
+integration execution, broad Offline, complete Web or exhaustive S2 rerun was
+needed. The four added nodes account for the collection increase from 462.
+
+The new `candidate-manifest.json` binds the complete candidate and its actual
+`candidate.patch`; `correction.patch` binds the incoming-to-corrected delta.
+Their sizes/SHA-256 values are separate from the explicitly ordered/framed
+file-content aggregate. `correction-delta.json` lists exact changed and
+byte-identical preserved paths. Current documentation synchronizes only this
+finding, correction, evidence and re-review status. No staging, commit, push,
+approval or new feature authorization accompanies this handoff.
 
 ## Related documents
 

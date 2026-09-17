@@ -2,6 +2,11 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from typing import Annotated, Literal
+import hashlib
+import json
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from deviation_protocol.domain.run import (
@@ -12,6 +17,9 @@ from deviation_protocol.domain.run import (
     RunStateVersion,
     revalidate_run_model,
     validate_canonical_run,
+    canonical_run_operation_bytes, RunMutationKind, RunMutationProvenance,
+    RunOperationId, RunAuthoritySourceRef, ReservedPlayerCharacterBinding,
+    _validate_actual_pydantic_state,
 )
 from deviation_protocol.domain.run_protocol_resolution import (
     ResolvedRunProtocolObjectivesV1,
@@ -126,4 +134,119 @@ class NativeRunAdmissionV1(BaseModel):
         return self
 
 
-_ClassifiedRun = LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1
+_ExitId = Annotated[str, Field(strict=True, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
+
+
+class _NativeExitModel(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always", serialize_by_alias=True)
+
+    @model_validator(mode="wrap")
+    @classmethod
+    def _original(cls, value, handler):
+        if isinstance(value, BaseModel):
+            if type(value) is not cls:
+                raise ValueError("unexpected exit evidence carrier")
+            _validate_actual_pydantic_state(value,path=cls.__name__,visited=set())
+            value = dict(value.__dict__)
+            value["schema"] = value.pop("schema_version")
+        return handler(value)
+
+
+class NativeRunExitRequestV1(_NativeExitModel):
+    schema_version: Literal["run.terminate-native-request/v1"] = Field(alias="schema")
+    controller_binding: _ExitId
+    player_id: _ExitId
+    public_operation_key: _ExitId
+    run_id: _ExitId
+    continuous_story_line_id: _ExitId
+    session_id: Annotated[str, Field(strict=True, min_length=1, max_length=64, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
+    expected_run_state_version: int = Field(strict=True, ge=1, le=2**63 - 1)
+    expected_session_state_version: int = Field(strict=True, ge=0, le=2**63 - 1)
+    source_reference: _ExitId
+
+    def operation_id(self) -> RunOperationId:
+        revalidate_run_model(self, NativeRunExitRequestV1)
+        payload = {"schema": "run.terminate-native-operation/v1", "controller_binding": self.controller_binding,
+                   "public_operation_key": self.public_operation_key, "run_id": self.run_id}
+        return RunOperationId(value=hashlib.sha256(canonical_run_operation_bytes(payload)).hexdigest())
+
+    def fingerprint(self) -> str:
+        revalidate_run_model(self, NativeRunExitRequestV1)
+        return hashlib.sha256(canonical_run_operation_bytes(self)).hexdigest()
+
+
+class NativeRunExitEvidenceV1(_NativeExitModel):
+    schema_version: Literal["run.terminate-native-evidence/v1"] = Field(alias="schema")
+    request: NativeRunExitRequestV1
+    scenario_id: _ExitId
+    scenario_content_version: Annotated[str, Field(strict=True, min_length=1, max_length=32, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
+    ending_id: _ExitId
+    ending_status: Literal["RESOLVED", "FAILED"]
+    session_state_version: int = Field(strict=True, ge=0, le=2**63 - 1)
+    snapshot_sha256: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _association(self):
+        if (self.request.expected_run_state_version != 3
+                or self.session_state_version != self.request.expected_session_state_version
+                or len(canonical_run_operation_bytes(self)) > 4096):
+            raise ValueError("invalid exit evidence association or size")
+        return self
+
+
+def decode_native_run_exit_evidence(payload: bytes) -> NativeRunExitEvidenceV1:
+    if type(payload) is not bytes or not 1 <= len(payload) <= 4096:
+        raise ValueError("invalid exit evidence bytes")
+    # Exact canonical equality also rejects duplicate members, BOM and alternate encodings.
+    value = NativeRunExitEvidenceV1.model_validate(json.loads(payload.decode("utf-8")), strict=True)
+    if canonical_run_operation_bytes(value) != payload:
+        raise ValueError("noncanonical exit evidence")
+    return value
+
+
+def terminate_native_run(admission: NativeRunAdmissionV1, request: NativeRunExitRequestV1,
+                         *, occurred_at: datetime) -> CanonicalRun:
+    revalidate_run_model(admission, NativeRunAdmissionV1)
+    revalidate_run_model(request, NativeRunExitRequestV1)
+    run = admission.canonical_run
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.session_id != run.trusted_participation_references[0].session_id
+            or request.expected_run_state_version != 3
+            or occurred_at < run.current_mutation_provenance.occurred_at):
+        raise ValueError("exit request does not bind admission")
+    binding = ReservedPlayerCharacterBinding(**{
+        **run.player_character_binding.__dict__, "binding_state": "historical", "inactivated_at": occurred_at})
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=4),
+        mutation_kind=RunMutationKind.TERMINATE_NATIVE_RUN, operation_id=request.operation_id(),
+        source_reference=RunAuthoritySourceRef(value=request.source_reference), occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=4),
+        "lifecycle_status": RunLifecycleStatus.TERMINATED, "player_character_binding": binding,
+        "current_mutation_provenance": provenance})
+
+
+class NativeRunTerminatedV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+
+    admission: NativeRunAdmissionV1
+    canonical_run: CanonicalRun
+    exit_evidence: NativeRunExitEvidenceV1
+
+    @model_validator(mode="after")
+    def _association(self):
+        revalidate_run_model(self.admission, NativeRunAdmissionV1)
+        revalidate_run_model(self.exit_evidence, NativeRunExitEvidenceV1)
+        validate_canonical_run(self.canonical_run)
+        expected = terminate_native_run(self.admission, self.exit_evidence.request,
+            occurred_at=self.canonical_run.current_mutation_provenance.occurred_at)
+        world = self.admission.world_binding.entry_world
+        if (expected != self.canonical_run
+                or (self.exit_evidence.scenario_id, self.exit_evidence.scenario_content_version)
+                != (world.scenario_id, world.scenario_content_version)):
+            raise ValueError("invalid terminal family association")
+        return self
+
+
+_ClassifiedRun = LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1

@@ -25,6 +25,8 @@ Observed failure:
 - Windows PowerShell 5.1 displayed Chinese text as mojibake.
 - Buffered PowerShell replay corrupted native-command diagnostics and delayed
   the first useful pytest error until the command had finished.
+- A verification wrapper configured UTF-8 only for its child; its own Windows
+  stdout encoder failed on Vitest output before it could record the exit status.
 
 Rule:
 
@@ -33,6 +35,8 @@ Rule:
 - Repository text uses UTF-8 and LF.
 - Stream native command output unless a bounded, non-sensitive result must be
   captured for parsing.
+- Configure UTF-8 on evidence wrappers themselves as well as their children;
+  retain raw output and the child's actual exit status.
 - If `.venv` is missing or broken, stop instead of recreating it silently.
 
 Enforcement:
@@ -95,6 +99,9 @@ Observed failure:
   timestamps retained microseconds while existing Session/event columns did not.
 - Combined rollback/invalidation failure left the native connection wrapper open
   after its driver was closed.
+- Native Run terminal CHECK branches accepted NULL prior versions and binding
+  states: equality against a nullable operand evaluated to UNKNOWN, which MySQL
+  accepts in a CHECK.
 
 Rule:
 
@@ -109,6 +116,10 @@ Rule:
   evidence. Do not repair or relax equality after database truncation.
 - Disposal failure must still remove the retained physical owner from pool reuse
   and close its wrappers, preserving the original error and cleanup evidence.
+- Required nullable operands in a CHECK branch need explicit non-NULL
+  enforcement. Equality alone does not prove presence. Test each nullable
+  prerequisite independently on an otherwise valid stored record and verify
+  the named CHECK failure and intact state after rollback.
 
 Enforcement:
 
@@ -119,6 +130,9 @@ Enforcement:
 - Migration 007 live-owner invalidation/disposal regression:
   `test_007_failed_invalidation_terminates_live_owner` (including physical-close
   failure, independent owner/lock observation and usable subsequent checkout)
+- Migration 008 `test_e07_terminal_check_rejects_required_null`: four real-MySQL
+  cases for `prior_state_version`/`binding_state` on terminal `run_revisions` and
+  `run_current`, using public play/exit and successful reconstruction controls.
 
 ## DB-002: Ending candidates require post-event memory validation
 
@@ -272,6 +286,26 @@ Rule:
 Enforcement:
 
 - Object-identity, rollback, ownership, visibility, and ID-collision tests
+
+## STATE-002: Validate stored evidence before ordering it
+
+Observed failure:
+
+- Terminal receipt corruption replaced a stored resulting version with null.
+  Demo reconstruction sorted the unvalidated receipts first, raising TypeError
+  and returning generic 500 instead of the required opaque integrity rejection.
+
+Rule:
+
+- Select evidence for the requested aggregate and validate original stored
+  scalars before sorting or comparing them. Do not coerce corrupt values to
+  sortable defaults or let another aggregate's malformed evidence affect it.
+- Keep corruption handling coherent across SQL and process-store readers.
+
+Enforcement:
+
+- `test_e03_terminal_corruption_rejected_without_writes`, including every
+  terminal receipt field and `receipt.resulting_state_version`.
 
 ## API-001: Public responses expose safe projections only
 

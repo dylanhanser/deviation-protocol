@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from deviation_protocol.domain.run import RunLifecycleStatus
+
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Mapping, Sequence
 from uuid import uuid4
@@ -165,6 +167,9 @@ from deviation_protocol.infrastructure.run_persistence import (
 
 if TYPE_CHECKING:
     from deviation_protocol.domain.run_protocol_binding import (
+        NativeRunExitEvidenceV1,
+        NativeRunAdmissionV1,
+        NativeRunTerminatedV1,
         LegacyRunCompatibilityV1,
         NativeRunProtocolBindingV1,
     )
@@ -212,12 +217,12 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
 
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
         return await self._classify(run_id, locking=False)
 
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
         return await self._classify(run_id, locking=True)
 
     async def _read(self, statement, *, locking, many=False):
@@ -326,10 +331,12 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
         evidence = creation_evidence_from_storage(creation.operation_evidence_canonical)
         if type(evidence) is NativeRunEntryCreationEvidenceV1:
             binding_storage._require(native_row is not None and world_row is not None, "incomplete native bindings")
+            current_run = run
+            run, prefix_revisions, prefix_mutations = self._codec(binding_storage._native_admission_prefix, run, revisions, mutations)
             stored = binding_storage._stored_binding_from_row(native_row, self._session)
             protocol = binding_storage._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=None)
             world = binding_storage._reconstruct_world_binding(binding_storage._stored_world_from_row(world_row, self._session), run)
-            request_id = self._codec(binding_storage._native_entry_evidence, run, revisions, creation, mutations, participations, evidence, protocol, world, stored)
+            request_id = self._codec(binding_storage._native_entry_evidence, run, prefix_revisions, creation, prefix_mutations, participations, evidence, protocol, world, stored)
             binding_storage._require(immutable is not None, "native immutable character missing")
             character_row = await self._read(select(PlayerCharacterCurrentRow).where(PlayerCharacterCurrentRow.player_character_id == immutable.player_character_id.value), locking=locking)
             controller_row = await self._read(select(PlayerCharacterControllerBindingRow).where(PlayerCharacterControllerBindingRow.controller_binding == immutable.controller_binding.value), locking=locking)
@@ -338,7 +345,8 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
             session_row = await self._read(select(GameSessionRow).where(GameSessionRow.session_id == participation.session_id), locking=locking)
             event_row = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == participation.session_id, DomainEventRow.sequence_no == 1), locking=locking)
             snapshot_row = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == participation.session_id), locking=locking)
-            return self._codec(binding_storage._complete_native_admission, run, protocol, world, evidence, request_id, participation, session_row, event_row, snapshot_row)
+            admission = self._codec(binding_storage._complete_native_admission, run, protocol, world, evidence, request_id, participation, session_row, event_row, snapshot_row)
+            return self._codec(binding_storage._complete_native_family, admission, current_run, mutations, evidence, session_row, snapshot_row)
         legacy = self._codec(binding_storage._legacy_entry_evidence, run, revisions, creation, mutations, participations)
         legacy_proof = None
         if legacy is not None:
@@ -2569,46 +2577,35 @@ class _SqlAlchemyRunRepositorySupport:
         evidence_run_ids: set[str] = set()
         for statement in evidence_statements:
             evidence_run_ids.update(await self._run_scalars(statement))
-        if not evidence_run_ids:
-            return None
-        if len(evidence_run_ids) != 1:
-            raise RunStoredRecordIntegrityError(
-                "player character has contradictory surviving binding evidence"
-            )
+        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1
+        active = []
+        for identity in sorted(evidence_run_ids):
+            run_id = RunId(value=identity)
+            statement = select(RunCurrentRow).where(RunCurrentRow.run_id == identity)
+            if for_update:
+                statement = statement.with_for_update()
+            current_row = await self._run_scalar(statement)
+            if current_row is None:
+                raise RunStoredRecordIntegrityError("surviving binding has no current Run")
+            run = await self._validate_complete_run(run_id, current_row=current_row, lock_related=for_update)
+            if run is None or run.player_character_binding is None:
+                raise RunStoredRecordIntegrityError("surviving binding has no canonical Run")
+            binding = run.player_character_binding
+            if binding.applicable_character_reference.player_character_id != player_character_id:
+                raise RunStoredRecordIntegrityError("surviving binding character mismatch")
+            if run.lifecycle_status is RunLifecycleStatus.TERMINATED:
+                classifier = SqlAlchemyRunProtocolBindingRepository(self._session)
+                family = await classifier._classify(run_id, locking=for_update)
+                if type(family) is not NativeRunTerminatedV1:
+                    raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
+            elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
+                active.append(run)
+            else:
+                raise RunStoredRecordIntegrityError("invalid surviving binding")
+        if len(active) > 1:
+            raise RunStoredRecordIntegrityError("multiple active character bindings")
+        return active[0] if active else None
 
-        run_id = RunId(value=next(iter(evidence_run_ids)))
-        statement = select(RunCurrentRow).where(
-            RunCurrentRow.run_id == run_id.value
-        )
-        if for_update:
-            statement = statement.with_for_update()
-        current_row = await self._run_scalar(statement)
-        if current_row is None:
-            raise RunStoredRecordIntegrityError(
-                "active binding has no current Run row"
-            )
-        run = await self._validate_complete_run(
-            run_id,
-            current_row=current_row,
-            lock_related=for_update,
-        )
-        if run is None:
-            raise RunStoredRecordIntegrityError(
-                "active binding has no canonical Run"
-            )
-        binding = run.player_character_binding
-        if (
-            not run.lifecycle_status.is_active_line
-            or binding is None
-            or binding.binding_state != "active"
-            or binding.inactivated_at is not None
-            or binding.applicable_character_reference.player_character_id
-            != player_character_id
-        ):
-            raise RunStoredRecordIntegrityError(
-                "surviving binding evidence is not one canonical active binding"
-            )
-        return run
 
     async def _validate_complete_run_family(
         self,
@@ -2935,6 +2932,7 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
             not in {
                 RunMutationKind.ATTACH_SESSION,
                 RunMutationKind.BIND_PLAYER_CHARACTER,
+                RunMutationKind.TERMINATE_NATIVE_RUN,
             }
         ):
             raise RunStoredRecordIntegrityError(
@@ -2971,6 +2969,13 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
                 raise RunStoredRecordIntegrityError(
                     "successor Run participation is inconsistent"
                 )
+        elif mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN:
+            _require_native_writer(self._session.info.get("native_admission_guard"))
+            if (current.state_version.value != 3 or current.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or run.trusted_participation_references != current.trusted_participation_references
+                    or run.player_character_binding != current.player_character_binding.model_copy(update={
+                        "binding_state": "historical", "inactivated_at": run.current_mutation_provenance.occurred_at})):
+                raise RunStoredRecordIntegrityError("invalid terminal successor")
         else:
             binding = run.player_character_binding
             if (
@@ -3026,7 +3031,7 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
         values["active_player_character_id"] = (
             run.player_character_binding.applicable_character_reference
             .player_character_id.value
-            if run.player_character_binding is not None
+            if run.player_character_binding is not None and run.player_character_binding.binding_state == "active"
             else None
         )
         values["updated_at"] = updated_at
@@ -3382,6 +3387,7 @@ class SqlAlchemyRunMutationReceiptRepository(
         if key.operation_namespace not in {
             RunOperationNamespace.ATTACH_SESSION_V1,
             RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+            RunOperationNamespace.TERMINATE_NATIVE_V1,
         }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         row = await self._run_scalar(
@@ -3409,6 +3415,7 @@ class SqlAlchemyRunMutationReceiptRepository(
         receipt: StoredRunSuccessReceipt,
         *,
         created_at: datetime,
+        exit_evidence: NativeRunExitEvidenceV1 | None = None,
     ) -> None:
         if (
             (
@@ -3416,6 +3423,7 @@ class SqlAlchemyRunMutationReceiptRepository(
                 receipt.command_kind,
             )
             not in {
+                (RunOperationNamespace.TERMINATE_NATIVE_V1, RunMutationKind.TERMINATE_NATIVE_RUN),
                 (
                     RunOperationNamespace.ATTACH_SESSION_V1,
                     RunMutationKind.ATTACH_SESSION,
@@ -3440,7 +3448,13 @@ class SqlAlchemyRunMutationReceiptRepository(
         )
         participation = result.participation_reference
         character_reference = result.applicable_character_reference
-        if receipt.command_kind is RunMutationKind.ATTACH_SESSION:
+        if receipt.command_kind is RunMutationKind.TERMINATE_NATIVE_RUN:
+            _require_native_writer(self._session.info.get("native_admission_guard"))
+            from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1
+            from deviation_protocol.domain.run import canonical_run_operation_bytes, revalidate_run_model
+            revalidate_run_model(exit_evidence, NativeRunExitEvidenceV1)
+            operation_evidence = canonical_run_operation_bytes(exit_evidence)
+        elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:
             if participation is None or character_reference is not None:
                 raise RunStoredRecordIntegrityError(
                     "Run attachment receipt result shape is invalid"

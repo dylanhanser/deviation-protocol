@@ -484,15 +484,16 @@ def _binding_from_storage(
     _require_utc(stored.bound_at, "bound_at")
     if stored.inactivated_at is not None:
         _require_utc(stored.inactivated_at, "inactivated_at")
-    if (
-        stored.binding_state != "active"
-        or stored.inactivated_at is not None
-    ):
-        raise _fail("P4-S1 stored binding must be complete and active")
+    terminal = (stored.state_version == 4 and stored.prior_state_version == 3
+                and stored.lifecycle_status == "terminated"
+                and stored.mutation_kind == "TERMINATE_NATIVE_RUN")
+    if ((not terminal and (stored.binding_state != "active" or stored.inactivated_at is not None))
+            or (terminal and (stored.binding_state != "historical" or stored.inactivated_at != stored.occurred_at))):
+        raise _fail("stored binding does not match the exact lifecycle edge")
     if (
         is_current
         and stored.active_player_character_id
-        != stored.binding_player_character_id
+        != (None if terminal else stored.binding_player_character_id)
     ):
         raise _fail(
             "active binding does not match the current-row backstop"
@@ -812,6 +813,24 @@ def mutation_receipt_from_storage(
             raise _fail(
                 "stored Run binding receipt columns are inconsistent"
             )
+    elif stored.command_kind == RunMutationKind.TERMINATE_NATIVE_RUN.value:
+        from deviation_protocol.domain.run_protocol_binding import decode_native_run_exit_evidence
+        try:
+            evidence = decode_native_run_exit_evidence(stored.operation_evidence_canonical)
+        except (TypeError, ValueError, AttributeError) as error:
+            raise _fail("invalid terminal evidence") from error
+        request = evidence.request
+        if (receipt.command_kind is not RunMutationKind.TERMINATE_NATIVE_RUN
+                or request.fingerprint() != receipt.fingerprint.value
+                or request.operation_id() != stored.operation_id
+                or request.run_id != stored.run_id.value
+                or request.continuous_story_line_id != stored.result_continuous_story_line_id.value
+                or stored.expected_state_version != 3 or stored.resulting_state_version != 4
+                or any(v is not None for v in (stored.participation_session_id,
+                    stored.participation_operation_id, stored.participation_source_reference,
+                    stored.result_player_character_id, stored.result_character_contract_version,
+                    stored.result_character_record_revision))):
+            raise _fail("terminal receipt association")
     else:
         raise _fail("stored Run mutation receipt command is not admitted")
     return receipt
@@ -951,10 +970,14 @@ def validate_stored_run_record_set(
             )
         binding_version = binding_versions[0]
         for item in history:
+            original_binding = current_binding
+            if current_run.lifecycle_status is RunLifecycleStatus.TERMINATED and item.state_version.value < 4:
+                original_binding = ReservedPlayerCharacterBinding(**{
+                    **current_binding.__dict__, "binding_state": "active", "inactivated_at": None})
             expected_binding = (
                 None
                 if item.state_version.value < binding_version
-                else current_binding
+                else original_binding
             )
             if item.player_character_binding != expected_binding:
                 raise _fail(
@@ -992,6 +1015,10 @@ def validate_stored_run_record_set(
     creation_command = creation_evidence_from_storage(
         creation_receipt.operation_evidence_canonical
     )
+    if current_run.lifecycle_status is RunLifecycleStatus.TERMINATED:
+        from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
+        if type(creation_command) is not NativeRunEntryCreationEvidenceV1:
+            raise _fail("terminal history requires the exact native admission prefix")
     initial = history[0]
     if (
         creation.result != creation_result(initial)
@@ -1107,6 +1134,23 @@ def validate_stored_run_record_set(
                 raise _fail(
                     "Run binding evidence does not bind adjacent history"
                 )
+        elif provenance.mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN:
+            from deviation_protocol.domain.run_protocol_binding import decode_native_run_exit_evidence
+            evidence = decode_native_run_exit_evidence(stored.operation_evidence_canonical)
+            request = evidence.request
+            if (before.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or before.state_version.value != 3 or after.state_version.value != 4
+                    or receipt.command_kind is not RunMutationKind.TERMINATE_NATIVE_RUN
+                    or request.run_id != after.run_id.value
+                    or request.continuous_story_line_id != after.continuous_story_line_id.value
+                    or request.session_id != before.trusted_participation_references[0].session_id
+                    or request.source_reference != provenance.source_reference.value
+                    or request.operation_id() != provenance.operation_id
+                    or request.controller_binding != creation_command.controller_operation.controller_binding.value
+                    or request.player_id != creation_command.player_id
+                    or provenance.occurred_at < before.current_mutation_provenance.occurred_at
+                    or after.trusted_participation_references != before.trusted_participation_references):
+                raise _fail("terminal evidence does not bind adjacent history")
         else:
             raise _fail("Run history contains an unsupported mutation")
 

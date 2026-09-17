@@ -184,6 +184,7 @@ class RunMutationKind(StrEnum):
     CREATE = "CREATE"
     ATTACH_SESSION = "ATTACH_SESSION"
     BIND_PLAYER_CHARACTER = "BIND_PLAYER_CHARACTER"
+    TERMINATE_NATIVE_RUN = "TERMINATE_NATIVE_RUN"
 
 
 class RunMutationProvenance(_StrictFrozenModel):
@@ -282,8 +283,8 @@ class CanonicalRun(_StrictFrozenModel):
         ):
             raise ValueError("Run provenance does not bind the canonical state")
         # P8-S2 admits one and only one active shape.  The older generic
-        # attachment operation deliberately remains pre-first-turn; later Run
-        # lifecycle transitions are not admitted here.
+        # attachment operation deliberately remains pre-first-turn. S7-1 adds
+        # only the exact native termination successor below.
         if self.lifecycle_status is RunLifecycleStatus.ACTIVE:
             if (
                 self.state_version.value != 3
@@ -294,8 +295,23 @@ class CanonicalRun(_StrictFrozenModel):
                 or self.player_character_binding is None
             ):
                 raise ValueError("pre_first_turn Run may become active only as the exact P8 entry successor")
+        elif self.lifecycle_status is RunLifecycleStatus.TERMINATED:
+            if (
+                self.state_version.value != 4
+                or current.prior_state_version != RunStateVersion(value=3)
+                or current.mutation_kind is not RunMutationKind.TERMINATE_NATIVE_RUN
+                or len(self.trusted_participation_references) != 1
+                or self.trusted_participation_references[0].joined_state_version.value != 3
+                or self.player_character_binding is None
+                or self.player_character_binding.inactivated_at != current.occurred_at
+                or current.occurred_at < creation.occurred_at
+            ):
+                raise ValueError("termination requires the exact native revision-four successor")
         elif self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
             raise ValueError("current Run implementation permits no terminal lifecycle state")
+        if (current.mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN
+                and self.lifecycle_status is not RunLifecycleStatus.TERMINATED):
+            raise ValueError("termination mutation requires terminal lifecycle")
         binding = self.player_character_binding
         if binding is not None:
             if (
@@ -305,9 +321,11 @@ class CanonicalRun(_StrictFrozenModel):
             ):
                 raise ValueError("player-character binding does not bind this Run")
             if (
-                binding.binding_state != "active"
-                or binding.inactivated_at is not None
-                or not self.lifecycle_status.is_active_line
+                (self.lifecycle_status.is_active_line and (
+                    binding.binding_state != "active" or binding.inactivated_at is not None))
+                or (self.lifecycle_status is RunLifecycleStatus.TERMINATED and (
+                    binding.binding_state != "historical" or binding.inactivated_at is None
+                    or binding.inactivated_at < binding.bound_at))
             ):
                 raise ValueError(
                     "P4-S1 permits only a complete active binding on an active line"
@@ -332,6 +350,8 @@ class CanonicalRun(_StrictFrozenModel):
         )
         sessions = tuple(item.session_id for item in self.trusted_participation_references)
         expected_successor_versions = set(range(2, self.state_version.value + 1))
+        if self.lifecycle_status is RunLifecycleStatus.TERMINATED:
+            expected_successor_versions.remove(4)
         participation_versions = set(versions)
         missing_versions = expected_successor_versions - participation_versions
         if (

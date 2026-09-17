@@ -90,7 +90,8 @@ Demo browser acceptance, including its unobserved storage ordering, failed saved
 restart-panel screenshot, coupled frontend restart and verified process cleanup.
 No general browser or wider-release guarantee follows. The
 [S7-1 exit contract](phase_3_3_s7_1_post_ending_run_exit_plan.md#7-public-contract-and-recovery)
-is proposed only; its routes and lifecycle behavior are not yet implemented.
+was approved and published at `9fab18d`; its routes and lifecycle behavior are
+implemented in the local S7-1 candidate awaiting independent implementation review.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1564,3 +1565,61 @@ approval. Neither review nor publication retroactively satisfies a historical
 gate. The published correction introduced no route, error code, new public
 `turn_id` field, DTO, response shape, OpenAPI schema, database schema, or
 migration.
+
+## P3.3-S7-1 Session-scoped native Run exit
+
+Status: local implementation candidate under the independently approved plan
+published at `9fab18d8de4ba05000e38ee37fa6a2e8da17940a`; one substantive
+independent implementation review remains. This is irreversible termination of
+one Run. A Session ending alone does not terminate it or release its character.
+
+| Route | Input | Success |
+| --- | --- | --- |
+| `GET /v1/sessions/{session_id}/run-status` | Existing bounded Session ID; no body/query | Closed `native-run-status/v1` status, no mutation |
+| `POST /v1/sessions/{session_id}/run-exit` | Same path; required Idempotency-Key; only `expected_run_state_version` and `expected_session_state_version` | HTTP 200 terminal status, also on exact replay |
+
+The exact response fields are `schema_version`, `session_id`, `run_id`,
+`run_state_version`, `session_state_version`, `lifecycle_status`, `can_exit`.
+Lifecycle is only `active` (Run revision 3) or `terminated` (revision 4).
+`can_exit` requires a validated native family, active current owned character,
+catalog-valid RESOLVED/FAILED ending and completed scenario memory. Public Run
+versions are positive signed int64 and Session versions are 0..2^63-1; Web
+rejects integers outside JavaScript's safe range. POST is limited to 1,024 UTF-8
+bytes and rejects BOM, invalid encoding, duplicate members/relevant raw headers,
+queries, extra fields, nulls and coerced scalars. GET rejects any body or query.
+OpenAPI operation IDs are `get_native_run_status` and `exit_native_run`.
+
+Ownership and stored-family integrity precede scoped receipt replay/conflict.
+For new requests, terminal/character eligibility precedes version comparison
+and ending eligibility. Exact exit replay after later admission returns the
+original committed versions without changing either Run's binding.
+
+| Condition | HTTP / code |
+| --- | --- |
+| Missing/foreign Session or controller | 404 / `SESSION_NOT_FOUND` |
+| Established legacy/standalone Session | 409 / `NATIVE_RUN_REQUIRED` |
+| Invalid transport | 422 / `REQUEST_VALIDATION_FAILED` |
+| Wrong expected versions for a new operation | 409 / `RUN_EXIT_STALE` |
+| Active Session, terminated Run or inactive character | 409 / `RUN_EXIT_NOT_AVAILABLE` |
+| Existing key with different intent | 409 / `IDEMPOTENCY_CONFLICT` |
+| Corrupt family or ending evidence | 409 / `SNAPSHOT_INVALID` |
+| Known contention | 409 / `RUN_EXIT_CONFLICT` |
+| Service unavailable, including Dynamic Demo | 503 / `RUN_EXIT_NOT_AVAILABLE` |
+| Commit/cleanup outcome unknown | 503 / `RUN_EXIT_OUTCOME_UNKNOWN` |
+| Unexpected failure | Existing opaque 500 envelope |
+
+No internal line, controller, operation/key, fingerprint, snapshot digest,
+ending predicate or SQL is projected. `public-run-context/v1` and the View
+shape are unchanged; historical Views retain the original admission context.
+
+Web binds status to the loaded Session ID, complete immutable native context,
+Run ID and Session version. Exit requires explicit confirmation. Uncertain
+dispatch retains the exact path/body/key in memory for explicit retry. GET
+reconciliation and reload never POST automatically. A successful exit retains
+history and the version-1 Session storage record. “返回设置” is a separate local
+storage operation; a removal failure blocks new admission and its retry only
+retries removal. Successful return refreshes eligibility/options and clears
+character/profile/world selections. Starting another journey requires fresh
+explicit selections and confirmation. No same-line continuity is inferred.
+
+See [implementation evidence and limits](run_protocol.md#p33-s7-1-implementation-candidate-evidence).

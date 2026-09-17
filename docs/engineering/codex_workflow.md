@@ -287,6 +287,12 @@ Do not use system Python, bare `python`, or global packages.
 If `.venv` is missing or broken, stop and report it.
 
 Chinese text must be read and written as UTF-8.
+External evidence wrappers must also configure their own stdout/stderr encoding,
+not only the subprocess environment. During S7-1 verification, an otherwise
+UTF-8 child produced a Vitest symbol that failed the wrapper's Windows legacy
+encoder before exit-status recording. Configure UTF-8 before streaming, retain
+the interrupted record, and rerun only the affected command when no trustworthy
+completion record exists. Do not interpret a wrapper failure as a test verdict.
 
 ## Offline and database modes
 

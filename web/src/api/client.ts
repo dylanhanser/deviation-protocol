@@ -2,6 +2,8 @@ import type { z } from "zod";
 
 import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
 import { ApiClientError } from "./errors";
+import { nativeRunStatusSchema, type NativeRunStatus } from "./schemas";
+import type { FrozenRunExit } from "../runExit";
 import { assertNativeResponse, validateSetup, type FrozenNativeEntry } from "../runSetup";
 import { runEntryOptionsSchema, nativeRunEntryResponseSchema, type RunEntryOptions,
   type NativeRunEntryRequest, type NativeRunEntryResponse, type PublicRunProfile, type PublicEntryWorld } from "./schemas";
@@ -99,6 +101,23 @@ async function parseJsonBody(response: Response): Promise<unknown> {
 }
 
 export class PublicApiClient {
+  getNativeRunStatus(sessionId: string, signal?: AbortSignal): Promise<NativeRunStatus> {
+    const id = sessionPathIdSchema.parse(sessionId);
+    return this.request(`v1/sessions/${encodeURIComponent(id)}/run-status`,
+      {method:"GET", ...(signal === undefined ? {} : {signal})}, 200, nativeRunStatusSchema);
+  }
+
+  async exitNativeRun(attempt: FrozenRunExit, signal?: AbortSignal): Promise<NativeRunStatus> {
+    const response = await this.request(attempt.url, {method:"POST",
+      headers:{"Content-Type":"application/json", "Idempotency-Key":attempt.key}, body:attempt.serializedBody,
+      ...(signal === undefined ? {} : {signal})}, 200, nativeRunStatusSchema);
+    const body = JSON.parse(attempt.serializedBody) as {expected_session_state_version: number};
+    if (response.session_id !== attempt.sessionId || response.run_id !== attempt.runId ||
+        response.session_state_version !== body.expected_session_state_version || response.lifecycle_status !== "terminated") {
+      throw responseError(200, "CONTRACT_MISMATCH");
+    }
+    return response;
+  }
   private readonly baseUrl: URL;
   private readonly fetchImplementation: FetchImplementation | undefined;
 

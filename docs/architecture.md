@@ -185,8 +185,10 @@ record subsequent independent approval/publication and representative local Demo
 browser acceptance separately from automated ASGI/rendered MSW proof. Browser
 storage ordering was not directly observed, the restart-panel screenshot failed,
 restart included Web, and verified owned-process cleanup replaced ineffective
-Ctrl+C. The S7-1 [post-ending Run exit proposal](phase_3_3_s7_1_post_ending_run_exit_plan.md)
-is unapproved and unimplemented; current ended Sessions still leave Runs active.
+Ctrl+C. The S7-1 [post-ending Run exit plan](phase_3_3_s7_1_post_ending_run_exit_plan.md)
+was approved and published at `9fab18d`; its local implementation candidate
+adds explicit termination after a valid Session ending. Ending alone still
+leaves the Run active. S7-2 and later continuity remain unauthorized.
 It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
 Demo inserts require an explicit native-admission UoW capability. Both new maps
@@ -274,8 +276,9 @@ or projection, Demo, Web, Provider integration, scenario/world/visit/region/
 revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
-described above; S5 internal implementation is published, S6 public integration
-is an implementation candidate and S7 remains unauthorized; the
+described above; S5 internal implementation and S6 public integration are
+published. S7-1 is a local implementation candidate under the approved plan
+published at `9fab18d`; S7-2 and later remain unauthorized. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1171,7 +1174,7 @@ components described above:
   published S3 supplies durable binding reconstruction. Published S4 adds
   independently approved internal admission/world freezing; published S5 applies
   objective mechanics and compiles trusted context. S6 public activation is
-  independently approved and published at `2f144599`; S7-1 is a plan candidate
+  independently approved and published at `2f144599`; S7-1 is a local implementation candidate
   and same-line S7 continuity remains later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
@@ -1647,3 +1650,46 @@ the bounded experimental state. The corrective aggregate and its status
 synchronization were independently approved, committed, pushed, published, and
 closed. That closeout does not establish production Provider distribution and
 does not change paused Phase 6, inactive Phase 7, or completed Phase 8/P8-S6.
+
+## P3.3-S7-1 native Run termination candidate
+
+The approved plan at `9fab18d` is implemented as a local corrected candidate
+awaiting focused independent re-review after one `CHANGES_REQUIRED` nullable
+terminal-CHECK finding. The only new transition is a
+validated native active revision 3 to terminated revision 4. The original
+`NativeRunAdmissionV1` stays strictly revision three. `NativeRunTerminatedV1`
+contains that independently reconstructed admission prefix, the exact terminal
+successor and canonical exit evidence bound to the unchanged ended snapshot.
+
+`RunExitService` resolves ownership through Session participation, then reuses
+the existing pinned native UoW and shared advisory lock. It locks the character
+before Run/Session authority and revalidates after locking. Turn readers retain
+their nonlocking Run reconstruction. Scoped receipt replay/conflict precedes new
+operation checks. One transaction appends revision four, CAS-updates Run current,
+historicalizes only its binding, nulls its active uniqueness slot and writes the
+exit receipt. Character lifecycle/revisions, all Session history, protocol and
+world bindings remain unchanged. Uncertain commit or cleanup never compensates,
+retries automatically or admits a replacement Run.
+
+Migration `20260917_0008_native_run_exit.py` follows `20260916_0007` and changes
+only the mutation-branch checks on `run_revisions`, `run_current` and
+`run_mutation_receipts`, with matching ORM metadata. Required nullable operands
+in the new terminal branches have explicit non-NULL guards, including prior
+version and binding state; equality alone does not reject SQL UNKNOWN. Existing
+branches and column nullability remain unchanged. Both directions share the
+writer lock. Downgrade uses current locking reads to refuse complete or partial
+terminal evidence before DDL. Each table's ALTER is one statement; a later
+failure can leave earlier constraint changes committed. The migration reports
+the completed constraints/stage and disposes unsafe owners; it never claims DDL
+rollback or reconnect-and-continue.
+
+SQL and Demo classifiers and admission/View/turn consumers distinguish active
+admission from historical terminal context. Eligibility scans validate historical
+families without treating their immutable character references as active slots.
+Demo publishes the same transition through its existing atomic trial store.
+Normal production and Demo service graphs share the exit service; Dynamic Demo
+does not expose native authority. Web recovery remains GET-only until an explicit
+exit or admission confirmation. The [public contract](public_client_contract.md#p33-s7-1-session-scoped-native-run-exit)
+and [evidence](run_protocol.md#p33-s7-1-implementation-candidate-evidence) own the
+transport, recovery and verification details. S7-2/later continuity, new content,
+Phase 3.4 and S7/Phase 3.3 completion remain outside this increment.

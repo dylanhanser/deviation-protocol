@@ -145,7 +145,7 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("native mechanics catalogue is incompatible")
 
     async def load(self, uow, game_session, state, definition):
-        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, LegacyRunCompatibilityV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, NativeRunTerminatedV1, LegacyRunCompatibilityV1
         session_id = game_session.session_id
         participation = await uow.run_participations.get(session_id)
         reverse = await uow.run_participations.find_attachment_run_ids(session_id)
@@ -161,6 +161,10 @@ class NativeTurnMechanicsCoordinator:
             if family.session_id != session_id:
                 raise NativeTurnBindingError(session_id)
             return None
+        classified = family
+        if type(family) is NativeRunTerminatedV1:
+            revalidate_run_model(family, NativeRunTerminatedV1)
+            family = family.admission
         if type(family) is not NativeRunAdmissionV1:
             raise NativeTurnBindingError(session_id)
         revalidate_run_model(family, NativeRunAdmissionV1)
@@ -179,7 +183,7 @@ class NativeTurnMechanicsCoordinator:
             raise NativeTurnBindingError(session_id)
         # Validate original state before snapshot serialization can normalize it.
         self.validate_state(state, session_id)
-        return family
+        return classified
 
     def validate_state(self, state, session_id):
         try:

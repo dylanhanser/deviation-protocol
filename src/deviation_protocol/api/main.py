@@ -981,6 +981,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     install_exception_handlers(app)
     from deviation_protocol.api.run_protocol_routes import install_run_protocol_routes
     install_run_protocol_routes(app)
+    from deviation_protocol.api.run_exit_routes import install_run_exit_routes
+    install_run_exit_routes(app)
 
     # Starlette does not dispatch an empty path parameter to an APIRoute, so the
     # normal parameter validation handler cannot see this one malformed spelling

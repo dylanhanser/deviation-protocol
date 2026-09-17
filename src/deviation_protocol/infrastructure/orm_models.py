@@ -840,17 +840,7 @@ class RunRevisionRow(Base):
             name="ck_run_revisions_lifecycle",
         ),
         CheckConstraint(
-            "("
-            "mutation_kind = 'CREATE' AND state_version = 1 "
-            "AND prior_state_version IS NULL "
-            "AND creation_operation_id = operation_id "
-            "AND creation_source_reference = source_reference "
-            "AND creation_occurred_at = occurred_at"
-            ") OR ("
-            "mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') "
-            "AND state_version BETWEEN 2 AND 9223372036854775807 "
-            "AND prior_state_version = state_version - 1"
-            ")",
+            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at)",
             name="ck_run_revisions_mutation_matrix",
         ),
         CheckConstraint(
@@ -993,17 +983,7 @@ class RunCurrentRow(Base):
             name="ck_run_current_lifecycle",
         ),
         CheckConstraint(
-            "("
-            "mutation_kind = 'CREATE' AND state_version = 1 "
-            "AND prior_state_version IS NULL "
-            "AND creation_operation_id = operation_id "
-            "AND creation_source_reference = source_reference "
-            "AND creation_occurred_at = occurred_at"
-            ") OR ("
-            "mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') "
-            "AND state_version BETWEEN 2 AND 9223372036854775807 "
-            "AND prior_state_version = state_version - 1"
-            ")",
+            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at AND active_player_character_id IS NULL)",
             name="ck_run_current_mutation_matrix",
         ),
         CheckConstraint(
@@ -1305,27 +1285,7 @@ class RunMutationReceiptRow(Base):
             name="ck_run_mutation_receipts_version_successor",
         ),
         CheckConstraint(
-            "("
-            "operation_namespace = 'run.attach-session/v1' "
-            "AND command_kind = 'ATTACH_SESSION' "
-            "AND result_schema_version = 'run.attach-session-result/v1' "
-            "AND participation_session_id IS NOT NULL "
-            "AND participation_operation_id IS NOT NULL "
-            "AND participation_source_reference IS NOT NULL "
-            "AND result_player_character_id IS NULL "
-            "AND result_character_contract_version IS NULL "
-            "AND result_character_record_revision IS NULL"
-            ") OR ("
-            "operation_namespace = 'run.bind-player-character/v1' "
-            "AND command_kind = 'BIND_PLAYER_CHARACTER' "
-            "AND result_schema_version = 'run.bind-player-character-result/v1' "
-            "AND participation_session_id IS NULL "
-            "AND participation_operation_id IS NULL "
-            "AND participation_source_reference IS NULL "
-            "AND result_player_character_id IS NOT NULL "
-            "AND result_character_contract_version IS NOT NULL "
-            "AND result_character_record_revision IS NOT NULL"
-            ")",
+            "(operation_namespace = 'run.attach-session/v1' AND command_kind = 'ATTACH_SESSION' AND result_schema_version = 'run.attach-session-result/v1' AND participation_session_id IS NOT NULL AND participation_operation_id IS NOT NULL AND participation_source_reference IS NOT NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL) OR (operation_namespace = 'run.bind-player-character/v1' AND command_kind = 'BIND_PLAYER_CHARACTER' AND result_schema_version = 'run.bind-player-character-result/v1' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NOT NULL AND result_character_contract_version IS NOT NULL AND result_character_record_revision IS NOT NULL) OR (operation_namespace = 'run.terminate-native/v1' AND command_kind = 'TERMINATE_NATIVE_RUN' AND result_schema_version = 'run.terminate-native-result/v1' AND expected_state_version = 3 AND resulting_state_version = 4 AND resulting_lifecycle_status = 'terminated' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL)",
             name="ck_run_mutation_receipts_protocol_matrix",
         ),
         CheckConstraint(

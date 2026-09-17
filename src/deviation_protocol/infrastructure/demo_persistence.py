@@ -5,7 +5,10 @@ from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime
 from types import TracebackType
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping, Sequence, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1
 
 from deviation_protocol.application import ports as application_ports
 from deviation_protocol.application import run_operations as run_operations_module
@@ -492,7 +495,7 @@ def _stored_run_current(
         **_run_core_values(run),
         active_player_character_id=(
             binding.applicable_character_reference.player_character_id.value
-            if binding is not None
+            if binding is not None and binding.binding_state == "active"
             else None
         ),
         created_at=created_at,
@@ -647,14 +650,10 @@ def _run_from_maps(
         )
         if stored_id == identity
     )
-    mutation_receipts = tuple(
-        item
-        for (stored_id, _, _), item in sorted(
-            maps.run_mutation_receipts.items(),
-            key=lambda pair: (pair[1].resulting_state_version, pair[0]),
-        )
-        if stored_id == identity
-    )
+    mutation_receipts = tuple(item for (stored_id, _, _), item in maps.run_mutation_receipts.items() if stored_id == identity)
+    for item in mutation_receipts:
+        run_mutation_receipt_from_storage(item)
+    mutation_receipts = tuple(sorted(mutation_receipts, key=lambda item: (item.resulting_state_version, item.operation_id.value)))
     participation_records = tuple(
         item
         for item in maps.run_participations.values()
@@ -698,10 +697,12 @@ def _run_from_maps(
     )
 
 
-def _active_run_for_character(
+async def _active_run_for_character(
     maps: _AuthorityMaps,
+    classifier,
     player_character_id: PlayerCharacterId,
 ) -> CanonicalRun | None:
+    from deviation_protocol.domain.run import RunLifecycleStatus
     identity = player_character_id.value
     run_ids = {
         item.run_id.value
@@ -719,30 +720,26 @@ def _active_run_for_character(
         for item in maps.run_mutation_receipts.values()
         if item.result_player_character_id == identity
     )
-    if not run_ids:
-        return None
-    if len(run_ids) != 1:
-        raise RunStoredRecordIntegrityError(
-            "player character has contradictory surviving binding evidence"
-        )
-    run = _run_from_maps(maps, RunId(value=next(iter(run_ids))))
-    if run is None:
-        raise RunStoredRecordIntegrityError(
-            "active binding has no canonical Run"
-        )
-    binding = run.player_character_binding
-    if (
-        not run.lifecycle_status.is_active_line
-        or binding is None
-        or binding.binding_state != "active"
-        or binding.inactivated_at is not None
-        or binding.applicable_character_reference.player_character_id
-        != player_character_id
-    ):
-        raise RunStoredRecordIntegrityError(
-            "surviving binding evidence is not one canonical active binding"
-        )
-    return run
+    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1
+    active = []
+    for identity in sorted(run_ids):
+        run = _run_from_maps(maps, RunId(value=identity))
+        if run is None or run.player_character_binding is None:
+            raise RunStoredRecordIntegrityError("surviving binding has no canonical Run")
+        binding = run.player_character_binding
+        if binding.applicable_character_reference.player_character_id != player_character_id:
+            raise RunStoredRecordIntegrityError("surviving binding character mismatch")
+        if run.lifecycle_status is RunLifecycleStatus.TERMINATED:
+            family = await classifier(run_id=run.run_id)
+            if type(family) is not NativeRunTerminatedV1:
+                raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
+        elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
+            active.append(run)
+        else:
+            raise RunStoredRecordIntegrityError("invalid surviving binding")
+    if len(active) > 1:
+        raise RunStoredRecordIntegrityError("multiple active character bindings")
+    return active[0] if active else None
 
 
 def _character_mutation_evidence(
@@ -922,8 +919,8 @@ class DemoPlayerCharacterRepository(PlayerCharacterRepository):
             if record.lifecycle is not PlayerCharacterLifecycle.ACTIVE:
                 continue
             try:
-                occupied = _active_run_for_character(
-                    maps, record.player_character_id
+                occupied = await _active_run_for_character(
+                    maps, self._uow.run_protocol_bindings.get_classified, record.player_character_id
                 )
             except RunStoredRecordIntegrityError as exc:
                 raise PlayerCharacterStoredRecordIntegrityError(
@@ -1311,8 +1308,8 @@ class DemoRunRepository(RunRepository):
         self, player_character_id: PlayerCharacterId
     ) -> CanonicalRun | None:
         self._uow._ensure_open()
-        return _active_run_for_character(
-            self._uow._visible_authority_maps(), player_character_id
+        return await _active_run_for_character(
+            self._uow._visible_authority_maps(), self._uow.run_protocol_bindings.get_classified, player_character_id
         )
 
     async def get_active_for_player_character_for_update(
@@ -1384,12 +1381,15 @@ class DemoRunRepository(RunRepository):
         self._uow._ensure_open()
         run = validate_canonical_run(run)
         prior = run.current_mutation_provenance.prior_state_version
+        if run.current_mutation_provenance.mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN:
+            self._uow._require_native_writer()
         if (
             prior is None
             or run.current_mutation_provenance.mutation_kind
             not in {
                 RunMutationKind.ATTACH_SESSION,
                 RunMutationKind.BIND_PLAYER_CHARACTER,
+                RunMutationKind.TERMINATE_NATIVE_RUN,
             }
         ):
             raise RunStoredRecordIntegrityError(
@@ -1455,7 +1455,7 @@ class DemoRunRepository(RunRepository):
                 "successor Run revision does not match current candidate"
             )
         binding = run.player_character_binding
-        if binding is not None:
+        if binding is not None and binding.binding_state == "active":
             character_id = (
                 binding.applicable_character_reference.player_character_id.value
             )
@@ -1738,6 +1738,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         if key.operation_namespace not in {
             RunOperationNamespace.ATTACH_SESSION_V1,
             RunOperationNamespace.BIND_PLAYER_CHARACTER_V1,
+            RunOperationNamespace.TERMINATE_NATIVE_V1,
         }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         stored = self._uow._visible_authority_maps().run_mutation_receipts.get(
@@ -1763,6 +1764,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         receipt: StoredRunSuccessReceipt,
         *,
         created_at: datetime,
+        exit_evidence: NativeRunExitEvidenceV1 | None = None,
     ) -> None:
         self._uow._ensure_open()
         if (
@@ -1771,6 +1773,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
                 receipt.command_kind,
             )
             not in {
+                (RunOperationNamespace.TERMINATE_NATIVE_V1, RunMutationKind.TERMINATE_NATIVE_RUN),
                 (
                     RunOperationNamespace.ATTACH_SESSION_V1,
                     RunMutationKind.ATTACH_SESSION,
@@ -1803,7 +1806,13 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         )
         participation = result.participation_reference
         character_reference = result.applicable_character_reference
-        if receipt.command_kind is RunMutationKind.ATTACH_SESSION:
+        if receipt.command_kind is RunMutationKind.TERMINATE_NATIVE_RUN:
+            self._uow._require_native_writer()
+            from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1
+            from deviation_protocol.domain.run import canonical_run_operation_bytes, revalidate_run_model
+            revalidate_run_model(exit_evidence, NativeRunExitEvidenceV1)
+            operation_evidence = canonical_run_operation_bytes(exit_evidence)
+        elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:
             if participation is None or character_reference is not None:
                 raise RunStoredRecordIntegrityError(
                     "Run attachment receipt result shape is invalid"
@@ -2335,13 +2344,16 @@ def _classify_demo_run(maps, run_id, sessions, snapshots, events):
 
         if type(evidence) is NativeRunEntryCreationEvidenceV1:
             b._require(stored is not None and world_stored is not None, "incomplete native bindings")
+            current_run = run
+            run, prefix_revisions, prefix_mutations = b._native_admission_prefix(run, revisions, mutations)
             protocol = b._reconstruct_native_binding(stored, canonical_run=run, legacy_proof=None)
             world = b._reconstruct_world_binding(world_stored, run)
-            request_id = b._native_entry_evidence(run, revisions, creation, mutations, participations,
+            request_id = b._native_entry_evidence(run, prefix_revisions, creation, prefix_mutations, participations,
                                                 evidence, protocol, world, stored)
             b._validate_native_character(run, evidence, immutable, *character_rows())
-            return b._complete_native_admission(run, protocol, world, evidence, request_id,
-                                               participations[0], *session_rows(participations[0]))
+            rows = session_rows(participations[0])
+            admission = b._complete_native_admission(run, protocol, world, evidence, request_id, participations[0], *rows)
+            return b._complete_native_family(admission, current_run, mutations, evidence, rows[0], rows[2])
         legacy = b._legacy_entry_evidence(run, revisions, creation, mutations, participations)
         proof = None
         if legacy is not None:

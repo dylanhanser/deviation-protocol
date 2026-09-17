@@ -601,3 +601,40 @@ def _complete_native_admission(run, protocol, world, evidence, request_id, parti
     _validate_entry_session_fields(run, evidence, request_id, participation, session_row, event_row, snapshot_row)
     _require(vars(session_row)["player_id"] == evidence.player_id, "native Session player association")
     return NativeRunAdmissionV1(canonical_run=run, protocol_binding=protocol, world_binding=world)
+
+
+def _native_admission_prefix(run, revisions, mutations):
+    from deviation_protocol.domain.run import RunLifecycleStatus
+    from deviation_protocol.infrastructure.run_persistence import canonical_run_from_revision_storage
+    if run.lifecycle_status is not RunLifecycleStatus.TERMINATED:
+        return run, revisions, mutations
+    _require(tuple(r.state_version for r in revisions) == (1, 2, 3, 4)
+             and tuple(r.resulting_state_version for r in mutations) == (2, 3, 4), "terminal history shape")
+    prefix = canonical_run_from_revision_storage(revisions[2], participations=run.trusted_participation_references)
+    return prefix, revisions[:3], mutations[:2]
+
+
+def _complete_native_family(admission, run, mutations, creation_evidence, session_row, snapshot_row):
+    from deviation_protocol.domain.run import RunLifecycleStatus
+    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1, decode_native_run_exit_evidence
+    from deviation_protocol.domain.state import GameState
+    from deviation_protocol.application.narrative_outcome_policy import state_fingerprint
+    if run.lifecycle_status is not RunLifecycleStatus.TERMINATED:
+        return admission
+    evidence = decode_native_run_exit_evidence(mutations[-1].operation_evidence_canonical)
+    request = evidence.request
+    state = GameState.model_validate_json(json.dumps(vars(snapshot_row)["state_json"], ensure_ascii=False), strict=True)
+    runtime = state.scenario_runtime
+    records = tuple(r for r in state.player_memory.scenario_records if r.scenario_id == evidence.scenario_id)
+    _require(vars(session_row)["state_version"] == vars(snapshot_row)["state_version"] == evidence.session_state_version
+             and request.player_id == creation_evidence.player_id == vars(session_row)["player_id"]
+             and request.controller_binding == creation_evidence.controller_operation.controller_binding.value
+             and runtime is not None and runtime.ending_status.value == evidence.ending_status
+             and runtime.ending_id == evidence.ending_id
+             and runtime.scenario_id == evidence.scenario_id
+             and runtime.scenario_content_version == state.content_version == evidence.scenario_content_version
+             and len(records) == 1 and records[0].status.value == "COMPLETED"
+             and records[0].ending_id == evidence.ending_id
+             and records[0].scenario_content_version == evidence.scenario_content_version
+             and state_fingerprint(state) == evidence.snapshot_sha256, "terminal ending evidence")
+    return NativeRunTerminatedV1(admission=admission, canonical_run=run, exit_evidence=evidence)

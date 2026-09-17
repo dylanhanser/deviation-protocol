@@ -33,6 +33,7 @@ class ApiServices:
         native_run_admission_service: RunEntryService | None = None
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
+    run_exit_service: object | None = None
 
     def __post_init__(self):
         if self.native_run_admission_service is not None:
@@ -44,6 +45,13 @@ class ApiServices:
                     or self.native_run_admission_service.controller_binding_resolver is not self.session_service.native_controller_resolver):
                 raise ValueError("incomplete native public service graph")
             project_entry_options(self.session_service, coordinator)
+            if self.run_exit_service is None:
+                from deviation_protocol.application.run_exit_service import RunExitService
+                admission = self.native_run_admission_service
+                object.__setattr__(self, "run_exit_service", RunExitService(
+                    uow_factory=admission.uow_factory, session_service=self.session_service,
+                    controller_binding_resolver=admission.controller_binding_resolver,
+                    source_reference=admission.source_reference, clock=admission.clock))
         elif getattr(self.session_service, "native_view_coordinator", None) is not None:
             raise ValueError("native View without native admission")
 
