@@ -56,8 +56,9 @@ published at `34dc752295ba270617e5d29020f3a0c0b133544e`. Its earlier
 deferred. The S5 plan is independently approved and published at `ff866d2`.
 S5 implementation is independently approved with DF-001 deferred and published
 at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published at `4365721`; its separately authorized
-implementation is a candidate awaiting independent implementation review. S7
-remains unauthorized. Phase 3.3 remains incomplete.
+implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
+S7-2 is a documentation plan candidate, not implemented continuity. Phase 3.3
+remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -186,9 +187,11 @@ browser acceptance separately from automated ASGI/rendered MSW proof. Browser
 storage ordering was not directly observed, the restart-panel screenshot failed,
 restart included Web, and verified owned-process cleanup replaced ineffective
 Ctrl+C. The S7-1 [post-ending Run exit plan](phase_3_3_s7_1_post_ending_run_exit_plan.md)
-was approved and published at `9fab18d`; its local implementation candidate
+was approved and published at `9fab18d`; its implementation published at `41d68aac`
 adds explicit termination after a valid Session ending. Ending alone still
-leaves the Run active. S7-2 and later continuity remain unauthorized.
+leaves the Run active. S7-2 continuity is proposed only; implementation remains
+unauthorized. The [S7-1 browser record](run_protocol.md#s7-1-publication-and-local-browser-evidence)
+adds bounded both-ending/exit/re-entry evidence at the published implementation.
 It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
 Demo inserts require an explicit native-admission UoW capability. Both new maps
@@ -277,8 +280,8 @@ revisit/progression/continuity behavior, or identity or memory schema. The
 separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
 described above; S5 internal implementation and S6 public integration are
-published. S7-1 is a local implementation candidate under the approved plan
-published at `9fab18d`; S7-2 and later remain unauthorized. The
+published. S7-1 is published at `41d68aac` under the approved plan
+at `9fab18d`; S7-2 is a plan candidate and later implementation remains unauthorized. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1174,8 +1177,9 @@ components described above:
   published S3 supplies durable binding reconstruction. Published S4 adds
   independently approved internal admission/world freezing; published S5 applies
   objective mechanics and compiles trusted context. S6 public activation is
-  independently approved and published at `2f144599`; S7-1 is a local implementation candidate
-  and same-line S7 continuity remains later work: [`run_protocol.md`](run_protocol.md).
+  independently approved and published at `2f144599`; S7-1 exit is published at
+  `41d68aac`. Same-line S7-2 continuity remains a proposed documentation candidate:
+  [S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider
@@ -1651,11 +1655,13 @@ synchronization were independently approved, committed, pushed, published, and
 closed. That closeout does not establish production Provider distribution and
 does not change paused Phase 6, inactive Phase 7, or completed Phase 8/P8-S6.
 
-## P3.3-S7-1 native Run termination candidate
+<a id="p33-s7-1-native-run-termination-candidate"></a>
 
-The approved plan at `9fab18d` is implemented as a local corrected candidate
-awaiting focused independent re-review after one `CHANGES_REQUIRED` nullable
-terminal-CHECK finding. The only new transition is a
+## P3.3-S7-1 published native Run termination
+
+The approved plan at `9fab18d` is implemented and published at `41d68aac`.
+The first `CHANGES_REQUIRED` nullable terminal-CHECK finding and correction
+remain historical review evidence. The only new transition is a
 validated native active revision 3 to terminated revision 4. The original
 `NativeRunAdmissionV1` stays strictly revision three. `NativeRunTerminatedV1`
 contains that independently reconstructed admission prefix, the exact terminal
@@ -1693,3 +1699,41 @@ exit or admission confirmation. The [public contract](public_client_contract.md#
 and [evidence](run_protocol.md#p33-s7-1-implementation-candidate-evidence) own the
 transport, recovery and verification details. S7-2/later continuity, new content,
 Phase 3.4 and S7/Phase 3.3 completion remain outside this increment.
+
+## Proposed P3.3-S7-2 continuation boundary
+
+The [S7-2 plan candidate](phase_3_3_s7_2_same_line_world_continuation_plan.md)
+proposes one continuation-only authored destination, preserving the existing
+Run/line, admission, protocol and character binding. Product choices, including
+both-ending eligibility and resource carryover, await explicit user approval;
+the corrected plan awaits focused independent re-review. Nothing in this section
+is implemented or a second source of approval authority.
+
+The first review returned CHANGES_REQUIRED: one blocking predecessor-navigation
+gap and one non-blocking ending-priority contradiction. Both receive bounded
+contract corrections in the plan; unchanged review conclusions are preserved.
+This does not claim a passing re-review or product approval.
+
+The proposed minimum extension is a closed revision-four active continuation
+family, immutable world roots and visits, an authoritative current position,
+and version-specific content/service routing. Original Session snapshots and
+memory stay with their validated historical Session. A new Session carries the
+player's actual state, not a refill or copied old runtime/NPC memory. New turn
+evidence binds the current visit while admission context remains immutable.
+The plan also extends explicit exit to revision five after the second ending,
+so continuation does not recreate the occupied-character dead end.
+
+Existing one-pack loading, revision-three native turn evidence and one-runtime
+memory validation cannot be assumed to support this already. The plan names
+their direct consumers, schema/reconstruction changes, atomic handoff and
+GET-only client recovery. Continuation GET adds the plan's required nullable
+`predecessor` association, derived from the fully reconstructed same-Run/line
+receipt, visits, roots, participations and position after ownership checks.
+SQL and Demo disclose it only from one consistent read snapshot; owned-family
+missing/crossed evidence rejects as SNAPSHOT_INVALID, never null repair.
+The Web keeps successor storage v1/current recovery separate from historical
+display, validates the reciprocal GET edge and complete View associations, and
+returns by GET without enabling predecessor writes or accepting stale reads.
+Revisits, region unlocking, anti-farming, authorized
+canon transitions and final integrated evidence remain allocated to S7-3/4/5.
+S7 and Phase 3.3 remain incomplete.

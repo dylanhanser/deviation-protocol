@@ -91,7 +91,9 @@ restart-panel screenshot, coupled frontend restart and verified process cleanup.
 No general browser or wider-release guarantee follows. The
 [S7-1 exit contract](phase_3_3_s7_1_post_ending_run_exit_plan.md#7-public-contract-and-recovery)
 was approved and published at `9fab18d`; its routes and lifecycle behavior are
-implemented in the local S7-1 candidate awaiting independent implementation review.
+implemented and published at `41d68aac13ca9129b7f6e08fad5f015987603fda`.
+Its [bounded local browser evidence](run_protocol.md#s7-1-publication-and-local-browser-evidence)
+is distinct from the earlier S6 report. S7-2 remains a proposed extension below.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1568,9 +1570,9 @@ migration.
 
 ## P3.3-S7-1 Session-scoped native Run exit
 
-Status: local implementation candidate under the independently approved plan
-published at `9fab18d8de4ba05000e38ee37fa6a2e8da17940a`; one substantive
-independent implementation review remains. This is irreversible termination of
+Status: implemented and published at
+`41d68aac13ca9129b7f6e08fad5f015987603fda`, under the independently approved
+plan at `9fab18d8de4ba05000e38ee37fa6a2e8da17940a`. This is irreversible termination of
 one Run. A Session ending alone does not terminate it or release its character.
 
 | Route | Input | Success |
@@ -1623,3 +1625,44 @@ character/profile/world selections. Starting another journey requires fresh
 explicit selections and confirmation. No same-line continuity is inferred.
 
 See [implementation evidence and limits](run_protocol.md#p33-s7-1-implementation-candidate-evidence).
+
+## Proposed P3.3-S7-2 same-line continuation
+
+The [S7-2 plan candidate](phase_3_3_s7_2_same_line_world_continuation_plan.md#8-public-api-projections-and-web-recovery)
+owns the proposed contracts and its sole review gate. Its first review returned
+CHANGES_REQUIRED for one blocking predecessor-navigation gap, with a non-blocking
+ending-priority contradiction also identified. The bounded corrected candidate
+awaits focused re-review and user approval of unchanged P01–P08; these are not
+implemented routes, DTOs or content.
+
+It proposes Session-scoped GET/POST `run-continuation`: the player confirms
+continuation, while the server selects one authored eligible successor and
+atomically creates its Session in the same Run/line. It preserves the separate
+irreversible exit choice. A terminated Run cannot continue. The existing
+`public-run-context/v1` remains original admission settings, and View/storage v1
+remain unchanged; a separate allowlisted result/status identifies the new visit
+and committed successor. Its GET status additionally requires `predecessor`,
+null for the first Session and a closed `{session_id, session_state_version,
+scenario_id, scenario_content_version, visit}` association for the second,
+including after exit. Exact types/bounds are owned by plan section 8. Disclosure
+requires ownership and complete same-Run/line committed-edge reconstruction;
+missing/foreign path authority is 404, owned-family missing/crossed/contradictory
+evidence is opaque 409 SNAPSHOT_INVALID, never a fabricated null predecessor.
+Exit/status retain their shape with narrowly extended
+current-Session/version eligibility for the new family.
+
+The proposed Web handoff retains exact uncertain requests, stores the validated
+new Session before View, and enforces complete immutable-context plus new
+scenario/content/visit associations. GET reconciliation/reload never POST.
+After successor-only storage-v1 reload, its GET supplies the predecessor without
+page memory or a retained POST response. History GETs validate the old View's
+complete association and the reciprocal successor link before display; returning
+to the authoritative current Session also uses GET. Historical display has its
+own association, keeps successor storage byte-identical and cannot enable old
+gameplay/continuation/exit or mutation retry. Navigation generation checks reject
+stale completions after return, reload or client replacement. Storage retry never
+repeats continuation. C08 requires the combined public continuation -> discard
+page memory -> reload -> read old history -> return journey with zero write
+requests during reload/navigation and no persistent mutation. Existing S6 and
+S7-1 recovery and explicit-selection regressions remain required. No S7-2 acceptance has run;
+browser acceptance requires separate authorization. S7/Phase 3.3 remain incomplete.
