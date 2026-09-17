@@ -27,8 +27,11 @@ at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published
 at `4365721`; separately authorized S6 implementation received `CHANGES_REQUIRED`
 for two Web findings. Focused re-review closed character selection and returned
 a second `CHANGES_REQUIRED` solely for automatic recovery's scenario/content
-binding. The corrected recovery candidate awaits focused independent re-review.
-S7 remains later.
+binding. Subsequent independent approval and publication at
+`2f144599af5977e871c7a3466c52896b6a36510c` close S6 implementation. Its bounded
+local Demo browser journey passed. S7-1 is an unapproved post-ending Run exit
+plan candidate; remaining S7 work stays allocated and unimplemented. DF-002
+records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
@@ -99,11 +102,12 @@ mechanics, catalogue, relationship or canon authority.
 The plan owns exact contracts, Demo adapters, Web uncertainty and GET-only
 recovery, dependency-derived paths, verification allocation and review tokens.
 [Public contract status](public_client_contract.md#proposed-p33-s6-native-public-extension)
-describes the implemented candidate. The first `CHANGES_REQUIRED` covered two Web
-findings; focused re-review closed character selection but returned a second
-`CHANGES_REQUIRED` for automatic recovery's scenario/content binding. Next is
-focused re-review of that correction by the same independent reviewer. No candidate
-approval or Git writes are claimed. DF-001 remains deferred. No separate S5 closeout,
+describes the implementation independently approved and published at `2f144599`.
+The two earlier `CHANGES_REQUIRED` reviews remain history; current approval and
+bounded browser evidence are recorded [below](#s6-publication-and-local-browser-evidence).
+The [S7-1 plan](phase_3_3_s7_1_post_ending_run_exit_plan.md) proposes the first
+post-ending Run transition but is unapproved and unimplemented. DF-001/DF-002
+remain deferred. No separate S6 closeout,
 new story/world content, production Provider, S7 continuity or Phase 3.4 state
 is included. Phase 3.3 remains incomplete and no release readiness is claimed.
 
@@ -360,9 +364,9 @@ independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544
 The [published S5 plan](phase_3_3_s5_objective_mechanics_prompt_context_plan.md)
 is independently approved at `ff866d2`; its candidate-time wording is historical.
 S5 implementation is independently approved and published at `86c258e9`.
-S6 is an implemented public-flow candidate under its approved published plan;
-independent implementation review is next. S7 remains later.
-DF-001 remains deferred.
+S6 public flow is independently approved and published at `2f144599`. S7-1
+post-ending Run exit is an unapproved plan candidate; later same-line continuity
+remains allocated to subsequent S7 subdivisions. DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
@@ -764,9 +768,9 @@ OpenAPI, Demo, Web, projection, recovery, or client representation. Neither
 slice may change, round, clamp, or replace the numeric S2 value; each may only
 project from it. The approved S5 internal bands are Generous 0..30, Fluid
 35..65 and Scarce 70..100 on the S2 lattice. Published S5
-uses these bands in trusted context. The S6 implementation candidate exposes
+uses these bands in trusted context. Published S6 exposes
 the same exact numeric values and bands publicly, under its separately approved
-plan; implementation review and publication remain pending.
+plan; implementation is independently approved and published at `2f144599`.
 
 Numeric resource pressure is an engine-owned world/difficulty input. A model
 may narrate confirmed effects supplied by later trusted mechanics/prompt
@@ -1134,7 +1138,8 @@ approval with DF-001 deferred and were published at
 `a53f8e65ad74c62bc6c40b9de26222eb889084f0`. S4's plan was approved and published at `42411b2`; its separately authorized
 implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and independently approved
 implementation published at `86c258e9`. S6 plan is published at `4365721`;
-its implementation candidate awaits review. S7 remains unauthorized.
+its implementation is independently approved and published at `2f144599`. S7-1
+is now a plan candidate only; S7 implementation remains unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -1481,8 +1486,10 @@ The approved S6 plan was published at
 `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. Implementation began only after
 local `main`, HEAD and local `origin/main` matched that baseline at 0/0 with
 clean worktree/index and no conflicts, operations or locks; no fetch occurred.
-Frozen plan wording is historical. This is a separately authorized implementation
-candidate, not an approval, publication or Phase 3.3 completion.
+Frozen plan wording is historical. The following records preserve implementation
+candidate evidence and its original limitations. S6 was subsequently independently
+approved and published at `2f144599`; the [publication/browser record](#s6-publication-and-local-browser-evidence)
+owns current status. Phase 3.3 remains incomplete.
 
 The delivered journey is explicit character selection/creation -> profile/world
 and optional overrides/presentation -> confirmation -> shared S4 native admission
@@ -1589,10 +1596,11 @@ DF-001's documented globalization settings exist only in verification child
 processes, with parent settings unchanged. Its owner and post-playable
 reassessment milestone are unchanged; no additional finding is deferred.
 
-Automated integrated flow is demonstrated on public ASGI and rendered MSW
-surfaces. Browser evidence is omitted, not passed. No browser-verified usability,
-limited-trial or wider-release readiness is claimed. There are no real
-Provider/Live calls, dependency installations, production database operations,
+At the implementation-candidate checkpoint, automated integrated flow was
+demonstrated on public ASGI and rendered MSW surfaces. Browser evidence was
+omitted then, not passed. That checkpoint made no browser-verified usability,
+limited-trial or wider-release readiness claim. That implementation task used no
+real Provider/Live calls, dependency installations, production database operations,
 deployment, staging, commits or pushes. S1-S5 authority algorithms, SQL native
 writer/UoW/shared-lock topology, ORM, migrations, content, dependencies and
 recovery storage schema remain unchanged. Ending a Session does not complete
@@ -1677,7 +1685,8 @@ storage -> storage-only retry -> automatic View recovery still accepted a differ
 scenario or content version and replaced the confirmed identity with that View.
 Earlier applicable conclusions, including safe-clear retry, same-Session reads,
 genuine replacement and character selection, remain preserved. This correction
-does not claim independent closure of the remaining finding.
+did not itself claim independent closure of the remaining finding; subsequent
+approval/publication is recorded separately below.
 
 `App.tsx` now shares the pure `assertViewAssociation` boundary between automatic
 recovery and `commitLoadedSession`. It checks the requested/confirmed Session,
@@ -1735,10 +1744,61 @@ and its original broad/focused applicability limits remain valid; no Python broa
 suite, MySQL, exhaustive S2 or migration reruns or overlapping pass counts are
 added. No browser, database, real Provider, network install or Git write occurred.
 
-Disposition remains `CHANGES_REQUIRED`; next is the previous independent reviewer's
-focused re-review of this binding correction, direct dependencies and replacement
-Web evidence under the existing operative implementation token. No new approval
-stage or post-commit audit is introduced. Guardrail impact: None.
+At this correction checkpoint, disposition remained `CHANGES_REQUIRED` pending
+the previous independent reviewer's focused re-review of the binding correction,
+direct dependencies and replacement Web evidence under the existing token. The
+subsequent approval is recorded below. No new approval stage or post-commit audit
+was introduced. Guardrail impact: None.
+
+#### S6 publication and local browser evidence
+
+Current status supersedes the candidate-time checkpoints above: S6 implementation
+was independently approved and published at
+`2f144599af5977e871c7a3466c52896b6a36510c`. The first `CHANGES_REQUIRED` covered
+native recovery identity and late character selection; the second closed
+character selection and retained only automatic recovery's scenario/content
+binding. Both remain accurate historical reviews. Subsequent independent approval
+accepts the corrected implementation; no S6 review or separate closeout is pending.
+
+On 2026-09-17, separately authorized local deterministic Demo browser acceptance
+at that exact commit passed the representative journey: explicit character
+creation/selection, Standard profile and authored entry world, pressure override
+55 and heroic/lawful/off presentation -> one native admission -> ten UI actions
+-> version-10 `ENDED` / `FAILED`, **记录成为现实**. Same-tab reload at version 2
+restored play and continued to the ending. The ending is a Session result; the
+Run remains active and bound. No same-line continuation or canonical character
+death was demonstrated.
+
+The actual external report is
+`C:\Users\dylanmonster\.codex\visualizations\2026\09\17\01a0ad1f-763c-74e1-865b-44360d4b0bc0\p33-s6-browser-acceptance\acceptance-report.md`.
+It is browser acceptance, not the independent implementation review. Its
+`requests-redacted.json`, `runtime-redacted.txt`, redacted DOM snapshots and
+delivered screenshots support the stated observations. The planning manifest
+records report identity; no browser acceptance is rerun for this documentation.
+
+After a controlled coupled backend/Web restart, startup-race proxy 502s paused
+recovery. Explicit safe GET later returned 404; explicit local clear made no
+server request. Full page reload restored discovery, with native profile/world
+unselected and admission disabled. The partial discovery refresh is recorded as
+[DF-002](engineering/deferred_findings.md#df-002--partial-discovery-refresh-after-demo-startup-race),
+contained by that explicit reload. DF-001 remains unchanged.
+
+Preserve these limits: storage-before-View was not directly observed in the
+browser (existing automated evidence owns that ordering); the saved restart
+recovery crop failed and no usable screenshot of that panel was delivered,
+although contemporaneous text/request evidence exists; restarting also restarted
+the frontend, so uninterrupted-Web/backend-only recovery was not exercised;
+terminal Ctrl+C was ineffective and verified task-owned process-tree cleanup
+was used instead. No browser 202/pending-job path, all-profile/race matrix,
+database persistence, real Provider, wider-release readiness or Phase 3.3
+completion is claimed. Technical presentation U2 is a usability observation;
+the single ClientDisconnect R1 has no established reproducible cause and is not
+registered as a confirmed code defect.
+
+The [S7-1 plan candidate](phase_3_3_s7_1_post_ending_run_exit_plan.md) proposes an
+explicit post-ending native Run exit, historical binding and separately confirmed
+fresh admission. It is not implemented or approved and does not provide later-world
+continuation. Its same-document allocation preserves all remaining parent S7 work.
 
 ### Extreme — Silent Hunting Ground
 
@@ -1861,7 +1921,7 @@ Public/client representation remains S6-owned.
   and consumes no seed; later-world seed behavior remains S7 work.
 - The published S2 resolver produces only exact numeric `resource_pressure`;
   categorical mechanics/prompt projection is published in S5 and public/client
-  representation is implemented in the S6 candidate.
+  representation is implemented in published S6.
 - No setting depends on unordered collection iteration, wall-clock time, or a
   Provider-selected random value.
 - Entry-world identity remains frozen, and later-world selection is
@@ -1927,7 +1987,8 @@ Phase 3.3 is acceptable only when:
   its implementation is published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`,
   independently approved with DF-001 deferred. S4 internal implementation is
   independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
-  S6 public integration is an implementation candidate; S7 remains later.
+  S6 public integration is independently approved and published at `2f144599`;
+  S7-1 is a plan candidate, and later S7 continuity remains unimplemented.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -1938,7 +1999,8 @@ Phase 3.3 is acceptable only when:
 - S6 world/profile discovery is implemented under its published plan; later unlock policy remains S7.
 - Public entry-world catalogue exposure (S6; no expansion in this slice); S4's bounded internal
   catalogue and explicit world/scenario mapping are implemented and published
-  at `34dc752`; S6 public activation is an implementation candidate.
+  at `34dc752`; S6 public activation is independently approved and published at
+  `2f144599`.
 - Later-world weighting algorithm and general anti-repeat rules.
 - Progression constraints and priority-injection rules for required story
   progression and major hidden settings; important-NPC integration remains

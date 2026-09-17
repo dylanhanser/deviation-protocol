@@ -49,3 +49,36 @@ The already-fixed S3 planning findings remain historical closures, not open debt
   reliance with a language-independent assertion and rerun both locales.
 - **Closure evidence:** none; the production guard works, but the locale-fragile
   assertion has not been changed within this S3 path budget.
+
+### DF-002 — Partial discovery refresh after Demo startup race
+
+- **ID / status:** DF-002 / deferred for S7-1 planning and the bounded local
+  playable milestone; no wider-release approval.
+- **Affected feature/path:** Web setup discovery recovery in `web/src/App.tsx`;
+  the observed “刷新可用选项” action refreshes entry options while scenario and
+  character discovery error sections remain after the documented startup race.
+- **Evidence:** U1 in the 2026-09-17 S6 local deterministic Demo browser report,
+  tested at `2f144599af5977e871c7a3466c52896b6a36510c`; canonical locator and
+  limitations are in [the S6 evidence record](../run_protocol.md#s6-publication-and-local-browser-evidence).
+  Report artifacts `07-restart-transient.txt`, `07-missing-session.txt`,
+  `08-cleared.txt`, `08-discovery-refresh-partial.txt`, `09-fresh-setup.txt` and
+  `runtime-redacted.txt` record coupled backend/Web restart -> frontend ready
+  before backend -> discovery/recovery 502 -> safe GET 404 -> explicit local
+  clear -> partial options refresh -> successful full-page reload.
+- **User impact / exposure:** one additional explicit page reload in that
+  observed local startup ordering. No automatic mutation, lost durable data or
+  unrecoverable gameplay block was observed. This does not establish impact for
+  every network failure or a backend-only restart.
+- **Non-blocking rationale:** the observed reload restores all discovery and
+  explicit native setup; no workflow blocking, authority, privacy or integrity
+  failure was demonstrated for this milestone. The workarounds and limited
+  exposure permit the next plan review under existing deferral policy.
+- **Containment/workaround:** once the backend is ready and missing-Session
+  recovery has been explicitly cleared, reload the page to refresh all discovery.
+  Do not treat partial entry-options refresh as a complete discovery retry.
+  Keep native confirmation disabled until explicit eligible selections succeed.
+- **Repair/reassessment:** Web client maintainer; reassess at S7-1 return-to-setup
+  acceptance and the post-playable stabilization checkpoint before wider release,
+  or sooner if reachability/impact expands or reload fails to restore the flow.
+  Escalate if containment fails under the workflow's blocking criteria.
+- **Closure evidence:** none; no code fix or browser rerun accompanies this entry.

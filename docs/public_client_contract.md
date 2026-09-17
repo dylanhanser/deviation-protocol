@@ -40,14 +40,16 @@ validation completed locally (canonical Offline 1,814 passed/124 expected skips,
 
 ## P3.3-S6 native public extension
 
-Status: **Implemented candidate; independent implementation review pending.** S5 internal
+Status: **Independently approved and published at
+`2f144599af5977e871c7a3466c52896b6a36510c`.** S5 internal
 mechanics and trusted context are independently approved with DF-001 deferred
 and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. Public native
 activation follows the approved and published [S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md),
 which owns the exact DTOs, validation/error tables, implementation inventory,
 acceptance and implementation-review gate. The plan was published at `4365721`;
 implementation was separately authorized. The existing contracts below remain
-implemented behavior; no candidate approval or Git operation is claimed.
+implemented behavior. The two earlier `CHANGES_REQUIRED` reviews remain history;
+subsequent approval/publication establish current status.
 
 | Implemented public surface | Closed projection / compatibility decision |
 | --- | --- |
@@ -80,12 +82,15 @@ action replay, replacement Session, or new browser storage family. Public fields
 exclude internal evidence, compiled context, private state and hidden information;
 presentation and model output create no mechanics or canon authority.
 
-This candidate changes neither production Provider integration nor S7 continuity
-or Phase 3.4 relationship/residence state. Phase 3.3 remains incomplete. Browser
-evidence requires separate explicit authorization; automated contract evidence
-is recorded in [the S6 evidence record](run_protocol.md#p33-s6-implementation-candidate-evidence).
-Browser evidence is omitted, not passed; no browser usability or wider-release
-readiness is claimed.
+Published S6 adds neither production Provider integration nor S7 continuity
+or Phase 3.4 relationship/residence state. Phase 3.3 remains incomplete.
+[The S6 evidence record](run_protocol.md#s6-publication-and-local-browser-evidence)
+separates automated evidence from subsequently authorized representative local
+Demo browser acceptance, including its unobserved storage ordering, failed saved
+restart-panel screenshot, coupled frontend restart and verified process cleanup.
+No general browser or wider-release guarantee follows. The
+[S7-1 exit contract](phase_3_3_s7_1_post_ending_run_exit_plan.md#7-public-contract-and-recovery)
+is proposed only; its routes and lifecycle behavior are not yet implemented.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,

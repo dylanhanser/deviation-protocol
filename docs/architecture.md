@@ -157,10 +157,13 @@ S4 rows and character authority remain immutable; a Session ending does not
 transition its Run. S6 owns public discovery/admission/API/OpenAPI/Demo/Web and
 recovery projection; S7 owns later worlds and continuity.
 
-## P3.3-S6 implemented public flow candidate
+<a id="p33-s6-implemented-public-flow-candidate"></a>
+
+## P3.3-S6 published public flow
 
 The [approved published S6 plan](phase_3_3_s6_public_api_demo_web_projection_recovery_plan.md)
-is frozen at `4365721`. The implementation candidate exposes additive
+is frozen at `4365721`. Its implementation is independently approved and
+published at `2f144599af5977e871c7a3466c52896b6a36510c` and exposes additive
 `GET /v1/run-entry-options` and `POST /v1/runs/native`, backed by the production
 S4 service and
 unchanged S5 turn coordinator. Legacy entry contracts remain valid. Native
@@ -176,9 +179,14 @@ and world, confirms permitted overrides, freezes exact admission evidence,
 stores validated Session identity before View and keeps recovery GET-only.
 Dynamic Demo remains explicitly legacy-only. The plan specifies separate
 automated public/MySQL/Demo/Web evidence and separately authorized browser work.
-The S6 candidate awaits one substantive independent implementation review.
-[Evidence and limits](run_protocol.md#p33-s6-implementation-candidate-evidence)
-separate automated ASGI/rendered MSW proof from omitted browser acceptance.
+The earlier two `CHANGES_REQUIRED` reviews and their corrections remain history.
+[Evidence and limits](run_protocol.md#s6-publication-and-local-browser-evidence)
+record subsequent independent approval/publication and representative local Demo
+browser acceptance separately from automated ASGI/rendered MSW proof. Browser
+storage ordering was not directly observed, the restart-panel screenshot failed,
+restart included Web, and verified owned-process cleanup replaced ineffective
+Ctrl+C. The S7-1 [post-ending Run exit proposal](phase_3_3_s7_1_post_ending_run_exit_plan.md)
+is unapproved and unimplemented; current ended Sessions still leave Runs active.
 It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
 Demo inserts require an explicit native-admission UoW capability. Both new maps
@@ -1162,8 +1170,9 @@ components described above:
   published S1/S2 components supply representation and deterministic resolution;
   published S3 supplies durable binding reconstruction. Published S4 adds
   independently approved internal admission/world freezing; published S5 applies
-  objective mechanics and compiles trusted context. S6 public activation is an
-  implementation candidate, while S7 continuity remains later work: [`run_protocol.md`](run_protocol.md).
+  objective mechanics and compiles trusted context. S6 public activation is
+  independently approved and published at `2f144599`; S7-1 is a plan candidate
+  and same-line S7 continuity remains later work: [`run_protocol.md`](run_protocol.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
 - Phase 4.0 owns the future **Production Distribution Gateway** (or **Provider
