@@ -93,7 +93,9 @@ No general browser or wider-release guarantee follows. The
 was approved and published at `9fab18d`; its routes and lifecycle behavior are
 implemented and published at `41d68aac13ca9129b7f6e08fad5f015987603fda`.
 Its [bounded local browser evidence](run_protocol.md#s7-1-publication-and-local-browser-evidence)
-is distinct from the earlier S6 report. The authorized S7-2 candidate is described below; required automated evidence is delivered for independent review.
+is distinct from the earlier S6 report. S7-2 implementation is published at
+`6dfbd37`, with automated and bounded local browser evidence described below.
+S7-3 public changes remain proposed in the new documentation candidate.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1628,11 +1630,12 @@ See [implementation evidence and limits](run_protocol.md#p33-s7-1-implementation
 
 ## P3.3-S7-2 same-line continuation
 
-Correction status (2026-09-18): the incoming implementation received
-**CHANGES_REQUIRED** for four P2 findings. The bounded correction is delivered;
-implementation approval remains pending focused re-review. The following addition
-is explicitly authorized for this unpublished continuation DTO to satisfy P03's
-visible arrival requirement; it was missing from the incoming implementation.
+Published status (2026-09-18): S7-2 implementation is published at
+`6dfbd37d127386b589a1e6c0c43b831aefd70279`. Its incoming **CHANGES_REQUIRED**
+review had four P2 findings. The following arrival addition was explicitly
+authorized while the continuation DTO was unpublished, to satisfy P03's visible
+arrival requirement; it was missing from the incoming implementation. The
+correction history is preserved rather than relabelled as a new approval.
 
 `native-run-continuation-status/v1` additionally requires nullable `arrival`.
 It is null for the first/path historical Session, including original termination;
@@ -1653,8 +1656,8 @@ The service derives the annotation from fully reconstructed owned continuation
 evidence and its validated entry variant within the ordinary read snapshot.
 It exposes no root, hidden fact, seed, fingerprint or historical memory.
 
-This is an additive breaking change only to the new, unpublished strict status
-schema: the candidate server and client must be updated together. The frozen plan
+At correction time this was an additive breaking change only to the then-unpublished
+strict status schema: server and client were updated together. The frozen plan
 is unchanged; `PlayerSessionView`, `public-run-context/v1`, POST receipt/result,
 private prompt attachment and storage v1 keep their existing contracts. The Web
 renders the annotation at arrival, after first action and successor-only reload;
@@ -1666,10 +1669,12 @@ current versions may progress beyond initialization.
 The [published S7-2 contract](phase_3_3_s7_2_same_line_world_continuation_plan.md#8-public-api-projections-and-web-recovery)
 is independently approved at `2c272487`; P01–P08 are user-approved. Earlier
 CHANGES_REQUIRED findings and candidate-time wording remain historical. The
-corrected implementation candidate is unstaged and awaits focused re-review
-with replacement automated evidence; no implementation approval is implied.
+corrected implementation is now published at `6dfbd37` with its replacement
+automated evidence. The inspected local browser report demonstrates the two
+bounded journeys; neither publication nor this status synchronization issues
+an independent approval or establishes broader-release readiness.
 
-The candidate adds Session-scoped GET/POST `run-continuation`: the player confirms
+The implementation adds Session-scoped GET/POST `run-continuation`: the player confirms
 continuation, while the server selects one authored eligible successor and
 atomically creates its Session in the same Run/line. It preserves the separate
 irreversible exit choice. A terminated Run cannot continue. The existing
@@ -1701,5 +1706,53 @@ requests during reload/navigation and no persistent mutation. Existing S6 and
 S7-1 recovery and explicit-selection regressions remain required. The corrected rendered normal-Demo journey covers 20 confirmation/recovery/
 arrival/association/history/exit variants. Fresh complete Web results are recorded
 in the correction evidence map; incoming counts remain historical. The [evidence map](run_protocol.md#s7-2-evidence-map) records scope and
-source applicability. Interactive
-browser acceptance is outside this task. S7/Phase 3.3 remain incomplete.
+source applicability. Subsequent authorized local browser results and their
+storage/request-body/private-authority limitations are recorded in
+[S7-2 publication evidence](run_protocol.md#s7-2-publication-and-local-browser-evidence).
+This planning task performed no new browser execution. S7/Phase 3.3 remain incomplete.
+
+## P3.3-S7-3 proposed journey navigation and regional return
+
+Status: **PROPOSED documentation contract, not an available API.** The
+[S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md#8-public-contracts-and-recovery-across-three-visits)
+owns exact fields, validation, errors, compatibility and client transitions.
+Its P01–P09 require explicit approval, including the narrow amendment permitting
+the player to consent to one engine-selected regional return. This is not a
+destination selector, unlock request or general travel control.
+
+Proposed GET `run-journey` returns a closed `native-run-journey/v1`: schema_version,
+session_id, run_id, run_state_version, lifecycle_status, run_context, path,
+current, predecessor, successor, next_transition and arrival. Required nullable
+neighbors identify immediate visits; path/current are complete Session/content/
+visit associations. Materialized ordinals 1/2/3 require exact visit identity;
+only unmaterialized first visits have a null visit. Corrupt missing neighbors
+fail as opaque 409 after ownership, never null repair. One snapshot owns the
+whole result, including historical reads after termination or new admission.
+
+Proposed POST `run-revisit` accepts only the two expected versions and existing
+Idempotency-Key, returning `native-run-revisit-result/v1`, revision 5 and exact
+third-visit initialization association. It does not return a current View. Only
+the true held-receipt ending offers this return; old receipt replay precedes
+fresh eligibility. The new third visit's ending permits explicit exit to 6.
+Published View, immutable admission context and Session storage v1 keep their
+meanings. Published two-visit continuation GET stays exact for old families;
+new three-visit families receive the plan's explicit unavailable response there,
+while old POST receipts remain replayable through complete reconstruction.
+Updated clients use journey GET for all native navigation; no mixed old-client
+support for the new family is promised.
+
+The proposed Web retains the complete confirmed POST association, compares every
+immutable source/destination/context/content/visit field before enabling play,
+and permits legitimate later Session/lifecycle versions. Store the confirmed
+successor before View; retry storage with GET only. From successor-only recovery,
+GET locates visit two and then visit one after all page memory is lost. Reciprocal
+history navigation and return to current are GET-only, with no storage set/remove
+or historical write controls. Current recovery and temporary historical display
+remain separate; generation/client-instance checks reject stale completions.
+Lost-response/retained exact retry, explicit exit/storage clearing/fresh admission
+and DF-002 containment remain required. No automatic POST on reload or recovery.
+
+The R09 combined rendered case must use the normal public deterministic Demo
+store/transport for actual play through three visits; separate mocks only supply
+additional fault/contradiction cases. No implementation or new browser evidence
+is claimed by this plan candidate. S7 and Phase 3.3 remain incomplete.

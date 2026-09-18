@@ -57,7 +57,9 @@ deferred. The S5 plan is independently approved and published at `ff866d2`.
 S5 implementation is independently approved with DF-001 deferred and published
 at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published at `4365721`; its separately authorized
 implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
-S7-2 follows its independently approved published plan at `2c272487`; the corrected unstaged implementation/evidence candidate awaits focused re-review. Phase 3.3
+S7-2 follows its independently approved plan at `2c272487`; implementation is
+published at `6dfbd37` with bounded local browser evidence. The S7-3 documentation
+candidate awaits independent plan review and product approval. Phase 3.3
 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
@@ -189,7 +191,8 @@ restart included Web, and verified owned-process cleanup replaced ineffective
 Ctrl+C. The S7-1 [post-ending Run exit plan](phase_3_3_s7_1_post_ending_run_exit_plan.md)
 was approved and published at `9fab18d`; its implementation published at `41d68aac`
 adds explicit termination after a valid Session ending. Ending alone still
-leaves the Run active. S7-2 continuity has an unstaged implementation candidate with automated integrated-play evidence. The [S7-1 browser record](run_protocol.md#s7-1-publication-and-local-browser-evidence)
+leaves the Run active. S7-2 continuity is published at `6dfbd37` with automated
+and bounded local browser evidence. The [S7-1 browser record](run_protocol.md#s7-1-publication-and-local-browser-evidence)
 adds bounded both-ending/exit/re-entry evidence at the published implementation.
 It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
@@ -280,7 +283,9 @@ separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
 described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
-at `9fab18d`; S7-2 implementation is a corrected unstaged candidate awaiting focused re-review; S7-3/4/5 remain unauthorized. The
+at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 documentation
+planning is authorized, with new decisions still PROPOSED; S7-3 implementation
+and S7-4/5 remain unauthorized. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1711,13 +1716,18 @@ from the already reconstructed family in the owned read snapshot, separately
 from unchanged View/admission/prompt contracts. It has no writer or schema impact.
 See the [exact correction contract](public_client_contract.md#p33-s7-2-same-line-continuation)
 and [correction evidence](run_protocol.md#s7-2-bounded-correction-2026-09-18).
-Candidate approval remains pending focused independent re-review.
+Those correction-stage statements are historical. The implementation is now
+published at `6dfbd37d127386b589a1e6c0c43b831aefd70279`; see the
+[inspected local browser evidence and its limits](run_protocol.md#s7-2-publication-and-local-browser-evidence).
 
 The [published S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md)
 is independently approved at `2c272487`; the user approved P01–P08. Its earlier
-review findings and candidate-time wording remain historical. The implementation
-candidate has replacement automated evidence and awaits focused independent re-review.
-It has not received implementation approval or browser acceptance.
+review findings and candidate-time wording remain historical. Its implementation
+is published at `6dfbd37`; both source-ending classes have inspected bounded
+local deterministic Demo browser evidence through exit and fresh admission.
+Publication/browser evidence is not a newly issued independent approval or
+production-readiness claim. The original four-P2 review/correction records remain
+unchanged in scope.
 
 The implementation introduces a closed revision-four active continuation
 family, immutable world roots and visits, an authoritative current position,
@@ -1741,3 +1751,38 @@ returns by GET without enabling predecessor writes or accepting stale reads.
 Revisits, region unlocking, anti-farming, authorized
 canon transitions and final integrated evidence remain allocated to S7-3/4/5.
 S7 and Phase 3.3 remain incomplete.
+
+## P3.3-S7-3 proposed regional revisit boundary
+
+The [five-document S7-3 candidate](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
+proposes a third visit to the existing receipt world, entering a distinct archive
+region after the actual held-receipt ending. P01–P09 are unapproved; neither a
+third-visit reader/writer nor migration 010 exists yet. Explicit journey consent
+is a proposed amendment to the current no-approve/no-veto revisit product rule,
+not permission for the client to select or unlock a world.
+
+The proposed architecture preserves strict S7-2 v1 prefixes and adds closed
+active 4→5 / terminal 5→6 suffixes, v2 visit/position carriers and immutable
+regional entry evidence. The original two world roots and all old Sessions stay
+unchanged. The new initializer consumes visit two's latest ended state, preserves
+its region's facts/NPCs/clocks/history, carries current PlayerState without refill,
+and projects only approved public consequences into the new local runtime.
+One-runtime memory validation and version-specific, independently pinned content
+routing remain mandatory. Unlock derives from the sealed hold ending; the one
+successful entry receipt consumes the opportunity. No reward ledger or mutable
+world-state duplicate is proposed.
+
+The same pinned named-lock UoW and character-first ordering own one atomic
+transition/position CAS; rendering/compilation remain outside locks. New journey
+GET supplies all three visits' reciprocal associations after complete reconstruction.
+The Web retains current recovery identity separately from historical display and
+performs historical navigation by GET without storage writes. Existing strict
+two-visit continuation GET cannot represent the new family; the proposed explicit
+compatibility response and new endpoint are specified in plan section 8, alongside
+unchanged original receipt replay and View/admission/storage meanings.
+
+Implementation inventory and R01–R10 evidence in the plan cover all shared family,
+turn, exit, character-binding, SQL/Demo and client consumers. Schema 010 extends
+only exact constraints and one entry table; 001–009 remain protected. S7-4 keeps
+canon-preserving line transitions/normal completion; S7-5 keeps final integration.
+No code, migration, runtime or new approval is delivered by this documentation.

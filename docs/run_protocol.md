@@ -1,8 +1,69 @@
 # Run Protocol, Difficulty, and World Profiles
 
+## Current S7-2 publication and S7-3 planning status
+
+S7-2 implementation is published at
+`6dfbd37d127386b589a1e6c0c43b831aefd70279`, subject
+`feat(run): implement P3.3-S7-2 same-line world continuation`, parent
+`2c272487a2f12c60c28ada95dd9a3f1edf1d42ba`. The S7-3 planning preflight verified
+clean main/HEAD/local origin/main at that exact commit, 0/0, empty index and no
+Git conflict/operation/lock, without fetching. Current status supersedes the
+explicitly historical candidate checkpoints below; published plans and earlier
+reviews are not rewritten. No separate lifecycle-closeout task is due.
+
+The [S7-3 five-document plan candidate](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
+proposes a single new visit to the existing receipt world, in a new verification
+archive region after the real held-receipt ending. It preserves prior world
+consequences and actual PlayerState, supplies new actions/endings and three-visit
+GET history/recovery, then explicit exit. P01–P09 remain **PROPOSED**. In
+particular, player consent to this engine-selected return is an explicit proposed
+amendment to the no-approve/no-veto rule below, not an already approved reading
+of that rule. The new policy becomes applicable only after explicit approval;
+no arbitrary destination choice or client-owned eligibility is proposed.
+
+S7-3 planning is authorized; implementation is not. Next is one substantive
+independent plan review, with the plan's single operative token and dormant
+implementation token. S7-4 retains canon-preserving line transitions and normal
+completion; S7-5 retains final integration/parent criteria reconciliation.
+S7 and Phase 3.3 remain incomplete. Existing DF-001/DF-002 dispositions persist.
+
+### S7-2 publication and local browser evidence
+
+During this planning task the actual report and request record were read at:
+
+- `C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-2-browser-20260918/browser-acceptance-report.md`
+- `C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-2-browser-20260918/request-evidence.json`
+
+Report SHA-256:
+`68ba838522e9cccc7aeefe3340221fb38b579b6498e184ffc4abf07f29fb1aa8`;
+request-record SHA-256:
+`2abc5c5ee044230ba2438d4b78f1bfcfa031ad2d5de767582d74be73392de8b1`.
+These are inspected prior artifacts agreeing with the user's report, not fresh
+browser execution or an independent code approval in this planning task.
+
+| Inspected prior result | Scope and limits |
+| --- | --- |
+| RESOLVED source | 19 actual source UI actions; composure 6/6 carried, destination starts 0/40. |
+| FAILED source | 10 actual source UI actions; composure 4/6 carried, destination starts 4/40. |
+| Both full local journeys | Explicit continuation; correct trusted arrival; first destination action; refresh recovery; history/return; destination hold ending; explicit exit; separately confirmed same-character admission and first action. Supplementary public GETs compare Run/context and public player fields. |
+| Mutation boundaries | 44 POSTs: character creation 1, admissions 3, actions 36, continuations 2, exits 2. Cancellation window 6 GETs, RESOLVED history 17 GETs and FAILED history 14 GETs, each zero writes. Restart record six GETs/zero writes, two old Sessions 404. |
+| Deferred findings | DF-002 partial discovery refresh reproduced; full reload once backend was ready restored discovery with confirmation still requiring explicit selection. DF-001 original containment assertion passed. Neither finding is closed. |
+| Environment/cleanup | Report records deterministic local Demo only, no DB/real Provider/.env access, tabs/services stopped and ports released, original 301-file comparison/Git refs unchanged. Planning does not claim it independently reran cleanup. |
+
+The report did not monitor browser storage API calls, request bodies or keys;
+history reload behavior is not direct proof of zero set/remove calls. Private
+line IDs/roots, SQL atomicity and concurrency were not browser evidence. Both
+destination routes chose hold, not release/deadline; not every profile/zero-resource
+case was exercised in a browser. Restart coverage was coupled Web/backend with
+Web first, not a separate backend-only experiment. No precise lost-response or
+storage-fault acceptance was added. Earlier automated evidence retains those
+separate responsibilities where applicable. This demonstrates the bounded local
+integrated flow, not production readiness, S7 completion or Phase 3.3 completion.
+
 ## S7-2 bounded correction (2026-09-18)
 
-Incoming independent disposition is **CHANGES_REQUIRED**, with four P2 findings:
+Historical correction checkpoint. Incoming independent disposition was
+**CHANGES_REQUIRED**, with four P2 findings:
 independent destination-pack pinning, missing public arrival annotation,
 incomplete confirmed successor association, and incomplete playable-boundary /
 FAILED-source cross-process evidence. P01–P08 remain approved. The incoming
@@ -39,9 +100,10 @@ applicability checks passed in `evidence-reuse.json`.
 The additive arrival projection is an explicitly authorized bounded correction
 to the unpublished status DTO to fulfill P03's approved visible arrival requirement;
 it was absent from the incoming implementation. It does not revise balance,
-mechanics, persistence, lifecycle or the frozen plan. Current status: corrected
-unstaged candidate awaiting focused re-review by the same reviewer; no approval
-or broader readiness is claimed.
+mechanics, persistence, lifecycle or the frozen plan. At that checkpoint the
+corrected unstaged candidate awaited focused re-review; it issued no approval.
+Publication/current browser status is recorded above; these historical evidence
+identities and limitations remain unchanged.
 
 ### Correction C01–C10 evidence
 
@@ -117,10 +179,11 @@ above. Earlier runs are not relabelled as complete corrected-source passes.
 The same-line continuation plan is independently approved and published at
 `2c272487a2f12c60c28ada95dd9a3f1edf1d42ba`. The user approved P01–P08 and
 authorized implementation on 2026-09-18. Candidate-time pending wording is
-historical; published plan/review bytes remain unchanged. The delivered increment
-is an unstaged candidate for one substantive independent implementation review.
-No implementation approval, browser acceptance, wider-release readiness,
-S7 completion or Phase 3.3 completion is claimed.
+historical; published plan/review bytes remain unchanged. At this incoming
+implementation checkpoint the increment was unstaged for independent review;
+no approval or browser acceptance was claimed then. Subsequent publication and
+bounded browser evidence are recorded above, without relabelling these runs as
+later-source passes or claiming broader readiness, S7 or Phase 3.3 completion.
 
 Actual public play demonstrates eligible first-world endings, explicit handoff
 into 《未送达的回执》, legitimate destination actions, reload, old history and
@@ -228,8 +291,9 @@ regressions. Neither disposition changed; no new deferred code defect is claimed
 Documentation synchronization covers behavior/API, architecture, roadmap/status,
 authored-content identity, evidence/limits and the confirmed DB-001 rule. Published
 plans/reviews and prior migrations are protected. The external inventory documents
-every modified/new path and inspected no-change boundary. Review is the next step;
-staging/commit/push and S7-3/4/5 are not authorized.
+every modified/new path and inspected no-change boundary. At that historical
+checkpoint review was the next step; it authorized no staging/commit/push or
+later-slice implementation. Current publication/planning status is above.
 
 Status: **Approved product design. P3.3-G0 is approved, published, frozen, and
 complete. The corrected exact no-migration P3.3-S1 implementation is
@@ -265,8 +329,9 @@ published at `9fab18d`; implementation is published at
 `41d68aac13ca9129b7f6e08fad5f015987603fda`, including the reviewed nullable
 terminal-CHECK correction. Bounded local Demo browser acceptance covers both
 endings, exit/re-entry and recovery. S7-2 has an independently approved published plan and approved P01–P08;
-its corrected unstaged implementation candidate and replacement evidence await focused re-review. S7-3/4/5
-remain unauthorized. DF-002
+its implementation is published at `6dfbd37` with inspected bounded local browser
+evidence. S7-3 has an authorized documentation plan candidate with P01–P09 still
+PROPOSED; S7-3 implementation and S7-4/5 remain unauthorized. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
@@ -606,8 +671,10 @@ S6 public flow is independently approved and published at `2f144599`. S7-1
 post-ending Run exit is published at `41d68aac` under its approved published
 plan (`9fab18d`). The [published S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md)
 authorizes the first same-line successor; its product choices and technical plan
-are approved. The unstaged implementation/evidence candidate is ready for independent
-review. Later S7 allocation is preserved. DF-001/DF-002 remain deferred.
+are approved. Implementation is published at `6dfbd37` with inspected bounded
+local browser evidence. The S7-3 plan candidate is ready for independent plan
+review and P01–P09 disposition; later S7 allocation is preserved.
+DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
@@ -916,6 +983,12 @@ weighting, anti-repeat, progression and priority-injection remain Deferred.
 ### Important-world revisits
 
 Status: **Approved product design — not implemented**
+
+The scoped S7-3 candidate above proposes P02 as a narrow amendment to the
+no-approve/no-veto sentence below: the engine selects the sole eligible region,
+while the player explicitly consents to continuing there. That amendment is
+PROPOSED, not operative; the sentence is preserved until product approval. The
+candidate does not grant world selection, unlock or canon authority to the client.
 
 - An explicitly authored important world may remain eligible for later engine
   selection after the player has already visited it.
@@ -1381,9 +1454,9 @@ implementation is independently approved and published at `34dc752`. S5 has an a
 implementation published at `86c258e9`. S6 plan is published at `4365721`;
 its implementation is independently approved and published at `2f144599`. S7-1
 is published at `41d68aac` under its approved published plan; the S7-2
-plan is approved and published at `2c272487`, with P01–P08 approved. Authorized
-implementation/evidence form an unstaged candidate ready for independent review;
-S7-3/4/5 remain unauthorized.
+plan is approved and published at `2c272487`, with P01–P08 approved. Implementation
+is published at `6dfbd37`. S7-3 documentation planning is authorized; the proposed
+decisions await approval. S7-3 implementation and S7-4/5 remain unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -2236,8 +2309,9 @@ Phase 3.3 is acceptable only when:
   independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
   S6 public integration is independently approved and published at `2f144599`;
   S7-1 is published at `41d68aac` under its approved published plan.
-  S7-2 minimum later-world continuity is an unstaged implementation candidate
-  with automated integrated-play evidence, ready for independent review.
+  S7-2 minimum later-world continuity is published at `6dfbd37` with automated
+  and bounded local browser evidence. S7-3's proposed regional-return contract
+  awaits independent plan review and explicit product approval.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2277,8 +2351,8 @@ implementation was subsequently published at `41d68aac`; that earlier verdict
 and [replacement evidence](#s7-1-nullable-terminal-check-correction) remain history.
 [Publication and subsequent browser acceptance](#s7-1-publication-and-local-browser-evidence)
 record current status separately from the original automated execution below.
-Neither S7 nor Phase 3.3 is complete; S7-2 has an unstaged implementation/evidence
-candidate ready for independent review. No limited
+Neither S7 nor Phase 3.3 is complete; S7-2 is published at `6dfbd37`, and the
+S7-3 plan candidate awaits independent plan review. No limited
 user trial, broader release, deployment or real Provider acceptance is claimed.
 The frozen plan and historical reviews retain their candidate-time wording.
 
@@ -2534,7 +2608,7 @@ or balance. Its published patch was 124,937 bytes, +1,289/-61, SHA-256
 `91b6e2332a693b1eb5e88b5ae9061c1bd15c04bdf3cd6a4ae7b59ee222c0f9f9`.
 The plan bytes and historical reviews are unchanged.
 
-The candidate continues the existing Run and line into **未送达的回执** after
+The published implementation continues the existing Run and line into **未送达的回执** after
 explicit confirmation. The character association and full remaining PlayerState
 carry unchanged. Local state resets, original history remains owned/readable,
 and GET exposes a required nullable predecessor from complete reconstruction.
@@ -2544,9 +2618,11 @@ world, revisit, reward, refill, character revision or normal Run completion.
 
 Current code, C01–C10 automated evidence, source applicability, documentation
 synchronization and the frozen review package are recorded at the top of this
-document. The unstaged candidate is ready for independent review. No implementation
-approval or broader readiness is claimed. S7-3/4/5 and parent criteria 10–12
-remain outside this increment; S7 and Phase 3.3 are incomplete.
+document, with subsequent publication at `6dfbd37` and inspected local browser
+evidence above. This synchronization issues no independent approval or broader
+readiness claim. S7-3's documentation proposal now awaits its own plan review;
+S7-3 implementation, S7-4/5 and parent criteria 10–12 completion remain outside
+the delivered increment. S7 and Phase 3.3 are incomplete.
 
 ## Related documents
 
