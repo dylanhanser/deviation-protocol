@@ -256,7 +256,8 @@ def test_default_composition_reuses_one_lazy_mysql_uow_graph(
         assert observed_engine is engine
         return session_factory
 
-    def construct_uow(observed_factory: object) -> object:
+    def construct_uow(observed_factory: object, *, content_registry) -> object:
+        assert len(content_registry.continuation_pool()) == 1
         constructed_with.append(observed_factory)
         return uow
 
@@ -473,6 +474,8 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
     assert public_routes == {
         ("/v1/sessions/{session_id}/run-status", frozenset({"GET"})),
         ("/v1/sessions/{session_id}/run-exit", frozenset({"POST"})),
+        ("/v1/sessions/{session_id}/run-continuation", frozenset({"GET"})),
+        ("/v1/sessions/{session_id}/run-continuation", frozenset({"POST"})),
         ("/v1/run-entry-options", frozenset({"GET"})),
         ("/v1/runs/native", frozenset({"POST"})),
         ("/health", frozenset({"GET"})),

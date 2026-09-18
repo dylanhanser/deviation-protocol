@@ -199,7 +199,9 @@ async def test_e02_non_hospital_catalog_valid_ended_fixture(monkeypatch, tmp_pat
     mechanics = replace(MECHANICS_CATALOGUE[0], scenario_id=world.scenario_id,
         content_version=world.scenario_content_version,character_id=world.default_character_definition_id)
     from deviation_protocol.application import native_turn_mechanics
-    monkeypatch.setattr(native_turn_mechanics,"NativeTurnMechanicsCoordinator",lambda c,s: NativeTurnMechanicsCoordinator(c,s,catalogue=(mechanics,),worlds=(world,)))
+    monkeypatch.setattr(native_turn_mechanics,"NativeTurnMechanicsCoordinator",lambda c,s:
+        NativeTurnMechanicsCoordinator(c,s,catalogue=(mechanics,),worlds=(world,))
+        if s.content_version == catalog.content_version else NativeTurnMechanicsCoordinator(c,s))
     runtime = build_demo_runtime()
     app = create_app(services=runtime.services)
     app.state.api_services = runtime.services

@@ -24,7 +24,7 @@ class NativeRunStatusResponse(BaseModel):
 
     @model_validator(mode="after")
     def _state(self):
-        if (self.run_state_version != (3 if self.lifecycle_status == "active" else 4)
+        if (self.run_state_version not in ((3,4) if self.lifecycle_status == "active" else (4,5))
                 or self.lifecycle_status == "terminated" and self.can_exit):
             raise ValueError("invalid native lifecycle projection")
         return self
@@ -321,6 +321,118 @@ class NarrativeRequestStatusResponse(BaseModel):
                 else None
             ),
         )
+
+
+class NativeRunContinuationRequest(NativeRunExitRequest):
+    pass
+
+
+class NativeWorldVisitResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    visit_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    visit_ordinal: int = Field(ge=1,le=2)
+    world_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    world_version: int = Field(ge=1,le=2**63-1)
+    region_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    region_version: int = Field(ge=1,le=2**63-1)
+
+    @model_validator(mode="after")
+    def _identity(self):
+        expected = (("world.death_certificate", "region.death_certificate.facility")
+            if self.visit_ordinal == 1 else ("world.undelivered_receipt", "region.undelivered_receipt.dispatch_hall"))
+        if (self.world_id, self.region_id) != expected or self.world_version != 1 or self.region_version != 1:
+            raise ValueError("invalid authored visit identity")
+        return self
+
+
+class NativeRunPredecessorResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    session_state_version: int = Field(ge=0,le=2**63-1)
+    scenario_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    scenario_content_version: str = Field(min_length=1,max_length=32,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    visit: NativeWorldVisitResponse
+
+    @model_validator(mode="after")
+    def _first(self):
+        if (self.visit.visit_ordinal != 1 or self.scenario_id != "death_certificate"
+                or self.scenario_content_version != "death-certificate-1.1.0"):
+            raise ValueError("predecessor must be visit one")
+        return self
+
+
+class NativeRunContinuationResultResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    schema_version: Literal["native-run-continuation-result/v1"]
+    source_session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    source_session_state_version: int = Field(ge=0,le=2**63-1)
+    run_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    resulting_run_state_version: int = Field(ge=4,le=4)
+    session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    initial_session_state_version: int = Field(ge=0,le=0)
+    scenario_id: Literal["undelivered_receipt"]
+    scenario_content_version: Literal["undelivered-receipt-1.0.0"]
+    run_context: PublicNativeRunContext
+    visit: NativeWorldVisitResponse
+
+    @model_validator(mode="after")
+    def _second(self):
+        if self.visit.visit_ordinal != 2 or self.source_session_id == self.session_id or self.run_id != self.run_context.run_id:
+            raise ValueError("invalid continuation edge")
+        return self
+
+
+class NativeWorldArrivalResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    previous_ending_status: Literal["RESOLVED", "FAILED"]
+    previous_ending_title: str = Field(min_length=1, max_length=120)
+    entry_notice: str = Field(min_length=1, max_length=300)
+
+    @model_validator(mode="after")
+    def _authored(self):
+        from deviation_protocol.application.world_visit_context import ENTRY_NOTICES, ENDING_TITLES
+        titles = (tuple(ENDING_TITLES.values())[:2] if self.previous_ending_status == "RESOLVED"
+                  else (ENDING_TITLES["death_certificate.ending.deadline_reached"],))
+        if self.previous_ending_title not in titles or self.entry_notice != ENTRY_NOTICES[self.previous_ending_status]:
+            raise ValueError("invalid authored arrival annotation")
+        return self
+
+
+class NativeRunContinuationStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid",strict=True)
+    schema_version: Literal["native-run-continuation-status/v1"]
+    session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    run_id: str = Field(min_length=1,max_length=128,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    run_state_version: int = Field(ge=3,le=5)
+    session_state_version: int = Field(ge=0,le=2**63-1)
+    lifecycle_status: Literal["active","terminated"]
+    can_continue: bool
+    current_session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    visit: NativeWorldVisitResponse | None
+    predecessor: NativeRunPredecessorResponse | None
+    successor: NativeRunContinuationResultResponse | None
+    arrival: NativeWorldArrivalResponse | None
+
+    @model_validator(mode="after")
+    def _edge(self):
+        if (self.arrival is not None) != (self.visit is not None and self.visit.visit_ordinal == 2):
+            raise ValueError("arrival requires the destination visit")
+        expected_revision = (3 if self.visit is None else 4) + (self.lifecycle_status == "terminated")
+        if self.run_state_version != expected_revision:
+            raise ValueError("invalid continuation lifecycle")
+        if self.can_continue and (self.run_state_version != 3 or self.visit is not None):
+            raise ValueError("invalid continuation eligibility")
+        if self.visit is None:
+            if self.predecessor is not None or self.successor is not None or self.current_session_id != self.session_id:
+                raise ValueError("invalid first visit association")
+        elif self.visit.visit_ordinal == 2:
+            if self.predecessor is None or self.successor is not None or self.current_session_id != self.session_id or self.predecessor.session_id == self.session_id:
+                raise ValueError("incomplete successor association")
+        elif (self.predecessor is not None or self.successor is None or self.successor.source_session_id != self.session_id
+                or self.successor.session_id != self.current_session_id or self.successor.run_id != self.run_id
+                or self.successor.source_session_state_version != self.session_state_version):
+            raise ValueError("incomplete predecessor association")
+        return self
 
 
 class ErrorDetail(BaseModel):

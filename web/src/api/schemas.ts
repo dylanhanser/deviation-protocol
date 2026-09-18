@@ -19,7 +19,7 @@ export const nativeRunStatusSchema = z.object({
   lifecycle_status: z.enum(["active", "terminated"]),
   can_exit: z.boolean(),
 }).strict().refine((s) => s.lifecycle_status === "active"
-  ? s.run_state_version === 3 : s.run_state_version === 4 && !s.can_exit);
+  ? [3, 4].includes(s.run_state_version) : [4, 5].includes(s.run_state_version) && !s.can_exit);
 export type NativeRunStatus = z.infer<typeof nativeRunStatusSchema>;
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
@@ -1248,3 +1248,37 @@ export type PublicSuggestedAction = z.infer<
 >;
 export type PlayerSessionView = z.infer<typeof playerSessionViewSchema>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
+
+export const nativeWorldVisitSchema = z.object({visit_id:safeId128Schema, visit_ordinal:z.union([z.literal(1),z.literal(2)]),
+  world_id:safeId128Schema,world_version:z.literal(1),region_id:safeId128Schema,region_version:z.literal(1)}).strict().refine(v =>
+    v.visit_ordinal === 1 ? v.world_id === "world.death_certificate" && v.region_id === "region.death_certificate.facility"
+      : v.world_id === "world.undelivered_receipt" && v.region_id === "region.undelivered_receipt.dispatch_hall");
+export const nativeRunContinuationResultSchema = z.object({schema_version:z.literal("native-run-continuation-result/v1"),
+  source_session_id:safeId64Schema,source_session_state_version:nonNegativeIntegerSchema.safe(),run_id:safeId128Schema,
+  resulting_run_state_version:z.literal(4),session_id:safeId64Schema,initial_session_state_version:z.literal(0),
+  scenario_id:z.literal("undelivered_receipt"),scenario_content_version:z.literal("undelivered-receipt-1.0.0"),
+  run_context:publicNativeRunContextSchema,visit:nativeWorldVisitSchema}).strict().refine(r =>
+    r.visit.visit_ordinal === 2 && r.source_session_id !== r.session_id && r.run_id === r.run_context.run_id);
+export const nativeRunContinuationStatusSchema = z.object({schema_version:z.literal("native-run-continuation-status/v1"),
+  session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5)]),
+  session_state_version:nonNegativeIntegerSchema.safe(),lifecycle_status:z.enum(["active","terminated"]),can_continue:z.boolean(),
+  current_session_id:safeId64Schema,visit:nativeWorldVisitSchema.nullable(),
+  predecessor:z.object({session_id:safeId64Schema,session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:z.literal("death_certificate"),
+    scenario_content_version:z.literal("death-certificate-1.1.0"),visit:nativeWorldVisitSchema}).strict().refine(p=>p.visit.visit_ordinal===1).nullable(),
+  arrival:z.object({previous_ending_status:z.enum(["RESOLVED","FAILED"]),
+    previous_ending_title:z.string().min(1).max(120),entry_notice:z.string().min(1).max(300)}).strict().refine(a =>
+      a.previous_ending_status === "RESOLVED"
+        ? ["规程已中断","记录已被质疑"].includes(a.previous_ending_title) && a.entry_notice === "上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。"
+        : a.previous_ending_title === "记录成为现实" && a.entry_notice === "上一世界以失败结果结束。你带着原有状态抵达发运大厅，当前队列已经消耗四格期限。").nullable(),
+  successor:nativeRunContinuationResultSchema.nullable()}).strict().refine(s=>{
+    if ((s.arrival !== null) !== (s.visit?.visit_ordinal === 2)) return false;
+    if (s.run_state_version !== (s.visit === null ? 3 : 4) + (s.lifecycle_status === "terminated" ? 1 : 0)) return false;
+    if (s.can_continue && (s.run_state_version !== 3 || s.lifecycle_status !== "active" || s.visit !== null)) return false;
+    if (s.visit === null) return s.predecessor === null && s.successor === null && s.current_session_id === s.session_id;
+    if (s.visit.visit_ordinal === 2) return s.predecessor !== null && s.predecessor.session_id !== s.session_id && s.successor === null && s.current_session_id === s.session_id;
+    return s.predecessor === null && s.successor !== null && s.successor.source_session_id === s.session_id &&
+      s.successor.run_id === s.run_id && s.successor.session_id === s.current_session_id &&
+      s.successor.source_session_state_version === s.session_state_version;
+  });
+export type NativeRunContinuationStatus = z.infer<typeof nativeRunContinuationStatusSchema>;
+export type NativeRunContinuationResult = z.infer<typeof nativeRunContinuationResultSchema>;

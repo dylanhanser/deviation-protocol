@@ -840,7 +840,7 @@ class RunRevisionRow(Base):
             name="ck_run_revisions_lifecycle",
         ),
         CheckConstraint(
-            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at)",
+            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at) OR (mutation_kind = 'CONTINUE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'active' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'active' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NULL AND occurred_at >= bound_at) OR (mutation_kind = 'TERMINATE_CONTINUED_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 4 AND state_version = 5 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at)",
             name="ck_run_revisions_mutation_matrix",
         ),
         CheckConstraint(
@@ -983,7 +983,7 @@ class RunCurrentRow(Base):
             name="ck_run_current_lifecycle",
         ),
         CheckConstraint(
-            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at AND active_player_character_id IS NULL)",
+            "(mutation_kind = 'CREATE' AND state_version = 1 AND prior_state_version IS NULL AND creation_operation_id = operation_id AND creation_source_reference = source_reference AND creation_occurred_at = occurred_at) OR (mutation_kind IN ('ATTACH_SESSION', 'BIND_PLAYER_CHARACTER') AND state_version BETWEEN 2 AND 9223372036854775807 AND prior_state_version = state_version - 1) OR (mutation_kind = 'TERMINATE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at AND active_player_character_id IS NULL) OR (mutation_kind = 'CONTINUE_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 3 AND state_version = 4 AND lifecycle_status = 'active' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'active' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NULL AND occurred_at >= bound_at AND active_player_character_id IS NOT NULL AND active_player_character_id = binding_player_character_id) OR (mutation_kind = 'TERMINATE_CONTINUED_NATIVE_RUN' AND prior_state_version IS NOT NULL AND prior_state_version = 4 AND state_version = 5 AND lifecycle_status = 'terminated' AND binding_player_character_id IS NOT NULL AND binding_contract_version IS NOT NULL AND binding_record_revision IS NOT NULL AND binding_state IS NOT NULL AND binding_state = 'historical' AND binding_operation_id IS NOT NULL AND binding_authority_source_ref IS NOT NULL AND bound_at IS NOT NULL AND inactivated_at IS NOT NULL AND inactivated_at = occurred_at AND occurred_at >= bound_at AND active_player_character_id IS NULL)",
             name="ck_run_current_mutation_matrix",
         ),
         CheckConstraint(
@@ -1276,6 +1276,95 @@ class RunCreationReceiptRow(Base):
     )
 
 
+class RunWorldStateRow(Base):
+    __tablename__ = "run_world_states"
+    __table_args__ = (
+        CheckConstraint("world_version BETWEEN 1 AND 9223372036854775807 AND region_version BETWEEN 1 AND 9223372036854775807 AND materialized_state_version = 4", name="ck_run_world_states_versions"),
+        CheckConstraint("state_schema = 'run-world-state/v1'", name="ck_run_world_states_schema"),
+        CheckConstraint("OCTET_LENGTH(state_canonical) BETWEEN 1 AND 1048576", name="ck_run_world_states_payload_size"),
+        UniqueConstraint("run_id", "continuous_story_line_id", "world_id", "world_version", name="uq_run_world_states_exact"),
+        ForeignKeyConstraint(("run_id", "continuous_story_line_id", "materialized_state_version"),
+            ("run_revisions.run_id", "run_revisions.continuous_story_line_id", "run_revisions.state_version"),
+            name="fk_run_world_states_revision", ondelete="RESTRICT", onupdate="RESTRICT"),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+    run_id: Mapped[str] = mapped_column(_ascii_varchar(128), primary_key=True)
+    continuous_story_line_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    world_id: Mapped[str] = mapped_column(_ascii_varchar(128), primary_key=True)
+    world_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    first_visit_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    scenario_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    scenario_content_version: Mapped[str] = mapped_column(_ascii_varchar(32), nullable=False)
+    region_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    region_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    state_schema: Mapped[str] = mapped_column(_ascii_varchar(64), nullable=False)
+    state_canonical: Mapped[bytes] = mapped_column(mysql.MEDIUMBLOB(), nullable=False)
+    state_sha256: Mapped[bytes] = mapped_column(mysql.BINARY(32), nullable=False)
+    materialized_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
+
+
+class RunWorldVisitRow(Base):
+    __tablename__ = "run_world_visits"
+    __table_args__ = (
+        CheckConstraint("world_version BETWEEN 1 AND 9223372036854775807 AND region_version BETWEEN 1 AND 9223372036854775807 AND materialized_state_version = 4", name="ck_run_world_visits_versions"),
+        CheckConstraint("(visit_ordinal = 1 AND joined_state_version = 3) OR (visit_ordinal = 2 AND joined_state_version = 4)", name="ck_run_world_visits_ordinal_join"),
+        UniqueConstraint("session_id", name="uq_run_world_visits_session"),
+        UniqueConstraint("run_id", "visit_ordinal", name="uq_run_world_visits_ordinal"),
+        UniqueConstraint("run_id", "joined_state_version", name="uq_run_world_visits_join"),
+        UniqueConstraint("run_id", "continuous_story_line_id", "visit_id", "session_id", name="uq_run_world_visits_exact"),
+        ForeignKeyConstraint(("run_id", "continuous_story_line_id", "materialized_state_version"),
+            ("run_revisions.run_id", "run_revisions.continuous_story_line_id", "run_revisions.state_version"),
+            name="fk_run_world_visits_revision", ondelete="RESTRICT", onupdate="RESTRICT"),
+        ForeignKeyConstraint(("session_id", "run_id", "continuous_story_line_id", "joined_state_version"),
+            ("run_session_participations.session_id", "run_session_participations.run_id",
+             "run_session_participations.continuous_story_line_id", "run_session_participations.joined_state_version"),
+            name="fk_run_world_visits_participation", ondelete="RESTRICT", onupdate="RESTRICT"),
+        ForeignKeyConstraint(("run_id", "continuous_story_line_id", "world_id", "world_version"),
+            ("run_world_states.run_id", "run_world_states.continuous_story_line_id",
+             "run_world_states.world_id", "run_world_states.world_version"),
+            name="fk_run_world_visits_world", ondelete="RESTRICT", onupdate="RESTRICT"),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+    run_id: Mapped[str] = mapped_column(_ascii_varchar(128), primary_key=True)
+    visit_id: Mapped[str] = mapped_column(_ascii_varchar(128), primary_key=True)
+    continuous_story_line_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    visit_ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    world_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    world_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    region_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    region_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    session_id: Mapped[str] = mapped_column(_legacy_session_id_varchar(), nullable=False)
+    joined_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    materialized_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    operation_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    source_reference: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    entered_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
+
+
+class RunWorldPositionRow(Base):
+    __tablename__ = "run_world_positions"
+    __table_args__ = (
+        CheckConstraint("position_state_version = 4", name="ck_run_world_positions_versions"),
+        UniqueConstraint("session_id", name="uq_run_world_positions_session"),
+        ForeignKeyConstraint(("run_id", "continuous_story_line_id", "position_state_version"),
+            ("run_revisions.run_id", "run_revisions.continuous_story_line_id", "run_revisions.state_version"),
+            name="fk_run_world_positions_revision", ondelete="RESTRICT", onupdate="RESTRICT"),
+        ForeignKeyConstraint(("run_id", "continuous_story_line_id", "visit_id", "session_id"),
+            ("run_world_visits.run_id", "run_world_visits.continuous_story_line_id",
+             "run_world_visits.visit_id", "run_world_visits.session_id"),
+            name="fk_run_world_positions_visit", ondelete="RESTRICT", onupdate="RESTRICT"),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+    run_id: Mapped[str] = mapped_column(_ascii_varchar(128), primary_key=True)
+    continuous_story_line_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    visit_id: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    session_id: Mapped[str] = mapped_column(_legacy_session_id_varchar(), nullable=False)
+    position_state_version: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(mysql.DATETIME(fsp=6), nullable=False)
+
+
 class RunMutationReceiptRow(Base):
     __tablename__ = "run_mutation_receipts"
     __table_args__ = (
@@ -1285,7 +1374,7 @@ class RunMutationReceiptRow(Base):
             name="ck_run_mutation_receipts_version_successor",
         ),
         CheckConstraint(
-            "(operation_namespace = 'run.attach-session/v1' AND command_kind = 'ATTACH_SESSION' AND result_schema_version = 'run.attach-session-result/v1' AND participation_session_id IS NOT NULL AND participation_operation_id IS NOT NULL AND participation_source_reference IS NOT NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL) OR (operation_namespace = 'run.bind-player-character/v1' AND command_kind = 'BIND_PLAYER_CHARACTER' AND result_schema_version = 'run.bind-player-character-result/v1' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NOT NULL AND result_character_contract_version IS NOT NULL AND result_character_record_revision IS NOT NULL) OR (operation_namespace = 'run.terminate-native/v1' AND command_kind = 'TERMINATE_NATIVE_RUN' AND result_schema_version = 'run.terminate-native-result/v1' AND expected_state_version = 3 AND resulting_state_version = 4 AND resulting_lifecycle_status = 'terminated' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL)",
+            "(operation_namespace = 'run.attach-session/v1' AND command_kind = 'ATTACH_SESSION' AND result_schema_version = 'run.attach-session-result/v1' AND participation_session_id IS NOT NULL AND participation_operation_id IS NOT NULL AND participation_source_reference IS NOT NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL) OR (operation_namespace = 'run.bind-player-character/v1' AND command_kind = 'BIND_PLAYER_CHARACTER' AND result_schema_version = 'run.bind-player-character-result/v1' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NOT NULL AND result_character_contract_version IS NOT NULL AND result_character_record_revision IS NOT NULL) OR (operation_namespace = 'run.terminate-native/v1' AND command_kind = 'TERMINATE_NATIVE_RUN' AND result_schema_version = 'run.terminate-native-result/v1' AND expected_state_version = 3 AND resulting_state_version = 4 AND resulting_lifecycle_status = 'terminated' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL) OR (operation_namespace = 'run.continue-native/v1' AND command_kind = 'CONTINUE_NATIVE_RUN' AND result_schema_version = 'run.continue-native-result/v1' AND expected_state_version = 3 AND resulting_state_version = 4 AND resulting_lifecycle_status = 'active' AND participation_session_id IS NOT NULL AND participation_operation_id IS NOT NULL AND participation_source_reference IS NOT NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL) OR (operation_namespace = 'run.terminate-continued-native/v1' AND command_kind = 'TERMINATE_CONTINUED_NATIVE_RUN' AND result_schema_version = 'run.terminate-continued-native-result/v1' AND expected_state_version = 4 AND resulting_state_version = 5 AND resulting_lifecycle_status = 'terminated' AND participation_session_id IS NULL AND participation_operation_id IS NULL AND participation_source_reference IS NULL AND result_player_character_id IS NULL AND result_character_contract_version IS NULL AND result_character_record_revision IS NULL)",
             name="ck_run_mutation_receipts_protocol_matrix",
         ),
         CheckConstraint(

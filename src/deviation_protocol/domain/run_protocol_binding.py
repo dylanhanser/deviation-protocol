@@ -249,4 +249,178 @@ class NativeRunTerminatedV1(BaseModel):
         return self
 
 
-_ClassifiedRun = LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1
+from deviation_protocol.domain.world_continuation import (
+    NativeRunContinuationEvidenceV1, NativeRunContinuationRequestV1,
+    WorldStateRootV1, WorldVisitV1, WorldPositionV1,
+)
+from deviation_protocol.domain.run import RunSessionParticipationReference
+
+
+def continue_native_run(admission: NativeRunAdmissionV1,
+                        evidence: NativeRunContinuationEvidenceV1) -> CanonicalRun:
+    revalidate_run_model(admission, NativeRunAdmissionV1)
+    revalidate_run_model(evidence, NativeRunContinuationEvidenceV1)
+    run, request = admission.canonical_run, evidence.request
+    occurred_at = datetime.fromisoformat(evidence.occurred_at.replace("Z", "+00:00"))
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.source_session_id != run.trusted_participation_references[0].session_id
+            or occurred_at < run.current_mutation_provenance.occurred_at
+            or evidence.selection_inputs.resolution_fingerprint != admission.protocol_binding.resolved_protocol.fingerprint.value):
+        raise ValueError("continuation does not bind admission")
+    participation = RunSessionParticipationReference(session_id=evidence.destination_session_id,
+        run_id=run.run_id, continuous_story_line_id=run.continuous_story_line_id,
+        joined_state_version=RunStateVersion(value=4), operation_id=request.operation_id(),
+        source_reference=RunAuthoritySourceRef(value=request.source_reference))
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=4),
+        mutation_kind=RunMutationKind.CONTINUE_NATIVE_RUN, operation_id=request.operation_id(),
+        source_reference=participation.source_reference, occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=4),
+        "current_mutation_provenance": provenance,
+        "trusted_participation_references": (*run.trusted_participation_references, participation)})
+
+
+class NativeRunContinuedV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+
+    admission: NativeRunAdmissionV1
+    canonical_run: CanonicalRun
+    continuation_evidence: NativeRunContinuationEvidenceV1
+    source_root: WorldStateRootV1
+    destination_root: WorldStateRootV1
+    visits: tuple[WorldVisitV1, WorldVisitV1]
+    position: WorldPositionV1
+
+    @model_validator(mode="after")
+    def _association(self):
+        for obj in (self.admission, self.canonical_run, self.continuation_evidence,
+                    self.source_root, self.destination_root, *self.visits, self.position):
+            revalidate_run_model(obj, type(obj))
+        evidence = self.continuation_evidence
+        expected = continue_native_run(self.admission, evidence)
+        time = expected.current_mutation_provenance.occurred_at
+        if (self.canonical_run != expected
+                or self.source_root.digest() != evidence.source_world_state_sha256
+                or self.destination_root.digest() != evidence.destination_world_state_sha256
+                or self.source_root.snapshot_sha256 != evidence.source_ending.snapshot_sha256
+                or self.source_root.snapshot_state_version != evidence.source_ending.session_state_version
+                or self.source_root.snapshot["player"] != self.destination_root.snapshot["player"]
+                or self.position.run_id != expected.run_id.value
+                or self.position.continuous_story_line_id != expected.continuous_story_line_id.value
+                or self.position.visit_id != evidence.destination_visit_id
+                or self.position.session_id != evidence.destination_session_id
+                or self.position.created_at != time):
+            raise ValueError("invalid continued Run family")
+        for ordinal, (visit, root, participation) in enumerate(zip(
+                self.visits, (self.source_root, self.destination_root),
+                expected.trusted_participation_references), 1):
+            if (visit.visit_ordinal != ordinal
+                    or visit.run_id != root.run_id or visit.run_id != expected.run_id.value
+                    or visit.continuous_story_line_id != root.continuous_story_line_id
+                    or visit.continuous_story_line_id != expected.continuous_story_line_id.value
+                    or visit.visit_id != root.first_visit_id
+                    or visit.session_id != root.session_id or visit.session_id != participation.session_id
+                    or (visit.world_id, visit.world_version) != (root.world.world_id, root.world.world_version)
+                    or (visit.region_id, visit.region_version) != (root.region.region_id, root.region.region_version)
+                    or visit.joined_state_version != participation.joined_state_version.value
+                    or visit.created_at != time
+                    or visit.entered_at != (expected.creation_provenance.occurred_at if ordinal == 1 else time)
+                    or visit.operation_id != evidence.request.operation_id().value
+                    or visit.source_reference != evidence.request.source_reference):
+                raise ValueError("invalid continued visit/root association")
+        return self
+
+
+class ContinuedNativeRunExitRequestV1(NativeRunExitRequestV1):
+    schema_version: Literal["run.terminate-continued-native-request/v1"] = Field(alias="schema")
+
+    def operation_id(self) -> RunOperationId:
+        revalidate_run_model(self, ContinuedNativeRunExitRequestV1)
+        payload = {"schema": "run.terminate-continued-native-operation/v1",
+                   "controller_binding": self.controller_binding,
+                   "public_operation_key": self.public_operation_key, "run_id": self.run_id}
+        return RunOperationId(value=hashlib.sha256(canonical_run_operation_bytes(payload)).hexdigest())
+
+    def fingerprint(self) -> str:
+        revalidate_run_model(self, ContinuedNativeRunExitRequestV1)
+        return hashlib.sha256(canonical_run_operation_bytes(self)).hexdigest()
+
+
+class ContinuedNativeRunExitEvidenceV1(_NativeExitModel):
+    schema_version: Literal["run.terminate-continued-native-evidence/v1"] = Field(alias="schema")
+    request: ContinuedNativeRunExitRequestV1
+    scenario_id: Literal["undelivered_receipt"]
+    scenario_content_version: Literal["undelivered-receipt-1.0.0"]
+    ending_id: _ExitId
+    ending_status: Literal["RESOLVED", "FAILED"]
+    session_state_version: int = Field(strict=True, ge=0, le=2**63 - 1)
+    snapshot_sha256: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _association(self):
+        if (self.request.expected_run_state_version != 4
+                or self.session_state_version != self.request.expected_session_state_version
+                or len(canonical_run_operation_bytes(self)) > 4096):
+            raise ValueError("invalid continued exit evidence")
+        return self
+
+
+def decode_continued_native_run_exit_evidence(payload: bytes) -> ContinuedNativeRunExitEvidenceV1:
+    if type(payload) is not bytes or not 1 <= len(payload) <= 4096:
+        raise ValueError("invalid continued exit evidence bytes")
+    value = ContinuedNativeRunExitEvidenceV1.model_validate(json.loads(payload.decode("utf-8")), strict=True)
+    if canonical_run_operation_bytes(value) != payload:
+        raise ValueError("noncanonical continued exit evidence")
+    return value
+
+
+def terminate_continued_native_run(continued: NativeRunContinuedV1,
+        request: ContinuedNativeRunExitRequestV1, *, occurred_at: datetime) -> CanonicalRun:
+    revalidate_run_model(continued, NativeRunContinuedV1)
+    revalidate_run_model(request, ContinuedNativeRunExitRequestV1)
+    run = continued.canonical_run
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.session_id != run.trusted_participation_references[1].session_id
+            or request.expected_run_state_version != 4
+            or occurred_at < run.current_mutation_provenance.occurred_at):
+        raise ValueError("continued exit does not bind current visit")
+    binding = ReservedPlayerCharacterBinding(**{**run.player_character_binding.__dict__,
+        "binding_state": "historical", "inactivated_at": occurred_at})
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=5),
+        mutation_kind=RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
+        operation_id=request.operation_id(), source_reference=RunAuthoritySourceRef(value=request.source_reference),
+        occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=5),
+        "lifecycle_status": RunLifecycleStatus.TERMINATED, "player_character_binding": binding,
+        "current_mutation_provenance": provenance})
+
+
+class NativeRunContinuedTerminatedV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+    continued: NativeRunContinuedV1
+    canonical_run: CanonicalRun
+    exit_evidence: ContinuedNativeRunExitEvidenceV1
+
+    @property
+    def admission(self):
+        return self.continued.admission
+
+    @model_validator(mode="after")
+    def _association(self):
+        revalidate_run_model(self.continued, NativeRunContinuedV1)
+        revalidate_run_model(self.exit_evidence, ContinuedNativeRunExitEvidenceV1)
+        validate_canonical_run(self.canonical_run)
+        if self.canonical_run != terminate_continued_native_run(self.continued,
+                self.exit_evidence.request,
+                occurred_at=self.canonical_run.current_mutation_provenance.occurred_at):
+            raise ValueError("invalid continued terminal family")
+        return self
+
+
+_ClassifiedRun = (LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1
+                 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1)

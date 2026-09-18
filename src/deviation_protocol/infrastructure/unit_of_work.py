@@ -23,13 +23,17 @@ from deviation_protocol.infrastructure.repositories import (
 
 
 class SqlAlchemyUnitOfWork(UnitOfWork):
-    def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+    def __init__(self, session_factory: async_sessionmaker[AsyncSession], *, content_registry=None) -> None:
         self._session_factory = session_factory
+        self._content_registry = content_registry
         self._session: AsyncSession | None = None
         self._committed = False
 
     async def __aenter__(self) -> "SqlAlchemyUnitOfWork":
         self._session = self._session_factory()
+        self._session.info["session_content_registry"] = self._content_registry
+        from deviation_protocol.infrastructure.repositories import SqlAlchemyRunWorldContinuationRepository
+        self.run_world_continuations = SqlAlchemyRunWorldContinuationRepository(self._session)
         self.sessions = SqlAlchemyGameSessionRepository(self._session)
         self.turn_requests = SqlAlchemyTurnRequestRepository(self._session)
         self.narrative_jobs = SqlAlchemyNarrativeJobRepository(self._session)
@@ -97,8 +101,9 @@ NATIVE_ADMISSION_LOCK = "deviation_protocol:p33:s3:run_protocol_bindings:ddl_wri
 class SqlAlchemyNativeRunAdmissionUnitOfWork(SqlAlchemyUnitOfWork, NativeRunAdmissionUnitOfWork):
     """One explicitly owned physical connection, including post-commit cleanup."""
 
-    def __init__(self, engine):
+    def __init__(self, engine, *, content_registry=None):
         self._engine = engine
+        self._content_registry = content_registry
         self._connection = None
         self._transaction = None
         self._driver = None
@@ -317,8 +322,9 @@ class SqlAlchemyNativeRunAdmissionUnitOfWork(SqlAlchemyUnitOfWork, NativeRunAdmi
 
 
 class SqlAlchemyNativeRunAdmissionUnitOfWorkFactory:
-    def __init__(self, engine):
+    def __init__(self, engine, *, content_registry=None):
         self.engine = engine
+        self.content_registry = content_registry
 
     def __call__(self):
-        return SqlAlchemyNativeRunAdmissionUnitOfWork(self.engine)
+        return SqlAlchemyNativeRunAdmissionUnitOfWork(self.engine,content_registry=self.content_registry)

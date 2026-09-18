@@ -233,6 +233,7 @@ async def test_event_flush_failure_returns_no_receipt_capability() -> None:
 
 class FakeSession:
     def __init__(self) -> None:
+        self.info = {}
         self.add = Mock()
         self.begin = Mock()
         self.execute = AsyncMock()

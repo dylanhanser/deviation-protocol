@@ -246,7 +246,9 @@ async def test_s3_v01_a(monkeypatch):
     assert [statement.column_descriptions[0]["entity"] for statement in session.statements] == [
         orm.RunCurrentRow, orm.RunRevisionRow, orm.RunSessionParticipationRow,
         orm.RunCreationReceiptRow, orm.RunMutationReceiptRow, orm.PlayerCharacterRevisionRow,
-        orm.RunProtocolBindingRow, orm.RunEntryWorldBindingRow, orm.PlayerCharacterCurrentRow,
+        orm.RunProtocolBindingRow, orm.RunEntryWorldBindingRow,
+        orm.RunWorldStateRow, orm.RunWorldVisitRow, orm.RunWorldPositionRow,
+        orm.PlayerCharacterCurrentRow,
         orm.PlayerCharacterControllerBindingRow, orm.GameSessionRow, orm.DomainEventRow, orm.GameSnapshotRow,
     ]
     session.close()

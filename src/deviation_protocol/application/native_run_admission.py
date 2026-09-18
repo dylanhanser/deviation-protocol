@@ -402,9 +402,9 @@ class NativeRunAdmissionService(RunEntryService):
                 or evidence.entry_world != command.entry_world):
             return _decision("IDEMPOTENCY_CONFLICT")
         admission = await uow.run_protocol_bindings.get_classified_for_update(run_id=receipt.result.run_id)
-        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1
-        if type(admission) is NativeRunTerminatedV1:
-            revalidate_run_model(admission, NativeRunTerminatedV1)
+        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1
+        if type(admission) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1):
+            revalidate_run_model(admission, type(admission))
             admission = admission.admission
         if type(admission) is not NativeRunAdmissionV1:
             raise NativeRunAdmissionIntegrityError("missing admitted family") from None

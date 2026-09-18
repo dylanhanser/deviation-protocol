@@ -46,8 +46,12 @@ from deviation_protocol.domain.run import (
 )
 if TYPE_CHECKING:
     from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
+    from deviation_protocol.domain.world_continuation import NativeRunContinuationEvidenceV1
     from deviation_protocol.domain.run_protocol_binding import (
         NativeRunTerminatedV1,
+        NativeRunContinuedV1,
+        NativeRunContinuedTerminatedV1,
+        ContinuedNativeRunExitEvidenceV1,
         NativeRunExitEvidenceV1,
         LegacyRunCompatibilityV1,
         NativeRunProtocolBindingV1,
@@ -239,7 +243,7 @@ class NarrativeJobRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def get_active_for_session(self, session_id: str) -> NarrativeJob | None:
+    async def get_active_for_session(self, session_id: str, *, for_update: bool = False) -> NarrativeJob | None:
         raise NotImplementedError
 
     @abstractmethod
@@ -410,13 +414,13 @@ class RunProtocolBindingRepository(ABC):
     @abstractmethod
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | None:
         raise NotImplementedError
 
     @abstractmethod
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | None:
         raise NotImplementedError
 
 
@@ -536,8 +540,17 @@ class RunMutationReceiptRepository(ABC):
 
     @abstractmethod
     async def add(
-        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime, exit_evidence: NativeRunExitEvidenceV1 | None = None
+        self, receipt: StoredRunSuccessReceipt, *, created_at: datetime,
+        exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | None = None,
+        continuation_evidence: NativeRunContinuationEvidenceV1 | None = None
     ) -> None:
+        raise NotImplementedError
+
+
+class RunWorldContinuationRepository(ABC):
+    @abstractmethod
+    async def add(self, continued: NativeRunContinuedV1) -> None:
+        """Stage both immutable roots, visits and the unique current position."""
         raise NotImplementedError
 
 
@@ -554,6 +567,7 @@ class UnitOfWork(ABC):
     run_creation_receipts: RunCreationReceiptRepository
     run_mutation_receipts: RunMutationReceiptRepository
     run_protocol_bindings: RunProtocolBindingRepository
+    run_world_continuations: RunWorldContinuationRepository
 
     @abstractmethod
     async def __aenter__(self) -> "UnitOfWork":

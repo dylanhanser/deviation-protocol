@@ -604,13 +604,18 @@ def _complete_native_admission(run, protocol, world, evidence, request_id, parti
 
 
 def _native_admission_prefix(run, revisions, mutations):
-    from deviation_protocol.domain.run import RunLifecycleStatus
+    from deviation_protocol.domain.run import RunMutationKind
     from deviation_protocol.infrastructure.run_persistence import canonical_run_from_revision_storage
-    if run.lifecycle_status is not RunLifecycleStatus.TERMINATED:
+    if run.state_version.value == 3:
         return run, revisions, mutations
-    _require(tuple(r.state_version for r in revisions) == (1, 2, 3, 4)
-             and tuple(r.resulting_state_version for r in mutations) == (2, 3, 4), "terminal history shape")
-    prefix = canonical_run_from_revision_storage(revisions[2], participations=run.trusted_participation_references)
+    kind = run.current_mutation_provenance.mutation_kind
+    _require((run.state_version.value, kind) in (
+        (4, RunMutationKind.TERMINATE_NATIVE_RUN),
+        (4, RunMutationKind.CONTINUE_NATIVE_RUN),
+        (5, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN)), "native suffix shape")
+    _require(tuple(r.state_version for r in revisions) == tuple(range(1,run.state_version.value+1))
+             and tuple(r.resulting_state_version for r in mutations) == tuple(range(2,run.state_version.value+1)), "native history shape")
+    prefix = canonical_run_from_revision_storage(revisions[2], participations=run.trusted_participation_references[:1])
     return prefix, revisions[:3], mutations[:2]
 
 

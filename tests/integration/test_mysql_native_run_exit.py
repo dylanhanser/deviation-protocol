@@ -30,7 +30,7 @@ async def migrate_to(engine, target):
         current = await connection.scalar(sa.text("SELECT version_num FROM alembic_version"))
         await connection.rollback()
         def run(sync):
-            direction = SCRIPT._downgrade_revs if target == "20260916_0007" else SCRIPT._upgrade_revs
+            direction = SCRIPT._downgrade_revs if target < current else SCRIPT._upgrade_revs
             context = MigrationContext.configure(sync, opts={"fn": lambda revisions, context: direction(target, revisions)})
             with Operations.context(context), context.begin_transaction():
                 context.run_migrations()
@@ -43,9 +43,9 @@ async def migrate_to(engine, target):
 async def exit_case(engine, monkeypatch):
     async with engine.connect() as connection:
         original = await connection.scalar(sa.text("SELECT version_num FROM alembic_version"))
-        assert original in ("20260916_0007", "20260917_0008")
+        assert original in ("20260916_0007", "20260917_0008", "20260918_0009")
     with monkeypatch.context() as patch:
-        patch.setattr(admission_tests, "HEAD", "20260917_0008")
+        patch.setattr(admission_tests, "HEAD", "20260918_0009")
         try:
             async with native_runtime(engine) as case:
                 patch.setattr(main, "create_engine", lambda: engine)

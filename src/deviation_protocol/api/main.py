@@ -860,11 +860,11 @@ def build_run_entry_service(
     )
 
 
-def build_native_run_admission_service(*, engine, run_service: RunService, session_service: SessionService):
+def build_native_run_admission_service(*, engine, run_service: RunService, session_service: SessionService,content_registry=None):
     from deviation_protocol.application.native_run_admission import NativeRunAdmissionService
     from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
     return NativeRunAdmissionService(
-        uow_factory=SqlAlchemyNativeRunAdmissionUnitOfWorkFactory(engine),
+        uow_factory=SqlAlchemyNativeRunAdmissionUnitOfWorkFactory(engine,content_registry=content_registry),
         run_id_issuer=run_service.run_id_issuer,
         continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
         source_reference=run_service.source_reference, clock=run_service.clock,
@@ -892,7 +892,8 @@ def build_default_services(
     catalog = scenario_catalog.content_catalog
     engine = create_engine()
     session_factory = create_session_factory(engine)
-    uow_factory = lambda: SqlAlchemyUnitOfWork(session_factory)
+    registry = None
+    uow_factory = lambda: SqlAlchemyUnitOfWork(session_factory,content_registry=registry)
     try:
         deepseek_settings = DeepSeekSettings.from_environment()
     except ValueError:
@@ -936,9 +937,24 @@ def build_default_services(
         controller_binding_resolver=controller_binding_resolver,
         player_character_binding_evidence=player_character_service,
     )
+    from deviation_protocol.application.session_content_registry import SessionContentBundle,SessionContentRegistry
+    destination_path = SCENARIO_PACK.with_name("undelivered_receipt_v1.json")
+    destination_pack = JsonScenarioCatalogLoader(destination_path).load()
+    destination_coordinator = _build_native_turn_coordinator(destination_pack.content_catalog,destination_pack)
+    destination_service = SessionService(uow_factory=uow_factory,catalog=destination_pack.content_catalog,
+        scenario_catalog=destination_pack,native_view_coordinator=destination_coordinator,
+        native_controller_resolver=controller_binding_resolver)
+    destination_orchestrator = DurableNarrativeTurnOrchestrator(resolver=DeterministicRuleResolver(),
+        uow_factory=uow_factory,catalog=destination_pack.content_catalog,scenario_catalog=destination_pack,
+        native_coordinator=destination_coordinator,narrative_provider=provider,provider_name="deepseek",
+        model_name=deepseek_settings.model if deepseek_settings is not None else "deepseek-v4-flash")
+    registry = SessionContentRegistry((
+        SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=orchestrator),
+        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator)))
     return ApiServices(
         session_service=session_service,
         turn_orchestrator=orchestrator,
+        content_registry=registry,
         player_character_service=player_character_service,
         run_service=run_service,
         run_entry_service=build_run_entry_service(
@@ -946,7 +962,7 @@ def build_default_services(
             session_service=session_service,
         ),
         native_run_admission_service=build_native_run_admission_service(
-            engine=engine, run_service=run_service, session_service=session_service,
+            engine=engine, run_service=run_service, session_service=session_service,content_registry=registry,
         ),
         engine=engine,
         narrative_provider=provider,
@@ -983,6 +999,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     install_run_protocol_routes(app)
     from deviation_protocol.api.run_exit_routes import install_run_exit_routes
     install_run_exit_routes(app)
+    from deviation_protocol.api.run_continuation_routes import install_run_continuation_routes
+    install_run_continuation_routes(app)
 
     # Starlette does not dispatch an empty path parameter to an APIRoute, so the
     # normal parameter validation handler cannot see this one malformed spelling

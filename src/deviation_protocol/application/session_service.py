@@ -867,6 +867,33 @@ class SessionService:
             created_at=created_at,
         )
 
+    def prepare_world_continuation_initialization(self, principal, *, creation_request_id,
+            source_state: GameState, entry_variant: str, created_at: datetime):
+        """Detached destination initialization preserving the entire PlayerState."""
+        from dataclasses import replace
+        if entry_variant not in ("resolved", "failed") or type(entry_variant) is not str:
+            raise ValueError("invalid continuation entry variant")
+        definition = self.resolve_run_entry_definition("undelivered_receipt")
+        if definition.content_version != "undelivered-receipt-1.0.0":
+            raise ValueError("unsupported destination content")
+        if source_state.player.player_id != principal.player_id:
+            raise ValueError("continuation player mismatch")
+        prepared = self.prepare_run_entry_initialization(principal,
+            creation_request_id=creation_request_id,definition=definition,
+            character_definition_id=source_state.player.character_definition_id,created_at=created_at)
+        character = self.catalog.character(source_state.player.character_definition_id)
+        started = initialize_scenario_state(GameState(content_version=self.catalog.content_version,
+            player=source_state.player.model_copy(deep=True)),self.catalog,definition,
+            character_tags=character.tags,story_director=self.story_director)
+        state = started.candidate_state
+        state.scenario_runtime.threat_clocks["dispatch_deadline"].value = 4 if entry_variant == "failed" else 0
+        state.validate_against(self.catalog)
+        state.scenario_runtime.validate_against(definition)
+        frame = bind_public_decision_frame(self.story_director.plan_initial_frame(state,definition),
+            session_id=prepared.session.session_id,state_version=0,
+            scenario_content_version=definition.content_version)
+        return replace(prepared,initial_state=state,initial_frame=frame)
+
     async def stage_run_entry_initialization(
         self,
         uow: UnitOfWork,

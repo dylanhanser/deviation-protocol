@@ -185,6 +185,8 @@ class RunMutationKind(StrEnum):
     ATTACH_SESSION = "ATTACH_SESSION"
     BIND_PLAYER_CHARACTER = "BIND_PLAYER_CHARACTER"
     TERMINATE_NATIVE_RUN = "TERMINATE_NATIVE_RUN"
+    CONTINUE_NATIVE_RUN = "CONTINUE_NATIVE_RUN"
+    TERMINATE_CONTINUED_NATIVE_RUN = "TERMINATE_CONTINUED_NATIVE_RUN"
 
 
 class RunMutationProvenance(_StrictFrozenModel):
@@ -286,22 +288,28 @@ class CanonicalRun(_StrictFrozenModel):
         # attachment operation deliberately remains pre-first-turn. S7-1 adds
         # only the exact native termination successor below.
         if self.lifecycle_status is RunLifecycleStatus.ACTIVE:
-            if (
-                self.state_version.value != 3
-                or current.mutation_kind is not RunMutationKind.ATTACH_SESSION
-                or len(self.trusted_participation_references) != 1
-                or self.trusted_participation_references[0].joined_state_version.value
-                != 3
-                or self.player_character_binding is None
-            ):
+            joins = tuple(p.joined_state_version.value for p in self.trusted_participation_references)
+            admitted = (self.state_version.value == 3
+                        and current.mutation_kind is RunMutationKind.ATTACH_SESSION
+                        and joins == (3,))
+            continued = (self.state_version.value == 4
+                         and current.prior_state_version == RunStateVersion(value=3)
+                         and current.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN
+                         and joins == (3, 4))
+            if not (admitted or continued) or self.player_character_binding is None:
                 raise ValueError("pre_first_turn Run may become active only as the exact P8 entry successor")
         elif self.lifecycle_status is RunLifecycleStatus.TERMINATED:
+            joins = tuple(p.joined_state_version.value for p in self.trusted_participation_references)
+            original_exit = (self.state_version.value == 4
+                and current.prior_state_version == RunStateVersion(value=3)
+                and current.mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN
+                and joins == (3,))
+            continued_exit = (self.state_version.value == 5
+                and current.prior_state_version == RunStateVersion(value=4)
+                and current.mutation_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN
+                and joins == (3, 4))
             if (
-                self.state_version.value != 4
-                or current.prior_state_version != RunStateVersion(value=3)
-                or current.mutation_kind is not RunMutationKind.TERMINATE_NATIVE_RUN
-                or len(self.trusted_participation_references) != 1
-                or self.trusted_participation_references[0].joined_state_version.value != 3
+                not (original_exit or continued_exit)
                 or self.player_character_binding is None
                 or self.player_character_binding.inactivated_at != current.occurred_at
                 or current.occurred_at < creation.occurred_at
@@ -309,9 +317,13 @@ class CanonicalRun(_StrictFrozenModel):
                 raise ValueError("termination requires the exact native revision-four successor")
         elif self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
             raise ValueError("current Run implementation permits no terminal lifecycle state")
-        if (current.mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN
+        if (current.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,
+                                     RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN)
                 and self.lifecycle_status is not RunLifecycleStatus.TERMINATED):
             raise ValueError("termination mutation requires terminal lifecycle")
+        if (current.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN
+                and self.lifecycle_status is not RunLifecycleStatus.ACTIVE):
+            raise ValueError("continuation mutation requires active lifecycle")
         binding = self.player_character_binding
         if binding is not None:
             if (
@@ -351,7 +363,7 @@ class CanonicalRun(_StrictFrozenModel):
         sessions = tuple(item.session_id for item in self.trusted_participation_references)
         expected_successor_versions = set(range(2, self.state_version.value + 1))
         if self.lifecycle_status is RunLifecycleStatus.TERMINATED:
-            expected_successor_versions.remove(4)
+            expected_successor_versions.remove(self.state_version.value)
         participation_versions = set(versions)
         missing_versions = expected_successor_versions - participation_versions
         if (
@@ -395,7 +407,8 @@ class CanonicalRun(_StrictFrozenModel):
                     "creation state must be version one with exact creation provenance "
                     "and no participation or binding"
                 )
-        elif self.current_mutation_provenance.mutation_kind is RunMutationKind.ATTACH_SESSION:
+        elif self.current_mutation_provenance.mutation_kind in (
+                RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN):
             if not self.trusted_participation_references:
                 raise ValueError("attach-session state requires participation")
             latest = self.trusted_participation_references[-1]

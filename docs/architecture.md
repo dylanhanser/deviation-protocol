@@ -57,7 +57,7 @@ deferred. The S5 plan is independently approved and published at `ff866d2`.
 S5 implementation is independently approved with DF-001 deferred and published
 at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published at `4365721`; its separately authorized
 implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
-S7-2 is a documentation plan candidate, not implemented continuity. Phase 3.3
+S7-2 follows its independently approved published plan at `2c272487`; the corrected unstaged implementation/evidence candidate awaits focused re-review. Phase 3.3
 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
@@ -189,8 +189,7 @@ restart included Web, and verified owned-process cleanup replaced ineffective
 Ctrl+C. The S7-1 [post-ending Run exit plan](phase_3_3_s7_1_post_ending_run_exit_plan.md)
 was approved and published at `9fab18d`; its implementation published at `41d68aac`
 adds explicit termination after a valid Session ending. Ending alone still
-leaves the Run active. S7-2 continuity is proposed only; implementation remains
-unauthorized. The [S7-1 browser record](run_protocol.md#s7-1-publication-and-local-browser-evidence)
+leaves the Run active. S7-2 continuity has an unstaged implementation candidate with automated integrated-play evidence. The [S7-1 browser record](run_protocol.md#s7-1-publication-and-local-browser-evidence)
 adds bounded both-ending/exit/re-entry evidence at the published implementation.
 It does not complete Phase 3.3, S7, Phase 3.4 or wider-release readiness.
 
@@ -281,7 +280,7 @@ separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
 described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
-at `9fab18d`; S7-2 is a plan candidate and later implementation remains unauthorized. The
+at `9fab18d`; S7-2 implementation is a corrected unstaged candidate awaiting focused re-review; S7-3/4/5 remain unauthorized. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1178,7 +1177,7 @@ components described above:
   independently approved internal admission/world freezing; published S5 applies
   objective mechanics and compiles trusted context. S6 public activation is
   independently approved and published at `2f144599`; S7-1 exit is published at
-  `41d68aac`. Same-line S7-2 continuity remains a proposed documentation candidate:
+  `41d68aac`. Same-line S7-2 continuity follows the approved published contract:
   [S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md).
 - Phase 3.4 owns NPC relationship progression and temporary residence:
   [`npc_relationship_residence.md`](npc_relationship_residence.md).
@@ -1700,21 +1699,27 @@ and [evidence](run_protocol.md#p33-s7-1-implementation-candidate-evidence) own t
 transport, recovery and verification details. S7-2/later continuity, new content,
 Phase 3.4 and S7/Phase 3.3 completion remain outside this increment.
 
-## Proposed P3.3-S7-2 continuation boundary
+## P3.3-S7-2 continuation boundary
 
-The [S7-2 plan candidate](phase_3_3_s7_2_same_line_world_continuation_plan.md)
-proposes one continuation-only authored destination, preserving the existing
-Run/line, admission, protocol and character binding. Product choices, including
-both-ending eligibility and resource carryover, await explicit user approval;
-the corrected plan awaits focused independent re-review. Nothing in this section
-is implemented or a second source of approval authority.
+The incoming implementation received four P2 findings and **CHANGES_REQUIRED**.
+Bounded corrections preserve the published plan and P01–P08: an independent
+literal destination digest plus a pack-specific Git byte-preservation attribute;
+a trusted required-nullable arrival projection on the unpublished continuation
+status; retained complete POST association checks before successor publication;
+and full boundary / both-source-class public journeys. The annotation is built
+from the already reconstructed family in the owned read snapshot, separately
+from unchanged View/admission/prompt contracts. It has no writer or schema impact.
+See the [exact correction contract](public_client_contract.md#p33-s7-2-same-line-continuation)
+and [correction evidence](run_protocol.md#s7-2-bounded-correction-2026-09-18).
+Candidate approval remains pending focused independent re-review.
 
-The first review returned CHANGES_REQUIRED: one blocking predecessor-navigation
-gap and one non-blocking ending-priority contradiction. Both receive bounded
-contract corrections in the plan; unchanged review conclusions are preserved.
-This does not claim a passing re-review or product approval.
+The [published S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md)
+is independently approved at `2c272487`; the user approved P01–P08. Its earlier
+review findings and candidate-time wording remain historical. The implementation
+candidate has replacement automated evidence and awaits focused independent re-review.
+It has not received implementation approval or browser acceptance.
 
-The proposed minimum extension is a closed revision-four active continuation
+The implementation introduces a closed revision-four active continuation
 family, immutable world roots and visits, an authoritative current position,
 and version-specific content/service routing. Original Session snapshots and
 memory stay with their validated historical Session. A new Session carries the
@@ -1723,10 +1728,9 @@ evidence binds the current visit while admission context remains immutable.
 The plan also extends explicit exit to revision five after the second ending,
 so continuation does not recreate the occupied-character dead end.
 
-Existing one-pack loading, revision-three native turn evidence and one-runtime
-memory validation cannot be assumed to support this already. The plan names
-their direct consumers, schema/reconstruction changes, atomic handoff and
-GET-only client recovery. Continuation GET adds the plan's required nullable
+Version-specific content bundles route each owned Session to its exact pack.
+Original admission/turn evidence and one-runtime memory validation retain their
+meaning. The new continuation family carries separate visit evidence. Continuation GET adds the plan's required nullable
 `predecessor` association, derived from the fully reconstructed same-Run/line
 receipt, visits, roots, participations and position after ownership checks.
 SQL and Demo disclose it only from one consistent read snapshot; owned-family

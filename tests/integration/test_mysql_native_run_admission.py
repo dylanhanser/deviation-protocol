@@ -27,7 +27,7 @@ from tests.unit.test_native_run_admission import command
 from tests.unit.test_run_protocol_resolution import RESOLUTION_004
 
 pytestmark = pytest.mark.integration
-HEAD = "20260916_0007"
+HEAD = "20260918_0009"
 
 
 async def upgrade_head(engine):

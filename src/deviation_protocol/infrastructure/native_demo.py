@@ -43,6 +43,14 @@ def build_native_demo_orchestrator(*, store, provider, **dependencies):
             if type(context) is not CompiledRunProtocolContextV1:
                 raise NarrativeProposalRejectedError()
             compiled = context.validated_object()
+            visit = getattr(request,"_compiled_world_visit_context",None)
+            if job.narrative_request.get("schema") == "native-visit-turn-request/v1":
+                from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1
+                if type(visit) is not CompiledWorldVisitContextV1:
+                    raise NarrativeProposalRejectedError()
+                visit.validated_object()
+            elif visit is not None:
+                raise NarrativeProposalRejectedError()
             snapshot = store.snapshot()
             stored = snapshot.narrative_jobs.get(job.job_id)
             if (stored != job or job.status is not NarrativeJobStatus.IN_PROGRESS or job.attempt_count != 1

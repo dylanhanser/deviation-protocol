@@ -102,6 +102,9 @@ Observed failure:
 - Native Run terminal CHECK branches accepted NULL prior versions and binding
   states: equality against a nullable operand evaluated to UNKNOWN, which MySQL
   accepts in a CHECK.
+- Continuation waiting on a final turn read the newly committed ending through
+  locking reads but read the old active job through a repeatable-read snapshot,
+  incorrectly classifying the completed Session as corrupt.
 
 Rule:
 
@@ -111,6 +114,9 @@ Rule:
 - Repositories do not commit.
 - State, snapshot, events, response, job state, and version commit atomically.
 - Idempotency binds the complete request and uses locks plus unique constraints.
+- Locked finalization must use current reads for every mutable prerequisite,
+  including active-job exclusion; a prior consistent snapshot must not be mixed
+  with freshly locked Session state.
 - When equality spans persisted timestamps, choose one transaction timestamp
   at a precision supported by every participating column before constructing
   evidence. Do not repair or relax equality after database truncation.
@@ -124,6 +130,8 @@ Rule:
 Enforcement:
 
 - Repository, UoW, idempotency, rollback, and real MySQL tests
+- `test_s7_2_mysql_final_turn_revalidation` observes the real Session lock wait,
+  rejects stale detached preparation and proves explicit retry after completion.
 - Alembic consistency checks
 - Native admission through normal production composition with a fractional
   clock and real MySQL, followed by complete reconstruction and owned replay
@@ -174,6 +182,8 @@ Observed failure:
   before proving that each object was an authentic repository-issued receipt.
 - Free-text phrase matching proved too weak to authorize hidden clues, and an
   opaque event ID was once confused with the rule identity needed by `once`.
+- A same-version authored pack with a changed deadline was accepted because
+  its freshly calculated digest also became the expected catalogue identity.
 
 Rule:
 
@@ -191,6 +201,11 @@ Authority must be issued by a trusted server-side policy and rebound to the
 current session, turn, action, state version, state fingerprint, and scenario.
 Opaque capabilities and persisted-event receipts must be authenticated before
 their bound fields are read, compared, sorted, or used to select a rule.
+Approved immutable content is checked against an independently fixed catalogue
+digest before exposing its bundle. A digest computed from the candidate bytes
+alone proves no approval. Required missing content is an integrity failure.
+The repository/deployment byte policy must preserve the pinned bytes.
+
 Hidden clue authority requires structural server state such as a bound public
 decision, authoritative current location, and mechanical action type. Outcome
 rule identity comes from persisted evidence, never from a public event ID.
@@ -199,6 +214,7 @@ Enforcement:
 
 - Receipt construction, tamper, cross-binding, and ordinary-string tests
 - Declarative memory-rule authority tests
+- Destination registry same-version substitution, missing-pack and byte-policy tests
 
 ## AUTH-002: Async call allowances are task-bound and transaction-single-use
 
@@ -324,6 +340,8 @@ Observed failure:
   as required even though the Gateway contract kept that field optional.
 - OpenAPI omitted a real 202 action response and advertised FastAPI's default
   validation body even though the public runtime returned `ErrorResponse`.
+- Successor adoption accepted a schema-valid GET visit ID that contradicted
+  the confirmed continuation POST association.
 
 Rule:
 
@@ -347,6 +365,13 @@ server-side.
 OpenAPI declares every real success status and the route-specific public error
 statuses using the same DTOs and error envelope returned at runtime; framework
 default validation schemas are not advertised as the public 422 contract.
+
+After a confirmed transition, retain its complete immutable association as the
+comparison authority for subsequent reads and recovery. Do not let the received
+View/GET replace its own expected identity; validate before publication or enabling
+actions. Current Session/lifecycle versions may advance independently of the
+immutable initialization receipt. Test schema-valid contradictions and a progressed
+matching control, including storage failure and client replacement.
 
 Missing and unauthorized sessions use the same safe response.
 

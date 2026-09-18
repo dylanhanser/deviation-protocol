@@ -660,6 +660,27 @@ def build_demo_runtime(
         event_id_generator=runtime_generators.event_id, job_id_generator=runtime_generators.job_id,
         lease_token_generator=runtime_generators.lease_token, worker_id_generator=runtime_generators.worker_id)
     dispatcher = DemoNarrativeDispatcher(legacy=orchestrator, native=native, session_service=session_service)
+    from deviation_protocol.application.session_content_registry import SessionContentBundle,SessionContentRegistry
+    destination_path = Path(__file__).parents[3] / "config" / "scenarios" / "undelivered_receipt_v1.json"
+    destination_pack = JsonScenarioCatalogLoader(destination_path).load()
+    destination_catalog = destination_pack.content_catalog
+    destination_coordinator = NativeTurnMechanicsCoordinator(destination_catalog,destination_pack)
+    destination_service = SessionService(uow_factory=runtime_store.unit_of_work,
+        catalog=destination_catalog,scenario_catalog=destination_pack,
+        native_view_coordinator=destination_coordinator,native_controller_resolver=controller_binding_resolver,
+        clock=runtime_generators.clock,session_id_generator=runtime_generators.session_id,
+        seed_generator=runtime_generators.seed,event_id_generator=runtime_generators.event_id)
+    destination_orchestrator = build_native_demo_orchestrator(store=runtime_store,provider=provider_delegate,
+        resolver=DeterministicRuleResolver(),uow_factory=runtime_store.unit_of_work,
+        catalog=destination_catalog,scenario_catalog=destination_pack,native_coordinator=destination_coordinator,
+        provider_name="deterministic-demo",model_name="deterministic-demo-v1",
+        scenario_event_issuer=DeterministicDemoScenarioEventIssuer(),clock=runtime_generators.clock,
+        event_id_generator=runtime_generators.event_id,job_id_generator=runtime_generators.job_id,
+        lease_token_generator=runtime_generators.lease_token,worker_id_generator=runtime_generators.worker_id)
+    registry = SessionContentRegistry((
+        SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=dispatcher),
+        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator)))
+    runtime_store._content_registry = registry
     admission = NativeRunAdmissionService(uow_factory=runtime_store.native_admission_unit_of_work,
         run_id_issuer=run_service.run_id_issuer, continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
         source_reference=run_service.source_reference, clock=run_service.clock,
@@ -668,6 +689,7 @@ def build_demo_runtime(
     services = ApiServices(
         session_service=session_service,
         turn_orchestrator=dispatcher,
+        content_registry=registry,
         native_run_admission_service=admission,
         player_character_service=player_character_service,
         run_service=run_service,

@@ -195,8 +195,8 @@ async def read_native_context(uow, principal, persisted, state, definition, coor
                 or character.contract_version != reference.contract_version
                 or character.record_revision.value < reference.record_revision.value):
             raise SnapshotInvalidError(session_id)
-        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1
-        admission = family.admission if type(family) is NativeRunTerminatedV1 else family
+        from deviation_protocol.application.run_continuation_service import original_admission
+        admission = original_admission(family)
         return project_native_context(_result(admission))
     except (NativeMechanicsIntegrityError, ValueError, TypeError, AttributeError, s2._S2StateError):
         raise SnapshotInvalidError(session_id) from None

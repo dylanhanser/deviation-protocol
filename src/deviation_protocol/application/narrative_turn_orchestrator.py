@@ -459,6 +459,10 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             try:
                 request = request.with_compiled_run_protocol_context(
                     compile_run_protocol_context(decision.inputs, decision))
+                if getattr(decision.inputs,"visit_evidence",None) is not None:
+                    from deviation_protocol.application.world_visit_context import compile_world_visit_context
+                    request = request.with_compiled_world_visit_context(compile_world_visit_context(
+                        decision.inputs.visit_evidence,decision.inputs,decision))
             except RunPromptContextError as error:
                 rejection = NarrativeRequestRejectedError()
                 rejection.internal_reason = error.reason

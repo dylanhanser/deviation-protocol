@@ -1,5 +1,236 @@
 # Run Protocol, Difficulty, and World Profiles
 
+## S7-2 bounded correction (2026-09-18)
+
+Incoming independent disposition is **CHANGES_REQUIRED**, with four P2 findings:
+independent destination-pack pinning, missing public arrival annotation,
+incomplete confirmed successor association, and incomplete playable-boundary /
+FAILED-source cross-process evidence. P01–P08 remain approved. The incoming
+68-path candidate and exact binary patch are preserved externally at
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-2-correction-20260918/incoming`.
+The published plan remains byte-exact; this correction is not independent approval.
+
+Correction-to-test map and bounded inventory (recorded before implementation):
+
+| Finding | Existing candidate owners | Required focused proof |
+| --- | --- | --- |
+| R1 | `session_content_registry.py`, its unit suite | Literal approved raw-byte digest; altered same-version / missing / incompatible pack rejection; exact original pack retained; composition regressions. |
+| R2 | `world_visit_context.py`, `run_continuation_service.py`, API and Web schemas, App, continuation API/MySQL/rendered tests | Required nullable `arrival` on the new unpublished continuation status only, exactly `{previous_ending_status, previous_ending_title, entry_notice}`; trusted completed reconstruction and approved authored strings; initial/action/reload for both classes and both RESOLVED titles. View, admission context and storage v1 stay unchanged. |
+| R3 | `runContinuation.ts`, App and their existing tests | Retain confirmed POST result plus source association; complete immutable visit/context checks on adoption and recovery before View publication, with schema-valid contradictions and progressed positive controls. |
+| R4 | Existing destination content, E2E and MySQL continuation suites | Actual hold/release/deadline/exit with profile/objective/zero-composure boundaries; reversed independent selector order; both source classes across processes. |
+
+Direct dependency extension recorded before editing: `.gitattributes` needs one
+exact destination-pack `-text` override. The incoming approved raw pack uses CRLF
+and SHA-256 `74af55faf2eca0dd826be1f025272d070c23a2000383183e886ec823f495582c`;
+the existing JSON `eol=lf` rule would otherwise change its deployment bytes on
+commit/checkout. Preserve the content bytes, pin that one exact raw identity and
+disable Git conversion for this pack alone. Verify the clean-filter Git blob
+hash equals the raw bytes; reject line-ending substitution through the registry.
+The same path's whitespace policy recognizes CRLF terminators while retaining
+blank-at-eol, blank-at-eof and space-before-tab checks; the inherited LF attribute
+is unset. No content byte is repaired to make a whitespace check pass.
+No original-world or other file line-ending policy changes. Other extensions must
+be recorded here before editing. Real MySQL was used only after dedicated
+test-database preflight and recording its actual initial state. Unchanged schema,
+locking, commit/fault logic and S2 formulas retain narrowly qualified
+C03/C05/C06/C07 and historical evidence; source, method and environment
+applicability checks passed in `evidence-reuse.json`.
+
+The additive arrival projection is an explicitly authorized bounded correction
+to the unpublished status DTO to fulfill P03's approved visible arrival requirement;
+it was absent from the incoming implementation. It does not revise balance,
+mechanics, persistence, lifecycle or the frozen plan. Current status: corrected
+unstaged candidate awaiting focused re-review by the same reviewer; no approval
+or broader readiness is claimed.
+
+### Correction C01–C10 evidence
+
+New evidence is saved under
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-2-correction-20260918`.
+The new `review-package` owns complete/delta patch identities, raw per-file
+identities, commands/logs/exits, final-source applicability and incoming snapshot.
+Patch aggregates are distinct from complete-file aggregates.
+
+| Case | Fresh correction proof and retained scope |
+| --- | --- |
+| C01 | `offline-affected-final` includes actual public eligibility/arrival/action/reload for both classes and distinct RESOLVED titles; `mysql-correction-01` covers all three profiles and the other RESOLVED title through production persisted reconstruction. |
+| C02 | `content-final`: 18 completed hold/exit/fresh-admission journeys across three profiles × default/beneficial/adverse permitted bounds × ordinary/zero composure; six actual deadline/exit/fresh-admission journeys; six synthetic 39/40 priority cases each executed with original and reversed definitions. Actual effects, independent integer costs, full PlayerState and unchanged source/character checks are asserted. Release remains covered across all three profiles in public API/MySQL journeys. Entry class follows actual source play; no ending is injected. |
+| C03 | Fresh API/MySQL journeys retain exact replay after later action/exit/admission. Original receipt codecs/writers/replay methods and prior fault evidence remain applicable. |
+| C04 | Fresh registry substitution/missing/configuration rejection, public DTO bounds, complete Demo corruption matrix and eight SQL corruption cases. Source and successor reject corrupt evidence before annotation disclosure. |
+| C05 | Retain original observed real-connection exclusion/race evidence: mutation/locking methods, SQL/Demo repositories/UoWs and concurrency test bodies are unchanged. Registry construction now rejects unsupported bytes before writers exist; valid approved bytes remain identical. |
+| C06 | Retain original staging, rollback, cancellation, uncertain-commit/disposal proof: transaction/receipt/publication code and injected fault cases unchanged. No new writer or commit boundary. |
+| C07 | Retain original 009/008 migrations, constraints, downgrade/failure and zero-difference ORM metadata proof; all schema/migration dependencies unchanged. No new migration matrix was run. |
+| C08 | Corrected rendered normal public Demo tests cover both arrival classes/titles, first action and successor-only remount, history/return, schema-valid crossed visit/predecessor, storage retry/client replacement, and progressed adoption. Rejection preserves confirmed identity/storage and dispatches no extra POST. Full Web and tooling results are in the external index. |
+| C09 | Fresh four cross-process journeys: both source classes × hold/release, each across two hash seeds with identical complete public traces/private store, exit and fresh admission. Fresh affected original replay, native/Demo composition and public schemas. |
+| C10 | Fresh independent registry digest, Git byte-preservation and mismatch controls plus unchanged canonical root/receipt/context and v1 prompt/mechanics tests. S2 exhaustive 5,624,910-call evidence and historical 007 internal faults revalidated against original artifacts and environment. |
+
+Canonical sanitized `offline-affected-final`: **714 passed, 1 deselected**;
+`content-final`: **30 passed**; `registry-deployment-final`: **9 passed** (overlaps
+the earlier registry selection). The first two runs have the existing schema-name
+warning; the affected run also records the unavailable Turkish locale warning.
+All canonical commands completed compileall, dependency, Alembic heads/history
+and whitespace stages. These are focused correction passes, not a claim that the
+old 2,954-case broad run passed on corrected source. The sole exhaustive S2 node
+is reused; other selected S2 tests ran. Failed/intermediate runs remain history.
+
+`web-affected-final-02`: **208 passed**; `web-full-final`: **369 passed, 1 skipped**
+across ten files. The focused cases are included in the full result, not additive.
+The skip is the unchanged explicit presentation-probe gate. `types-final`,
+`lint-final` and `build-final` passed; the deterministic Demo build transformed
+103 modules. All final production Web source identities match these records.
+Intermediate fixture-name/assertion-timing failures, the fixed arrival-status
+clearing window, the first lint dependency warning and a wrapper argument-quoting
+failure remain in raw history. None is counted as a complete pass.
+
+`mysql-correction-01`: **15 passing cases**, exit zero, covering six public
+hold/release journeys, the other RESOLVED title and eight corruption cases. Quiet
+output supplies no deselection total. The later test-helper assertion comparing
+the expected title directly to the source View is additionally covered Offline;
+production Python bytes are unchanged from this MySQL run. Each fixture restored
+its initial schema. Fresh initial/final snapshot records are byte-identical,
+SHA-256 `1fb00d7f67da9069a00c30972d079ecbbab600790858232698d3236f3a9533d2`:
+MySQL 8.0.43, `mysql+asyncmy`, only `deviation_protocol_test`, revision 007,
+18 empty application tables plus version row, exact definitions/enforcement and
+free shared named lock. No production database, `.env`, Provider or browser access.
+
+The original reviewer Python diagnostics reproduced both content defects and both
+missing arrival classes before correction. Their unchanged post-correction runs
+exit nonzero at the expected fixed boundaries; these are negative diagnostic
+results, not test-suite passes. The unchanged TypeScript diagnostic now rejects
+its old fixture's missing required arrival member. A separately labelled fixture
+adaptation proves the original substituted visit stays schema-valid but fails the
+new confirmed-association check, with matching positive control. The normal
+rendered public-Demo regressions provide the fresh integrated proof.
+
+Guardrail impact: **AUTH-001** now requires independent approved content identity
+and preserved deployment bytes; **API-001** retains confirmed immutable transition
+associations across reads. Existing **DB-001** and workflow cleanup corrections are
+preserved; workflow bytes and DF-001/DF-002 dispositions are unchanged. No new
+deferred blocker, product decision, schema or later-slice implementation is added.
+
+## P3.3-S7-2 implementation candidate
+
+The following records the incoming implementation and its original evidence.
+Its four P2 gaps and replacement evidence are owned by the correction section
+above. Earlier runs are not relabelled as complete corrected-source passes.
+
+The same-line continuation plan is independently approved and published at
+`2c272487a2f12c60c28ada95dd9a3f1edf1d42ba`. The user approved P01–P08 and
+authorized implementation on 2026-09-18. Candidate-time pending wording is
+historical; published plan/review bytes remain unchanged. The delivered increment
+is an unstaged candidate for one substantive independent implementation review.
+No implementation approval, browser acceptance, wider-release readiness,
+S7 completion or Phase 3.3 completion is claimed.
+
+Actual public play demonstrates eligible first-world endings, explicit handoff
+into 《未送达的回执》, legitimate destination actions, reload, old history and
+return, all destination endings, explicit continued exit and separately confirmed
+fresh admission. Continuation preserves the Run, permanent line, character
+association and full remaining PlayerState. RESOLVED starts at 0; FAILED at 4;
+deadline maximum is 40. There is no refill/reward/character revision, third world,
+revisit or normal Run completion. Destination content SHA-256:
+`74af55faf2eca0dd826be1f025272d070c23a2000383183e886ec823f495582c`.
+
+Dependency inventory amendments recorded before their edits:
+
+| Additional direct consumer | Dependency and bounded verification |
+| --- | --- |
+| `tests/e2e/support/demo_replay_child.py` | Exhaustive Demo snapshot manifest needs three new maps; historical one-world replay requires them empty and retains its prior bytes. Fresh cross-process Offline coverage. |
+| `web/src/App.continuation.test.tsx` | Isolates combined C08 using the normal Demo child/public transport/store; complete Web suite and affected recovery suites executed. |
+| `tests/integration/test_mysql_native_run_admission.py` | Shared current production reconstruction reads 009 tables; only current runtime head advances, while historical migrations retain explicit versions. Fresh admission/turn/exit readers and exact database restoration. |
+| `docs/engineering/codex_workflow.md` | Repeated Windows sandbox failure during final pytest temporary-directory cleanup. Preserve failed completion evidence, exact outside-sandbox rerun and prohibition on deleting unrelated temp directories. |
+
+Final inventory reconciliation also records `tests/unit/test_repository_and_uow.py`:
+its FakeSession needs the real AsyncSession `info` surface consumed by new repository
+composition. This one-line mechanical fixture addition was recorded here after
+editing, rather than prospectively; it changes no product/schema/authority contract.
+Its existing regression suite ran in the canonical Offline verification. Reviewers
+should retain this bounded process deviation in the candidate assessment.
+
+Plan-listed files left unchanged retain sufficient contracts: exit routes and
+`runExit.ts` already dispatch through the extended service/status; existing
+Run/admission/turn/Session/prompt/scenario unit suites and Web client/App/recovery/
+exit suites exercise shared consumers without duplicating their assertions.
+New matrices live in the dedicated continuation suites. All plan section 10
+no-change production dependencies, original content and earlier migrations remain
+unchanged. Current-head fixture updates do not rewrite historical 005–008 contracts.
+
+### S7-2 evidence map
+
+External evidence and the frozen review package are at
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-p33-s7-2-implementation-20260918/review-package`.
+The package records exact commands, raw UTF-8 logs, exits, source/content/environment
+identities, final applicability, failed/interrupted history, per-file inventory,
+protected comparisons and the complete binary/full-index patch including new files.
+Its patch aggregate is distinct from complete-file byte/line aggregates.
+
+| Case | Executed evidence and scope |
+| --- | --- |
+| C01 | `mysql-s7-2-final-02`, canonical Offline public API/E2E suites: actual Easier/Extreme play and the other RESOLVED ending; carryover/local reset/history; first action; hold/release; exit/fresh admission. No fabricated ending snapshot substitutes for play. |
+| C02 | Incoming content tests covered zero-composure deadline failure and permitted-extreme arrival at the decision, but omitted successful completion and reversed-order controls. R4 replacement evidence is above. |
+| C03 | Canonical Offline service/API and MySQL journey/race suites: exact replay after later actions/exit/fresh admission, changed-body conflict, competing fresh key; replay consumes no clock, preparation or commit. |
+| C04 | `matrix-final-01` independently removes every canonical root/receipt key and corrupts every new storage column; existing 16 Demo cases and eight SQL cases cover missing/crossed evidence, coherent rehash/local-memory corruption, active source jobs and exact content. Foreign owner/controller paths return 404; owned corruption returns opaque 409 without writes or null fallback. |
+| C05 | `mysql-s7-2-final-02`: observed real-connection same/different-key waiting; continuation versus exit/admission/retirement; final-turn revalidation; migration/writer exclusion in both orders; current-read downgrade refusal. |
+| C06 | Same MySQL run: exception/cancellation at nine service boundaries and each of five individual world-row inserts, uncertain commit before/after durability, cleanup exception/cancellation and exact retry. Canonical Offline Demo trial-publication tests prove no partial maps. |
+| C07 | `mysql-009-final-03` (64 cases), `mysql-008-fault-final-01` (30), MySQL family preservation/constraint cases and `mysql-active-null-final-01`: enforced constraints, nullable current/revision operands, contradictory schema refusal, every 009 DDL/disconnect/lock/disposal boundary, and restoration. `metadata-final-01`: no ORM differences; one 009 head. |
+| C08 | `web-c08-final-01` (13 rendered public-Demo cases), `web-full-final-01` (361 passed, one existing skip): double confirmation, exact retry, old/new record reload, lost/malformed response, storage failures, stale return/unmount/client replacement, successor-only remount/predecessor GET/history/return and continued exit/reselection. History performs GET only with no storage writes. |
+| C09 | Incoming two-process continuation E2E covered RESOLVED source only; FAILED source is added by R4 above. Original replay/standalone/Dynamic suites remain separately scoped. |
+| C10 | `goldens-final-01`, `context-final-03`, canonical Offline S5/mechanics/prompt suites: independent request/operation/creation/visit/root/receipt/context bytes and hashes, strict scalar/actual-model rejection, registry order/empty pool/closed edge/anti-repeat, exact visit envelope and unchanged v1 prompt/formulas. |
+
+Canonical Offline result: `2954 passed, 586 skipped, 1 deselected, 2 warnings in 1155.86s (0:19:15)`. Only the unchanged S2 exhaustive
+node is deselected and validly reused: actual **5,624,910 resolver calls**, original
+logs/instrumentation/source/dependencies/Python/platform verified by
+`s2-reuse-applicability.json`. Other S2 tests ran normally. The first full run
+reached 100% but failed sandbox temp cleanup; `offline-final-01-attempt-2` is the
+exact canonical outside-sandbox rerun on final code/content/test source. Matrix,
+NULL and golden additions also have named focused passes; the package lists
+source differences instead of relabelling earlier broad runs as final-source passes.
+Fresh shared MySQL suites are `mysql-shared-native-01` and
+`mysql-shared-readers-02`. The independent review corrects the prior annotation-only
+qualification: shared-native also predates changes in continuation domain code and
+migration 009; shared-readers also predates migration 009 changes, and both have
+repository declaration differences. The original review's per-run identity record
+is preserved. Later original final 009/continuation runs cover those changes;
+the correction does not relabel the shared runs as entirely source-identical.
+No blanket reuse of reconstruction/turn consumers occurs. Unchanged 007 internal
+fault evidence alone is reused under `historical-migration-reuse.json`; 008 and all
+009 interactions have fresh proof. Counts overlap and must not be summed.
+Unchanged pre-007 migration internal fault suites were not rerun or counted;
+the selected shared-reader command explicitly excludes those historical schema
+fixtures while running the affected current-head reconstruction consumers.
+
+Canonical verification also executed compileall, pip dependency checks and
+Alembic heads/history. Web typecheck, lint and deterministic-demo build passed.
+No dependency install, real Provider/Live call or interactive browser was used.
+No production database was accessed. Schema suites ran sequentially.
+
+The dedicated database was verified as `mysql+asyncmy` / `deviation_protocol_test`.
+Its actual initial state was revision `20260916_0007`, 18 empty application tables,
+one version row, original definitions/enforcement and a free shared named lock.
+`database-initial.json` and `database-final-restored.json` are byte-identical:
+SHA-256 `1fb00d7f67da9069a00c30972d079ecbbab600790858232698d3236f3a9533d2`.
+Authorized fixtures/migration fault prefixes were explicitly restored; no runtime
+read repair, automatic compensation or reconnect-and-continue was introduced.
+
+Confirmed implementation defects were fixed with regressions: locking finalization
+must current-read the active-job prerequisite after a concurrent final turn;
+sealed initial memory must match independently reconstructed authored facts;
+historical reload must not rewrite successor storage, and client replacement must
+retain an uncertain exact continuation request while rejecting stale completion.
+DB-001 records the reusable current-read rule; the workflow's Offline/database
+section records the repeated final-cleanup evidence failure and exact rerun rule.
+Fixture/verification failures remain
+in raw history, including the MySQL ALTER CHECK charset-marker restoration fix.
+DF-001 remains contained by process-local invariant locale; DF-002 remains deferred
+with existing explicit discovery retries/reload containment and fresh rendered
+regressions. Neither disposition changed; no new deferred code defect is claimed.
+
+Documentation synchronization covers behavior/API, architecture, roadmap/status,
+authored-content identity, evidence/limits and the confirmed DB-001 rule. Published
+plans/reviews and prior migrations are protected. The external inventory documents
+every modified/new path and inspected no-change boundary. Review is the next step;
+staging/commit/push and S7-3/4/5 are not authorized.
+
 Status: **Approved product design. P3.3-G0 is approved, published, frozen, and
 complete. The corrected exact no-migration P3.3-S1 implementation is
 independently approved, committed, manually published by the user, and
@@ -33,9 +264,9 @@ local Demo browser journey passed. S7-1's plan is independently approved and
 published at `9fab18d`; implementation is published at
 `41d68aac13ca9129b7f6e08fad5f015987603fda`, including the reviewed nullable
 terminal-CHECK correction. Bounded local Demo browser acceptance covers both
-endings, exit/re-entry and recovery. S7-2 is a documentation plan candidate
-awaiting focused independent re-review and user product approval; later
-implementation stays unauthorized and unimplemented. DF-002
+endings, exit/re-entry and recovery. S7-2 has an independently approved published plan and approved P01–P08;
+its corrected unstaged implementation candidate and replacement evidence await focused re-review. S7-3/4/5
+remain unauthorized. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
@@ -373,9 +604,10 @@ is independently approved at `ff866d2`; its candidate-time wording is historical
 S5 implementation is independently approved and published at `86c258e9`.
 S6 public flow is independently approved and published at `2f144599`. S7-1
 post-ending Run exit is published at `41d68aac` under its approved published
-plan (`9fab18d`). The [S7-2 candidate](phase_3_3_s7_2_same_line_world_continuation_plan.md)
-proposes the first same-line successor; its product choices and technical plan
-remain pending approval. Later S7 allocation is preserved. DF-001/DF-002 remain deferred.
+plan (`9fab18d`). The [published S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md)
+authorizes the first same-line successor; its product choices and technical plan
+are approved. The unstaged implementation/evidence candidate is ready for independent
+review. Later S7 allocation is preserved. DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
 server-owned policies of `resource_pressure`, `social_trust`,
@@ -1148,9 +1380,10 @@ approval with DF-001 deferred and were published at
 implementation is independently approved and published at `34dc752`. S5 has an approved, published plan at `ff866d2` and independently approved
 implementation published at `86c258e9`. S6 plan is published at `4365721`;
 its implementation is independently approved and published at `2f144599`. S7-1
-is published at `41d68aac` under its approved published plan; the corrected S7-2
-plan candidate awaits focused re-review/product approval. Later implementation
-remains unauthorized.
+is published at `41d68aac` under its approved published plan; the S7-2
+plan is approved and published at `2c272487`, with P01–P08 approved. Authorized
+implementation/evidence form an unstaged candidate ready for independent review;
+S7-3/4/5 remain unauthorized.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -2003,7 +2236,8 @@ Phase 3.3 is acceptable only when:
   independently approved and published at `34dc752`. S5 internal integration is independently approved and published at `86c258e9`;
   S6 public integration is independently approved and published at `2f144599`;
   S7-1 is published at `41d68aac` under its approved published plan.
-  S7-2 proposes minimum later-world continuity; implementation remains unauthorized.
+  S7-2 minimum later-world continuity is an unstaged implementation candidate
+  with automated integrated-play evidence, ready for independent review.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2043,7 +2277,8 @@ implementation was subsequently published at `41d68aac`; that earlier verdict
 and [replacement evidence](#s7-1-nullable-terminal-check-correction) remain history.
 [Publication and subsequent browser acceptance](#s7-1-publication-and-local-browser-evidence)
 record current status separately from the original automated execution below.
-Neither S7 nor Phase 3.3 is complete; S7-2 is a plan candidate only. No limited
+Neither S7 nor Phase 3.3 is complete; S7-2 has an unstaged implementation/evidence
+candidate ready for independent review. No limited
 user trial, broader release, deployment or real Provider acceptance is claimed.
 The frozen plan and historical reviews retain their candidate-time wording.
 
@@ -2290,38 +2525,28 @@ deliberately reproduced and DF-002 is not closed. This establishes the bounded
 integrated local flow, not limited-trial or broader-release readiness, S7 or
 Phase 3.3 completion. Planning did not rerun acceptance or access the database.
 
-## Proposed P3.3-S7-2 same-line continuation
+## P3.3-S7-2 same-line continuation
 
-The [new plan candidate](phase_3_3_s7_2_same_line_world_continuation_plan.md)
-proposes continuing an active Run after either supported ending class into
-**未送达的回执**, a distinct authored world. The player explicitly chooses to
-continue the journey; the engine owns destination selection. Existing Run/line,
-character, resources and frozen protocol remain; original Session history stays
-readable. FAILED does not imply canonical character death, and terminated Runs
-cannot continue. The plan's grouped product decisions require explicit user
-approval; no new content is activated or approved by this documentation.
+The [published plan](phase_3_3_s7_2_same_line_world_continuation_plan.md) is
+independently approved at `2c272487a2f12c60c28ada95dd9a3f1edf1d42ba`; the user
+approved P01–P08 and chose to complete this journey before reconsidering genre
+or balance. Its published patch was 124,937 bytes, +1,289/-61, SHA-256
+`91b6e2332a693b1eb5e88b5ae9061c1bd15c04bdf3cd6a4ae7b59ee222c0f9f9`.
+The plan bytes and historical reviews are unchanged.
 
-The first independent review returned **CHANGES_REQUIRED**: one blocking gap in
-predecessor discovery after successor-only recovery reload, plus one non-blocking
-ending-priority contradiction. The bounded corrected candidate supplies a trusted
-nullable `predecessor` in continuation GET and separate current-recovery versus
-historical-display associations. History and return use validated reciprocal
-GET links, leave successor storage v1 unchanged and never activate predecessor
-writes; C08 now requires the full memory-discard/reload/history/return sequence.
-The unchanged ascending selector uses proposed deadline 10, hold 20, release 30;
-the plan specifies distinct ending-rule IDs and synthetic simultaneous-condition
-assertions without changing clocks or P01–P08 recommendations. No corrected-candidate
-approval is claimed; unchanged reviewed conclusions and historical verdicts remain.
+The candidate continues the existing Run and line into **未送达的回执** after
+explicit confirmation. The character association and full remaining PlayerState
+carry unchanged. Local state resets, original history remains owned/readable,
+and GET exposes a required nullable predecessor from complete reconstruction.
+Original admission context retains its meaning. Continued exit reaches revision
+five; a separately confirmed admission creates a new Run. There is no third
+world, revisit, reward, refill, character revision or normal Run completion.
 
-The minimum proposed contract includes persistent world/visit/region provenance,
-one deterministic required successor, version-specific content loading, atomic
-handoff/replay, current-position recovery and explicit exit after the second
-ending. Existing entry-world/context bytes retain admission meaning. No third
-world, revisit, regional unlock, reward system, NPC continuity or normal Run
-completion is supplied. S7-3/4/5 retain their published responsibilities and
-parent criteria 10–12 remain incomplete. The next step is focused independent
-re-review by the same reviewer, with P01–P08 still awaiting explicit user approval.
-This companion defines no separate approval authority.
+Current code, C01–C10 automated evidence, source applicability, documentation
+synchronization and the frozen review package are recorded at the top of this
+document. The unstaged candidate is ready for independent review. No implementation
+approval or broader readiness is claimed. S7-3/4/5 and parent criteria 10–12
+remain outside this increment; S7 and Phase 3.3 are incomplete.
 
 ## Related documents
 

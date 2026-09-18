@@ -326,6 +326,15 @@ MySQL integration tests may run only after safely confirming:
 
 Never display the complete URL.
 
+On Windows, pytest can reach 100% test progress and then fail its final cleanup
+of the shared temporary-directory link `pytest-current`. S7-2 verification
+repeatedly observed sandbox `WinError 5` at that boundary. Progress dots do not
+establish a successful verification: retain the raw log and nonzero exit, then
+rerun the exact operation outside the sandbox under the repository escalation
+rule. Do not relabel the interrupted run as a canonical pass or delete unrelated
+pytest temporary directories. If the same operation fails outside the sandbox,
+diagnose its OS permissions or file locks normally.
+
 A sandbox network failure does not prove that a provider key is invalid.
 
 ## Live Provider calls

@@ -41,6 +41,8 @@ from deviation_protocol.domain.run import (
 
 CREATE_RUN_RESULT_SCHEMA_VERSION = "run.create-result/v1"
 TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-native-result/v1"
+CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.continue-native-result/v1"
+TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-continued-native-result/v1"
 ATTACH_SESSION_RESULT_SCHEMA_VERSION = "run.attach-session-result/v1"
 BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION = (
     "run.bind-player-character-result/v1"
@@ -58,6 +60,8 @@ class RunOperationNamespace(StrEnum):
     ATTACH_SESSION_V1 = "run.attach-session/v1"
     BIND_PLAYER_CHARACTER_V1 = "run.bind-player-character/v1"
     TERMINATE_NATIVE_V1 = "run.terminate-native/v1"
+    CONTINUE_NATIVE_V1 = "run.continue-native/v1"
+    TERMINATE_CONTINUED_NATIVE_V1 = "run.terminate-continued-native/v1"
 
 
 class RunOperationFingerprint(_StrictFrozenModel):
@@ -215,7 +219,23 @@ class RunSafeResult(_StrictFrozenModel):
 
     @model_validator(mode="after")
     def validate_result_shape(self) -> RunSafeResult:
-        if self.result_schema_version == TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+        if self.result_schema_version == CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+            participation = self.participation_reference
+            if (self.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or self.resulting_state_version.value != 4
+                    or self.applicable_character_reference is not None
+                    or participation is None
+                    or participation.run_id != self.run_id
+                    or participation.continuous_story_line_id != self.continuous_story_line_id
+                    or participation.joined_state_version.value != 4):
+                raise ValueError("continuation result requires exact active revision four")
+        elif self.result_schema_version == TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+            if (self.lifecycle_status is not RunLifecycleStatus.TERMINATED
+                    or self.resulting_state_version.value != 5
+                    or self.participation_reference is not None
+                    or self.applicable_character_reference is not None):
+                raise ValueError("continued termination requires exact terminal revision five")
+        elif self.result_schema_version == TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
             if (self.lifecycle_status is not RunLifecycleStatus.TERMINATED
                     or self.resulting_state_version.value != 4
                     or self.participation_reference is not None
@@ -280,6 +300,13 @@ class StoredRunSuccessReceipt(_StrictFrozenModel):
     @model_validator(mode="after")
     def validate_receipt_bindings(self) -> StoredRunSuccessReceipt:
         expected = {
+            RunMutationKind.CONTINUE_NATIVE_RUN: (
+                RunOperationNamespace.CONTINUE_NATIVE_V1, CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+            ),
+            RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: (
+                RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1,
+                TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+            ),
             RunMutationKind.TERMINATE_NATIVE_RUN: (
                 RunOperationNamespace.TERMINATE_NATIVE_V1,
                 TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,

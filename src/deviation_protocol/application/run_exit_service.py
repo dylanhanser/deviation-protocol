@@ -13,12 +13,16 @@ from deviation_protocol.application.run_operations import (
     RunEntryPublicOperationKey, RunOperationFingerprint, RunOperationNamespace,
     RunReceiptKey, RunSafeResult, StoredRunSuccessReceipt,
     TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+    TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION,
 )
 from deviation_protocol.domain.player_character import ControllerBindingRef, PlayerCharacterLifecycle, validate_canonical_player_character
 from deviation_protocol.domain.run import RunAuthoritySourceRef, RunMutationKind, revalidate_run_model
 from deviation_protocol.domain.run_protocol_binding import (
     NativeRunAdmissionV1, NativeRunTerminatedV1, NativeRunExitRequestV1,
     NativeRunExitEvidenceV1, LegacyRunCompatibilityV1, terminate_native_run,
+    NativeRunContinuedV1, NativeRunContinuedTerminatedV1,
+    ContinuedNativeRunExitRequestV1, ContinuedNativeRunExitEvidenceV1,
+    terminate_continued_native_run,
 )
 
 
@@ -42,6 +46,7 @@ class RunExitService:
     controller_binding_resolver: ControllerBindingResolver
     source_reference: RunAuthoritySourceRef
     clock: Callable[[], datetime]
+    content_registry: object = None
 
     async def _target(self, uow, principal, session_id):
         owned = await uow.sessions.get_owned(session_id, principal.player_id)
@@ -62,10 +67,10 @@ class RunExitService:
         family = await get(run_id=participation.run_id)
         if type(family) is LegacyRunCompatibilityV1:
             raise RunExitError("NATIVE_RUN_REQUIRED")
-        if type(family) not in (NativeRunAdmissionV1, NativeRunTerminatedV1):
+        if type(family) not in (NativeRunAdmissionV1, NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1):
             raise SnapshotInvalidError(session_id)
         revalidate_run_model(family, type(family))
-        if family.canonical_run.trusted_participation_references != (participation,):
+        if participation not in family.canonical_run.trusted_participation_references:
             raise SnapshotInvalidError(session_id)
         reference = family.canonical_run.player_character_binding.applicable_character_reference
         character = await uow.player_characters.get(reference.player_character_id)
@@ -83,7 +88,8 @@ class RunExitService:
         snapshot = await snapshot_get(session_id)
         if snapshot is None:
             raise SnapshotNotFoundError(session_id)
-        state = self.session_service._load_state(persisted, snapshot.state_version, snapshot.state)
+        service = self.session_service if self.content_registry is None else self.content_registry.for_session(persisted.session).session_service
+        state = service._load_state(persisted, snapshot.state_version, snapshot.state)
         runtime = state.scenario_runtime
         if runtime is not None and runtime.ending_status.value in ("RESOLVED", "FAILED"):
             records = tuple(record for record in state.player_memory.scenario_records if record.scenario_id == runtime.scenario_id)
@@ -91,7 +97,7 @@ class RunExitService:
                     or records[0].ending_id != runtime.ending_id
                     or records[0].scenario_content_version != runtime.scenario_content_version):
                 raise SnapshotInvalidError(session_id)
-        if type(family) is NativeRunTerminatedV1 and state_fingerprint(state) != family.exit_evidence.snapshot_sha256:
+        if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1) and session_id == family.exit_evidence.request.session_id and state_fingerprint(state) != family.exit_evidence.snapshot_sha256:
             raise SnapshotInvalidError(session_id)
         return family, character, persisted, state
 
@@ -109,7 +115,9 @@ class RunExitService:
         return dict(schema_version="native-run-status/v1", session_id=persisted.session.session_id,
             run_id=run.run_id.value, run_state_version=run.state_version.value,
             session_state_version=persisted.session.state_version, lifecycle_status=run.lifecycle_status.value,
-            can_exit=type(family) is NativeRunAdmissionV1 and character.lifecycle is PlayerCharacterLifecycle.ACTIVE and ended)
+            can_exit=type(family) in (NativeRunAdmissionV1,NativeRunContinuedV1)
+                and persisted.session.session_id == run.trusted_participation_references[-1].session_id
+                and character.lifecycle is PlayerCharacterLifecycle.ACTIVE and ended)
 
     async def status(self, principal, *, session_id):
         controller = await self._controller(principal, session_id)
@@ -139,47 +147,52 @@ class RunExitService:
                         or family.canonical_run.player_character_binding.applicable_character_reference.player_character_id != target):
                     raise SnapshotInvalidError(session_id)
                 run = family.canonical_run
-                request = NativeRunExitRequestV1(schema="run.terminate-native-request/v1",
+                continued = type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
+                expected_version = 4 if continued else 3
+                request_type = ContinuedNativeRunExitRequestV1 if continued else NativeRunExitRequestV1
+                request = request_type(schema="run.terminate-continued-native-request/v1" if continued else "run.terminate-native-request/v1",
                     controller_binding=controller.value, player_id=principal.player_id,
                     public_operation_key=command.public_operation_key.value, run_id=run.run_id.value,
                     continuous_story_line_id=run.continuous_story_line_id.value, session_id=session_id,
                     expected_run_state_version=command.expected_run_state_version,
                     expected_session_state_version=command.expected_session_state_version,
                     source_reference=self.source_reference.value)
-                key = RunReceiptKey(run_id=run.run_id, operation_namespace=RunOperationNamespace.TERMINATE_NATIVE_V1,
+                key = RunReceiptKey(run_id=run.run_id, operation_namespace=RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1 if continued else RunOperationNamespace.TERMINATE_NATIVE_V1,
                                     operation_id=request.operation_id())
                 receipt = await uow.run_mutation_receipts.get(key)
                 if receipt is not None:
                     if receipt.fingerprint.value != request.fingerprint():
                         raise RunExitError("IDEMPOTENCY_CONFLICT")
-                    if type(family) is not NativeRunTerminatedV1 or family.exit_evidence.request != request:
+                    if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1) or family.exit_evidence.request != request:
                         raise SnapshotInvalidError(session_id)
                     return self._status(family, character, persisted, state)
-                if type(family) is NativeRunTerminatedV1 or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE:
+                if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1) or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or session_id != run.trusted_participation_references[-1].session_id:
                     raise RunExitError("RUN_EXIT_NOT_AVAILABLE")
-                if (command.expected_run_state_version != 3
+                if (command.expected_run_state_version != expected_version
                         or command.expected_session_state_version != persisted.session.state_version):
                     raise RunExitError("RUN_EXIT_STALE")
                 if not self._status(family, character, persisted, state)["can_exit"]:
                     raise RunExitError("RUN_EXIT_NOT_AVAILABLE")
                 runtime = state.scenario_runtime
-                evidence = NativeRunExitEvidenceV1(schema="run.terminate-native-evidence/v1", request=request,
+                evidence_type = ContinuedNativeRunExitEvidenceV1 if continued else NativeRunExitEvidenceV1
+                evidence = evidence_type(schema="run.terminate-continued-native-evidence/v1" if continued else "run.terminate-native-evidence/v1", request=request,
                     scenario_id=persisted.session.scenario_id, scenario_content_version=state.content_version,
                     ending_id=runtime.ending_id, ending_status=runtime.ending_status.value,
                     session_state_version=persisted.session.state_version, snapshot_sha256=state_fingerprint(state))
                 time = self.clock()
-                terminal = terminate_native_run(family, request, occurred_at=time)
+                terminal = (terminate_continued_native_run if continued else terminate_native_run)(family, request, occurred_at=time)
                 receipt = StoredRunSuccessReceipt(key=key, fingerprint=RunOperationFingerprint(value=request.fingerprint()),
-                    command_kind=RunMutationKind.TERMINATE_NATIVE_RUN,
-                    result=RunSafeResult(result_schema_version=TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+                    command_kind=RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN if continued else RunMutationKind.TERMINATE_NATIVE_RUN,
+                    result=RunSafeResult(result_schema_version=TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION if continued else TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
                         run_id=run.run_id, continuous_story_line_id=run.continuous_story_line_id,
                         lifecycle_status=terminal.lifecycle_status, resulting_state_version=terminal.state_version))
                 await uow.runs.append_revision(terminal, created_at=time)
-                if not await uow.runs.compare_and_swap_current(terminal, expected_state_version=3, updated_at=time):
+                if not await uow.runs.compare_and_swap_current(terminal, expected_state_version=expected_version, updated_at=time):
                     raise RunExitError("RUN_EXIT_CONFLICT")
                 await uow.run_mutation_receipts.add(receipt, created_at=time, exit_evidence=evidence)
                 classified = await uow.run_protocol_bindings.get_classified_for_update(run_id=run.run_id)
-                if classified != NativeRunTerminatedV1(admission=family, canonical_run=terminal, exit_evidence=evidence):
+                expected_family = NativeRunContinuedTerminatedV1(continued=family,canonical_run=terminal,exit_evidence=evidence) if continued else NativeRunTerminatedV1(admission=family, canonical_run=terminal, exit_evidence=evidence)
+                if classified != expected_family:
                     raise SnapshotInvalidError(session_id)
                 result = self._status(classified, character, persisted, state)
                 commit_issued = True

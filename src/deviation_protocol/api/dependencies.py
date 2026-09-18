@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
-from fastapi import Request
+from fastapi import Request, Depends
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from deviation_protocol.application.identity import RequestPrincipal
@@ -34,6 +34,8 @@ class ApiServices:
     engine: AsyncEngine | None = None
     narrative_provider: NarrativeProvider | None = None
     run_exit_service: object | None = None
+    content_registry: object | None = None
+    run_continuation_service: object | None = None
 
     def __post_init__(self):
         if self.native_run_admission_service is not None:
@@ -51,7 +53,11 @@ class ApiServices:
                 object.__setattr__(self, "run_exit_service", RunExitService(
                     uow_factory=admission.uow_factory, session_service=self.session_service,
                     controller_binding_resolver=admission.controller_binding_resolver,
-                    source_reference=admission.source_reference, clock=admission.clock))
+                    source_reference=admission.source_reference, clock=admission.clock,
+                    content_registry=self.content_registry))
+            if self.content_registry is not None and self.run_continuation_service is None:
+                from deviation_protocol.application.run_continuation_service import RunContinuationService
+                object.__setattr__(self,"run_continuation_service",RunContinuationService(self.run_exit_service,self.content_registry))
         elif getattr(self.session_service, "native_view_coordinator", None) is not None:
             raise ValueError("native View without native admission")
 
@@ -72,12 +78,33 @@ def get_api_services(request: Request) -> ApiServices:
     return cast(ApiServices, request.app.state.api_services)
 
 
-def get_session_service(request: Request) -> SessionService:
-    return get_api_services(request).session_service
+async def _owned_bundle(request, principal):
+    services = get_api_services(request)
+    session_id = request.path_params.get("session_id")
+    if services.content_registry is None or session_id is None:
+        return None
+    import re
+    if not isinstance(session_id,str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,63}",session_id):
+        return None
+    from deviation_protocol.application.errors import SessionNotFoundError,SnapshotInvalidError
+    async with services.session_service.uow_factory() as uow:
+        persisted = await uow.sessions.get_owned(session_id,principal.player_id)
+        if persisted is None:
+            raise SessionNotFoundError(session_id)
+        try:
+            return services.content_registry.for_session(persisted.session)
+        except ValueError:
+            raise SnapshotInvalidError(session_id) from None
 
 
-def get_turn_orchestrator(request: Request) -> TurnOrchestrator:
-    return get_api_services(request).turn_orchestrator
+async def get_session_service(request: Request,principal=Depends(get_current_principal)) -> SessionService:
+    bundle = await _owned_bundle(request,principal)
+    return get_api_services(request).session_service if bundle is None else bundle.session_service
+
+
+async def get_turn_orchestrator(request: Request,principal=Depends(get_current_principal)) -> TurnOrchestrator:
+    bundle = await _owned_bundle(request,principal)
+    return get_api_services(request).turn_orchestrator if bundle is None else bundle.turn_orchestrator
 
 
 def get_player_character_service(request: Request) -> PlayerCharacterService:

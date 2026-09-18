@@ -1,0 +1,786 @@
+{
+  "schema_version": 1,
+  "content_version": "undelivered-receipt-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "undelivered-receipt-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.death_certificate.investigator",
+        "display_name": "调查者",
+        "base_attributes": [],
+        "resource_caps": [
+          {
+            "key": "composure",
+            "value": 6
+          }
+        ],
+        "equipment_slots": [],
+        "tags": [
+          "player"
+        ]
+      },
+      {
+        "definition_id": "character.undelivered_receipt.staff",
+        "display_name": "发运工作人员模板",
+        "base_attributes": [],
+        "resource_caps": [],
+        "equipment_slots": [],
+        "tags": [
+          "npc"
+        ]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.undelivered_receipt.dispatch_clerk",
+        "character_definition_id": "character.undelivered_receipt.staff",
+        "display_name": "发运员",
+        "persona_summary": "核对可见排程与回执，只按会签后的指令改变本次发运。",
+        "tags": [
+          "staff",
+          "dispatch"
+        ]
+      }
+    ],
+    "items": [
+      {
+        "definition_id": "item.death_certificate.signed_record",
+        "display_name": "已签发记录",
+        "stack_limit": 1,
+        "tags": [
+          "story",
+          "document"
+        ]
+      },
+      {
+        "definition_id": "item.death_certificate.audit_token",
+        "display_name": "审计令牌",
+        "stack_limit": 1,
+        "tags": [
+          "story",
+          "evidence"
+        ]
+      }
+    ],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "undelivered_receipt",
+      "schema_version": 1,
+      "content_version": "undelivered-receipt-1.0.0",
+      "title": "未送达的回执",
+      "summary": "在独立的发运大厅核对缺失回执与已完成排程，决定是否会签暂缓。",
+      "initial_phase_id": "undelivered_receipt.arrival",
+      "initial_location_id": "undelivered_receipt.receiving_desk",
+      "phases": [
+        {
+          "phase_id": "undelivered_receipt.arrival",
+          "title": "收件台",
+          "visible_location_ids": [
+            "undelivered_receipt.receiving_desk",
+            "undelivered_receipt.dispatch_counter"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "talk",
+            "custom"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 40,
+          "must_render_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent",
+            "undelivered_receipt.fact.schedule_complete",
+            "undelivered_receipt.fact.hold_prevents_dispatch",
+            "undelivered_receipt.fact.hold_is_not_delivery"
+          ],
+          "allowed_clue_ids": [
+            "undelivered_receipt.clue.receipt_gap"
+          ],
+          "objective_ids": [
+            "undelivered_receipt.objective.arrival"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "observe",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "talk",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "custom",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "undelivered_receipt.transition.arrival",
+              "target_phase_id": "undelivered_receipt.verification",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "EVENT_OCCURRED",
+                  "event_type": "receipt.gap.verified"
+                }
+              ],
+              "priority": 10
+            }
+          ]
+        },
+        {
+          "phase_id": "undelivered_receipt.verification",
+          "title": "复核柜台",
+          "visible_location_ids": [
+            "undelivered_receipt.dispatch_counter"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "talk",
+            "custom"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 40,
+          "must_render_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent",
+            "undelivered_receipt.fact.schedule_complete",
+            "undelivered_receipt.fact.hold_prevents_dispatch",
+            "undelivered_receipt.fact.hold_is_not_delivery"
+          ],
+          "allowed_clue_ids": [
+            "undelivered_receipt.clue.dispatch_schedule"
+          ],
+          "objective_ids": [
+            "undelivered_receipt.objective.verification"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "observe",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "talk",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "custom",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "undelivered_receipt.transition.verification",
+              "target_phase_id": "undelivered_receipt.dispatch_decision",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "CLUE_GROUP_COMPLETE",
+                  "clue_group_id": "dispatch_evidence"
+                }
+              ],
+              "priority": 10
+            }
+          ]
+        },
+        {
+          "phase_id": "undelivered_receipt.dispatch_decision",
+          "title": "发运决定",
+          "visible_location_ids": [
+            "undelivered_receipt.dispatch_counter"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "talk",
+            "custom",
+            "commit"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 40,
+          "must_render_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent",
+            "undelivered_receipt.fact.schedule_complete",
+            "undelivered_receipt.fact.hold_prevents_dispatch",
+            "undelivered_receipt.fact.hold_is_not_delivery"
+          ],
+          "allowed_clue_ids": [],
+          "objective_ids": [
+            "undelivered_receipt.objective.dispatch_decision"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "observe",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "talk",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            },
+            {
+              "action_type": "custom",
+              "clock_advances": [
+                {
+                  "clock_id": "dispatch_deadline",
+                  "amount": 1
+                }
+              ]
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "undelivered_receipt.transition.dispatch_decision",
+              "target_phase_id": "undelivered_receipt.resolution",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "EVENT_OCCURRED",
+                  "event_type": "dispatch.held"
+                }
+              ],
+              "priority": 10
+            },
+            {
+              "transition_id": "undelivered_receipt.transition.released",
+              "target_phase_id": "undelivered_receipt.resolution",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "EVENT_OCCURRED",
+                  "event_type": "dispatch.released"
+                }
+              ],
+              "priority": 20
+            }
+          ],
+          "decision_window_ids": [
+            "undelivered_receipt.decision.dispatch"
+          ]
+        },
+        {
+          "phase_id": "undelivered_receipt.resolution",
+          "title": "本次结果",
+          "visible_location_ids": [
+            "undelivered_receipt.dispatch_counter"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "talk",
+            "custom"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "must_render_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent",
+            "undelivered_receipt.fact.schedule_complete",
+            "undelivered_receipt.fact.hold_prevents_dispatch",
+            "undelivered_receipt.fact.hold_is_not_delivery"
+          ],
+          "allowed_clue_ids": [],
+          "objective_ids": [
+            "undelivered_receipt.objective.resolution"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "terminal": true
+        }
+      ],
+      "locations": [
+        {
+          "location_id": "undelivered_receipt.receiving_desk",
+          "title": "收件台",
+          "summary": "登记槽空着，旁边的排程却显示完成。",
+          "initially_open": true
+        },
+        {
+          "location_id": "undelivered_receipt.dispatch_counter",
+          "title": "发运柜台",
+          "summary": "发运员在柜台后核对排程。",
+          "initially_open": false,
+          "visible_entity_ids": [
+            "npc.undelivered_receipt.dispatch_clerk"
+          ]
+        }
+      ],
+      "npc_references": [
+        {
+          "npc_definition_id": "npc.undelivered_receipt.dispatch_clerk",
+          "known_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent",
+            "undelivered_receipt.fact.schedule_complete",
+            "undelivered_receipt.fact.hold_prevents_dispatch",
+            "undelivered_receipt.fact.hold_is_not_delivery"
+          ]
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "undelivered_receipt.fact.receipt_absent",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": "回执尚未收到。"
+        },
+        {
+          "fact_id": "undelivered_receipt.fact.schedule_complete",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": "当前排程将这次发运标记为完成。"
+        },
+        {
+          "fact_id": "undelivered_receipt.fact.hold_prevents_dispatch",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": "经复核会签的暂缓指令可以阻止本次发运。"
+        },
+        {
+          "fact_id": "undelivered_receipt.fact.hold_is_not_delivery",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": "暂缓发运不证明此前是否已经送达。"
+        },
+        {
+          "fact_id": "undelivered_receipt.fact.dispatch_held",
+          "kind": "MUTABLE",
+          "visibility": "PLAYER_KNOWN",
+          "value": false,
+          "mutable_transitions": [
+            {
+              "from_value": false,
+              "to_value": true,
+              "event_type": "dispatch.held"
+            }
+          ]
+        }
+      ],
+      "clues": [
+        {
+          "clue_id": "undelivered_receipt.clue.receipt_gap",
+          "supports_fact_ids": [
+            "undelivered_receipt.fact.receipt_absent"
+          ],
+          "source_event_types": [
+            "receipt.gap.verified"
+          ],
+          "allowed_phase_ids": [
+            "undelivered_receipt.arrival"
+          ],
+          "visible_summary": "登记槽中缺少对应回执。"
+        },
+        {
+          "clue_id": "undelivered_receipt.clue.dispatch_schedule",
+          "supports_fact_ids": [
+            "undelivered_receipt.fact.schedule_complete"
+          ],
+          "source_event_types": [
+            "dispatch.schedule.verified"
+          ],
+          "allowed_phase_ids": [
+            "undelivered_receipt.verification"
+          ],
+          "visible_summary": "排程标记完成；会签暂缓程序可用。"
+        }
+      ],
+      "clue_groups": [
+        {
+          "clue_group_id": "dispatch_evidence",
+          "clue_ids": [
+            "undelivered_receipt.clue.receipt_gap",
+            "undelivered_receipt.clue.dispatch_schedule"
+          ],
+          "required_count": 2,
+          "completion_event_type": "dispatch.evidence.complete"
+        }
+      ],
+      "threat_clocks": [
+        {
+          "clock_id": "dispatch_deadline",
+          "maximum": 40,
+          "initial": 0,
+          "player_visible": true,
+          "thresholds": [
+            {
+              "threshold": 40,
+              "event_type": "dispatch.deadline.reached"
+            }
+          ]
+        }
+      ],
+      "decision_windows": [
+        {
+          "decision_id": "undelivered_receipt.decision.dispatch",
+          "reason": "IRREVERSIBLE_CONSEQUENCE",
+          "earliest_beat": 0,
+          "latest_beat": 0,
+          "conditions": [
+            {
+              "rule_type": "CLUE_GROUP_COMPLETE",
+              "clue_group_id": "dispatch_evidence"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "undelivered_receipt.action.hold",
+              "action_type": "commit",
+              "label_hint": "会签暂缓发运",
+              "server_event_type": "dispatch.held",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "undelivered_receipt.fact.dispatch_held",
+                  "value": true
+                }
+              ],
+              "server_narrative_text": "你与发运员会签暂缓指令，本次发运停止。缺失回执仍需后续核验。"
+            },
+            {
+              "action_id": "undelivered_receipt.action.release",
+              "action_type": "commit",
+              "label_hint": "放行本次发运",
+              "server_event_type": "dispatch.released",
+              "server_narrative_text": "你明确选择放行，本次争议发运关闭。缺失回执没有被补写。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "observe",
+              "talk",
+              "custom"
+            ]
+          }
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "undelivered_receipt.ending.deadline_reached",
+          "status": "FAILED",
+          "priority": 10,
+          "conditions": [
+            {
+              "rule_type": "CLOCK_AT_LEAST",
+              "clock_id": "dispatch_deadline",
+              "value": 40
+            }
+          ]
+        },
+        {
+          "ending_id": "undelivered_receipt.ending.receipt_held",
+          "status": "RESOLVED",
+          "priority": 20,
+          "conditions": [
+            {
+              "rule_type": "EVENT_OCCURRED",
+              "event_type": "dispatch.held"
+            },
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "undelivered_receipt.fact.dispatch_held",
+              "value": true
+            }
+          ]
+        },
+        {
+          "ending_id": "undelivered_receipt.ending.dispatch_closed",
+          "status": "FAILED",
+          "priority": 30,
+          "conditions": [
+            {
+              "rule_type": "EVENT_OCCURRED",
+              "event_type": "dispatch.released"
+            }
+          ]
+        }
+      ],
+      "story_item_definition_ids": [
+        "item.death_certificate.signed_record",
+        "item.death_certificate.audit_token"
+      ],
+      "narrative_length": {
+        "target": 350,
+        "minimum": 100,
+        "maximum": 700
+      },
+      "narrative_outcome_rules": [
+        {
+          "rule_id": "undelivered_receipt.outcome.receipt_gap",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": [
+            "undelivered_receipt.arrival"
+          ],
+          "intent": {
+            "action_types": [
+              "OBSERVE"
+            ],
+            "requires_target": false
+          },
+          "required_current_location_ids": [
+            "undelivered_receipt.receiving_desk"
+          ],
+          "once": true,
+          "safe_description": "收件台的登记槽空着。你核对了可见条目：本次发运没有对应回执。发运柜台现在可以进入。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "receipt.gap.verified",
+              "action_type": "observe",
+              "discovered_clue_ids": [
+                "undelivered_receipt.clue.receipt_gap"
+              ],
+              "fixed_public_narrative_text": "收件台的登记槽空着。你核对了可见条目：本次发运没有对应回执。发运柜台现在可以进入。",
+              "opened_location_ids": [
+                "undelivered_receipt.dispatch_counter"
+              ],
+              "new_location_id": "undelivered_receipt.dispatch_counter"
+            }
+          ],
+          "priority": 10,
+          "mutex_group": "undelivered_receipt.outcome.action"
+        },
+        {
+          "rule_id": "undelivered_receipt.outcome.dispatch_schedule",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": [
+            "undelivered_receipt.verification"
+          ],
+          "intent": {
+            "action_types": [
+              "TALK"
+            ],
+            "requires_target": true
+          },
+          "required_current_location_ids": [
+            "undelivered_receipt.dispatch_counter"
+          ],
+          "once": true,
+          "safe_description": "发运员指向当前排程：本次发运被标记为完成，但没有回执。双方复核后确认，会签暂缓可以阻止本次发运，却不能证明此前是否送达。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "dispatch.schedule.verified",
+              "action_type": "talk",
+              "discovered_clue_ids": [
+                "undelivered_receipt.clue.dispatch_schedule"
+              ],
+              "fixed_public_narrative_text": "发运员指向当前排程：本次发运被标记为完成，但没有回执。双方复核后确认，会签暂缓可以阻止本次发运，却不能证明此前是否送达。"
+            }
+          ],
+          "priority": 20,
+          "mutex_group": "undelivered_receipt.outcome.action",
+          "required_visible_npc_definition_ids": [
+            "npc.undelivered_receipt.dispatch_clerk"
+          ]
+        },
+        {
+          "rule_id": "undelivered_receipt.outcome.no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": [
+            "undelivered_receipt.arrival",
+            "undelivered_receipt.verification",
+            "undelivered_receipt.dispatch_decision"
+          ],
+          "intent": {
+            "action_types": [
+              "OBSERVE",
+              "CUSTOM"
+            ]
+          },
+          "once": false,
+          "safe_description": "查看当前环境或提出尚未获得规则支持的尝试。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "dispatch.observation.no_effect",
+              "action_type": "custom",
+              "fixed_public_narrative_text": "这次尝试没有取得新的可核验证据，发运期限仍在逼近。"
+            }
+          ],
+          "priority": 0,
+          "mutex_group": "undelivered_receipt.outcome.action"
+        }
+      ],
+      "memory_rules": [
+        {
+          "rule_id": "undelivered_receipt.memory.00_started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.10_receipt_absent",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "undelivered_receipt.fact.receipt_absent"
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.11_schedule_complete",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "undelivered_receipt.fact.schedule_complete"
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.12_hold_prevents_dispatch",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "undelivered_receipt.fact.hold_prevents_dispatch"
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.13_hold_is_not_delivery",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "undelivered_receipt.fact.hold_is_not_delivery"
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.90_complete",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioRuntimeEventGenerated",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "undelivered_receipt.ending.deadline_reached"
+          ],
+          "required_scenario_event_types": [
+            "dispatch.deadline.reached"
+          ]
+        },
+        {
+          "rule_id": "undelivered_receipt.memory.91_decision_complete",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioDecisionSelected",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "undelivered_receipt.ending.receipt_held",
+            "undelivered_receipt.ending.dispatch_closed"
+          ],
+          "required_scenario_event_types": []
+        }
+      ],
+      "public_client": {
+        "title": "未送达的回执",
+        "hook": "回执缺失，排程却已标记完成。核对证据，决定本次发运。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.death_certificate.investigator",
+            "description": "沿用当前 Run 的调查者与剩余状态。"
+          }
+        ],
+        "default_character_definition_id": "character.death_certificate.investigator",
+        "scenes": [
+          {
+            "phase_id": "undelivered_receipt.arrival",
+            "title": "收件台",
+            "summary": "收件台上缺少回执，而排程仍显示完成。"
+          },
+          {
+            "phase_id": "undelivered_receipt.verification",
+            "title": "复核柜台",
+            "summary": "向发运员核对排程与暂缓程序。"
+          },
+          {
+            "phase_id": "undelivered_receipt.dispatch_decision",
+            "title": "发运决定",
+            "summary": "证据已齐备，由你决定暂缓还是放行。"
+          },
+          {
+            "phase_id": "undelivered_receipt.resolution",
+            "title": "本次结果",
+            "summary": "本次发运争议已经形成明确结果。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "undelivered_receipt.ending.deadline_reached",
+            "title": "发运期限已到",
+            "summary": "期限已到，争议发运关闭；这并未补齐缺失的回执。"
+          },
+          {
+            "ending_id": "undelivered_receipt.ending.receipt_held",
+            "title": "回执待核，发运暂缓",
+            "summary": "复核后的暂缓指令阻止了本次发运。是否送达仍待回执证明。"
+          },
+          {
+            "ending_id": "undelivered_receipt.ending.dispatch_closed",
+            "title": "争议发运已放行",
+            "summary": "你选择放行本次发运，缺失回执的问题仍未解决。"
+          }
+        ],
+        "actions": [
+          {
+            "action_type": "CONTINUE",
+            "label": "继续"
+          },
+          {
+            "action_type": "OBSERVE",
+            "label": "核对收件台"
+          },
+          {
+            "action_type": "TALK",
+            "label": "询问发运员"
+          },
+          {
+            "action_type": "CUSTOM",
+            "label": "尝试其他行动"
+          }
+        ]
+      }
+    }
+  ]
+}
