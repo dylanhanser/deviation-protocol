@@ -612,7 +612,9 @@ def _native_admission_prefix(run, revisions, mutations):
     _require((run.state_version.value, kind) in (
         (4, RunMutationKind.TERMINATE_NATIVE_RUN),
         (4, RunMutationKind.CONTINUE_NATIVE_RUN),
-        (5, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN)), "native suffix shape")
+        (5, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN),
+        (5, RunMutationKind.REVISIT_NATIVE_REGION),
+        (6, RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN)), "native suffix shape")
     _require(tuple(r.state_version for r in revisions) == tuple(range(1,run.state_version.value+1))
              and tuple(r.resulting_state_version for r in mutations) == tuple(range(2,run.state_version.value+1)), "native history shape")
     prefix = canonical_run_from_revision_storage(revisions[2], participations=run.trusted_participation_references[:1])

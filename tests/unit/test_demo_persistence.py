@@ -2513,6 +2513,7 @@ async def test_expanded_snapshot_is_complete_and_detached() -> None:
         "run_world_states",
         "run_world_visits",
         "run_world_positions",
+        "run_world_visit_entries",
         "run_participations",
         "run_creation_receipts",
         "run_mutation_receipts",

@@ -36,7 +36,7 @@ import {
   scenarioCatalogFixture,
   synchronousActionResponseFixture,
   runOptionsFixture,
-  nativeEntryFixture,
+  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
@@ -45,7 +45,8 @@ const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
 
 it("pauses a native confirmed-202 identity mismatch while retaining GET recovery identity",async()=>{
   writeSessionRecoveryRecord("session-public-1");let posts=0,reads=0;
-  server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>HttpResponse.json({...freeActionViewFixture(1),run_context:nativeEntryFixture().run_context})),
+  vi.spyOn(PublicApiClient.prototype,"getNativeRunJourney").mockResolvedValue(nativeJourneyFixture(nativeViewFixture(freeActionViewFixture(1))));
+  server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>HttpResponse.json(nativeViewFixture(freeActionViewFixture(1)))),
     http.post(`${apiOrigin}/v1/sessions/session-public-1/actions`,()=>{posts++;return HttpResponse.json(pendingActionResponseFixture("opaque-request-1"),{status:202});}),
     http.get(`${apiOrigin}/v1/sessions/session-public-1/requests/opaque-request-1`,()=>{reads++;return HttpResponse.json({session_id:"foreign",client_request_id:"opaque-request-1",status:"PENDING",client_action:"POLL_SAME_REQUEST",error_code:null,retry_after_seconds:2,response:null});}));
   renderActionApp();await screen.findByText("当前 Session：session-public-1");
@@ -58,12 +59,13 @@ it("pauses a native confirmed-202 identity mismatch while retaining GET recovery
 
 it.each([true,false])("native setup follows authoritative action affordances and rejects missing context: ending=%s",async (ending) => {
   const admitted=nativeEntryFixture(); let views=0,entries=0,actions=0;
+  vi.spyOn(PublicApiClient.prototype,"getNativeRunJourney").mockImplementation(async()=>nativeJourneyFixture(nativeViewFixture(views>1 ? endedViewFixture("RESOLVED") : activeViewFixture)));
   server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
     http.post(`${apiOrigin}/v1/runs/native`,() => {entries++;return HttpResponse.json(admitted);}),
     http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
       views++;
-      if (views===1) return HttpResponse.json({...activeViewFixture,run_context:admitted.run_context});
-      return HttpResponse.json(ending?{...endedViewFixture("RESOLVED"),run_context:admitted.run_context}:freeActionViewFixture(7));
+      if (views===1) return HttpResponse.json(nativeViewFixture(activeViewFixture));
+      return HttpResponse.json(ending?nativeViewFixture(endedViewFixture("RESOLVED")):freeActionViewFixture(7));
     }),http.post(`${apiOrigin}/v1/sessions/session-public-1/actions`,() => {actions++;return HttpResponse.json(synchronousActionResponseFixture("opaque-request-1",7));}));
   renderActionApp(); await screen.findByLabelText("Player Character");
   fireEvent.click(screen.getByRole("button",{name:"原生 Run 设置"}));
@@ -74,6 +76,7 @@ it.each([true,false])("native setup follows authoritative action affordances and
   fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
   fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
   await screen.findByText("当前 Session：session-public-1");
+  await waitFor(()=>expect(screen.getByRole("button",{name:"检查灯塔信号"})).toBeEnabled());
   fireEvent.click(screen.getByRole("button",{name:"检查灯塔信号"}));
   await waitFor(() => expect(views).toBe(2));
   if (ending) {

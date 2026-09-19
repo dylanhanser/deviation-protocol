@@ -2,7 +2,7 @@ import { act, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { StrictMode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
 import { PublicApiClient } from "./api/client";
@@ -29,7 +29,7 @@ import {
   runEntryResponseFixture,
   scenarioCatalogFixture,
   runOptionsFixture,
-  nativeEntryFixture,
+  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
@@ -43,12 +43,13 @@ async function selectNativeSetup() {
 }
 
 describe("native admission and storage recovery", () => {
+  beforeEach(()=>{vi.spyOn(PublicApiClient.prototype,"getNativeRunJourney").mockResolvedValue(nativeJourneyFixture());});
   describe("S6 correction: confirmed native association", () => {
     const cases = ["missing context", "mismatched context", "changed scenario", "changed content", "matching View"] as const;
 
     function recoveryView(kind: typeof cases[number]): PlayerSessionView {
       const view: PlayerSessionView = {
-        ...activeViewFixture,
+        ...nativeViewFixture(activeViewFixture),
         run_context: nativeEntryFixture().run_context,
       };
       if (kind === "missing context") delete view.run_context;
@@ -148,6 +149,7 @@ describe("native admission and storage recovery", () => {
         objectives: {...nativeEntryFixture().run_context.objectives, resource_pressure: 30},
       };
       expect(playerSessionViewSchema.safeParse(replacementView).success).toBe(true);
+      vi.mocked(PublicApiClient.prototype.getNativeRunJourney).mockResolvedValue(nativeJourneyFixture(replacementView));
       server.use(
         scenarioHandler(),
         ...postGuards(() => { posts++; }),
@@ -290,6 +292,8 @@ describe("native admission and storage recovery", () => {
       const replacement = withSessionId(
         recoveryView(mode === "legacy" ? "missing context" : "mismatched context"), "session-other",
       );
+      vi.mocked(PublicApiClient.prototype.getNativeRunJourney).mockImplementation(async(id)=>
+        nativeJourneyFixture(id==="session-other" ? replacement : recoveryView("matching View")));
       server.use(
         scenarioHandler(),
         ...postGuards(() => { unexpectedPosts++; }),
@@ -322,7 +326,7 @@ describe("native admission and storage recovery", () => {
     const post=vi.spyOn(oldClient,"enterNativeRun").mockImplementation(()=>late.promise);
     let views=0;
     server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,()=>HttpResponse.json(runOptionsFixture)),
-      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>{views++;return HttpResponse.json({...activeViewFixture,run_context:nativeEntryFixture().run_context});}));
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>{views++;return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:nativeEntryFixture().run_context});}));
     const rendered=renderRecoveryApp({client:oldClient});
     await screen.findByLabelText("Player Character"); await selectNativeSetup();
     fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
@@ -345,7 +349,7 @@ describe("native admission and storage recovery", () => {
         return HttpResponse.json(response);
       }),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
         views++; expect(storedRecoveryRecord()).toEqual({version:1,session_id:"session-public-1"});
-        return HttpResponse.json({...activeViewFixture,run_context:response.run_context});
+        return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});
       }));
     renderRecoveryApp();
     await screen.findByLabelText("Player Character");
@@ -373,7 +377,7 @@ describe("native admission and storage recovery", () => {
     const storage=new FaultInjectingStorage(); const restore=installSessionStorage(storage);
     server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
       http.post(`${apiOrigin}/v1/runs/native`,() => {posts++; storage.failSet=true; return HttpResponse.json(response);}),
-      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {views++; return HttpResponse.json({...activeViewFixture,run_context:response.run_context});}));
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {views++; return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});}));
     try {
       renderRecoveryApp(); await screen.findByLabelText("Player Character"); await selectNativeSetup();
       fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
@@ -392,7 +396,7 @@ describe("native admission and storage recovery", () => {
     seedRecoveryRecord("session-public-1"); let posts=0,gets=0;
     const response=nativeEntryFixture();
     server.use(scenarioHandler(),...postGuards(() => {posts++;}),http.post(`${apiOrigin}/v1/runs/native`,() => {posts++;return HttpResponse.json(response);}),
-      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json({...activeViewFixture,run_context:response.run_context});}));
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});}));
     const page=renderRecoveryApp(); await screen.findByText("当前 Session：session-public-1");
     expect(screen.getByRole("region",{name:"Run 设置"})).toBeVisible(); page.unmount();
     server.use(http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json(errorFixture("SESSION_NOT_FOUND","Session was not found"),{status:404});}));

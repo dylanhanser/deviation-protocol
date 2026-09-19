@@ -2,8 +2,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEve
 
 import { publicApiClient, type PublicApiClient } from "./api/client";
 import { assertRunStatus, freezeRunExit, type FrozenRunExit } from "./runExit";
-import { assertContinuationStatus, assertContinuationResult, assertConfirmedSuccessor, assertHistoricalPair, freezeRunContinuation, type ConfirmedContinuation, type FrozenRunContinuation } from "./runContinuation";
-import type { NativeRunContinuationStatus, NativeRunContinuationResult } from "./api/schemas";
+import { assertJourney as assertContinuationStatus, assertTransitionResult as assertContinuationResult, assertConfirmedCurrent, assertConfirmedDestination as assertConfirmedSuccessor, assertNeighbor, assertJourneyRunStatus, sameAssociation, freezeJourneyTransition as freezeRunContinuation, type ConfirmedTransition as ConfirmedContinuation, type FrozenJourneyTransition as FrozenRunContinuation } from "./runJourney";
+import type { NativeRunJourney as NativeRunContinuationStatus, NativeTransitionResult as NativeRunContinuationResult } from "./api/schemas";
 import type { NativeRunStatus } from "./api/schemas";
 import { ApiClientError, formatApiClientError } from "./api/errors";
 import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPresentation, type FrozenNativeEntry } from "./runSetup";
@@ -741,10 +741,11 @@ export default function App({
   const confirmedContinuation = useRef<ConfirmedContinuation | null>(null);
   const validateSuccessorRead = useCallback(async(view: PlayerSessionView, signal: AbortSignal) => {
     const confirmed=confirmedContinuation.current;
-    if (confirmed?.result.session_id !== view.metadata.session_id && view.narrative_frame.scenario_id !== "undelivered_receipt") return;
-    const status=await client.getNativeRunContinuation(view.metadata.session_id,signal);
+    if (!view.run_context) return;
+    const status=await client.getNativeRunJourney(view.metadata.session_id,signal);
     assertContinuationStatus(view,status);
-    if (confirmed?.result.session_id === view.metadata.session_id) assertConfirmedSuccessor(confirmed,view,status);
+    if (confirmed) assertConfirmedSuccessor(confirmed,view,status);
+    return status;
   },[client]);
   const latestClient = useRef(client);
   useLayoutEffect(() => {
@@ -785,6 +786,10 @@ export default function App({
     );
   const [manualSessionId, setManualSessionId] = useState("");
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
+  const [runAuthority, setRunAuthority] = useState<{
+    owner: LoadedSession; client: PublicApiClient;
+    journey: NativeRunContinuationStatus; status: NativeRunStatus | null;
+  } | null>(null);
   const [runStatus, setRunStatus] = useState<NativeRunStatus | null>(null);
   const [exitConfirm, setExitConfirm] = useState(false);
   const [exitAttempt, setExitAttempt] = useState<FrozenRunExit | null>(null);
@@ -798,6 +803,7 @@ export default function App({
   const [continuationError, setContinuationError] = useState<string | null>(null);
   const [historicalSession, setHistoricalSession] = useState<LoadedSession | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [historicalJourney, setHistoricalJourney] = useState<NativeRunContinuationStatus | null>(null);
   const [pendingContinuationRecovery, setPendingContinuationRecovery] = useState<NativeRunContinuationResult | null>(null);
   const [committedActionResponse, setCommittedActionResponse] =
     useState<ActionResponse | null>(null);
@@ -857,7 +863,7 @@ export default function App({
 
   const clearSessionUiState = useCallback(() => {
     setContinuationStatus(null); setContinuationConfirm(false); setContinuationAttempt(null); continuationAttemptRef.current = null;
-    setContinuationError(null); setHistoricalSession(null); setHistoryLoading(false);
+    setContinuationError(null); setHistoricalSession(null); setHistoricalJourney(null); setHistoryLoading(false);
     setRunStatus(null); setExitConfirm(false); setExitAttempt(null); exitAttemptRef.current = null;
     setExitError(null); setExitClearFailed(false);
     loadedSessionRef.current = null;
@@ -1025,7 +1031,7 @@ export default function App({
   useEffect(() => {
     if (previousClientRef.current !== client) {
       setContinuationStatus(null); setContinuationConfirm(false);
-      setContinuationError(null); setHistoricalSession(null); setHistoryLoading(false);
+      setContinuationError(null); setHistoricalSession(null); setHistoricalJourney(null); setHistoryLoading(false);
       setRunStatus(null); setExitConfirm(false);
       setExitError(null); setExitClearFailed(false);
       nativeExpected.current = null;
@@ -1058,28 +1064,6 @@ export default function App({
   }, [client, invalidateForegroundOperation, replaceMutationAttempt]);
 
   useEffect(() => {
-    const current = loadedSession;
-    const controller = new AbortController();
-    let active = true;
-    const synchronize = async () => {
-      await Promise.resolve();
-      if (!active) return;
-      setRunStatus(null); setExitConfirm(false);
-      if (current?.view.run_context && current.view.scenario_status === "ENDED" && current.stale === null) {
-        const status = await client.getNativeRunStatus(current.sessionId, controller.signal);
-        if (!active || latestClient.current !== client || loadedSessionRef.current !== current) return;
-        assertRunStatus(current.view, status);
-        setRunStatus(status); setExitError(null);
-        if (status.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current = null;}
-      }
-    };
-    void synchronize().catch((error: unknown) => {
-      if (active && latestClient.current === client) setExitError(formatApiClientError(error));
-    });
-    return () => {active = false; controller.abort();};
-  }, [client, loadedSession]);
-
-  useEffect(() => {
     return () => {
       operationGenerationRef.current += 1;
       foregroundOperationRef.current?.controller.abort();
@@ -1091,24 +1075,57 @@ export default function App({
   useEffect(() => {
     const current=loadedSession;
     const controller=new AbortController();
+    const generation=operationGenerationRef.current;
     let active=true;
+    const isCurrent=()=>active && latestClient.current === client && loadedSessionRef.current === current &&
+      operationGenerationRef.current === generation;
     const synchronize=async()=>{
       await Promise.resolve();
-      if (!active) return;
+      if (!isCurrent()) return;
+      setRunAuthority(null); setRunStatus(null);
+      // Keep already validated arrival/history text while re-reading. The
+      // separate owner-bound authority stays invalid until the reads agree.
       setContinuationStatus(previous => previous?.session_id === current?.sessionId &&
-        previous?.session_state_version === current?.view.metadata.state_version ? previous : null);
-      setContinuationConfirm(false);
+        previous?.path.session_state_version === current?.view.metadata.state_version ? previous : null);
+      setContinuationConfirm(false); setExitConfirm(false);
       if (!current?.view.run_context || current.stale !== null) return;
-      const status=await client.getNativeRunContinuation(current.sessionId,controller.signal);
-      if (!active || latestClient.current !== client || loadedSessionRef.current !== current) return;
-      assertContinuationStatus(current.view,status);
+      const [journey,status]=await Promise.all([
+        client.getNativeRunJourney(current.sessionId,controller.signal),
+        current.view.scenario_status === "ENDED" ? client.getNativeRunStatus(current.sessionId,controller.signal) : Promise.resolve(null),
+      ]);
+      if (!isCurrent()) return;
+      assertContinuationStatus(current.view,journey);
+      if (confirmedContinuation.current) assertConfirmedCurrent(confirmedContinuation.current,journey);
       if (confirmedContinuation.current?.result.session_id === current.sessionId)
-        assertConfirmedSuccessor(confirmedContinuation.current,current.view,status);
-      setContinuationStatus(status); setContinuationError(null);
+        assertConfirmedSuccessor(confirmedContinuation.current,current.view,journey);
+      if (status) assertJourneyRunStatus(current.view,journey,status);
+      setContinuationStatus(journey); setRunStatus(status);
+      setRunAuthority({owner:current,client,journey,status});
+      setContinuationError(null); setExitError(null);
+      if (status?.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current=null;}
     };
-    void synchronize().catch((error:unknown)=>{if(active && latestClient.current === client) setContinuationError(formatApiClientError(error));});
+    void synchronize().catch((error:unknown)=>{
+      if (!isCurrent()) return;
+      setRunAuthority(null);
+      setContinuationError(formatApiClientError(error));
+      if (current?.view.scenario_status === "ENDED") setExitError(formatApiClientError(error));
+    });
     return ()=>{active=false;controller.abort();};
   },[client,loadedSession]);
+
+  function hasRunAuthority(current: LoadedSession | null): boolean {
+    if (!current || current.stale || !runAuthority || runAuthority.owner !== current || runAuthority.client !== client ||
+        runAuthority.journey !== continuationStatus || runAuthority.status !== runStatus) return false;
+    try {
+      assertContinuationStatus(current.view,runAuthority.journey);
+      if (current.view.scenario_status === "ENDED") {
+        if (!runAuthority.status) return false;
+        assertJourneyRunStatus(current.view,runAuthority.journey,runAuthority.status);
+      }
+      return true;
+    } catch {return false;}
+  }
+  const runAuthorityReady=hasRunAuthority(loadedSession);
 
   useEffect(() => {
     if (recoveryStorageFailure !== null) {
@@ -1149,7 +1166,7 @@ export default function App({
         return;
       }
       assertViewAssociation(record.session_id, restoredView, nativeExpected.current);
-      await validateSuccessorRead(restoredView,operation.controller.signal);
+      const journey = await validateSuccessorRead(restoredView,operation.controller.signal);
       if (!isCurrent()) return;
       if (restoredView.run_context) nativeExpected.current = {sessionId:record.session_id, context:restoredView.run_context,
         scenarioId:restoredView.narrative_frame.scenario_id, contentVersion:restoredView.metadata.content_version};
@@ -1166,6 +1183,12 @@ export default function App({
       };
       loadedSessionRef.current = next;
       setLoadedSession(next);
+      if (journey) setContinuationStatus(journey);
+      if (confirmedContinuation.current?.result.session_id === record.session_id) {
+        setContinuationAttempt(null);
+        continuationAttemptRef.current = null;
+        setContinuationError(null);
+      }
       setCommittedActionResponse(
         response !== null &&
           response.session_id === record.session_id &&
@@ -1286,7 +1309,7 @@ export default function App({
     view: PlayerSessionView,
     response: ActionResponse | null = null,
   ) {
-    setHistoricalSession(null);
+    setHistoricalSession(null); setHistoricalJourney(null);
     assertViewAssociation(sessionId, view, nativeExpected.current);
     if (view.run_context) nativeExpected.current = {sessionId, context:view.run_context,
       scenarioId:view.narrative_frame.scenario_id, contentVersion:view.metadata.content_version};
@@ -1975,9 +1998,10 @@ export default function App({
   async function handleActionRequest(requestFactory: () => ActionRequest) {
     if (historicalSession || continuationAttemptRef.current || exitAttemptRef.current) return;
     const current = loadedSessionRef.current;
-    if (current?.view.narrative_frame.scenario_id === "undelivered_receipt" &&
+    if (current?.view.run_context &&
         (continuationError || continuationStatus?.session_id !== current.sessionId ||
-         continuationStatus.session_state_version !== current.view.metadata.state_version)) return;
+         continuationStatus.path.session_state_version !== current.view.metadata.state_version ||
+         continuationStatus.current.session_id !== current.sessionId || continuationStatus.lifecycle_status !== "active")) return;
     if (
       current === null ||
       current.stale !== null ||
@@ -2136,12 +2160,16 @@ export default function App({
     assertContinuationResult(current.view,result);
     if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
     const prior=confirmedContinuation.current;
-    if (prior) {
+    if (prior?.result.source_session_id === current.sessionId) {
       if (JSON.stringify(prior.result) !== JSON.stringify(result)) throw new Error("已确认的续接关联不匹配");
       assertContinuationResult(prior.source,result);
       assertViewAssociation(current.sessionId,current.view,{sessionId:prior.source.metadata.session_id,
         context:prior.result.run_context,scenarioId:prior.source.narrative_frame.scenario_id,contentVersion:prior.source.metadata.content_version});
-    } else confirmedContinuation.current=structuredClone({source:current.view,result});
+    } else {
+      const frozen=continuationAttemptRef.current;
+      if (!frozen || frozen.sessionId !== current.sessionId) throw new Error("缺少已确认的来源关联");
+      confirmedContinuation.current=structuredClone({source:frozen.source,sourceAssociation:frozen.authority.path,result});
+    }
     setPendingContinuationRecovery(result);
     // Persist the authoritative successor before publishing any successor View.
     if (!persistRecoveryRecord(result.session_id)) return;
@@ -2149,7 +2177,7 @@ export default function App({
     const view=await client.getSessionView(result.session_id,operation.controller.signal);
     if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
     assertViewAssociation(result.session_id,view,nativeExpected.current);
-    const status=await client.getNativeRunContinuation(result.session_id,operation.controller.signal);
+    const status=await client.getNativeRunJourney(result.session_id,operation.controller.signal);
     if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
     assertContinuationStatus(view,status);
     assertConfirmedSuccessor(confirmedContinuation.current!,view,status);
@@ -2160,17 +2188,19 @@ export default function App({
 
   async function handleContinuation(retry=false) {
     const current=loadedSessionRef.current;
-    if (!current || current.stale || historicalSession || foregroundOperationRef.current || exitAttemptRef.current) return;
+    if (!current || current.stale || historicalSession || foregroundOperationRef.current || exitAttemptRef.current ||
+        !hasRunAuthority(current)) return;
     let attempt=continuationAttemptRef.current;
     if (!retry) {
-      if (attempt || !continuationConfirm || !continuationStatus) return;
+      if (attempt || !continuationConfirm || !continuationStatus || continuationStatus.lifecycle_status !== "active" ||
+          continuationStatus.current.session_id !== current.sessionId) return;
       attempt=freezeRunContinuation(current.view,continuationStatus,idempotencyKeyFactory());
       continuationAttemptRef.current=attempt;setContinuationAttempt(attempt);setContinuationConfirm(false);
     }
     if (!attempt || attempt.sessionId !== current.sessionId || attempt.runId !== current.view.run_context?.run_id) return;
     const operation=beginForegroundOperation("submitting",{clearSession:false});
     if (!operation) return;
-    try {await adoptContinuation(current,await client.continueNativeRun(attempt,operation.controller.signal),operation);}
+    try {await adoptContinuation(current,await client.transitionNativeRun(attempt,operation.controller.signal),operation);}
     catch(error) {if(isCurrentOperation(operation)) setContinuationError(formatApiClientError(error));}
     finally {finishForegroundOperation(operation);}
   }
@@ -2190,48 +2220,84 @@ export default function App({
     if (!current || historicalSession || foregroundOperationRef.current) return;
     const operation=beginForegroundOperation("reading",{clearSession:false});
     if (!operation) return;
+    setRunAuthority(null);
     try {
-      const status=await client.getNativeRunContinuation(current.sessionId,operation.controller.signal);
+      const status=await client.getNativeRunJourney(current.sessionId,operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
       assertContinuationStatus(current.view,status);
+      const confirmed=confirmedContinuation.current;
+      if (confirmed) assertConfirmedCurrent(confirmed,status);
       if (confirmedContinuation.current?.result.session_id === current.sessionId)
         assertConfirmedSuccessor(confirmedContinuation.current,current.view,status);
       setContinuationStatus(status);setContinuationError(null);
-      if (status.successor) await adoptContinuation(current,status.successor,operation);
+      if (status.current.session_id !== current.sessionId) {
+        const target=status.current;
+        const saveTarget=()=>{
+          if (!persistRecoveryRecord(target.session_id)) return false;
+          nativeExpected.current={sessionId:target.session_id,context:confirmed?.result.run_context ?? status.run_context,
+            scenarioId:target.scenario_id,contentVersion:target.scenario_content_version};
+          return true;
+        };
+        // Without a retained receipt, keep the existing old-record recovery order.
+        if (!confirmed && !saveTarget()) return;
+        const view=await client.getSessionView(target.session_id,operation.controller.signal);
+        const destination=await client.getNativeRunJourney(target.session_id,operation.controller.signal);
+        if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
+        assertContinuationStatus(view,destination);
+        assertNativeView(view,status.run_context);
+        if (!sameAssociation(target,destination.path) || destination.run_state_version!==status.run_state_version ||
+            destination.lifecycle_status!==status.lifecycle_status) throw new Error("当前旅程关联发生变化，请重新读取");
+        if (confirmed) assertConfirmedSuccessor(confirmed,view,destination);
+        // Validate both GETs against retained POST authority before changing recovery.
+        if (confirmed && !saveTarget()) return;
+        commitLoadedSession(target.session_id,view);setContinuationStatus(destination);
+        setPendingContinuationRecovery(null);
+        setContinuationAttempt(null);continuationAttemptRef.current=null;
+      } else {
+        commitLoadedSession(current.sessionId,current.view);
+      }
     } catch(error) {if(isCurrentOperation(operation)) setContinuationError(formatApiClientError(error));}
     finally {finishForegroundOperation(operation);}
   }
 
-  async function navigateHistory(returning=false) {
+  async function navigateHistory(direction: "previous" | "next" | "current" = "previous") {
     const current=loadedSessionRef.current;
-    if (returning && historyLoading) invalidateForegroundOperation();
+    if (direction === "current" && historyLoading) invalidateForegroundOperation();
     if (!current || foregroundOperationRef.current || continuationAttemptRef.current || exitAttemptRef.current) return;
+    const displayed=historicalSession ?? current;
     const operation=beginForegroundOperation("reading",{clearSession:false});
     if (!operation) return;
+    setRunAuthority(null);
     setHistoryLoading(true);
     try {
       const signal=operation.controller.signal;
-      const status=await client.getNativeRunContinuation(current.sessionId,signal);
-      assertContinuationStatus(current.view,status);
-      if (!status.predecessor) throw new Error("缺少上一世界的权威关联");
-      const history=await client.getSessionView(status.predecessor.session_id,signal);
-      const historicalStatus=await client.getNativeRunContinuation(status.predecessor.session_id,signal);
-      const view=returning ? await client.getSessionView(current.sessionId,signal) : current.view;
-      assertHistoricalPair(view,status,history,historicalStatus);
-      if (confirmedContinuation.current?.result.session_id === current.sessionId)
+      const from=await client.getNativeRunJourney(displayed.sessionId,signal);
+      assertContinuationStatus(displayed.view,from);
+      if (confirmedContinuation.current) assertConfirmedCurrent(confirmedContinuation.current,from);
+      const target=direction === "current" ? from.current : direction === "previous" ? from.predecessor : from.successor;
+      if (!target || from.current.session_id!==current.sessionId) throw new Error("缺少完整的历史关联");
+      const view=await client.getSessionView(target.session_id,signal);
+      const status=await client.getNativeRunJourney(target.session_id,signal);
+      assertContinuationStatus(view,status);assertNativeView(view,current.view.run_context);
+      if (!sameAssociation(target,status.path) || !sameAssociation(from.current,status.current) ||
+          from.run_state_version!==status.run_state_version || from.lifecycle_status!==status.lifecycle_status)
+        throw new Error("历史关联发生变化，请重新读取");
+      if (direction!=="current") assertNeighbor(from,status);
+      if (confirmedContinuation.current?.result.session_id===target.session_id)
         assertConfirmedSuccessor(confirmedContinuation.current,view,status);
-      if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
-      if (returning) commitLoadedSession(current.sessionId,view);
-      else setHistoricalSession({sessionId:history.metadata.session_id,view:history,stale:null});
-      setContinuationStatus(status);setContinuationError(null);
+      if (!isCurrentOperation(operation) || loadedSessionRef.current!==current) return;
+      if (target.session_id===current.sessionId) {commitLoadedSession(current.sessionId,view);setContinuationStatus(status);}
+      else {setHistoricalSession({sessionId:target.session_id,view,stale:null});setHistoricalJourney(status);}
+      setContinuationError(null);
     } catch(error) {if(isCurrentOperation(operation)) setContinuationError(formatApiClientError(error));}
-    finally {if (isCurrentOperation(operation)) setHistoryLoading(false);finishForegroundOperation(operation);}
+    finally {if(isCurrentOperation(operation)) setHistoryLoading(false);finishForegroundOperation(operation);}
   }
 
   async function handleRunExit(retry = false) {
     if (historicalSession || continuationAttemptRef.current) return;
     const current = loadedSessionRef.current;
-    if (!current || current.stale || exitClearFailed || foregroundOperationRef.current) return;
+    if (!current || current.stale || exitClearFailed || foregroundOperationRef.current ||
+        !hasRunAuthority(current) || !runStatus?.can_exit || continuationStatus?.current.session_id !== current.sessionId) return;
     let attempt = exitAttemptRef.current;
     if (!retry) {
       if (attempt || !exitConfirm || !runStatus) return;
@@ -2246,7 +2312,15 @@ export default function App({
       const status = await client.exitNativeRun(attempt, operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
       assertRunStatus(current.view, status);
-      setRunStatus(status); setExitAttempt(null); exitAttemptRef.current = null;
+      // A confirmed exit advances the Run. Retain the request until a matching
+      // GET confirms the pair; never synthesize a terminal Journey from status.
+      setRunAuthority(null);
+      const journey=await validateSuccessorRead(current.view,operation.controller.signal);
+      if (!isCurrentOperation(operation) || loadedSessionRef.current !== current || !journey) return;
+      assertJourneyRunStatus(current.view,journey,status);
+      setContinuationStatus(journey); setRunStatus(status);
+      setRunAuthority({owner:current,client,journey,status});
+      setExitAttempt(null); exitAttemptRef.current = null;
     } catch (error) {
       if (isCurrentOperation(operation)) {
         setExitError(formatApiClientError(error));
@@ -2261,7 +2335,7 @@ export default function App({
     if (!current || foregroundOperationRef.current || exitClearFailed) return;
     const operation = beginForegroundOperation("reading", {clearSession:false});
     if (!operation) return;
-    setRunStatus(null);
+    setRunAuthority(null); setRunStatus(null);
     try {
       const view = await client.getSessionView(current.sessionId, operation.controller.signal);
       if (!isCurrentOperation(operation)) return;
@@ -2271,8 +2345,10 @@ export default function App({
       const status = await client.getNativeRunStatus(current.sessionId, operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
       assertRunStatus(view, status);
-      await validateSuccessorRead(view,operation.controller.signal);
+      const journey=await validateSuccessorRead(view,operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
+      if (!journey) return;
+      assertJourneyRunStatus(view,journey,status);
       commitLoadedSession(current.sessionId, view, null);
       setRunStatus(status); setExitError(null);
       if (status.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current = null;}
@@ -2284,7 +2360,7 @@ export default function App({
   function returnToSetup() {
     if (historicalSession || continuationAttemptRef.current) return;
     if (runStatus?.lifecycle_status !== "terminated" || foregroundOperationRef.current || !loadedSessionRef.current) return;
-    assertRunStatus(loadedSessionRef.current.view, runStatus);
+    if (!hasRunAuthority(loadedSessionRef.current)) return;
     const cleared = clearSessionRecoveryRecord();
     if (!cleared.ok) {setExitClearFailed(true); return;}
     invalidateForegroundOperation();
@@ -2692,10 +2768,13 @@ export default function App({
       )}
 
       {loadedSession?.view.run_context ? <section className="panel" aria-label="世界续接与历史">
-        {historyLoading && !historicalSession ? <button type="button" onClick={()=>void navigateHistory(true)}>返回当前世界</button> : null}
+        {historyLoading && !historicalSession ? <button type="button" onClick={()=>void navigateHistory("current")}>返回当前世界</button> : null}
         {historicalSession ? <>
           <p>正在阅读上一世界的历史。</p>
-          <button type="button" disabled={foregroundOperation !== null && !historyLoading} onClick={()=>void navigateHistory(true)}>返回当前世界</button>
+          {historicalJourney?.arrival ? <div aria-label="历史抵达说明"><p>{historicalJourney.arrival.previous_ending_title}</p><p>{historicalJourney.arrival.entry_notice}</p></div> : null}
+          {historicalJourney?.predecessor ? <button type="button" disabled={foregroundOperation !== null} onClick={()=>void navigateHistory()}>查看上一世界历史</button> : null}
+          {historicalJourney?.successor ? <button type="button" disabled={foregroundOperation !== null} onClick={()=>void navigateHistory("next")}>查看下一段旅程</button> : null}
+          <button type="button" disabled={foregroundOperation !== null && !historyLoading} onClick={()=>void navigateHistory("current")}>返回当前世界</button>
         </> : <>
           {continuationStatus?.session_id === loadedSession.sessionId && continuationStatus.arrival ?
             <div aria-label="抵达说明">
@@ -2704,16 +2783,16 @@ export default function App({
             </div> : null}
           {continuationStatus?.predecessor ? <button type="button" disabled={foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null}
             onClick={()=>void navigateHistory()}>查看上一世界历史</button> : null}
-          {continuationStatus?.can_continue ? <button type="button" disabled={foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null}
+          {runAuthorityReady && continuationStatus?.next_transition ? <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null}
             onClick={()=>{setExitConfirm(false);setContinuationConfirm(true);}}>继续当前旅程</button> : null}
           {continuationConfirm ? <div role="dialog" aria-label="确认继续旅程">
-            <p>将进入《未送达的回执》，保留本次旅程、角色与剩余资源。资源不会补满，上一世界将保留为历史。</p>
-            <button type="button" disabled={foregroundOperation !== null} onClick={()=>void handleContinuation()}>确认进入下一世界</button>
+            <p>将进入《{continuationStatus?.next_transition?.world_title}》的{continuationStatus?.next_transition?.region_title}。{continuationStatus?.next_transition?.notice}</p>
+            <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={()=>void handleContinuation()}>{continuationStatus?.next_transition?.kind === "regional_revisit" ? "确认进入核验档案室" : "确认进入下一世界"}</button>
             <button type="button" onClick={()=>setContinuationConfirm(false)}>取消继续</button>
           </div> : null}
           {continuationAttempt ? <>
             <p>续接请求尚未确认。可以读取续接状态，或重试原请求。</p>
-            <button type="button" disabled={foregroundOperation !== null} onClick={()=>void handleContinuation(true)}>重试原续接请求</button>
+            <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={()=>void handleContinuation(true)}>重试原续接请求</button>
           </> : null}
           {continuationAttempt || continuationStatus?.successor || continuationError ?
             <button type="button" disabled={foregroundOperation !== null} onClick={()=>void reconcileContinuation()}>读取续接状态</button> : null}
@@ -2723,23 +2802,23 @@ export default function App({
 
       {!historicalSession && loadedSession?.view.run_context && loadedSession.view.scenario_status === "ENDED" ? (
         <section className="panel" aria-label="旅程状态">
-          {runStatus?.lifecycle_status === "terminated" ? <>
+          {runAuthorityReady && runStatus?.lifecycle_status === "terminated" ? <>
             <p>本次旅程已永久结束。结局与历史仍可阅读。</p>
             {exitClearFailed ? <p role="alert">恢复记录清除失败；请重试。清除成功前不能进入新旅程。</p> : null}
             <button type="button" disabled={foregroundOperation !== null} onClick={returnToSetup}>
               {exitClearFailed ? "重试清除并返回设置" : "返回设置"}
             </button>
           </> : <>
-            <button type="button" disabled={!runStatus?.can_exit || exitAttempt !== null || continuationAttempt !== null || foregroundOperation !== null || loadedSession.stale !== null}
+            <button type="button" disabled={!runAuthorityReady || !runStatus?.can_exit || exitAttempt !== null || continuationAttempt !== null || foregroundOperation !== null || loadedSession.stale !== null}
               onClick={() => {setContinuationConfirm(false);setExitConfirm(true);}}>结束本次旅程</button>
             {exitConfirm ? <div role="dialog" aria-label="确认结束旅程">
               <p>本次旅程将永久结束，结局与历史保留。再次进入会创建新的旅程，不是继续当前旅程。</p>
-              <button type="button" onClick={() => void handleRunExit()}>确认永久结束</button>
+              <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={() => void handleRunExit()}>确认永久结束</button>
               <button type="button" onClick={() => setExitConfirm(false)}>取消结束</button>
             </div> : null}
             {exitAttempt ? <>
               <p>结束请求尚未确认。可读取旅程状态，或手动重试原请求。</p>
-              <button type="button" disabled={foregroundOperation !== null} onClick={() => void handleRunExit(true)}>重试原结束请求</button>
+              <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={() => void handleRunExit(true)}>重试原结束请求</button>
             </> : null}
           </>}
           {exitError ? <p role="alert">{exitError}</p> : null}
@@ -2764,9 +2843,10 @@ export default function App({
           disabled={
             foregroundOperation !== null || loadedSession.stale !== null ||
             continuationAttempt !== null || exitAttempt !== null ||
-            (loadedSession.view.narrative_frame.scenario_id === "undelivered_receipt" &&
+            (Boolean(loadedSession.view.run_context) &&
               (continuationError !== null || continuationStatus?.session_id !== loadedSession.sessionId ||
-               continuationStatus.session_state_version !== loadedSession.view.metadata.state_version))
+               continuationStatus.path.session_state_version !== loadedSession.view.metadata.state_version ||
+               continuationStatus.current.session_id !== loadedSession.sessionId || continuationStatus.lifecycle_status !== "active"))
           }
           disabledReason={actionDisabledReason}
           onSubmit={(intent) => void handleAction(intent)}

@@ -123,6 +123,7 @@ EXPECTED_DATACLASS_FIELDS = {
         "run_world_states",
         "run_world_visits",
         "run_world_positions",
+        "run_world_visit_entries",
         "run_participations",
         "run_creation_receipts",
         "run_mutation_receipts",
@@ -990,7 +991,7 @@ def _complete_raw_private_representation(runtime: Any) -> dict[str, Any]:
         )
 
     if (snapshot.run_protocol_bindings or snapshot.run_entry_world_bindings
-            or snapshot.run_world_states or snapshot.run_world_visits or snapshot.run_world_positions):
+            or snapshot.run_world_states or snapshot.run_world_visits or snapshot.run_world_positions or snapshot.run_world_visit_entries):
         raise RuntimeError("legacy replay unexpectedly contains native bindings")
     representation = {
         "run_protocol_bindings": [],

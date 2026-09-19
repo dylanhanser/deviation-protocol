@@ -19,7 +19,7 @@ export const nativeRunStatusSchema = z.object({
   lifecycle_status: z.enum(["active", "terminated"]),
   can_exit: z.boolean(),
 }).strict().refine((s) => s.lifecycle_status === "active"
-  ? [3, 4].includes(s.run_state_version) : [4, 5].includes(s.run_state_version) && !s.can_exit);
+  ? [3, 4, 5].includes(s.run_state_version) : [4, 5, 6].includes(s.run_state_version) && !s.can_exit);
 export type NativeRunStatus = z.infer<typeof nativeRunStatusSchema>;
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
@@ -1282,3 +1282,66 @@ export const nativeRunContinuationStatusSchema = z.object({schema_version:z.lite
   });
 export type NativeRunContinuationStatus = z.infer<typeof nativeRunContinuationStatusSchema>;
 export type NativeRunContinuationResult = z.infer<typeof nativeRunContinuationResultSchema>;
+
+export const nativeJourneyVisitSchema = z.strictObject({visit_id:safeId128Schema,
+  visit_ordinal:z.union([z.literal(1),z.literal(2),z.literal(3)]),world_id:safeId128Schema,
+  world_version:z.literal(1),region_id:safeId128Schema,region_version:z.literal(1)}).refine(v =>
+    v.world_id === (v.visit_ordinal === 1 ? "world.death_certificate" : "world.undelivered_receipt") &&
+    v.region_id === ["region.death_certificate.facility","region.undelivered_receipt.dispatch_hall",
+      "region.undelivered_receipt.verification_archive"][v.visit_ordinal-1]);
+export const nativeJourneyAssociationSchema = z.strictObject({session_id:safeId64Schema,
+  session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:safeId128Schema,
+  scenario_content_version:z.string().min(1).max(32).regex(safeIdPattern),visit:nativeJourneyVisitSchema.nullable()}).refine(a => {
+    const ordinal=a.visit?.visit_ordinal ?? 1;
+    return a.scenario_id === ["death_certificate","undelivered_receipt","receipt_archive"][ordinal-1] &&
+      a.scenario_content_version === ["death-certificate-1.1.0","undelivered-receipt-1.0.0","receipt-archive-1.0.0"][ordinal-1];
+  });
+export const ARCHIVE_NOTICE = "会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。";
+const journeyArrivalSchema = z.strictObject({previous_ending_status:z.enum(["RESOLVED","FAILED"]),
+  previous_ending_title:codePointBoundedStringSchema(1,120,"ending title"),entry_notice:codePointBoundedStringSchema(1,300,"entry notice")});
+export const nativeRunJourneySchema = z.strictObject({schema_version:z.literal("native-run-journey/v1"),
+  session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5),z.literal(6)]),
+  lifecycle_status:z.enum(["active","terminated"]),run_context:publicNativeRunContextSchema,
+  path:nativeJourneyAssociationSchema,current:nativeJourneyAssociationSchema,
+  predecessor:nativeJourneyAssociationSchema.nullable(),successor:nativeJourneyAssociationSchema.nullable(),
+  next_transition:z.strictObject({kind:z.enum(["first_continuation","regional_revisit"]),
+    world_title:codePointBoundedStringSchema(1,120,"world title"),region_title:codePointBoundedStringSchema(1,120,"region title"),
+    notice:codePointBoundedStringSchema(1,300,"notice")}).nullable(),arrival:journeyArrivalSchema.nullable()
+}).refine(j => {
+  const ordinal=j.path.visit?.visit_ordinal ?? 1, last=j.current.visit?.visit_ordinal ?? 1;
+  if (j.session_id !== j.path.session_id || j.run_id !== j.run_context.run_id || ordinal>last ||
+      j.run_state_version !== last+2+(j.lifecycle_status === "terminated" ? 1 : 0)) return false;
+  const rows=[j.path,j.current,j.predecessor,j.successor].filter(a=>a!==null);
+  if (rows.some(a=>(a.visit===null)!==(last===1))) return false;
+  if ((j.predecessor===null)!==(ordinal===1) || (j.successor===null)!==(ordinal===last)) return false;
+  if (j.predecessor && j.predecessor.visit?.visit_ordinal !== ordinal-1) return false;
+  if (j.successor && j.successor.visit?.visit_ordinal !== ordinal+1) return false;
+  for (let i=0;i<rows.length;i++) for (let k=i+1;k<rows.length;k++) {
+    const a=rows[i]!, b=rows[k]!;
+    if ((a.visit?.visit_ordinal ?? 1)===(b.visit?.visit_ordinal ?? 1)) {
+      if (JSON.stringify(a)!==JSON.stringify(b)) return false;
+    } else if (a.session_id===b.session_id || a.visit?.visit_id===b.visit?.visit_id) return false;
+  }
+  const offer=j.next_transition;
+  if (offer && (j.lifecycle_status!=="active" || ordinal!==last || last===3 ||
+      offer.kind!==(last===1 ? "first_continuation" : "regional_revisit") ||
+      offer.world_title!=="未送达的回执" || offer.region_title!==(last===1 ? "发运大厅" : "核验档案室") ||
+      (last===2 && offer.notice!==ARCHIVE_NOTICE))) return false;
+  const a=j.arrival;
+  if (ordinal===1) return a===null;
+  if (!a) return false;
+  if (ordinal===3) return a.previous_ending_status==="RESOLVED" && a.previous_ending_title==="回执待核，发运暂缓" && a.entry_notice===ARCHIVE_NOTICE;
+  return a.previous_ending_status==="RESOLVED" ? ["规程已中断","记录已被质疑"].includes(a.previous_ending_title) &&
+    a.entry_notice==="上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。" :
+    a.previous_ending_title==="记录成为现实" && a.entry_notice==="上一世界以失败结果结束。你带着原有状态抵达发运大厅，当前队列已经消耗四格期限。";
+});
+export const nativeRunRevisitResultSchema = z.strictObject({schema_version:z.literal("native-run-revisit-result/v1"),
+  source_session_id:safeId64Schema,source_session_state_version:nonNegativeIntegerSchema.safe(),run_id:safeId128Schema,
+  resulting_run_state_version:z.literal(5),session_id:safeId64Schema,initial_session_state_version:z.literal(0),
+  scenario_id:z.literal("receipt_archive"),scenario_content_version:z.literal("receipt-archive-1.0.0"),
+  run_context:publicNativeRunContextSchema,visit:nativeJourneyVisitSchema}).refine(r=>r.visit.visit_ordinal===3 &&
+    r.source_session_id!==r.session_id && r.run_id===r.run_context.run_id);
+export type NativeRunJourney = z.infer<typeof nativeRunJourneySchema>;
+export type NativeJourneyAssociation = z.infer<typeof nativeJourneyAssociationSchema>;
+export type NativeRunRevisitResult = z.infer<typeof nativeRunRevisitResultSchema>;
+export type NativeTransitionResult = NativeRunRevisitResult | NativeRunContinuationResult;

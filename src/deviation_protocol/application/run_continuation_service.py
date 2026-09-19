@@ -17,6 +17,7 @@ from deviation_protocol.domain.run import RunMutationKind, revalidate_run_model
 from deviation_protocol.domain.run_protocol_binding import (
     NativeRunAdmissionV1, NativeRunTerminatedV1, NativeRunContinuedV1,
     NativeRunContinuedTerminatedV1, continue_native_run,
+    NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1,
 )
 from deviation_protocol.domain.world_continuation import (
     NativeRunContinuationRequestV1, NativeRunContinuationEvidenceV1,
@@ -39,12 +40,16 @@ class RunContinuationCommand(RunExitCommand):
 def original_admission(family):
     if type(family) is NativeRunAdmissionV1:
         return family
-    if type(family) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1):
+    if type(family) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1):
         return family.admission
     raise ValueError("complete native family required")
 
 
 def _continued(family):
+    if type(family) is NativeRunRegionalRevisitTerminatedV1:
+        return family.revisited.continued
+    if type(family) is NativeRunRegionalRevisitV1:
+        return family.continued
     return family.continued if type(family) is NativeRunContinuedTerminatedV1 else family
 
 
@@ -89,6 +94,8 @@ class RunContinuationService:
             and bool(self.content_registry.continuation_pool()))
 
     def _status(self, family, character, persisted, state):
+        if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1):
+            raise RunContinuationError("RUN_CONTINUATION_NOT_AVAILABLE")
         run = family.canonical_run
         ordinal = next(i for i,p in enumerate(run.trusted_participation_references,1) if p.session_id == persisted.session.session_id)
         continued = type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
@@ -165,7 +172,7 @@ class RunContinuationService:
                 if receipt is not None:
                     if receipt.fingerprint.value != request.fingerprint():
                         raise RunContinuationError("IDEMPOTENCY_CONFLICT")
-                    if (type(family) not in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
+                    if (type(family) not in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1)
                             or _continued(family).continuation_evidence.request != request):
                         raise SnapshotInvalidError(session_id)
                     return continuation_result(family)

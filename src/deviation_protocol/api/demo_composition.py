@@ -677,9 +677,26 @@ def build_demo_runtime(
         scenario_event_issuer=DeterministicDemoScenarioEventIssuer(),clock=runtime_generators.clock,
         event_id_generator=runtime_generators.event_id,job_id_generator=runtime_generators.job_id,
         lease_token_generator=runtime_generators.lease_token,worker_id_generator=runtime_generators.worker_id)
+    archive_path = Path(__file__).parents[3] / "config" / "scenarios" / "receipt_archive_v1.json"
+    archive_pack = JsonScenarioCatalogLoader(archive_path).load()
+    archive_catalog = archive_pack.content_catalog
+    archive_coordinator = NativeTurnMechanicsCoordinator(archive_catalog,archive_pack)
+    archive_service = SessionService(uow_factory=runtime_store.unit_of_work,
+        catalog=archive_catalog,scenario_catalog=archive_pack,
+        native_view_coordinator=archive_coordinator,native_controller_resolver=controller_binding_resolver,
+        clock=runtime_generators.clock,session_id_generator=runtime_generators.session_id,
+        seed_generator=runtime_generators.seed,event_id_generator=runtime_generators.event_id)
+    archive_orchestrator = build_native_demo_orchestrator(store=runtime_store,provider=provider_delegate,
+        resolver=DeterministicRuleResolver(),uow_factory=runtime_store.unit_of_work,
+        catalog=archive_catalog,scenario_catalog=archive_pack,native_coordinator=archive_coordinator,
+        provider_name="deterministic-demo",model_name="deterministic-demo-v1",
+        scenario_event_issuer=DeterministicDemoScenarioEventIssuer(),clock=runtime_generators.clock,
+        event_id_generator=runtime_generators.event_id,job_id_generator=runtime_generators.job_id,
+        lease_token_generator=runtime_generators.lease_token,worker_id_generator=runtime_generators.worker_id)
     registry = SessionContentRegistry((
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=dispatcher),
-        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator)))
+        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),
+        SessionContentBundle.from_bytes(archive_path.read_bytes(),session_service=archive_service,turn_orchestrator=archive_orchestrator)))
     runtime_store._content_registry = registry
     admission = NativeRunAdmissionService(uow_factory=runtime_store.native_admission_unit_of_work,
         run_id_issuer=run_service.run_id_issuer, continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,

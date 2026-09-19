@@ -22,7 +22,7 @@ import {
   runEntryResponseFixture,
   scenarioCatalogFixture,
   runOptionsFixture,
-  nativeEntryFixture,
+  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
@@ -32,20 +32,25 @@ const testClient = new PublicApiClient({ baseUrl: `${apiOrigin}/` });
 describe("S7-1 explicit exit and return to setup", () => {
   function setup() {
     const client = new PublicApiClient({baseUrl:`${apiOrigin}/`});
-    const view = {...endedViewFixture("FAILED"), run_context:nativeEntryFixture().run_context};
+    const view = nativeViewFixture(endedViewFixture("FAILED"));
     writeSessionRecoveryRecord(view.metadata.session_id);
     vi.spyOn(client,"listScenarios").mockResolvedValue(scenarioCatalogFixture);
     vi.spyOn(client,"listEligiblePlayerCharacters").mockResolvedValue(eligiblePlayerCharactersFixture);
     vi.spyOn(client,"listRunEntryOptions").mockResolvedValue(runOptionsFixture);
     vi.spyOn(client,"getSessionView").mockResolvedValue(view);
+    const journey = vi.spyOn(client,"getNativeRunJourney").mockResolvedValue(nativeJourneyFixture(view));
     const active = {schema_version:"native-run-status/v1" as const, session_id:view.metadata.session_id,
-      run_id:view.run_context.run_id, session_state_version:view.metadata.state_version,
+      run_id:view.run_context!.run_id, session_state_version:view.metadata.state_version,
       run_state_version:3, lifecycle_status:"active" as const, can_exit:true};
     const terminal = {...active,run_state_version:4,lifecycle_status:"terminated" as const,can_exit:false};
     const status = vi.spyOn(client,"getNativeRunStatus").mockResolvedValue(active);
-    const exit = vi.spyOn(client,"exitNativeRun").mockResolvedValue(terminal);
+    const exit = vi.spyOn(client,"exitNativeRun").mockImplementation(async () => {
+      status.mockResolvedValue(terminal);
+      journey.mockResolvedValue({...nativeJourneyFixture(view),run_state_version:4,lifecycle_status:"terminated"});
+      return terminal;
+    });
     const entry = vi.spyOn(client,"enterNativeRun");
-    return {client,view,active,terminal,status,exit,entry};
+    return {client,view,active,terminal,status,journey,exit,entry};
   }
 
   it("confirms once, preserves history/storage, and requires explicit reselection after return", async () => {
@@ -68,7 +73,11 @@ describe("S7-1 explicit exit and return to setup", () => {
 
   it("reconciles a lost committed response using GET only", async () => {
     const c = setup();
-    c.exit.mockImplementation(async () => {c.status.mockResolvedValue(c.terminal); throw new ApiClientError("lost",{kind:"network"});});
+    c.exit.mockImplementation(async () => {
+      c.status.mockResolvedValue(c.terminal);
+      c.journey.mockResolvedValue({...nativeJourneyFixture(c.view),run_state_version:4,lifecycle_status:"terminated"});
+      throw new ApiClientError("lost",{kind:"network"});
+    });
     render(<App client={c.client} idempotencyKeyFactory={() => "exit.once"}/>);
     await waitFor(() => expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
     fireEvent.click(screen.getByRole("button",{name:"结束本次旅程"}));
@@ -102,6 +111,7 @@ describe("S7-1 explicit exit and return to setup", () => {
 
   it("reloads a terminal journey using only GET without preserving exit intent in storage", async () => {
     const c = setup(); c.status.mockResolvedValue(c.terminal);
+    c.journey.mockResolvedValue({...nativeJourneyFixture(c.view),run_state_version:4,lifecycle_status:"terminated"});
     render(<App client={c.client}/>);
     await screen.findByRole("button",{name:"返回设置"});
     expect(c.exit).not.toHaveBeenCalled(); expect(c.entry).not.toHaveBeenCalled();
@@ -151,6 +161,7 @@ describe("S7-1 explicit exit and return to setup", () => {
 
   it("reassesses DF-002: separate GET retries restore return-to-setup discovery without admission", async () => {
     const c = setup(); c.status.mockResolvedValue(c.terminal);
+    c.journey.mockResolvedValue({...nativeJourneyFixture(c.view),run_state_version:4,lifecycle_status:"terminated"});
     vi.mocked(c.client.listRunEntryOptions).mockResolvedValueOnce(runOptionsFixture).mockRejectedValueOnce(new ApiClientError("options unavailable",{kind:"network"})).mockResolvedValue(runOptionsFixture);
     vi.mocked(c.client.listEligiblePlayerCharacters).mockResolvedValueOnce(eligiblePlayerCharactersFixture).mockRejectedValueOnce(new ApiClientError("characters unavailable",{kind:"network"})).mockResolvedValue(eligiblePlayerCharactersFixture);
     render(<App client={c.client}/>);
@@ -179,7 +190,8 @@ describe("S6 correction: late eligible characters", () => {
     vi.spyOn(client, "listScenarios").mockResolvedValue(scenarioCatalogFixture);
     vi.spyOn(client, "listRunEntryOptions").mockResolvedValue(runOptionsFixture);
     vi.spyOn(client, "enterNativeRun").mockResolvedValue(nativeEntryFixture());
-    vi.spyOn(client, "getSessionView").mockResolvedValue({...activeViewFixture, run_context: nativeEntryFixture().run_context});
+    vi.spyOn(client, "getNativeRunJourney").mockResolvedValue(nativeJourneyFixture());
+    vi.spyOn(client, "getSessionView").mockResolvedValue(nativeViewFixture(activeViewFixture));
     return client;
   }
 

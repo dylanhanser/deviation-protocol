@@ -24,7 +24,7 @@ class NativeRunStatusResponse(BaseModel):
 
     @model_validator(mode="after")
     def _state(self):
-        if (self.run_state_version not in ((3,4) if self.lifecycle_status == "active" else (4,5))
+        if (self.run_state_version not in ((3,4,5) if self.lifecycle_status == "active" else (4,5,6))
                 or self.lifecycle_status == "terminated" and self.can_exit):
             raise ValueError("invalid native lifecycle projection")
         return self
@@ -432,6 +432,146 @@ class NativeRunContinuationStatusResponse(BaseModel):
                 or self.successor.session_id != self.current_session_id or self.successor.run_id != self.run_id
                 or self.successor.source_session_state_version != self.session_state_version):
             raise ValueError("incomplete predecessor association")
+        return self
+
+
+class NativeRunRevisitRequest(NativeRunExitRequest):
+    pass
+
+
+class NativeJourneyVisitResponse(NativeWorldVisitResponse):
+    visit_ordinal: int = Field(ge=1, le=3)
+
+    @model_validator(mode="after")
+    def _identity(self):
+        pairs = {1: ("world.death_certificate", "region.death_certificate.facility"),
+                 2: ("world.undelivered_receipt", "region.undelivered_receipt.dispatch_hall"),
+                 3: ("world.undelivered_receipt", "region.undelivered_receipt.verification_archive")}
+        if ((self.world_id, self.region_id) != pairs[self.visit_ordinal]
+                or self.world_version != 1 or self.region_version != 1):
+            raise ValueError("invalid journey visit identity")
+        return self
+
+
+class NativeVisitAssociationResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    session_id: SafeId64
+    session_state_version: int = Field(ge=0, le=2**63 - 1)
+    scenario_id: SafeId128
+    scenario_content_version: str = Field(min_length=1, max_length=32, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
+    visit: NativeJourneyVisitResponse | None
+
+    @model_validator(mode="after")
+    def _catalogue(self):
+        ordinal = 1 if self.visit is None else self.visit.visit_ordinal
+        expected = {1: ("death_certificate", "death-certificate-1.1.0"),
+                    2: ("undelivered_receipt", "undelivered-receipt-1.0.0"),
+                    3: ("receipt_archive", "receipt-archive-1.0.0")}
+        if (self.scenario_id, self.scenario_content_version) != expected[ordinal]:
+            raise ValueError("visit content mismatch")
+        return self
+
+
+class NativeJourneyArrivalResponse(NativeWorldArrivalResponse):
+    @model_validator(mode="after")
+    def _authored(self):
+        from deviation_protocol.domain.world_revisit import ARCHIVE_NOTICE
+        if (self.previous_ending_status, self.previous_ending_title, self.entry_notice) == (
+                "RESOLVED", "回执待核，发运暂缓", ARCHIVE_NOTICE):
+            return self
+        return super()._authored()
+
+
+class NativeNextTransitionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    kind: Literal["first_continuation", "regional_revisit"]
+    world_title: str = Field(min_length=1, max_length=120)
+    region_title: str = Field(min_length=1, max_length=120)
+    notice: str = Field(min_length=1, max_length=300)
+
+    @model_validator(mode="after")
+    def _authored(self):
+        from deviation_protocol.domain.world_revisit import ARCHIVE_NOTICE
+        expected = ("核验档案室", ARCHIVE_NOTICE) if self.kind == "regional_revisit" else (
+            "发运大厅", "沿用当前角色和剩余资源进入发运大厅；原有资源不会恢复。")
+        if self.world_title != "未送达的回执" or (self.region_title, self.notice) != expected:
+            raise ValueError("invalid authored transition")
+        return self
+
+
+class NativeRunJourneyResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    schema_version: Literal["native-run-journey/v1"]
+    session_id: SafeId64
+    run_id: SafeId128
+    run_state_version: int = Field(ge=3, le=6)
+    lifecycle_status: Literal["active", "terminated"]
+    run_context: PublicNativeRunContext
+    path: NativeVisitAssociationResponse
+    current: NativeVisitAssociationResponse
+    predecessor: NativeVisitAssociationResponse | None
+    successor: NativeVisitAssociationResponse | None
+    next_transition: NativeNextTransitionResponse | None
+    arrival: NativeJourneyArrivalResponse | None
+
+    @model_validator(mode="after")
+    def _chain(self):
+        if self.session_id != self.path.session_id or self.run_id != self.run_context.run_id:
+            raise ValueError("crossed journey identity")
+        if self.current.visit is None:
+            if (self.path != self.current or self.predecessor is not None or self.successor is not None
+                    or self.arrival is not None):
+                raise ValueError("invalid unmaterialized journey")
+            count, ordinal = 1, 1
+        else:
+            if self.path.visit is None:
+                raise ValueError("missing materialized path")
+            count, ordinal = self.current.visit.visit_ordinal, self.path.visit.visit_ordinal
+            if count not in (2, 3) or ordinal > count:
+                raise ValueError("invalid current position")
+            for neighbor, expected in ((self.predecessor, ordinal - 1), (self.successor, ordinal + 1)):
+                if 1 <= expected <= count:
+                    if (neighbor is None or neighbor.visit is None or neighbor.visit.visit_ordinal != expected
+                            or neighbor.session_id == self.session_id):
+                        raise ValueError("missing or crossed journey neighbor")
+                elif neighbor is not None:
+                    raise ValueError("extra journey neighbor")
+            if (ordinal == count) != (self.path == self.current):
+                raise ValueError("journey current path mismatch")
+            associations = [row for row in (self.path, self.current, self.predecessor, self.successor) if row is not None]
+            for index, left in enumerate(associations):
+                for right in associations[index + 1:]:
+                    if left.visit.visit_ordinal == right.visit.visit_ordinal:
+                        if left != right:
+                            raise ValueError("contradictory repeated journey association")
+                    elif left.session_id == right.session_id or left.visit.visit_id == right.visit.visit_id:
+                        raise ValueError("duplicate journey identity")
+            if (self.arrival is None) != (ordinal == 1):
+                raise ValueError("journey arrival mismatch")
+            if ordinal == 3 and self.arrival.previous_ending_title != "回执待核，发运暂缓":
+                raise ValueError("regional arrival mismatch")
+            if ordinal == 2 and self.arrival.previous_ending_title == "回执待核，发运暂缓":
+                raise ValueError("continued arrival mismatch")
+        if self.run_state_version != count + 2 + (self.lifecycle_status == "terminated"):
+            raise ValueError("journey lifecycle mismatch")
+        if self.next_transition is not None:
+            if (self.path != self.current or self.lifecycle_status != "active" or count == 3
+                    or self.next_transition.kind != ("first_continuation" if count == 1 else "regional_revisit")):
+                raise ValueError("unavailable journey transition")
+        return self
+
+
+class NativeRunRevisitResultResponse(NativeRunContinuationResultResponse):
+    schema_version: Literal["native-run-revisit-result/v1"]
+    resulting_run_state_version: int = Field(ge=5, le=5)
+    scenario_id: Literal["receipt_archive"]
+    scenario_content_version: Literal["receipt-archive-1.0.0"]
+    visit: NativeJourneyVisitResponse
+
+    @model_validator(mode="after")
+    def _second(self):
+        if self.visit.visit_ordinal != 3 or self.source_session_id == self.session_id or self.run_id != self.run_context.run_id:
+            raise ValueError("invalid regional edge")
         return self
 
 

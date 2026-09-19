@@ -422,5 +422,175 @@ class NativeRunContinuedTerminatedV1(BaseModel):
         return self
 
 
+from deviation_protocol.domain.world_revisit import (
+    NativeRunRegionalRevisitEvidenceV1, RegionalEntryV1, WorldVisitV2,
+    WorldPositionV2, ARCHIVE_ENDINGS, _decode_object,
+)
+
+
+def revisit_native_region(continued: NativeRunContinuedV1,
+                         evidence: NativeRunRegionalRevisitEvidenceV1) -> CanonicalRun:
+    revalidate_run_model(continued, NativeRunContinuedV1)
+    revalidate_run_model(evidence, NativeRunRegionalRevisitEvidenceV1)
+    run, request = continued.canonical_run, evidence.request
+    occurred_at = datetime.fromisoformat(evidence.occurred_at.replace("Z", "+00:00"))
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.source_session_id != run.trusted_participation_references[1].session_id
+            or occurred_at < run.current_mutation_provenance.occurred_at
+            or evidence.selection_inputs.resolution_fingerprint != continued.admission.protocol_binding.resolved_protocol.fingerprint.value):
+        raise ValueError("regional transition does not bind continued prefix")
+    for selected, visit in zip(evidence.selection_inputs.visits, continued.visits):
+        if ((selected.visit_id, selected.visit_ordinal, selected.session_id,
+             selected.world.world_id, selected.world.world_version,
+             selected.region.region_id, selected.region.region_version)
+                != (visit.visit_id, visit.visit_ordinal, visit.session_id, visit.world_id,
+                    visit.world_version, visit.region_id, visit.region_version)):
+            raise ValueError("regional selection changed prior visit")
+    participation = RunSessionParticipationReference(session_id=evidence.destination_session_id,
+        run_id=run.run_id, continuous_story_line_id=run.continuous_story_line_id,
+        joined_state_version=RunStateVersion(value=5), operation_id=request.operation_id(),
+        source_reference=RunAuthoritySourceRef(value=request.source_reference))
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=5),
+        mutation_kind=RunMutationKind.REVISIT_NATIVE_REGION, operation_id=request.operation_id(),
+        source_reference=participation.source_reference, occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=5),
+        "current_mutation_provenance": provenance,
+        "trusted_participation_references": (*run.trusted_participation_references, participation)})
+
+
+class NativeRunRegionalRevisitV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+    continued: NativeRunContinuedV1
+    canonical_run: CanonicalRun
+    revisit_evidence: NativeRunRegionalRevisitEvidenceV1
+    entry: RegionalEntryV1
+    visit: WorldVisitV2
+    position: WorldPositionV2
+
+    @property
+    def admission(self):
+        return self.continued.admission
+
+    @model_validator(mode="after")
+    def _association(self):
+        for obj in (self.continued, self.canonical_run, self.revisit_evidence,
+                    self.entry, self.visit, self.position):
+            revalidate_run_model(obj, type(obj))
+        evidence, entry, visit, position = self.revisit_evidence, self.entry, self.visit, self.position
+        expected = revisit_native_region(self.continued, evidence)
+        request = evidence.request
+        time = expected.current_mutation_provenance.occurred_at
+        if (self.canonical_run != expected or entry.digest() != evidence.destination_entry_sha256
+                or entry.base_snapshot_sha256 != evidence.world_base_snapshot_sha256
+                or entry.base_session_state_version != evidence.source_ending.session_state_version
+                or entry.base_session_id != request.source_session_id
+                or entry.base_visit_id != evidence.source_visit_id
+                or entry.content_sha256 != evidence.selection_inputs.eligible_pool[0].content_sha256
+                or visit.operation_id != request.operation_id().value
+                or visit.source_reference != request.source_reference
+                or visit.entered_at != time or visit.created_at != time
+                or position.created_at != self.continued.position.created_at):
+            raise ValueError("invalid regional family association")
+        for obj in (entry, visit, position):
+            if (obj.run_id != expected.run_id.value
+                    or obj.continuous_story_line_id != expected.continuous_story_line_id.value
+                    or obj.visit_id != evidence.destination_visit_id
+                    or obj.session_id != evidence.destination_session_id):
+                raise ValueError("crossed regional family member")
+        return self
+
+
+class RevisitedNativeRunExitRequestV1(NativeRunExitRequestV1):
+    schema_version: Literal["run.terminate-revisited-native-request/v1"] = Field(alias="schema")
+
+    def operation_id(self) -> RunOperationId:
+        revalidate_run_model(self, RevisitedNativeRunExitRequestV1)
+        return RunOperationId(value=hashlib.sha256(canonical_run_operation_bytes({
+            "schema": "run.terminate-revisited-native-operation/v1",
+            "controller_binding": self.controller_binding,
+            "public_operation_key": self.public_operation_key, "run_id": self.run_id})).hexdigest())
+
+    def fingerprint(self) -> str:
+        revalidate_run_model(self, RevisitedNativeRunExitRequestV1)
+        return hashlib.sha256(canonical_run_operation_bytes(self)).hexdigest()
+
+
+class RevisitedNativeRunExitEvidenceV1(_NativeExitModel):
+    schema_version: Literal["run.terminate-revisited-native-evidence/v1"] = Field(alias="schema")
+    request: RevisitedNativeRunExitRequestV1
+    scenario_id: Literal["receipt_archive"]
+    scenario_content_version: Literal["receipt-archive-1.0.0"]
+    ending_id: _ExitId
+    ending_status: Literal["RESOLVED", "FAILED"]
+    session_state_version: int = Field(strict=True, ge=0, le=2**63 - 1)
+    snapshot_sha256: str = Field(strict=True, pattern=r"^[0-9a-f]{64}$")
+
+    @model_validator(mode="after")
+    def _association(self):
+        if (self.request.expected_run_state_version != 5
+                or self.session_state_version != self.request.expected_session_state_version
+                or (self.ending_id, self.ending_status) not in ARCHIVE_ENDINGS
+                or len(canonical_run_operation_bytes(self)) > 4096):
+            raise ValueError("invalid regional exit evidence")
+        return self
+
+
+def decode_revisited_native_run_exit_evidence(payload: bytes) -> RevisitedNativeRunExitEvidenceV1:
+    value = RevisitedNativeRunExitEvidenceV1.model_validate(_decode_object(payload, 4096), strict=True)
+    if canonical_run_operation_bytes(value) != payload:
+        raise ValueError("noncanonical regional exit evidence")
+    return value
+
+
+def terminate_revisited_native_run(revisited: NativeRunRegionalRevisitV1,
+        request: RevisitedNativeRunExitRequestV1, *, occurred_at: datetime) -> CanonicalRun:
+    revalidate_run_model(revisited, NativeRunRegionalRevisitV1)
+    revalidate_run_model(request, RevisitedNativeRunExitRequestV1)
+    run = revisited.canonical_run
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.session_id != run.trusted_participation_references[2].session_id
+            or request.expected_run_state_version != 5
+            or occurred_at < run.current_mutation_provenance.occurred_at):
+        raise ValueError("regional exit does not bind current visit")
+    binding = ReservedPlayerCharacterBinding(**{**run.player_character_binding.__dict__,
+        "binding_state": "historical", "inactivated_at": occurred_at})
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=6),
+        mutation_kind=RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,
+        operation_id=request.operation_id(), source_reference=RunAuthoritySourceRef(value=request.source_reference),
+        occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=6),
+        "lifecycle_status": RunLifecycleStatus.TERMINATED, "player_character_binding": binding,
+        "current_mutation_provenance": provenance})
+
+
+class NativeRunRegionalRevisitTerminatedV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+    revisited: NativeRunRegionalRevisitV1
+    canonical_run: CanonicalRun
+    exit_evidence: RevisitedNativeRunExitEvidenceV1
+
+    @property
+    def admission(self):
+        return self.revisited.admission
+
+    @model_validator(mode="after")
+    def _association(self):
+        revalidate_run_model(self.revisited, NativeRunRegionalRevisitV1)
+        revalidate_run_model(self.exit_evidence, RevisitedNativeRunExitEvidenceV1)
+        validate_canonical_run(self.canonical_run)
+        if self.canonical_run != terminate_revisited_native_run(self.revisited,
+                self.exit_evidence.request,
+                occurred_at=self.canonical_run.current_mutation_provenance.occurred_at):
+            raise ValueError("invalid regional terminal family")
+        return self
+
+
 _ClassifiedRun = (LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1
-                 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1)
+                 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1
+                 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1)

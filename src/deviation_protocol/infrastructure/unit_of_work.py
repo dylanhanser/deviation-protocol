@@ -34,6 +34,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
         self._session.info["session_content_registry"] = self._content_registry
         from deviation_protocol.infrastructure.repositories import SqlAlchemyRunWorldContinuationRepository
         self.run_world_continuations = SqlAlchemyRunWorldContinuationRepository(self._session)
+        from deviation_protocol.infrastructure.repositories import SqlAlchemyRunWorldRevisitRepository
+        self.run_world_revisits = SqlAlchemyRunWorldRevisitRepository(self._session)
         self.sessions = SqlAlchemyGameSessionRepository(self._session)
         self.turn_requests = SqlAlchemyTurnRequestRepository(self._session)
         self.narrative_jobs = SqlAlchemyNarrativeJobRepository(self._session)

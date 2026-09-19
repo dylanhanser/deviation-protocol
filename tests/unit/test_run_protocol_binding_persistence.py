@@ -247,7 +247,7 @@ async def test_s3_v01_a(monkeypatch):
         orm.RunCurrentRow, orm.RunRevisionRow, orm.RunSessionParticipationRow,
         orm.RunCreationReceiptRow, orm.RunMutationReceiptRow, orm.PlayerCharacterRevisionRow,
         orm.RunProtocolBindingRow, orm.RunEntryWorldBindingRow,
-        orm.RunWorldStateRow, orm.RunWorldVisitRow, orm.RunWorldPositionRow,
+        orm.RunWorldStateRow, orm.RunWorldVisitRow, orm.RunWorldPositionRow, orm.RunWorldVisitEntryRow,
         orm.PlayerCharacterCurrentRow,
         orm.PlayerCharacterControllerBindingRow, orm.GameSessionRow, orm.DomainEventRow, orm.GameSnapshotRow,
     ]

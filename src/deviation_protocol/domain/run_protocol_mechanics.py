@@ -39,6 +39,9 @@ MECHANICS_CATALOGUE = (
     MechanicsCatalogueEntry("world.undelivered_receipt", 1, "undelivered_receipt",
                             "undelivered-receipt-1.0.0",
                             "character.death_certificate.investigator", "composure"),
+    MechanicsCatalogueEntry("world.undelivered_receipt", 1, "receipt_archive",
+                            "receipt-archive-1.0.0",
+                            "character.death_certificate.investigator", "composure"),
 )
 
 

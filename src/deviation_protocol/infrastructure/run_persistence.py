@@ -486,7 +486,8 @@ def _binding_from_storage(
         _require_utc(stored.inactivated_at, "inactivated_at")
     terminal = (stored.lifecycle_status == "terminated" and (
         (stored.state_version, stored.prior_state_version, stored.mutation_kind) in (
-            (4, 3, "TERMINATE_NATIVE_RUN"), (5, 4, "TERMINATE_CONTINUED_NATIVE_RUN"))))
+            (4, 3, "TERMINATE_NATIVE_RUN"), (5, 4, "TERMINATE_CONTINUED_NATIVE_RUN"),
+            (6, 5, "TERMINATE_REVISITED_NATIVE_RUN"))))
     if ((not terminal and (stored.binding_state != "active" or stored.inactivated_at is not None))
             or (terminal and (stored.binding_state != "historical" or stored.inactivated_at != stored.occurred_at))):
         raise _fail("stored binding does not match the exact lifecycle edge")
@@ -814,11 +815,14 @@ def mutation_receipt_from_storage(
                 "stored Run binding receipt columns are inconsistent"
             )
     elif stored.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN.value,
-                                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN.value):
+                                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN.value,
+                                 RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN.value):
         from deviation_protocol.domain.run_protocol_binding import (
-            decode_native_run_exit_evidence, decode_continued_native_run_exit_evidence)
+            decode_native_run_exit_evidence, decode_continued_native_run_exit_evidence,
+                decode_revisited_native_run_exit_evidence)
         continued = stored.command_kind == RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN.value
-        decoder = decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence
+        revisited = stored.command_kind == RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN.value
+        decoder = decode_revisited_native_run_exit_evidence if revisited else (decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence)
         try:
             evidence = decoder(stored.operation_evidence_canonical)
         except (TypeError, ValueError, AttributeError) as error:
@@ -829,8 +833,8 @@ def mutation_receipt_from_storage(
                 or request.operation_id() != stored.operation_id
                 or request.run_id != stored.run_id.value
                 or request.continuous_story_line_id != stored.result_continuous_story_line_id.value
-                or stored.expected_state_version != (4 if continued else 3)
-                or stored.resulting_state_version != (5 if continued else 4)
+                or stored.expected_state_version != (5 if revisited else 4 if continued else 3)
+                or stored.resulting_state_version != (6 if revisited else 5 if continued else 4)
                 or any(v is not None for v in (stored.participation_session_id,
                     stored.participation_operation_id, stored.participation_source_reference,
                     stored.result_player_character_id, stored.result_character_contract_version,
@@ -850,6 +854,28 @@ def mutation_receipt_from_storage(
                 or request.run_id != stored.run_id.value
                 or request.continuous_story_line_id != stored.result_continuous_story_line_id.value
                 or stored.expected_state_version != 3 or stored.resulting_state_version != 4
+                or participation is None
+                or participation.session_id != evidence.destination_session_id
+                or stored.participation_session_id != evidence.destination_session_id
+                or stored.participation_operation_id != request.operation_id().value
+                or stored.participation_source_reference != request.source_reference
+                or any(v is not None for v in (stored.result_player_character_id,
+                    stored.result_character_contract_version, stored.result_character_record_revision))):
+            raise _fail("continuation receipt association")
+    elif stored.command_kind == RunMutationKind.REVISIT_NATIVE_REGION.value:
+        from deviation_protocol.domain.world_revisit import decode_native_run_regional_revisit_evidence
+        try:
+            evidence = decode_native_run_regional_revisit_evidence(stored.operation_evidence_canonical)
+        except (TypeError, ValueError, AttributeError) as error:
+            raise _fail("invalid continuation evidence") from error
+        request = evidence.request
+        participation = receipt.result.participation_reference
+        if (receipt.command_kind is not RunMutationKind.REVISIT_NATIVE_REGION
+                or request.fingerprint() != receipt.fingerprint.value
+                or request.operation_id() != stored.operation_id
+                or request.run_id != stored.run_id.value
+                or request.continuous_story_line_id != stored.result_continuous_story_line_id.value
+                or stored.expected_state_version != 4 or stored.resulting_state_version != 5
                 or participation is None
                 or participation.session_id != evidence.destination_session_id
                 or stored.participation_session_id != evidence.destination_session_id
@@ -966,7 +992,7 @@ def validate_stored_run_record_set(
         for item in history[1:]
         if (
             item.current_mutation_provenance.mutation_kind
-            in (RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN)
+            in (RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION)
         )
     )
     if joined_versions != expected_joined_versions:
@@ -1044,7 +1070,7 @@ def validate_stored_run_record_set(
         creation_receipt.operation_evidence_canonical
     )
     if (current_run.lifecycle_status is RunLifecycleStatus.TERMINATED
-            or current_run.current_mutation_provenance.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN):
+            or current_run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION)):
         from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
         if type(creation_command) is not NativeRunEntryCreationEvidenceV1:
             raise _fail("terminal history requires the exact native admission prefix")
@@ -1191,17 +1217,48 @@ def validate_stored_run_record_set(
                         lifecycle_status=after.lifecycle_status, resulting_state_version=after.state_version,
                         participation_reference=participation)):
                 raise _fail("continuation evidence does not bind adjacent history")
+        elif provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION:
+            from deviation_protocol.domain.world_revisit import decode_native_run_regional_revisit_evidence
+            from deviation_protocol.application.run_operations import REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION, RunSafeResult
+            evidence = decode_native_run_regional_revisit_evidence(stored.operation_evidence_canonical)
+            request = evidence.request
+            participation = after.trusted_participation_references[-1]
+            stored_participation = next((p for p in ordered_participations if p.joined_state_version == 5), None)
+            if (before.state_version.value != 4 or after.state_version.value != 5
+                    or before.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or after.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or after.player_character_binding != before.player_character_binding
+                    or after.trusted_participation_references[:-1] != before.trusted_participation_references
+                    or request.source_session_id != before.trusted_participation_references[1].session_id
+                    or request.run_id != after.run_id.value
+                    or request.continuous_story_line_id != after.continuous_story_line_id.value
+                    or request.operation_id() != provenance.operation_id
+                    or request.source_reference != provenance.source_reference.value
+                    or request.controller_binding != creation_command.controller_operation.controller_binding.value
+                    or request.player_id != creation_command.player_id
+                    or participation.session_id != evidence.destination_session_id
+                    or stored_participation is None or stored_participation.joined_at != provenance.occurred_at
+                    or datetime.fromisoformat(evidence.occurred_at.replace("Z", "+00:00")) != provenance.occurred_at
+                    or provenance.occurred_at < before.current_mutation_provenance.occurred_at
+                    or receipt.result != RunSafeResult(result_schema_version=REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION,
+                        run_id=after.run_id, continuous_story_line_id=after.continuous_story_line_id,
+                        lifecycle_status=after.lifecycle_status, resulting_state_version=after.state_version,
+                        participation_reference=participation)):
+                raise _fail("continuation evidence does not bind adjacent history")
         elif provenance.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,
-                                          RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN):
+                                          RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
+                                          RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
             from deviation_protocol.domain.run_protocol_binding import (
-                decode_native_run_exit_evidence, decode_continued_native_run_exit_evidence)
+                decode_native_run_exit_evidence, decode_continued_native_run_exit_evidence,
+                decode_revisited_native_run_exit_evidence)
             continued = provenance.mutation_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN
-            decoder = decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence
+            revisited = provenance.mutation_kind is RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN
+            decoder = decode_revisited_native_run_exit_evidence if revisited else (decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence)
             evidence = decoder(stored.operation_evidence_canonical)
             request = evidence.request
             if (before.lifecycle_status is not RunLifecycleStatus.ACTIVE
-                    or before.state_version.value != (4 if continued else 3)
-                    or after.state_version.value != (5 if continued else 4)
+                    or before.state_version.value != (5 if revisited else 4 if continued else 3)
+                    or after.state_version.value != (6 if revisited else 5 if continued else 4)
                     or receipt.command_kind is not provenance.mutation_kind
                     or request.run_id != after.run_id.value
                     or request.continuous_story_line_id != after.continuous_story_line_id.value

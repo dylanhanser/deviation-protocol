@@ -174,6 +174,8 @@ if TYPE_CHECKING:
         NativeRunTerminatedV1,
         NativeRunContinuedV1,
         NativeRunContinuedTerminatedV1,
+        NativeRunRegionalRevisitV1,
+        NativeRunRegionalRevisitTerminatedV1,
         LegacyRunCompatibilityV1,
         NativeRunProtocolBindingV1,
     )
@@ -213,7 +215,7 @@ class SqlAlchemyRunWorldContinuationRepository:
         self._session = session
 
     async def add(self, continued):
-        from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
         from deviation_protocol.domain.run import revalidate_run_model
         from deviation_protocol.infrastructure.world_continuation_persistence import root_to_storage
         from deviation_protocol.infrastructure.orm_models import RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow
@@ -225,6 +227,38 @@ class SqlAlchemyRunWorldContinuationRepository:
         for visit in continued.visits:
             await _flush_native_binding(self._session, RunWorldVisitRow(**visit.model_dump()))
         await _flush_native_binding(self._session, RunWorldPositionRow(**continued.position.model_dump()))
+
+
+class SqlAlchemyRunWorldRevisitRepository:
+    def __init__(self, session):
+        self._session = session
+
+    async def source_events(self, session_id, *, locking=False):
+        statement = select(DomainEventRow).where(DomainEventRow.session_id == session_id).order_by(DomainEventRow.sequence_no)
+        if locking:
+            statement = statement.with_for_update()
+        rows = (await self._session.execute(statement.execution_options(populate_existing=True))).scalars().all()
+        return tuple(DomainEvent(event_id=r.event_id, session_id=r.session_id,
+            turn_id=r.turn_id, sequence_no=r.sequence_no, event_type=r.event_type,
+            payload=r.payload_json, occurred_at=_as_utc(r.occurred_at)) for r in rows)
+
+    async def add(self, revisited):
+        from deviation_protocol.application.ports import RunWriteConflictError
+        from deviation_protocol.domain.run import revalidate_run_model
+        from deviation_protocol.domain.run_protocol_binding import NativeRunRegionalRevisitV1
+        from deviation_protocol.infrastructure.world_revisit_persistence import entry_to_storage
+        from deviation_protocol.infrastructure.orm_models import RunWorldVisitRow, RunWorldPositionRow, RunWorldVisitEntryRow
+        _require_native_writer(self._session.info.get("native_admission_guard"))
+        revalidate_run_model(revisited, NativeRunRegionalRevisitV1)
+        time = revisited.canonical_run.current_mutation_provenance.occurred_at
+        await _flush_native_binding(self._session, RunWorldVisitRow(**revisited.visit.model_dump()))
+        await _flush_native_binding(self._session, RunWorldVisitEntryRow(**entry_to_storage(revisited.entry, created_at=time)))
+        before, after = revisited.continued.position, revisited.position
+        result = await self._session.execute(update(RunWorldPositionRow).where(
+            *(getattr(RunWorldPositionRow, k) == v for k, v in before.model_dump().items())
+        ).values(**after.model_dump()).execution_options(synchronize_session=False))
+        if result.rowcount != 1:
+            raise RunWriteConflictError("regional position CAS conflict")
 
 
 class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
@@ -240,12 +274,12 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
 
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | None:
         return await self._classify(run_id, locking=False)
 
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | None:
         return await self._classify(run_id, locking=True)
 
     async def _read(self, statement, *, locking, many=False):
@@ -288,7 +322,7 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
         from deviation_protocol.infrastructure import run_protocol_binding_persistence as binding_storage
         from deviation_protocol.domain.run import revalidate_run_model
         from deviation_protocol.domain.player_character import PlayerCharacterLifecycle
-        from deviation_protocol.infrastructure.orm_models import RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow
+        from deviation_protocol.infrastructure.orm_models import RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow, RunWorldVisitEntryRow
 
         revalidate_run_model(run_id, RunId)
         current_row = await self._read(select(RunCurrentRow).where(RunCurrentRow.run_id == run_id.value), locking=locking)
@@ -303,6 +337,7 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
                 (RunWorldStateRow, RunWorldStateRow.run_id),
                 (RunWorldVisitRow, RunWorldVisitRow.run_id),
                 (RunWorldPositionRow, RunWorldPositionRow.run_id),
+                (RunWorldVisitEntryRow, RunWorldVisitEntryRow.run_id),
             ):
                 orphan = await self._read(select(model).where(column == run_id.value).limit(1), locking=locking)
                 binding_storage._require(orphan is None, "orphan Run family evidence")
@@ -361,7 +396,11 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
             continuous_story_line_id=run.continuous_story_line_id.value,
             session_id=p.session_id,joined_state_version=p.joined_state_version.value).value
             for p in run.trusted_participation_references if p.joined_state_version.value in (3,4))
-        for model in (RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow):
+        from deviation_protocol.domain.world_revisit import derive_regional_visit_id
+        visit_ids += tuple(derive_regional_visit_id(run_id=run.run_id.value,
+            continuous_story_line_id=run.continuous_story_line_id.value, session_id=p.session_id,
+            joined_state_version=5).value for p in run.trusted_participation_references if p.joined_state_version.value == 5)
+        for model in (RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow, RunWorldVisitEntryRow):
             related = [model.run_id == run_id.value, model.continuous_story_line_id == run.continuous_story_line_id.value]
             if model is RunWorldStateRow:
                 related.append(model.first_visit_id.in_(visit_ids))
@@ -389,7 +428,7 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
             event_row = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == participation.session_id, DomainEventRow.sequence_no == 1), locking=locking)
             snapshot_row = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == participation.session_id), locking=locking)
             admission = self._codec(binding_storage._complete_native_admission, run, protocol, world, evidence, request_id, participation, session_row, event_row, snapshot_row)
-            if len(current_run.trusted_participation_references) == 2:
+            if len(current_run.trusted_participation_references) in (2, 3):
                 from deviation_protocol.infrastructure.world_continuation_persistence import reconstruct_continued_family
                 active_source_job = await self._read(select(NarrativeJobRow).where(
                     NarrativeJobRow.session_id == participation.session_id,
@@ -399,6 +438,25 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
                 destination_session = await self._read(select(GameSessionRow).where(GameSessionRow.session_id == destination_id),locking=locking)
                 destination_event = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == destination_id,DomainEventRow.sequence_no == 1),locking=locking)
                 destination_snapshot = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == destination_id),locking=locking)
+                if len(current_run.trusted_participation_references) == 3:
+                    from deviation_protocol.infrastructure.world_revisit_persistence import reconstruct_regional_family
+                    active_second_job = await self._read(select(NarrativeJobRow).where(
+                        NarrativeJobRow.session_id == destination_id,
+                        NarrativeJobRow.status.in_(tuple(item.value for item in ACTIVE_NARRATIVE_JOB_STATUSES))).limit(1), locking=locking)
+                    binding_storage._require(active_second_job is None, "regional source has active narrative job")
+                    regional_id = current_run.trusted_participation_references[2].session_id
+                    regional_session = await self._read(select(GameSessionRow).where(GameSessionRow.session_id == regional_id), locking=locking)
+                    regional_event = await self._read(select(DomainEventRow).where(DomainEventRow.session_id == regional_id, DomainEventRow.sequence_no == 1), locking=locking)
+                    regional_snapshot = await self._read(select(GameSnapshotRow).where(GameSnapshotRow.session_id == regional_id), locking=locking)
+                    source_events = await SqlAlchemyRunWorldRevisitRepository(self._session).source_events(destination_id, locking=locking)
+                    return self._codec(reconstruct_regional_family, admission=admission, run=current_run,
+                        mutations=mutations, creation_evidence=evidence, roots=world_rows[0], visits=world_rows[1],
+                        positions=world_rows[2], entries=world_rows[3], source_session=session_row, source_snapshot=snapshot_row,
+                        destination_session=destination_session, destination_snapshot=destination_snapshot,
+                        destination_event=destination_event, source_events=source_events,
+                        regional_session=regional_session, regional_snapshot=regional_snapshot, regional_event=regional_event,
+                        registry=self._session.info.get("session_content_registry"))
+                binding_storage._require(not world_rows[3], "entry on old continued family")
                 return self._codec(reconstruct_continued_family,admission=admission,run=current_run,
                     mutations=mutations,creation_evidence=evidence,roots=world_rows[0],visits=world_rows[1],positions=world_rows[2],
                     source_session=session_row,source_snapshot=snapshot_row,destination_session=destination_session,
@@ -2641,7 +2699,7 @@ class _SqlAlchemyRunRepositorySupport:
         evidence_run_ids: set[str] = set()
         for statement in evidence_statements:
             evidence_run_ids.update(await self._run_scalars(statement))
-        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1
         active = []
         for identity in sorted(evidence_run_ids):
             run_id = RunId(value=identity)
@@ -2660,13 +2718,13 @@ class _SqlAlchemyRunRepositorySupport:
             if run.lifecycle_status is RunLifecycleStatus.TERMINATED:
                 classifier = SqlAlchemyRunProtocolBindingRepository(self._session)
                 family = await classifier._classify(run_id, locking=for_update)
-                if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1):
+                if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1):
                     raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
             elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
-                if run.current_mutation_provenance.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN:
-                    from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1
+                if run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
+                    from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
                     family = await SqlAlchemyRunProtocolBindingRepository(self._session)._classify(run_id,locking=for_update)
-                    if type(family) is not NativeRunContinuedV1:
+                    if type(family) is not (NativeRunRegionalRevisitV1 if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else NativeRunContinuedV1):
                         raise RunStoredRecordIntegrityError("active continued binding requires complete family")
                 active.append(run)
             else:
@@ -3004,6 +3062,8 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
                 RunMutationKind.TERMINATE_NATIVE_RUN,
                 RunMutationKind.CONTINUE_NATIVE_RUN,
                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
+                RunMutationKind.REVISIT_NATIVE_REGION,
+                RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,
             }
         ):
             raise RunStoredRecordIntegrityError(
@@ -3024,8 +3084,8 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
             raise RunRepositoryConflictError("successor Run revision is stale")
         row = self._run_revision_row(run, created_at=created_at)
         mutation_kind = run.current_mutation_provenance.mutation_kind
-        if mutation_kind in (RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN):
-            if mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN:
+        if mutation_kind in (RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
+            if mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
                 _require_native_writer(self._session.info.get("native_admission_guard"))
             if not run.trusted_participation_references:
                 raise RunStoredRecordIntegrityError(
@@ -3042,9 +3102,9 @@ class SqlAlchemyRunRepository(_SqlAlchemyRunRepositorySupport, RunRepository):
                 raise RunStoredRecordIntegrityError(
                     "successor Run participation is inconsistent"
                 )
-        elif mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN):
+        elif mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
             _require_native_writer(self._session.info.get("native_admission_guard"))
-            expected = 3 if mutation_kind is RunMutationKind.TERMINATE_NATIVE_RUN else 4
+            expected = {RunMutationKind.TERMINATE_NATIVE_RUN: 3, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: 4, RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: 5}[mutation_kind]
             if (current.state_version.value != expected or current.lifecycle_status is not RunLifecycleStatus.ACTIVE
                     or run.trusted_participation_references != current.trusted_participation_references
                     or run.player_character_binding != current.player_character_binding.model_copy(update={
@@ -3210,7 +3270,7 @@ class SqlAlchemyRunSessionParticipationRepository(
             or revision_stored.continuous_story_line_id
             != participation.continuous_story_line_id
             or revision_stored.mutation_kind
-            not in (RunMutationKind.ATTACH_SESSION.value,RunMutationKind.CONTINUE_NATIVE_RUN.value)
+            not in (RunMutationKind.ATTACH_SESSION.value,RunMutationKind.CONTINUE_NATIVE_RUN.value,RunMutationKind.REVISIT_NATIVE_REGION.value)
             or revision_stored.operation_id != participation.operation_id
             or revision_stored.source_reference
             != participation.source_reference
@@ -3464,6 +3524,8 @@ class SqlAlchemyRunMutationReceiptRepository(
             RunOperationNamespace.TERMINATE_NATIVE_V1,
             RunOperationNamespace.CONTINUE_NATIVE_V1,
             RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1,
+            RunOperationNamespace.REVISIT_NATIVE_REGION_V1,
+            RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1,
         }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         row = await self._run_scalar(
@@ -3493,6 +3555,7 @@ class SqlAlchemyRunMutationReceiptRepository(
         created_at: datetime,
         exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | None = None,
         continuation_evidence: NativeRunContinuationEvidenceV1 | None = None,
+        revisit_evidence=None,
     ) -> None:
         if (
             (
@@ -3502,6 +3565,8 @@ class SqlAlchemyRunMutationReceiptRepository(
             not in {
                 (RunOperationNamespace.TERMINATE_NATIVE_V1, RunMutationKind.TERMINATE_NATIVE_RUN),
                 (RunOperationNamespace.CONTINUE_NATIVE_V1, RunMutationKind.CONTINUE_NATIVE_RUN),
+                (RunOperationNamespace.REVISIT_NATIVE_REGION_V1, RunMutationKind.REVISIT_NATIVE_REGION),
+                (RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1, RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN),
                 (RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN),
                 (
                     RunOperationNamespace.ATTACH_SESSION_V1,
@@ -3527,12 +3592,20 @@ class SqlAlchemyRunMutationReceiptRepository(
         )
         participation = result.participation_reference
         character_reference = result.applicable_character_reference
-        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN):
+        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
             _require_native_writer(self._session.info.get("native_admission_guard"))
             from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1, ContinuedNativeRunExitEvidenceV1
             from deviation_protocol.domain.world_continuation import NativeRunContinuationEvidenceV1
             from deviation_protocol.domain.run import canonical_run_operation_bytes, revalidate_run_model
-            carrier, kind = (continuation_evidence,NativeRunContinuationEvidenceV1) if receipt.command_kind is RunMutationKind.CONTINUE_NATIVE_RUN else (exit_evidence,NativeRunExitEvidenceV1 if receipt.command_kind is RunMutationKind.TERMINATE_NATIVE_RUN else ContinuedNativeRunExitEvidenceV1)
+            from deviation_protocol.domain.world_revisit import NativeRunRegionalRevisitEvidenceV1
+            from deviation_protocol.domain.run_protocol_binding import RevisitedNativeRunExitEvidenceV1
+            carrier, kind = {
+                RunMutationKind.CONTINUE_NATIVE_RUN: (continuation_evidence, NativeRunContinuationEvidenceV1),
+                RunMutationKind.REVISIT_NATIVE_REGION: (revisit_evidence, NativeRunRegionalRevisitEvidenceV1),
+                RunMutationKind.TERMINATE_NATIVE_RUN: (exit_evidence, NativeRunExitEvidenceV1),
+                RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: (exit_evidence, ContinuedNativeRunExitEvidenceV1),
+                RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: (exit_evidence, RevisitedNativeRunExitEvidenceV1),
+            }[receipt.command_kind]
             revalidate_run_model(carrier, kind)
             operation_evidence = canonical_run_operation_bytes(carrier)
         elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:

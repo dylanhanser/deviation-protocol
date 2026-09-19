@@ -45,7 +45,7 @@ async def exit_case(engine, monkeypatch):
         original = await connection.scalar(sa.text("SELECT version_num FROM alembic_version"))
         assert original in ("20260916_0007", "20260917_0008", "20260918_0009")
     with monkeypatch.context() as patch:
-        patch.setattr(admission_tests, "HEAD", "20260918_0009")
+        patch.setattr(admission_tests, "HEAD", "20260918_0010")
         try:
             async with native_runtime(engine) as case:
                 patch.setattr(main, "create_engine", lambda: engine)

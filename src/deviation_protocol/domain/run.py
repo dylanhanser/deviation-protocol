@@ -187,6 +187,8 @@ class RunMutationKind(StrEnum):
     TERMINATE_NATIVE_RUN = "TERMINATE_NATIVE_RUN"
     CONTINUE_NATIVE_RUN = "CONTINUE_NATIVE_RUN"
     TERMINATE_CONTINUED_NATIVE_RUN = "TERMINATE_CONTINUED_NATIVE_RUN"
+    REVISIT_NATIVE_REGION = "REVISIT_NATIVE_REGION"
+    TERMINATE_REVISITED_NATIVE_RUN = "TERMINATE_REVISITED_NATIVE_RUN"
 
 
 class RunMutationProvenance(_StrictFrozenModel):
@@ -296,7 +298,11 @@ class CanonicalRun(_StrictFrozenModel):
                          and current.prior_state_version == RunStateVersion(value=3)
                          and current.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN
                          and joins == (3, 4))
-            if not (admitted or continued) or self.player_character_binding is None:
+            revisited = (self.state_version.value == 5
+                         and current.prior_state_version == RunStateVersion(value=4)
+                         and current.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION
+                         and joins == (3, 4, 5))
+            if not (admitted or continued or revisited) or self.player_character_binding is None:
                 raise ValueError("pre_first_turn Run may become active only as the exact P8 entry successor")
         elif self.lifecycle_status is RunLifecycleStatus.TERMINATED:
             joins = tuple(p.joined_state_version.value for p in self.trusted_participation_references)
@@ -308,8 +314,12 @@ class CanonicalRun(_StrictFrozenModel):
                 and current.prior_state_version == RunStateVersion(value=4)
                 and current.mutation_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN
                 and joins == (3, 4))
+            revisited_exit = (self.state_version.value == 6
+                and current.prior_state_version == RunStateVersion(value=5)
+                and current.mutation_kind is RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN
+                and joins == (3, 4, 5))
             if (
-                not (original_exit or continued_exit)
+                not (original_exit or continued_exit or revisited_exit)
                 or self.player_character_binding is None
                 or self.player_character_binding.inactivated_at != current.occurred_at
                 or current.occurred_at < creation.occurred_at
@@ -318,10 +328,12 @@ class CanonicalRun(_StrictFrozenModel):
         elif self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
             raise ValueError("current Run implementation permits no terminal lifecycle state")
         if (current.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,
-                                     RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN)
+                                     RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
+                                     RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN)
                 and self.lifecycle_status is not RunLifecycleStatus.TERMINATED):
             raise ValueError("termination mutation requires terminal lifecycle")
-        if (current.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN
+        if (current.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN,
+                                     RunMutationKind.REVISIT_NATIVE_REGION)
                 and self.lifecycle_status is not RunLifecycleStatus.ACTIVE):
             raise ValueError("continuation mutation requires active lifecycle")
         binding = self.player_character_binding
@@ -408,7 +420,8 @@ class CanonicalRun(_StrictFrozenModel):
                     "and no participation or binding"
                 )
         elif self.current_mutation_provenance.mutation_kind in (
-                RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN):
+                RunMutationKind.ATTACH_SESSION, RunMutationKind.CONTINUE_NATIVE_RUN,
+                RunMutationKind.REVISIT_NATIVE_REGION):
             if not self.trusted_participation_references:
                 raise ValueError("attach-session state requires participation")
             latest = self.trusted_participation_references[-1]

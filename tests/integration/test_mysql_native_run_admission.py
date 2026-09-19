@@ -27,7 +27,7 @@ from tests.unit.test_native_run_admission import command
 from tests.unit.test_run_protocol_resolution import RESOLUTION_004
 
 pytestmark = pytest.mark.integration
-HEAD = "20260918_0009"
+HEAD = "20260918_0010"
 
 
 async def upgrade_head(engine):
@@ -45,6 +45,9 @@ async def upgrade_head(engine):
 
 @asynccontextmanager
 async def native_runtime(engine):
+    from tests.integration.test_mysql_world_continuation_migration import schema_state, migrate_to
+    initial = await schema_state(engine)
+    original = initial[0]["alembic_version"][1][0][0]
     await upgrade_head(engine)
     factory = async_sessionmaker(engine, expire_on_commit=False)
     scope = _Scope()
@@ -64,6 +67,8 @@ async def native_runtime(engine):
             assert await connection.scalar(sa.text("SELECT version_num FROM alembic_version")) == HEAD
             for model in (orm.RunEntryWorldBindingRow, orm.RunProtocolBindingRow):
                 assert await connection.scalar(sa.select(sa.func.count()).select_from(model).where(model.run_id.in_(scope.run_ids))) == 0
+        await migrate_to(engine, original)
+        assert await schema_state(engine) == initial
 
 
 async def family_bytes(case):

@@ -58,8 +58,8 @@ S5 implementation is independently approved with DF-001 deferred and published
 at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published at `4365721`; its separately authorized
 implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
 S7-2 follows its independently approved plan at `2c272487`; implementation is
-published at `6dfbd37` with bounded local browser evidence. The S7-3 documentation
-candidate awaits independent plan review and product approval. Phase 3.3
+published at `6dfbd37` with bounded local browser evidence. The S7-3 plan is independently approved and published at `0ea295e`;
+P01–P09 are approved and its local implementation candidate awaits focused independent re-review after the automatic Journey/status consistency correction. Phase 3.3
 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
@@ -283,9 +283,9 @@ separate published P3.3-S2 implementation adds only pure numeric profile
 resolution. S3's published component and the published S4 implementation are
 described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
-at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 documentation
-planning is authorized, with new decisions still PROPOSED; S7-3 implementation
-and S7-4/5 remain unauthorized. The
+at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 plan is published at `0ea295e`, P01–P09 are approved, and its authorized
+local implementation candidate awaits focused independent re-review.
+S7-4/5 remain outside this increment. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1748,41 +1748,75 @@ missing/crossed evidence rejects as SNAPSHOT_INVALID, never null repair.
 The Web keeps successor storage v1/current recovery separate from historical
 display, validates the reciprocal GET edge and complete View associations, and
 returns by GET without enabling predecessor writes or accepting stale reads.
-Revisits, region unlocking, anti-farming, authorized
-canon transitions and final integrated evidence remain allocated to S7-3/4/5.
+S7-3 adds the bounded held-receipt archive revisit and one-use regional entry.
+Authorized canon transitions and final integration remain allocated to S7-4/5.
 S7 and Phase 3.3 remain incomplete.
 
-## P3.3-S7-3 proposed regional revisit boundary
+## P3.3-S7-3 regional revisit implementation candidate
 
-The [five-document S7-3 candidate](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
-proposes a third visit to the existing receipt world, entering a distinct archive
-region after the actual held-receipt ending. P01–P09 are unapproved; neither a
-third-visit reader/writer nor migration 010 exists yet. Explicit journey consent
-is a proposed amendment to the current no-approve/no-veto revisit product rule,
-not permission for the client to select or unlock a world.
+The [published S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
+is independently approved at `0ea295e358f526c5101856e4dc2370d66b23b938`.
+P01–P09 are approved; candidate-time wording in that protected plan is history.
+P02 authorizes explicit consent to the engine-selected destination. Cancellation
+before submission consumes no eligibility; clients cannot select or unlock worlds.
 
-The proposed architecture preserves strict S7-2 v1 prefixes and adds closed
-active 4→5 / terminal 5→6 suffixes, v2 visit/position carriers and immutable
-regional entry evidence. The original two world roots and all old Sessions stay
-unchanged. The new initializer consumes visit two's latest ended state, preserves
-its region's facts/NPCs/clocks/history, carries current PlayerState without refill,
-and projects only approved public consequences into the new local runtime.
-One-runtime memory validation and version-specific, independently pinned content
-routing remain mandatory. Unlock derives from the sealed hold ending; the one
-successful entry receipt consumes the opportunity. No reward ledger or mutable
-world-state duplicate is proposed.
+The candidate preserves strict S7-2 v1 prefixes and adds closed active 4→5 /
+terminal 5→6 suffixes, v2 visit/position carriers and immutable regional entry
+on migration 010. It distinguishes old terminal 5 from new active 5. Exactly two
+world roots, three visits, one regional entry and one current position are
+reconstructed together. Historical position 4 comes from the committed prefix's
+visit/receipt evidence; it is not another stored row. Reverse and orphan checks
+cover entries, visits, position, receipts and owned Sessions from every path.
 
-The same pinned named-lock UoW and character-first ordering own one atomic
-transition/position CAS; rendering/compilation remain outside locks. New journey
-GET supplies all three visits' reciprocal associations after complete reconstruction.
-The Web retains current recovery identity separately from historical display and
-performs historical navigation by GET without storage writes. Existing strict
-two-visit continuation GET cannot represent the new family; the proposed explicit
-compatibility response and new endpoint are specified in plan section 8, alongside
-unchanged original receipt replay and View/admission/storage meanings.
+The initializer consumes the latest validated ended second visit and sealed hold
+event/memory. Old dispatch facts, NPCs, clocks and history remain in that region.
+The new archive runtime carries all current PlayerState, including zero composure,
+without refill or reward; it has no NPCs or clocks. Required independently pinned
+content routes all three versions separately. The successful receipt consumes
+the sole return opportunity. No fourth visit or mutable world-root copy exists.
 
-Implementation inventory and R01–R10 evidence in the plan cover all shared family,
-turn, exit, character-binding, SQL/Demo and client consumers. Schema 010 extends
-only exact constraints and one entry table; 001–009 remain protected. S7-4 keeps
-canon-preserving line transitions/normal completion; S7-5 keeps final integration.
-No code, migration, runtime or new approval is delivered by this documentation.
+The shared pinned named-lock UoW and character-first ordering own one atomic
+Session/revision/participation/visit/entry/receipt commit, Run CAS and position
+CAS. Exact replay precedes eligibility and issuance. Under lock, receipt conflict
+precedes fresh version checks. Failed CAS, stage or flush rolls back all writes;
+commit acknowledgement/cleanup uncertainty permits only explicit reconciliation.
+Rendering and prompt compilation remain outside transactions and locks.
+
+Third-visit actions use native-regional-turn-request/v1 and a separately sealed
+world-regional-prompt-context/v1. Binding includes exact current visit/region,
+Run revision 5 and regional request fingerprint; private entry/base/receipt hashes
+bind compilation. Public journey arrival is a separate allowlisted projection.
+The five S5 numeric policies, original prompt contract, admission context and
+PlayerSessionView remain unchanged.
+
+Journey GET supplies path/current/reciprocal neighbors from one consistent
+reconstruction. Web stores the confirmed successor before loading its View,
+validates every immutable association, accepts legitimate progressed versions,
+and keeps historical display separate from current recovery storage v1.
+Recovery retains POST authority across failed destination reads: source Journey
+current-target validation and full destination/predecessor validation both precede
+any recovery-storage write or target adoption. Contradictions retain the prior
+record and confirmed target; later matching progressed reads can recover.
+A terminated Journey requires an ended View. Active Runs may have active or ended
+current Sessions; historical Views must be ended even while a later visit remains
+active. Automatic synchronization and explicit recovery share one View/Journey/
+Run-status association, revision and lifecycle check. Native ended-Session controls
+remain unconfirmed until both reads agree; a pending or contradictory read blocks
+exit, continuation/revisit and their confirmations/retries. Active current-Session actions retain their separately validated Journey gate;
+they do not acquire a new Run-status dependency. Every dependent submission
+rechecks the gate; an already open confirmation supplies no authority. A matching
+GET can reconcile advanced state without altering either response, retrying a
+mutation or discarding a retained uncertain request. Confirmed exit status also
+requires a matching Journey GET before return-to-setup becomes available.
+The validated pair belongs to one loaded View and client; operation-generation,
+client and target checks discard late responses. Arrival/history text can remain
+visible during refresh without granting write authority.
+Storage-only remount and 3→2→1→2→3 navigation use GET without historical storage
+writes. The old continuation GET rejects three-visit families explicitly;
+original continuation/admission/exit receipts remain replayable.
+
+[Implementation evidence and limits](run_protocol.md#s7-3-implementation-candidate-evidence)
+remain separate from independent approval and browser acceptance. The candidate
+is unstaged/uncommitted and awaits focused independent re-review after the latest CHANGES_REQUIRED verdict (F1 closed, original ACTIVE-View mismatch corrected, automatic Journey/status consistency corrected locally). S7-4 owns
+canon-preserving line transitions/normal completion; S7-5 final integration.
+S7 and Phase 3.3 remain incomplete.

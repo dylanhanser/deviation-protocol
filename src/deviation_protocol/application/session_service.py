@@ -894,6 +894,31 @@ class SessionService:
             scenario_content_version=definition.content_version)
         return replace(prepared,initial_state=state,initial_frame=frame)
 
+    def prepare_regional_revisit_initialization(self, principal, *, creation_request_id,
+            base, created_at):
+        from dataclasses import replace
+        from deviation_protocol.application.scenario_initialization import ValidatedRegionalBase
+        if type(base) is not ValidatedRegionalBase:
+            raise ValueError("sealed regional base required")
+        source = base.state()
+        definition = self.resolve_run_entry_definition("receipt_archive")
+        if (definition.content_version != "receipt-archive-1.0.0"
+                or source.player.player_id != principal.player_id):
+            raise ValueError("regional initializer association")
+        prepared = self.prepare_run_entry_initialization(principal,
+            creation_request_id=creation_request_id, definition=definition,
+            character_definition_id=source.player.character_definition_id, created_at=created_at)
+        character = self.catalog.character(source.player.character_definition_id)
+        state = initialize_scenario_state(GameState(content_version=self.catalog.content_version,
+            player=source.player.model_copy(deep=True)), self.catalog, definition,
+            character_tags=character.tags, story_director=self.story_director).candidate_state
+        state.validate_against(self.catalog)
+        state.scenario_runtime.validate_against(definition)
+        frame = bind_public_decision_frame(self.story_director.plan_initial_frame(state, definition),
+            session_id=prepared.session.session_id, state_version=0,
+            scenario_content_version=definition.content_version)
+        return replace(prepared, initial_state=state, initial_frame=frame)
+
     async def stage_run_entry_initialization(
         self,
         uow: UnitOfWork,

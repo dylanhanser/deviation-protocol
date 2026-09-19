@@ -134,7 +134,7 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("invalid native mechanics catalogue entry")
             key = (entry.world_id, entry.world_version)
             world = next((w for w in worlds if (w.entry_world_id.value, w.entry_world_version.value) == key), None)
-            destination = entry == MECHANICS_CATALOGUE[1]
+            destination = entry in MECHANICS_CATALOGUE[1:]
             if not destination and (key in keys or world is None or (world.scenario_id, world.scenario_content_version,
                     world.default_character_definition_id) != (entry.scenario_id, entry.content_version, entry.character_id)):
                 raise ValueError("native mechanics world association is incompatible")
@@ -147,23 +147,45 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("native mechanics catalogue is incompatible")
 
     async def load(self, uow, game_session, state, definition):
-        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, NativeRunTerminatedV1, LegacyRunCompatibilityV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, NativeRunTerminatedV1, LegacyRunCompatibilityV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1
         session_id = game_session.session_id
-        participation = await uow.run_participations.get(session_id)
-        reverse = await uow.run_participations.find_attachment_run_ids(session_id)
+        try:
+            participation = await uow.run_participations.get(session_id)
+            reverse = await uow.run_participations.find_attachment_run_ids(session_id)
+        except ValueError:
+            raise NativeTurnBindingError(session_id) from None
         if participation is None:
             if reverse:
                 raise NativeTurnBindingError(session_id)
             return None
         if reverse != (participation.run_id,):
             raise NativeTurnBindingError(session_id)
-        family = await uow.run_protocol_bindings.get_classified(run_id=participation.run_id)
+        try:
+            family = await uow.run_protocol_bindings.get_classified(run_id=participation.run_id)
+        except ValueError:
+            raise NativeTurnBindingError(session_id) from None
         if type(family) is LegacyRunCompatibilityV1:
             revalidate_run_model(family, LegacyRunCompatibilityV1)
             if family.session_id != session_id:
                 raise NativeTurnBindingError(session_id)
             return None
         classified = family
+        if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1):
+            revalidate_run_model(family, type(family))
+            regional = family.revisited if type(family) is NativeRunRegionalRevisitTerminatedV1 else family
+            if participation not in family.canonical_run.trusted_participation_references:
+                raise NativeTurnBindingError(session_id)
+            if participation.joined_state_version.value == 5:
+                entry = regional.entry
+                if (definition is None or (game_session.scenario_id, game_session.scenario_version)
+                        != (entry.scenario_id, entry.scenario_content_version)
+                        or (definition.scenario_id, definition.content_version) != (entry.scenario_id, entry.scenario_content_version)
+                        or game_session.player_id != state.player.player_id
+                        or state.player.character_definition_id != entry.snapshot["player"]["character_definition_id"]):
+                    raise NativeTurnBindingError(session_id)
+                self.validate_state(state, session_id)
+                return classified
+            family = regional.continued
         if type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1):
             revalidate_run_model(family,type(family))
             continued = family.continued if type(family) is NativeRunContinuedTerminatedV1 else family
@@ -218,19 +240,20 @@ class NativeTurnMechanicsCoordinator:
             raise NativeMechanicsIntegrityError(session_id) from None
 
     def bind(self, family, state, submission, state_version, frame) -> TrustedNativeTurnInputs:
-        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1,NativeRunContinuedV1
-        if type(family) not in (NativeRunAdmissionV1,NativeRunContinuedV1):
+        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1
+        if type(family) not in (NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1):
             raise NativeTurnBindingError(submission.session_id)
         revalidate_run_model(family, type(family))
         continued = type(family) is NativeRunContinuedV1
-        admission = family.admission if continued else family
+        regional = type(family) is NativeRunRegionalRevisitV1
+        admission = family.admission if continued or regional else family
         self.validate_state(state, submission.session_id)
         run = family.canonical_run
         world = admission.world_binding.entry_world
-        scenario_id = family.destination_root.scenario_id if continued else world.scenario_id
-        content_version = family.destination_root.scenario_content_version if continued else world.scenario_content_version
-        world_id = "world.undelivered_receipt" if continued else world.entry_world_id.value
-        world_version = 1 if continued else world.entry_world_version.value
+        scenario_id = family.entry.scenario_id if regional else family.destination_root.scenario_id if continued else world.scenario_id
+        content_version = family.entry.scenario_content_version if regional else family.destination_root.scenario_content_version if continued else world.scenario_content_version
+        world_id = "world.undelivered_receipt" if continued or regional else world.entry_world_id.value
+        world_version = 1 if continued or regional else world.entry_world_version.value
         if (run.trusted_participation_references[-1].session_id != submission.session_id
                 or type(state_version) is not int or state_version < 0
                 or state.content_version != content_version
@@ -243,7 +266,7 @@ class NativeTurnMechanicsCoordinator:
               content_version, world.default_character_definition_id)), None)
         if entry is None or entry.resource_id not in state.player.resources:
             raise NativeMechanicsIntegrityError(submission.session_id)
-        binding = dict(run_id=run.run_id.value, run_revision=4 if continued else 3,
+        binding = dict(run_id=run.run_id.value, run_revision=5 if regional else 4 if continued else 3,
             continuous_story_line_id=run.continuous_story_line_id.value,
             session_id=submission.session_id, player_id=state.player.player_id,
             applicable_character_reference=run.player_character_binding.applicable_character_reference.model_dump(mode="json"),
@@ -258,6 +281,10 @@ class NativeTurnMechanicsCoordinator:
             binding.update(visit_id=family.position.visit_id,visit_ordinal=2,
                 world=family.destination_root.world.model_dump(),region=family.destination_root.region.model_dump(),
                 continuation_fingerprint=family.continuation_evidence.request.fingerprint())
+        if regional:
+            binding.update(visit_id=family.position.visit_id, visit_ordinal=3,
+                world=family.entry.world.model_dump(), region=family.entry.region.model_dump(),
+                regional_entry_fingerprint=family.revisit_evidence.request.fingerprint())
         envelope = protocol.resolution_input.envelope
         fields = dict(binding_bytes=canonical(binding), snapshot_bytes=canonical(state.to_snapshot()),
                       objectives=tuple(getattr(protocol.final_values, name).value for name in OBJECTIVES),
@@ -267,6 +294,9 @@ class NativeTurnMechanicsCoordinator:
         if continued:
             from deviation_protocol.application.world_visit_context import detach_world_visit_evidence
             object.__setattr__(inputs,"visit_evidence",detach_world_visit_evidence(family,inputs))
+        if regional:
+            from deviation_protocol.application.world_visit_context import detach_regional_visit_evidence
+            object.__setattr__(inputs, "visit_evidence", detach_regional_visit_evidence(family, inputs))
         return inputs
 
     def decide(self, inputs, state, definition, submission, *, selected=None, event=None):
@@ -365,8 +395,8 @@ class NativeTurnMechanicsCoordinator:
 def native_request_envelope(request, decision):
     if type(decision) is not NativeMechanicsDecision or not decision.is_authentic():
         raise NativeMechanicsIntegrityError("native")
-    visit = json.loads(decision.inputs.binding_bytes).get("run_revision") == 4
-    return {"schema": "native-visit-turn-request/v1" if visit else NATIVE_REQUEST_SCHEMA, "request": request.model_dump(mode="json"),
+    revision = json.loads(decision.inputs.binding_bytes)["run_revision"]
+    return {"schema": {3:NATIVE_REQUEST_SCHEMA, 4:"native-visit-turn-request/v1", 5:"native-regional-turn-request/v1"}[revision], "request": request.model_dump(mode="json"),
             "binding": json.loads(decision.inputs.binding_bytes), "mechanics": decision.evidence()}
 
 
@@ -377,16 +407,16 @@ def parse_job_request(payload):
         raise ValueError("invalid narrative request")
     if "schema" not in payload:
         return NarrativeRequest.model_validate(payload, strict=False), None
-    if set(payload) != {"schema", "request", "binding", "mechanics"} or payload["schema"] not in (NATIVE_REQUEST_SCHEMA,"native-visit-turn-request/v1"):
+    if set(payload) != {"schema", "request", "binding", "mechanics"} or payload["schema"] not in (NATIVE_REQUEST_SCHEMA,"native-visit-turn-request/v1","native-regional-turn-request/v1"):
         raise ValueError("invalid native request envelope")
     # Byte equality to recomputed evidence at detach/finalize validates every nested field.
     if not isinstance(payload["binding"], dict) or not isinstance(payload["mechanics"], dict):
         raise ValueError("invalid native evidence")
-    _validate_evidence(payload["binding"], payload["mechanics"],visit=payload["schema"] == "native-visit-turn-request/v1")
+    _validate_evidence(payload["binding"], payload["mechanics"],visit=payload["schema"] == "native-visit-turn-request/v1", regional=payload["schema"] == "native-regional-turn-request/v1")
     return NarrativeRequest.model_validate(payload["request"], strict=False), payload
 
 
-def _validate_evidence(binding, mechanics, *, visit=False):
+def _validate_evidence(binding, mechanics, *, visit=False, regional=False):
     from deviation_protocol.domain.player_character import ApplicableCharacterReference
     from deviation_protocol.domain.run_protocol_mechanics import pressure, MAX_SCENARIO_COUNTER
     keys = {"run_id", "run_revision", "continuous_story_line_id", "session_id", "player_id",
@@ -401,12 +431,23 @@ def _validate_evidence(binding, mechanics, *, visit=False):
                 or RegionRefV1.model_validate(binding.get("region")) != DESTINATION_REGION
                 or any(type(binding.get(k)) is not str or re.fullmatch(r"[0-9a-f]{64}",binding[k]) is None for k in ("visit_id","continuation_fingerprint"))):
             raise ValueError("invalid native visit binding")
+    if regional:
+        from deviation_protocol.domain.world_continuation import WorldRefV1, RegionRefV1, DESTINATION_WORLD
+        from deviation_protocol.domain.world_revisit import ARCHIVE_REGION, ARCHIVE_IDENTITY
+        keys |= {"visit_id", "visit_ordinal", "world", "region", "regional_entry_fingerprint"}
+        if (visit or type(binding.get("visit_ordinal")) is not int or binding["visit_ordinal"] != 3
+                or WorldRefV1.model_validate(binding.get("world")) != DESTINATION_WORLD
+                or RegionRefV1.model_validate(binding.get("region")) != ARCHIVE_REGION
+                or (binding.get("scenario_id"), binding.get("scenario_content_version")) != ARCHIVE_IDENTITY
+                or any(type(binding.get(k)) is not str or re.fullmatch(r"[0-9a-f]{64}", binding[k]) is None
+                       for k in ("visit_id", "regional_entry_fingerprint"))):
+            raise ValueError("invalid regional turn binding")
     if set(binding) != keys or binding["mechanics_version"] != MECHANICS_VERSION:
         raise ValueError("invalid native binding fields")
     for key in ("run_revision", "state_version"):
         if type(binding[key]) is not int or not 0 <= binding[key] <= 2**63 - 1:
             raise ValueError("invalid native revision")
-    if binding["run_revision"] != (4 if visit else 3):
+    if binding["run_revision"] != (5 if regional else 4 if visit else 3):
         raise ValueError("invalid native Run revision")
     for key in ("resolution_fingerprint", "state_fingerprint", "action_signature", "frame_digest"):
         if type(binding[key]) is not str or re.fullmatch(r"[0-9a-f]{64}", binding[key]) is None:

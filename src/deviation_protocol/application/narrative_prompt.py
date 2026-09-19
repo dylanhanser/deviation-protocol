@@ -116,8 +116,8 @@ class PromptBuilder(NarrativeBoundaryModel):
             )
         visit = getattr(request,"_compiled_world_visit_context",None)
         if visit is not None:
-            from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1
-            if type(visit) is not CompiledWorldVisitContextV1:
+            from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1, CompiledRegionalVisitContextV1
+            if type(visit) not in (CompiledWorldVisitContextV1, CompiledRegionalVisitContextV1):
                 raise NarrativeRequestRejectedError()
             try:
                 safe_context["world_visit_context"] = visit.validated_object()

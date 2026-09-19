@@ -21,6 +21,8 @@ from deviation_protocol.domain.world_continuation import (
 # normalize or refresh this pin on load.
 DESTINATION_CONTENT_IDENTITY = ("undelivered_receipt", "undelivered-receipt-1.0.0")
 DESTINATION_CONTENT_SHA256 = "74af55faf2eca0dd826be1f025272d070c23a2000383183e886ec823f495582c"
+ARCHIVE_CONTENT_IDENTITY = ("receipt_archive", "receipt-archive-1.0.0")
+ARCHIVE_CONTENT_SHA256 = "fa0af413ee0db565d9fa2cc3d46971518fccef123790a21fb9f16155be4edc39"
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +70,11 @@ class SessionContentBundle:
                 self.session_service.catalog != self.scenario_catalog.content_catalog
                 or self.session_service.scenario_catalog != self.scenario_catalog):
             raise ValueError("service/content association mismatch")
+        if (self.scenario_id == ARCHIVE_CONTENT_IDENTITY[0]
+                or self.content_version == ARCHIVE_CONTENT_IDENTITY[1]):
+            if ((self.scenario_id, self.content_version) != ARCHIVE_CONTENT_IDENTITY
+                    or self.content_sha256 != ARCHIVE_CONTENT_SHA256):
+                raise ValueError("required archive content identity mismatch")
 
     def validate_snapshot(self, snapshot: dict) -> GameState:
         state = GameState.from_snapshot(snapshot, catalog=self.scenario_catalog.content_catalog,
@@ -94,6 +101,8 @@ class SessionContentRegistry:
             by_identity[key] = bundle
         if DESTINATION_CONTENT_IDENTITY not in by_identity:
             raise ValueError("required destination content missing")
+        if ARCHIVE_CONTENT_IDENTITY not in by_identity:
+            raise ValueError("required archive content missing")
         self._bundles = MappingProxyType(by_identity)
 
     def resolve(self, scenario_id: str, content_version: str) -> SessionContentBundle:
@@ -120,3 +129,12 @@ class SessionContentRegistry:
             region_id="region.undelivered_receipt.dispatch_hall",region_version=1,
             scenario_id=bundle.scenario_id,scenario_content_version=bundle.content_version,
             content_sha256=bundle.content_sha256,required_priority=0,weight=1),)
+
+    def regional_pool(self):
+        from deviation_protocol.domain.world_continuation import DESTINATION_WORLD
+        from deviation_protocol.domain.world_revisit import ARCHIVE_REGION, RegionalPoolEntryV1
+        bundle = self.resolve(*ARCHIVE_CONTENT_IDENTITY)
+        return (RegionalPoolEntryV1(world=DESTINATION_WORLD, region=ARCHIVE_REGION,
+            scenario_id=bundle.scenario_id, scenario_content_version=bundle.content_version,
+            content_sha256=bundle.content_sha256, required_priority=0, weight=1,
+            cooldown_completed_visits=0),)

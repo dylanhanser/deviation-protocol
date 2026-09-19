@@ -472,6 +472,8 @@ def test_run_composition_activates_only_authorized_player_character_routes() -> 
     }
 
     assert public_routes == {
+        ("/v1/sessions/{session_id}/run-journey", frozenset({"GET"})),
+        ("/v1/sessions/{session_id}/run-revisit", frozenset({"POST"})),
         ("/v1/sessions/{session_id}/run-status", frozenset({"GET"})),
         ("/v1/sessions/{session_id}/run-exit", frozenset({"POST"})),
         ("/v1/sessions/{session_id}/run-continuation", frozenset({"GET"})),

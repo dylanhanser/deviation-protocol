@@ -948,9 +948,20 @@ def build_default_services(
         uow_factory=uow_factory,catalog=destination_pack.content_catalog,scenario_catalog=destination_pack,
         native_coordinator=destination_coordinator,narrative_provider=provider,provider_name="deepseek",
         model_name=deepseek_settings.model if deepseek_settings is not None else "deepseek-v4-flash")
+    archive_path = SCENARIO_PACK.with_name("receipt_archive_v1.json")
+    archive_pack = JsonScenarioCatalogLoader(archive_path).load()
+    archive_coordinator = _build_native_turn_coordinator(archive_pack.content_catalog,archive_pack)
+    archive_service = SessionService(uow_factory=uow_factory,catalog=archive_pack.content_catalog,
+        scenario_catalog=archive_pack,native_view_coordinator=archive_coordinator,
+        native_controller_resolver=controller_binding_resolver)
+    archive_orchestrator = DurableNarrativeTurnOrchestrator(resolver=DeterministicRuleResolver(),
+        uow_factory=uow_factory,catalog=archive_pack.content_catalog,scenario_catalog=archive_pack,
+        native_coordinator=archive_coordinator,narrative_provider=provider,provider_name="deepseek",
+        model_name=deepseek_settings.model if deepseek_settings is not None else "deepseek-v4-flash")
     registry = SessionContentRegistry((
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=orchestrator),
-        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator)))
+        SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),
+        SessionContentBundle.from_bytes(archive_path.read_bytes(),session_service=archive_service,turn_orchestrator=archive_orchestrator)))
     return ApiServices(
         session_service=session_service,
         turn_orchestrator=orchestrator,
@@ -1001,6 +1012,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     install_run_exit_routes(app)
     from deviation_protocol.api.run_continuation_routes import install_run_continuation_routes
     install_run_continuation_routes(app)
+    from deviation_protocol.api.run_revisit_routes import install_run_revisit_routes
+    install_run_revisit_routes(app)
 
     # Starlette does not dispatch an empty path parameter to an APIRoute, so the
     # normal parameter validation handler cannot see this one malformed spelling

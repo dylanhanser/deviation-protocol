@@ -95,7 +95,8 @@ implemented and published at `41d68aac13ca9129b7f6e08fad5f015987603fda`.
 Its [bounded local browser evidence](run_protocol.md#s7-1-publication-and-local-browser-evidence)
 is distinct from the earlier S6 report. S7-2 implementation is published at
 `6dfbd37`, with automated and bounded local browser evidence described below.
-S7-3 public changes remain proposed in the new documentation candidate.
+S7-3 public changes follow its approved plan published at `0ea295e`; the local
+implementation candidate awaits focused independent re-review after the automatic Journey/status consistency correction.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1711,16 +1712,18 @@ storage/request-body/private-authority limitations are recorded in
 [S7-2 publication evidence](run_protocol.md#s7-2-publication-and-local-browser-evidence).
 This planning task performed no new browser execution. S7/Phase 3.3 remain incomplete.
 
-## P3.3-S7-3 proposed journey navigation and regional return
+## P3.3-S7-3 journey navigation and regional return
 
-Status: **PROPOSED documentation contract, not an available API.** The
+Status: **Corrected local implementation candidate; focused independent re-review pending after correction of the remaining automatic Journey/status finding (CHANGES_REQUIRED).** The
 [S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md#8-public-contracts-and-recovery-across-three-visits)
 owns exact fields, validation, errors, compatibility and client transitions.
-Its P01–P09 require explicit approval, including the narrow amendment permitting
-the player to consent to one engine-selected regional return. This is not a
-destination selector, unlock request or general travel control.
+The plan is independently approved and published at `0ea295e`; P01–P09 are
+approved. P02 is operative: the engine determines eligibility and destination;
+the player confirms whether to continue. Cancellation before submission consumes
+no eligibility. No destination selector, unlock request or general travel control
+is added.
 
-Proposed GET `run-journey` returns a closed `native-run-journey/v1`: schema_version,
+GET `/v1/sessions/{session_id}/run-journey` returns a closed `native-run-journey/v1`: schema_version,
 session_id, run_id, run_state_version, lifecycle_status, run_context, path,
 current, predecessor, successor, next_transition and arrival. Required nullable
 neighbors identify immediate visits; path/current are complete Session/content/
@@ -1729,7 +1732,7 @@ only unmaterialized first visits have a null visit. Corrupt missing neighbors
 fail as opaque 409 after ownership, never null repair. One snapshot owns the
 whole result, including historical reads after termination or new admission.
 
-Proposed POST `run-revisit` accepts only the two expected versions and existing
+POST `/v1/sessions/{session_id}/run-revisit` accepts only the two expected versions and existing
 Idempotency-Key, returning `native-run-revisit-result/v1`, revision 5 and exact
 third-visit initialization association. It does not return a current View. Only
 the true held-receipt ending offers this return; old receipt replay precedes
@@ -1741,10 +1744,34 @@ while old POST receipts remain replayable through complete reconstruction.
 Updated clients use journey GET for all native navigation; no mixed old-client
 support for the new family is promised.
 
-The proposed Web retains the complete confirmed POST association, compares every
+The Web retains the complete confirmed POST association, compares every
 immutable source/destination/context/content/visit field before enabling play,
 and permits legitimate later Session/lifecycle versions. Store the confirmed
-successor before View; retry storage with GET only. From successor-only recovery,
+POST successor before its first View; retry storage with GET only. If that read
+fails, the retained POST remains the comparison authority. Explicit reconciliation
+checks the source Journey's complete proposed current association, then the
+retrieved destination View/Journey and predecessor, before writing recovery
+storage or replacing the expected target. Schema-valid contradictory targets,
+content or visits preserve the record and confirmed result, disable gameplay,
+and dispatch no automatic POST; repeated rejection still permits a later matching
+GET, including progressed Session versions. Current recovery reads check the
+retained receipt unconditionally rather than only when Session IDs already agree.
+A terminated Run Journey cannot accompany an active View. Active Run/current
+active or ended Session, terminal Run/current ended Session, and ended history
+with a later active visit remain supported, including old terminal revision 5
+and new active revision 5. Automatic synchronization and explicit recovery apply
+the same complete shared association/revision/lifecycle rule to View, Journey and
+Run-status. Ended-Session mutation controls stay disabled until the pair validates;
+an open confirmation must recheck at submission. Continuation/revisit uses the same owner-bound pair. Active current-Session
+actions retain their validated Journey gate and do not depend on Run-status. Pending,
+mismatched or superseded responses cannot reopen dependent controls. GET-only
+reconciliation can confirm a later matching snapshot; it neither rewrites a
+response nor automatically retries or clears a retained uncertain request.
+A confirmed exit waits for matching Journey GET before enabling return to setup.
+History reads also suspend ended-Session write authority; a failed read leaves
+confirmations blocked while safe read-only navigation/reconciliation stays available.
+Read-only arrival/history text remains separate from write authority during refresh.
+From successor-only recovery,
 GET locates visit two and then visit one after all page memory is lost. Reciprocal
 history navigation and return to current are GET-only, with no storage set/remove
 or historical write controls. Current recovery and temporary historical display
@@ -1752,7 +1779,14 @@ remain separate; generation/client-instance checks reject stale completions.
 Lost-response/retained exact retry, explicit exit/storage clearing/fresh admission
 and DF-002 containment remain required. No automatic POST on reload or recovery.
 
-The R09 combined rendered case must use the normal public deterministic Demo
-store/transport for actual play through three visits; separate mocks only supply
-additional fault/contradiction cases. No implementation or new browser evidence
-is claimed by this plan candidate. S7 and Phase 3.3 remain incomplete.
+The R09 combined rendered cases use normal public deterministic Demo
+store/transport for actual play through three visits, both archive endings,
+storage-only remount, historical navigation, exit and fresh admission/first action.
+Additional transport faults cover contradictory identities, lost response, storage
+failure, client replacement and legitimate progressed versions. Final complete Web, typecheck, lint and deterministic Demo build evidence is bound
+to the new correction package. The latest CHANGES_REQUIRED review closed F1 and
+the original ACTIVE-View mismatch, and identified automatic Journey/status
+synchronization as the remaining blocker. That correction now awaits the same
+reviewer's focused re-review. See [the evidence map](run_protocol.md#s7-3-implementation-candidate-evidence)
+for source applicability and limits. No new browser acceptance is claimed.
+S7 and Phase 3.3 remain incomplete.

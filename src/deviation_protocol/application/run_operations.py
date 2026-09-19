@@ -43,6 +43,8 @@ CREATE_RUN_RESULT_SCHEMA_VERSION = "run.create-result/v1"
 TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-native-result/v1"
 CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.continue-native-result/v1"
 TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-continued-native-result/v1"
+REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION = "run.revisit-native-region-result/v1"
+TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-revisited-native-result/v1"
 ATTACH_SESSION_RESULT_SCHEMA_VERSION = "run.attach-session-result/v1"
 BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION = (
     "run.bind-player-character-result/v1"
@@ -62,6 +64,8 @@ class RunOperationNamespace(StrEnum):
     TERMINATE_NATIVE_V1 = "run.terminate-native/v1"
     CONTINUE_NATIVE_V1 = "run.continue-native/v1"
     TERMINATE_CONTINUED_NATIVE_V1 = "run.terminate-continued-native/v1"
+    REVISIT_NATIVE_REGION_V1 = "run.revisit-native-region/v1"
+    TERMINATE_REVISITED_NATIVE_V1 = "run.terminate-revisited-native/v1"
 
 
 class RunOperationFingerprint(_StrictFrozenModel):
@@ -219,7 +223,23 @@ class RunSafeResult(_StrictFrozenModel):
 
     @model_validator(mode="after")
     def validate_result_shape(self) -> RunSafeResult:
-        if self.result_schema_version == CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+        if self.result_schema_version == REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION:
+            participation = self.participation_reference
+            if (self.lifecycle_status is not RunLifecycleStatus.ACTIVE
+                    or self.resulting_state_version.value != 5
+                    or self.applicable_character_reference is not None
+                    or participation is None
+                    or participation.run_id != self.run_id
+                    or participation.continuous_story_line_id != self.continuous_story_line_id
+                    or participation.joined_state_version.value != 5):
+                raise ValueError("regional result requires exact active revision five")
+        elif self.result_schema_version == TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+            if (self.lifecycle_status is not RunLifecycleStatus.TERMINATED
+                    or self.resulting_state_version.value != 6
+                    or self.participation_reference is not None
+                    or self.applicable_character_reference is not None):
+                raise ValueError("regional exit requires exact terminal revision six")
+        elif self.result_schema_version == CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION:
             participation = self.participation_reference
             if (self.lifecycle_status is not RunLifecycleStatus.ACTIVE
                     or self.resulting_state_version.value != 4
@@ -300,6 +320,14 @@ class StoredRunSuccessReceipt(_StrictFrozenModel):
     @model_validator(mode="after")
     def validate_receipt_bindings(self) -> StoredRunSuccessReceipt:
         expected = {
+            RunMutationKind.REVISIT_NATIVE_REGION: (
+                RunOperationNamespace.REVISIT_NATIVE_REGION_V1,
+                REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION,
+            ),
+            RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: (
+                RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1,
+                TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+            ),
             RunMutationKind.CONTINUE_NATIVE_RUN: (
                 RunOperationNamespace.CONTINUE_NATIVE_V1, CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
             ),

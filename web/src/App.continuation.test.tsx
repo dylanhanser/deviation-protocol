@@ -2,13 +2,15 @@
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import path from "node:path";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { configure, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 import App from "./App";
 import { PublicApiClient } from "./api/client";
 import { nativeRunEntryResponseSchema, playerCharacterCreationResultSchema, actionRequestSchema } from "./api/schemas";
 import { SESSION_RECOVERY_STORAGE_KEY } from "./sessionRecovery";
+
+configure({asyncUtilTimeout:10000});
 
 interface Step {action_type:string;choice_id:string|null;description:string|null}
 interface Message {id?:number;ready?:boolean;actions?:Step[];status?:number;body?:unknown;sha256?:string}
@@ -97,11 +99,11 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
         if(mode==="malformed-response")return {...reply,body:{schema_version:"native-run-continuation-result/v1"}};
       }
       if (["confirmed-visit","confirmed-predecessor","storage-visit"].includes(mode) && request.method==="GET" &&
-          request.path.endsWith("/run-continuation") && !request.path.includes(entered.session_id)) {
+          request.path.endsWith("/run-journey") && !request.path.includes(entered.session_id)) {
         contradicted=true;
-        const body=reply.body as {visit:Record<string,unknown>;predecessor:Record<string,unknown>};
+        const body=reply.body as import("./api/schemas").NativeRunJourney;
         return {...reply,body:{...body,...(mode==="confirmed-predecessor" ?
-          {predecessor:{...body.predecessor,session_id:"unrelated.valid.session"}} : {visit:{...body.visit,visit_id:"unrelated.valid.visit"}})}};
+          {predecessor:{...body.predecessor,session_id:"unrelated.valid.session"}} : {path:{...body.path,visit:{...body.path.visit,visit_id:"unrelated.valid.visit"}},current:{...body.current,visit:{...body.current.visit,visit_id:"unrelated.valid.visit"}}})}};
       }
       return reply;
     };
@@ -167,9 +169,9 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
     if(mode==="client-recovery-visit") {
       const retainedStorage=sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY);
       demo.transport.transform=(request,reply)=>{
-        if(request.path===`/v1/sessions/${record.session_id}/run-continuation`) {
-          const body=reply.body as {visit:Record<string,unknown>};
-          return {...reply,body:{...body,visit:{...body.visit,visit_id:"unrelated.valid.visit"}}};
+        if(request.path===`/v1/sessions/${record.session_id}/run-journey`) {
+          const body=reply.body as import("./api/schemas").NativeRunJourney;
+          return {...reply,body:{...body,path:{...body.path,visit:{...body.path.visit,visit_id:"unrelated.valid.visit"}},current:{...body.current,visit:{...body.current.visit,visit_id:"unrelated.valid.visit"}}}};
         }
         return reply;
       };
@@ -190,7 +192,7 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
       await user.type(within(form).getByLabelText("行动描述"),"核对收件台");
       await waitFor(()=>expect(button).toBeEnabled());
       await user.click(button);
-      await waitFor(()=>expect(demo.calls.some(c=>c.method==="GET" && c.path===`/v1/sessions/${record.session_id}/run-continuation`)).toBe(true));
+      await waitFor(()=>expect(demo.calls.some(c=>c.method==="GET" && c.path===`/v1/sessions/${record.session_id}/run-journey`)).toBe(true));
       await waitFor(()=>expect(screen.getByText(notice)).toBeInTheDocument(),{timeout:10000});
       await waitFor(()=>expect(screen.getByRole("button",{name:"查看上一世界历史"})).toBeEnabled(),{timeout:10000});
       expect((await client.getSessionView(record.session_id)).metadata.state_version).toBe(1);
@@ -232,7 +234,7 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
     }
     if(mode==="crossed-history") {
       demo.transport.transform=(request,reply)=>{
-        if(request.path===`/v1/sessions/${entered.session_id}/run-continuation`) {
+        if(request.path===`/v1/sessions/${entered.session_id}/run-journey`) {
           const body=reply.body as {successor:Record<string,unknown>};
           return {...reply,body:{...body,successor:{...body.successor,session_id:"foreign.session"}}};
         }

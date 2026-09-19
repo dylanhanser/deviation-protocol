@@ -44,9 +44,10 @@ def build_native_demo_orchestrator(*, store, provider, **dependencies):
                 raise NarrativeProposalRejectedError()
             compiled = context.validated_object()
             visit = getattr(request,"_compiled_world_visit_context",None)
-            if job.narrative_request.get("schema") == "native-visit-turn-request/v1":
-                from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1
-                if type(visit) is not CompiledWorldVisitContextV1:
+            if job.narrative_request.get("schema") in ("native-visit-turn-request/v1", "native-regional-turn-request/v1"):
+                from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1, CompiledRegionalVisitContextV1
+                expected = CompiledRegionalVisitContextV1 if job.narrative_request["schema"] == "native-regional-turn-request/v1" else CompiledWorldVisitContextV1
+                if type(visit) is not expected:
                     raise NarrativeProposalRejectedError()
                 visit.validated_object()
             elif visit is not None:

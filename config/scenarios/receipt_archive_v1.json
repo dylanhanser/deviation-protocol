@@ -1,0 +1,494 @@
+{
+  "schema_version": 1,
+  "content_version": "receipt-archive-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "receipt-archive-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.death_certificate.investigator",
+        "display_name": "调查者",
+        "base_attributes": [],
+        "resource_caps": [
+          {
+            "key": "composure",
+            "value": 6
+          }
+        ],
+        "equipment_slots": [],
+        "tags": [
+          "player"
+        ]
+      },
+      {
+        "definition_id": "character.undelivered_receipt.staff",
+        "display_name": "发运工作人员模板",
+        "base_attributes": [],
+        "resource_caps": [],
+        "equipment_slots": [],
+        "tags": [
+          "npc"
+        ]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.undelivered_receipt.dispatch_clerk",
+        "character_definition_id": "character.undelivered_receipt.staff",
+        "display_name": "发运员",
+        "persona_summary": "核对可见排程与回执，只按会签后的指令改变本次发运。",
+        "tags": [
+          "staff",
+          "dispatch"
+        ]
+      }
+    ],
+    "items": [
+      {
+        "definition_id": "item.death_certificate.signed_record",
+        "display_name": "已签发记录",
+        "stack_limit": 1,
+        "tags": [
+          "story",
+          "document"
+        ]
+      },
+      {
+        "definition_id": "item.death_certificate.audit_token",
+        "display_name": "审计令牌",
+        "stack_limit": 1,
+        "tags": [
+          "story",
+          "evidence"
+        ]
+      }
+    ],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "receipt_archive",
+      "schema_version": 1,
+      "content_version": "receipt-archive-1.0.0",
+      "title": "未送达的回执：核验档案室",
+      "summary": "会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。",
+      "initial_phase_id": "receipt_archive.arrival",
+      "initial_location_id": "receipt_archive.audit_desk",
+      "phases": [
+        {
+          "phase_id": "receipt_archive.arrival",
+          "title": "核验档案室",
+          "visible_location_ids": [
+            "receipt_archive.audit_desk"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "custom"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 40,
+          "must_render_fact_ids": [
+            "receipt_archive.fact.hold_effective",
+            "receipt_archive.fact.delivery_unproven"
+          ],
+          "allowed_clue_ids": [
+            "receipt_archive.clue.unresolved_entry"
+          ],
+          "objective_ids": [
+            "receipt_archive.objective.arrival"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "transitions": [
+            {
+              "transition_id": "receipt_archive.transition.observed",
+              "target_phase_id": "receipt_archive.decision",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "CLUE_GROUP_COMPLETE",
+                  "clue_group_id": "archive_evidence"
+                }
+              ],
+              "priority": 10
+            }
+          ]
+        },
+        {
+          "phase_id": "receipt_archive.decision",
+          "title": "保留待核记录",
+          "visible_location_ids": [
+            "receipt_archive.audit_desk"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "custom",
+            "commit"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 40,
+          "must_render_fact_ids": [
+            "receipt_archive.fact.hold_effective",
+            "receipt_archive.fact.delivery_unproven"
+          ],
+          "allowed_clue_ids": [],
+          "objective_ids": [
+            "receipt_archive.objective.decision"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "decision_window_ids": [
+            "receipt_archive.decision.record"
+          ],
+          "transitions": [
+            {
+              "transition_id": "receipt_archive.transition.0",
+              "target_phase_id": "receipt_archive.resolution",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "EVENT_OCCURRED",
+                  "event_type": "receipt_archive.record.sealed"
+                }
+              ],
+              "priority": 10
+            },
+            {
+              "transition_id": "receipt_archive.transition.1",
+              "target_phase_id": "receipt_archive.resolution",
+              "trigger": "VERIFIED_EVENT",
+              "conditions": [
+                {
+                  "rule_type": "EVENT_OCCURRED",
+                  "event_type": "receipt_archive.review.deferred"
+                }
+              ],
+              "priority": 20
+            }
+          ]
+        },
+        {
+          "phase_id": "receipt_archive.resolution",
+          "title": "核验结果",
+          "visible_location_ids": [
+            "receipt_archive.audit_desk"
+          ],
+          "allowed_action_types": [
+            "observe",
+            "custom"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "must_render_fact_ids": [
+            "receipt_archive.fact.hold_effective",
+            "receipt_archive.fact.delivery_unproven"
+          ],
+          "allowed_clue_ids": [],
+          "objective_ids": [
+            "receipt_archive.objective.resolution"
+          ],
+          "tone_hints": [
+            "procedural",
+            "evidence-led"
+          ],
+          "terminal": true
+        }
+      ],
+      "locations": [
+        {
+          "location_id": "receipt_archive.audit_desk",
+          "title": "核验桌",
+          "summary": "待核记录保留着尚未解决的送达疑点。",
+          "initially_open": true
+        }
+      ],
+      "npc_references": [],
+      "facts": [
+        {
+          "fact_id": "receipt_archive.fact.hold_effective",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": true
+        },
+        {
+          "fact_id": "receipt_archive.fact.delivery_unproven",
+          "kind": "FIXED",
+          "visibility": "PLAYER_KNOWN",
+          "value": true
+        },
+        {
+          "fact_id": "receipt_archive.fact.unresolved_sealed",
+          "kind": "MUTABLE",
+          "visibility": "PLAYER_KNOWN",
+          "value": false,
+          "mutable_transitions": [
+            {
+              "from_value": false,
+              "to_value": true,
+              "event_type": "receipt_archive.record.sealed"
+            }
+          ]
+        }
+      ],
+      "clues": [
+        {
+          "clue_id": "receipt_archive.clue.unresolved_entry",
+          "supports_fact_ids": [
+            "receipt_archive.fact.delivery_unproven"
+          ],
+          "source_event_types": [
+            "receipt_archive.entry.observed"
+          ],
+          "allowed_phase_ids": [
+            "receipt_archive.arrival"
+          ],
+          "visible_summary": "待核记录中仍没有足以证明送达的凭证。"
+        }
+      ],
+      "clue_groups": [
+        {
+          "clue_group_id": "archive_evidence",
+          "clue_ids": [
+            "receipt_archive.clue.unresolved_entry"
+          ],
+          "required_count": 1,
+          "completion_event_type": "receipt_archive.evidence.complete"
+        }
+      ],
+      "threat_clocks": [],
+      "decision_windows": [
+        {
+          "decision_id": "receipt_archive.decision.record",
+          "reason": "IRREVERSIBLE_CONSEQUENCE",
+          "earliest_beat": 0,
+          "latest_beat": 0,
+          "conditions": [
+            {
+              "rule_type": "CLUE_GROUP_COMPLETE",
+              "clue_group_id": "archive_evidence"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "receipt_archive.action.seal",
+              "action_type": "commit",
+              "label_hint": "封存待核记录",
+              "server_event_type": "receipt_archive.record.sealed",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "receipt_archive.fact.unresolved_sealed",
+                  "value": true
+                }
+              ],
+              "server_narrative_text": "你封存了仍未解决的待核记录。暂缓继续有效，送达仍未得到证明。"
+            },
+            {
+              "action_id": "receipt_archive.action.defer",
+              "action_type": "commit",
+              "label_hint": "核验暂置",
+              "server_event_type": "receipt_archive.review.deferred",
+              "server_narrative_text": "你暂置了本次核验。待核记录没有被封存，原有暂缓和送达疑点均被保留。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "observe",
+              "custom"
+            ]
+          }
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "receipt_archive.ending.unresolved_sealed",
+          "status": "RESOLVED",
+          "priority": 10,
+          "conditions": [
+            {
+              "rule_type": "EVENT_OCCURRED",
+              "event_type": "receipt_archive.record.sealed"
+            },
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "receipt_archive.fact.unresolved_sealed",
+              "value": true
+            }
+          ]
+        },
+        {
+          "ending_id": "receipt_archive.ending.review_deferred",
+          "status": "FAILED",
+          "priority": 20,
+          "conditions": [
+            {
+              "rule_type": "EVENT_OCCURRED",
+              "event_type": "receipt_archive.review.deferred"
+            }
+          ]
+        }
+      ],
+      "story_item_definition_ids": [
+        "item.death_certificate.signed_record",
+        "item.death_certificate.audit_token"
+      ],
+      "narrative_length": {
+        "target": 350,
+        "minimum": 100,
+        "maximum": 700
+      },
+      "narrative_outcome_rules": [
+        {
+          "rule_id": "receipt_archive.outcome.observe",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": [
+            "receipt_archive.arrival"
+          ],
+          "intent": {
+            "action_types": [
+              "OBSERVE"
+            ],
+            "requires_target": false
+          },
+          "required_current_location_ids": [
+            "receipt_archive.audit_desk"
+          ],
+          "once": true,
+          "safe_description": "核验桌上的待核记录没有送达凭证。原有暂缓仍然有效，你可以封存这项未决记录，或暂置本次核验。",
+          "effects": [
+            {
+              "result": "SUCCESS",
+              "event_type": "receipt_archive.entry.observed",
+              "action_type": "observe",
+              "discovered_clue_ids": [
+                "receipt_archive.clue.unresolved_entry"
+              ],
+              "fixed_public_narrative_text": "核验桌上的待核记录没有送达凭证。原有暂缓仍然有效，你可以封存这项未决记录，或暂置本次核验。"
+            }
+          ],
+          "priority": 10,
+          "mutex_group": "receipt_archive.outcome.action"
+        },
+        {
+          "rule_id": "receipt_archive.outcome.no_effect",
+          "rule_version": "1.0.0",
+          "allowed_phase_ids": [
+            "receipt_archive.arrival",
+            "receipt_archive.decision"
+          ],
+          "intent": {
+            "action_types": [
+              "OBSERVE",
+              "CUSTOM"
+            ]
+          },
+          "once": false,
+          "safe_description": "没有得到规则支持的尝试不改变待核记录。",
+          "effects": [
+            {
+              "result": "NO_EFFECT",
+              "event_type": "receipt_archive.observation.no_effect",
+              "action_type": "custom",
+              "fixed_public_narrative_text": "这次尝试没有发现新证据。暂缓仍有效，送达仍未得到证明。"
+            }
+          ],
+          "priority": 0,
+          "mutex_group": "receipt_archive.outcome.action"
+        }
+      ],
+      "memory_rules": [
+        {
+          "rule_id": "receipt_archive.memory.00_started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "receipt_archive.memory.10",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "receipt_archive.fact.hold_effective"
+        },
+        {
+          "rule_id": "receipt_archive.memory.11",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "REMEMBER_PUBLIC_FACT",
+          "public_fact_id": "receipt_archive.fact.delivery_unproven"
+        },
+        {
+          "rule_id": "receipt_archive.memory.90_complete",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioDecisionSelected",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "receipt_archive.ending.unresolved_sealed",
+            "receipt_archive.ending.review_deferred"
+          ],
+          "required_scenario_event_types": []
+        }
+      ],
+      "public_client": {
+        "title": "未送达的回执：核验档案室",
+        "hook": "会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.death_certificate.investigator",
+            "description": "沿用当前 Run 的完整剩余状态。"
+          }
+        ],
+        "default_character_definition_id": "character.death_certificate.investigator",
+        "scenes": [
+          {
+            "phase_id": "receipt_archive.arrival",
+            "title": "核验档案室",
+            "summary": "会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。"
+          },
+          {
+            "phase_id": "receipt_archive.decision",
+            "title": "保留待核记录",
+            "summary": "查看过待核记录后，决定封存或暂置。"
+          },
+          {
+            "phase_id": "receipt_archive.resolution",
+            "title": "核验结果",
+            "summary": "核验的结果已经记录；原有暂缓保持有效。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "receipt_archive.ending.unresolved_sealed",
+            "title": "封存待核记录",
+            "summary": "未解决的记录已封存，送达仍未得到证明。"
+          },
+          {
+            "ending_id": "receipt_archive.ending.review_deferred",
+            "title": "核验暂置",
+            "summary": "核验被暂置，记录未封存；原有暂缓保持有效。"
+          }
+        ],
+        "actions": [
+          {
+            "action_type": "OBSERVE",
+            "label": "查看待核记录"
+          },
+          {
+            "action_type": "CUSTOM",
+            "label": "尝试其他行动"
+          },
+          {
+            "action_type": "CONTINUE",
+            "label": "继续"
+          }
+        ]
+      }
+    }
+  ]
+}

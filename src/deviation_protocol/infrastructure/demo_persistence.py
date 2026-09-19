@@ -190,6 +190,7 @@ class DemoStoreSnapshot:
     run_world_states: dict
     run_world_visits: dict
     run_world_positions: dict
+    run_world_visit_entries: dict
     run_participations: dict[str, StoredRunSessionParticipationRecord]
     run_creation_receipts: dict[
         tuple[str, str], StoredRunCreationReceiptRecord
@@ -236,6 +237,7 @@ class DemoProcessStore:
         self._run_world_states = {}
         self._run_world_visits = {}
         self._run_world_positions = {}
+        self._run_world_visit_entries = {}
         self._run_participations: dict[
             str, StoredRunSessionParticipationRecord
         ] = {}
@@ -302,6 +304,7 @@ class DemoProcessStore:
             run_world_states=deepcopy(self._run_world_states),
             run_world_visits=deepcopy(self._run_world_visits),
             run_world_positions=deepcopy(self._run_world_positions),
+            run_world_visit_entries=deepcopy(self._run_world_visit_entries),
             run_participations=deepcopy(self._run_participations),
             run_creation_receipts=deepcopy(self._run_creation_receipts),
             run_mutation_receipts=deepcopy(self._run_mutation_receipts),
@@ -354,6 +357,7 @@ class _AuthorityMaps:
     run_world_states: dict
     run_world_visits: dict
     run_world_positions: dict
+    run_world_visit_entries: dict
     run_participations: dict[str, StoredRunSessionParticipationRecord]
     run_creation_receipts: dict[
         tuple[str, str], StoredRunCreationReceiptRecord
@@ -633,6 +637,7 @@ def _run_from_maps(
         or any(k[0] == identity for k in maps.run_world_states)
         or any(k[0] == identity for k in maps.run_world_visits)
         or identity in maps.run_world_positions
+        or any(k[0] == identity for k in maps.run_world_visit_entries)
         or
         any(key[0] == identity for key in maps.run_revisions)
         or any(item.run_id == run_id for item in maps.run_participations.values())
@@ -736,7 +741,7 @@ async def _active_run_for_character(
         for item in maps.run_mutation_receipts.values()
         if item.result_player_character_id == identity
     )
-    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1
+    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1
     active = []
     for identity in sorted(run_ids):
         run = _run_from_maps(maps, RunId(value=identity))
@@ -747,13 +752,13 @@ async def _active_run_for_character(
             raise RunStoredRecordIntegrityError("surviving binding character mismatch")
         if run.lifecycle_status is RunLifecycleStatus.TERMINATED:
             family = await classifier(run_id=run.run_id)
-            if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1):
+            if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1):
                 raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
         elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
-            if run.current_mutation_provenance.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN:
-                from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1
+            if run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
+                from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
                 family=await classifier(run_id=run.run_id)
-                if type(family) is not NativeRunContinuedV1:
+                if type(family) is not (NativeRunRegionalRevisitV1 if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else NativeRunContinuedV1):
                     raise RunStoredRecordIntegrityError("active continued binding requires complete family")
             active.append(run)
         else:
@@ -1402,7 +1407,7 @@ class DemoRunRepository(RunRepository):
         self._uow._ensure_open()
         run = validate_canonical_run(run)
         prior = run.current_mutation_provenance.prior_state_version
-        if run.current_mutation_provenance.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN):
+        if run.current_mutation_provenance.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
             self._uow._require_native_writer()
         if (
             prior is None
@@ -1413,6 +1418,8 @@ class DemoRunRepository(RunRepository):
                 RunMutationKind.TERMINATE_NATIVE_RUN,
                 RunMutationKind.CONTINUE_NATIVE_RUN,
                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
+                RunMutationKind.REVISIT_NATIVE_REGION,
+                RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,
             }
         ):
             raise RunStoredRecordIntegrityError(
@@ -1574,7 +1581,7 @@ class DemoRunSessionParticipationRepository(
             or revision.continuous_story_line_id
             != participation.continuous_story_line_id
             or revision.mutation_kind
-            not in (RunMutationKind.ATTACH_SESSION.value,RunMutationKind.CONTINUE_NATIVE_RUN.value)
+            not in (RunMutationKind.ATTACH_SESSION.value,RunMutationKind.CONTINUE_NATIVE_RUN.value,RunMutationKind.REVISIT_NATIVE_REGION.value)
             or revision.operation_id != participation.operation_id
             or revision.source_reference != participation.source_reference
             or revision.occurred_at != joined_at
@@ -1764,6 +1771,8 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
             RunOperationNamespace.TERMINATE_NATIVE_V1,
             RunOperationNamespace.CONTINUE_NATIVE_V1,
             RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1,
+            RunOperationNamespace.REVISIT_NATIVE_REGION_V1,
+            RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1,
         }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         stored = self._uow._visible_authority_maps().run_mutation_receipts.get(
@@ -1791,6 +1800,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         created_at: datetime,
         exit_evidence: NativeRunExitEvidenceV1 | None = None,
         continuation_evidence=None,
+        revisit_evidence=None,
     ) -> None:
         self._uow._ensure_open()
         if (
@@ -1801,6 +1811,8 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
             not in {
                 (RunOperationNamespace.TERMINATE_NATIVE_V1, RunMutationKind.TERMINATE_NATIVE_RUN),
                 (RunOperationNamespace.CONTINUE_NATIVE_V1, RunMutationKind.CONTINUE_NATIVE_RUN),
+                (RunOperationNamespace.REVISIT_NATIVE_REGION_V1, RunMutationKind.REVISIT_NATIVE_REGION),
+                (RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1, RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN),
                 (RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN),
                 (
                     RunOperationNamespace.ATTACH_SESSION_V1,
@@ -1834,12 +1846,20 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         )
         participation = result.participation_reference
         character_reference = result.applicable_character_reference
-        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN):
+        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
             self._uow._require_native_writer()
             from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1,ContinuedNativeRunExitEvidenceV1
             from deviation_protocol.domain.world_continuation import NativeRunContinuationEvidenceV1
             from deviation_protocol.domain.run import canonical_run_operation_bytes, revalidate_run_model
-            carrier, kind = (continuation_evidence,NativeRunContinuationEvidenceV1) if receipt.command_kind is RunMutationKind.CONTINUE_NATIVE_RUN else (exit_evidence,NativeRunExitEvidenceV1 if receipt.command_kind is RunMutationKind.TERMINATE_NATIVE_RUN else ContinuedNativeRunExitEvidenceV1)
+            from deviation_protocol.domain.world_revisit import NativeRunRegionalRevisitEvidenceV1
+            from deviation_protocol.domain.run_protocol_binding import RevisitedNativeRunExitEvidenceV1
+            carrier, kind = {
+                RunMutationKind.CONTINUE_NATIVE_RUN: (continuation_evidence, NativeRunContinuationEvidenceV1),
+                RunMutationKind.REVISIT_NATIVE_REGION: (revisit_evidence, NativeRunRegionalRevisitEvidenceV1),
+                RunMutationKind.TERMINATE_NATIVE_RUN: (exit_evidence, NativeRunExitEvidenceV1),
+                RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: (exit_evidence, ContinuedNativeRunExitEvidenceV1),
+                RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: (exit_evidence, RevisitedNativeRunExitEvidenceV1),
+            }[receipt.command_kind]
             revalidate_run_model(carrier,kind)
             operation_evidence = canonical_run_operation_bytes(carrier)
         elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:
@@ -2351,8 +2371,12 @@ def _classify_demo_run(maps, run_id, sessions, snapshots, events, registry=None,
             continuous_story_line_id=run.continuous_story_line_id.value,session_id=p.session_id,
             joined_state_version=p.joined_state_version.value).value for p in run.trusted_participation_references
             if p.joined_state_version.value in (3,4)}
+        from deviation_protocol.domain.world_revisit import derive_regional_visit_id
+        visit_ids.update(derive_regional_visit_id(run_id=run.run_id.value,
+            continuous_story_line_id=run.continuous_story_line_id.value, session_id=p.session_id,
+            joined_state_version=5).value for p in run.trusted_participation_references if p.joined_state_version.value == 5)
         world_rows = []
-        for mapping in (maps.run_world_states,maps.run_world_visits,maps.run_world_positions):
+        for mapping in (maps.run_world_states,maps.run_world_visits,maps.run_world_positions,maps.run_world_visit_entries):
             rows=[]
             for key,row in mapping.items():
                 related = (row.run_id == run_id.value or row.continuous_story_line_id == run.continuous_story_line_id.value
@@ -2401,12 +2425,26 @@ def _classify_demo_run(maps, run_id, sessions, snapshots, events, registry=None,
             b._validate_native_character(run, evidence, immutable, *character_rows())
             rows = session_rows(participations[0])
             admission = b._complete_native_admission(run, protocol, world, evidence, request_id, participations[0], *rows)
-            if len(current_run.trusted_participation_references) == 2:
+            if len(current_run.trusted_participation_references) in (2, 3):
                 from deviation_protocol.infrastructure.world_continuation_persistence import reconstruct_continued_family
                 b._require(not any(job.session_id == participations[0].session_id
                     and job.status in ACTIVE_NARRATIVE_JOB_STATUSES for job in jobs.values()),
                     "historical source has active narrative job")
                 destination_rows = session_rows(participations[1])
+                if len(current_run.trusted_participation_references) == 3:
+                    from deviation_protocol.infrastructure.world_revisit_persistence import reconstruct_regional_family
+                    b._require(not any(job.session_id == participations[1].session_id
+                        and job.status in ACTIVE_NARRATIVE_JOB_STATUSES for job in jobs.values()),
+                        "regional source has active narrative job")
+                    regional_rows = session_rows(participations[2])
+                    return reconstruct_regional_family(admission=admission, run=current_run, mutations=mutations,
+                        creation_evidence=evidence, roots=world_rows[0], visits=world_rows[1], positions=world_rows[2],
+                        entries=world_rows[3], source_session=rows[0], source_snapshot=rows[2],
+                        destination_session=destination_rows[0], destination_event=destination_rows[1],
+                        destination_snapshot=destination_rows[2], regional_session=regional_rows[0],
+                        regional_event=regional_rows[1], regional_snapshot=regional_rows[2],
+                        source_events=tuple(e for e in events if e.session_id == participations[1].session_id), registry=registry)
+                b._require(not world_rows[3], "entry on old continued family")
                 return reconstruct_continued_family(admission=admission,run=current_run,mutations=mutations,
                     creation_evidence=evidence,roots=world_rows[0],visits=world_rows[1],positions=world_rows[2],
                     source_session=rows[0],source_snapshot=rows[2],destination_session=destination_rows[0],
@@ -2476,7 +2514,7 @@ class DemoRunWorldContinuationRepository(application_ports.RunWorldContinuationR
 
     async def add(self,continued):
         from types import SimpleNamespace
-        from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
         from deviation_protocol.domain.run import revalidate_run_model
         from deviation_protocol.infrastructure.world_continuation_persistence import root_to_storage
         self._uow._require_native_writer()
@@ -2495,6 +2533,38 @@ class DemoRunWorldContinuationRepository(application_ports.RunWorldContinuationR
             getattr(self._uow,"_pending_"+name)[key]=row
 
 
+class DemoRunWorldRevisitRepository(application_ports.RunWorldRevisitRepository):
+    def __init__(self, store, uow):
+        self._store, self._uow = store, uow
+
+    async def source_events(self, session_id, *, locking=False):
+        self._uow._ensure_open()
+        return tuple(deepcopy(e) for e in (*self._store._events, *self._uow._pending_events)
+                     if e.session_id == session_id)
+
+    async def add(self, revisited):
+        from types import SimpleNamespace
+        from deviation_protocol.domain.run import revalidate_run_model
+        from deviation_protocol.domain.run_protocol_binding import NativeRunRegionalRevisitV1
+        from deviation_protocol.infrastructure.world_revisit_persistence import entry_to_storage
+        self._uow._require_native_writer()
+        revalidate_run_model(revisited, NativeRunRegionalRevisitV1)
+        maps = self._uow._visible_authority_maps()
+        before, after = revisited.continued.position, revisited.position
+        expected = SimpleNamespace(**before.model_dump())
+        if maps.run_world_positions.get(before.run_id) != expected:
+            raise application_ports.NativeRunAdmissionWriteConflictError("regional position CAS conflict")
+        key = (revisited.visit.run_id, revisited.visit.visit_id)
+        if (key in maps.run_world_visits or key in maps.run_world_visit_entries
+                or any(row.session_id == revisited.visit.session_id for row in maps.run_world_visits.values())):
+            raise application_ports.NativeRunAdmissionWriteConflictError("regional visit conflict")
+        self._uow._pending_run_world_visits[key] = SimpleNamespace(**revisited.visit.model_dump())
+        self._uow._pending_run_world_visit_entries[key] = SimpleNamespace(**entry_to_storage(revisited.entry,
+            created_at=revisited.canonical_run.current_mutation_provenance.occurred_at))
+        self._uow._pending_run_world_position_expected[before.run_id] = expected
+        self._uow._pending_run_world_positions[after.run_id] = SimpleNamespace(**after.model_dump())
+
+
 class DemoUnitOfWork(UnitOfWork):
     def __init__(self, store: DemoProcessStore, *, native_capability=None) -> None:
         self._store = store
@@ -2502,11 +2572,14 @@ class DemoUnitOfWork(UnitOfWork):
         self.run_protocol_bindings = DemoRunProtocolBindingRepository(store, self)
         self.run_entry_world_bindings = DemoRunEntryWorldBindingRepository(store, self)
         self.run_world_continuations = DemoRunWorldContinuationRepository(store,self)
+        self.run_world_revisits = DemoRunWorldRevisitRepository(store,self)
+        self._pending_run_world_position_expected = {}
         self._pending_run_protocol_bindings = {}
         self._pending_run_entry_world_bindings = {}
         self._pending_run_world_states = {}
         self._pending_run_world_visits = {}
         self._pending_run_world_positions = {}
+        self._pending_run_world_visit_entries = {}
         self.sessions = DemoSessionRepository(store, self)
         self.turn_requests = DemoTurnRequestRepository(store, self)
         self.narrative_jobs = DemoNarrativeJobRepository(store, self)
@@ -2721,6 +2794,7 @@ class DemoUnitOfWork(UnitOfWork):
             run_world_states=dict(self._store._run_world_states),
             run_world_visits=dict(self._store._run_world_visits),
             run_world_positions=dict(self._store._run_world_positions),
+            run_world_visit_entries=dict(self._store._run_world_visit_entries),
             run_participations=dict(self._store._run_participations),
             run_creation_receipts=dict(self._store._run_creation_receipts),
             run_mutation_receipts=dict(self._store._run_mutation_receipts),
@@ -2748,6 +2822,7 @@ class DemoUnitOfWork(UnitOfWork):
         maps.run_world_states.update(self._pending_run_world_states)
         maps.run_world_visits.update(self._pending_run_world_visits)
         maps.run_world_positions.update(self._pending_run_world_positions)
+        maps.run_world_visit_entries.update(self._pending_run_world_visit_entries)
         maps.run_participations.update(self._pending_run_participations)
         maps.run_creation_receipts.update(self._pending_run_creation_receipts)
         maps.run_mutation_receipts.update(self._pending_run_mutation_receipts)
@@ -2814,6 +2889,7 @@ class DemoUnitOfWork(UnitOfWork):
             run_world_states=deepcopy(self._store._run_world_states),
             run_world_visits=deepcopy(self._store._run_world_visits),
             run_world_positions=deepcopy(self._store._run_world_positions),
+            run_world_visit_entries=deepcopy(self._store._run_world_visit_entries),
             run_participations=deepcopy(self._store._run_participations),
             run_creation_receipts=deepcopy(
                 self._store._run_creation_receipts
@@ -3050,10 +3126,11 @@ class DemoUnitOfWork(UnitOfWork):
         )
         authority.run_revisions.update(deepcopy(self._pending_run_revisions))
         authority.run_current.update(deepcopy(self._pending_run_current))
-        for name in ("run_protocol_bindings", "run_entry_world_bindings", "run_world_states", "run_world_visits", "run_world_positions"):
+        for name in ("run_protocol_bindings", "run_entry_world_bindings", "run_world_states", "run_world_visits", "run_world_positions", "run_world_visit_entries"):
             target, pending = getattr(authority, name), getattr(self, "_pending_" + name)
-            if set(target) & set(pending):
-                raise application_ports.NativeRunAdmissionWriteConflictError("native map conflict")
+            for key in set(target) & set(pending):
+                if name != "run_world_positions" or target[key] != self._pending_run_world_position_expected.get(key):
+                    raise application_ports.NativeRunAdmissionWriteConflictError("native map conflict")
             target.update(deepcopy(pending))
         authority.run_participations.update(
             deepcopy(self._pending_run_participations)
@@ -3094,6 +3171,7 @@ class DemoUnitOfWork(UnitOfWork):
         run_ids.update(k[0] for k in authority.run_world_states)
         run_ids.update(k[0] for k in authority.run_world_visits)
         run_ids.update(authority.run_world_positions)
+        run_ids.update(key[0] for key in authority.run_world_visit_entries)
         run_ids.update(key[0] for key in authority.run_revisions)
         run_ids.update(
             item.run_id.value for item in authority.run_participations.values()
@@ -3148,6 +3226,7 @@ class DemoUnitOfWork(UnitOfWork):
         self._store._run_world_states = authority.run_world_states
         self._store._run_world_visits = authority.run_world_visits
         self._store._run_world_positions = authority.run_world_positions
+        self._store._run_world_visit_entries = authority.run_world_visit_entries
         self._store._snapshots = snapshots
         self._store._creation_keys = creation_keys
         self._store._turn_requests = turn_requests
@@ -3181,6 +3260,8 @@ class DemoUnitOfWork(UnitOfWork):
         self._pending_run_world_states.clear()
         self._pending_run_world_visits.clear()
         self._pending_run_world_positions.clear()
+        self._pending_run_world_position_expected.clear()
+        self._pending_run_world_visit_entries.clear()
         self._pending_session = None
         self._pending_snapshot = None
         self._pending_state_update = None

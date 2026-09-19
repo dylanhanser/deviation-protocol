@@ -22,15 +22,15 @@ export const runOptionsFixture: RunEntryOptions = {
   ].map((p) => ({profile_ref:{profile_id:p.id,profile_version:1},label:p.label,
     defaults:Object.fromEntries(objectiveNames.map((n,i) => [n,p.defaults[i]])) as RunEntryOptions["profiles"][number]["defaults"],
     override_rules:objectiveNames.map((parameter,i) => ({parameter,minimum:p.ranges[i]![0]!,maximum:p.ranges[i]![1]!,step:5 as const}))})),
-  entry_worlds:[{entry_world:{entry_world_id:"world.death_certificate",entry_world_version:1},scenario_id:"scenario.public-alpha",
-    scenario_content_version:"public-alpha-1.0.0",title:"起始世界",hook:"已公开的场景说明。",
+  entry_worlds:[{entry_world:{entry_world_id:"world.death_certificate",entry_world_version:1},scenario_id:"death_certificate",
+    scenario_content_version:"death-certificate-1.1.0",title:"起始世界",hook:"已公开的场景说明。",
     eligible_profiles:["difficulty.silent-hunting-ground","difficulty.fragile-alliance","difficulty.open-expedition"].map((profile_id) => ({profile_id,profile_version:1}))}],
   presentation_options:{world_tone:["grim","balanced","heroic"],reality_boundary:["lawful","deviant","chaotic"],relationship_overlay:["off","veiled","charged"]},
 };
 
 export function nativeEntryFixture(): NativeRunEntryResponse {
   const profile = runOptionsFixture.profiles[2]!;
-  return structuredClone({session_id:"session-public-1",scenario_id:"scenario.public-alpha",scenario_content_version:"public-alpha-1.0.0",
+  return structuredClone({session_id:"session-public-1",scenario_id:"death_certificate",scenario_content_version:"death-certificate-1.1.0",
     run_context:{schema_version:"public-run-context/v1",run_id:"run.native",player_character:structuredClone(playerCharacterFixture),
       entry_world:runOptionsFixture.entry_worlds[0]!.entry_world,profile_ref:profile.profile_ref,objectives:profile.defaults,
       presentation:{world_tone:"balanced",reality_boundary:"lawful",relationship_overlay:"off"},resource_pressure_label:"Generous"}});
@@ -407,4 +407,18 @@ export function endedViewFixture(
 
 export function errorFixture(errorCode: string, message: string) {
   return { error: { error_code: errorCode, message } };
+}
+
+
+export function nativeViewFixture(view: PlayerSessionView = activeViewFixture): PlayerSessionView {
+  const copy=JSON.parse(JSON.stringify(view).replaceAll('scenario.public-alpha','death_certificate')
+    .replaceAll('public-alpha-1.0.0','death-certificate-1.1.0')) as PlayerSessionView;
+  return {...copy,run_context:copy.run_context ?? nativeEntryFixture().run_context};
+}
+export function nativeJourneyFixture(view: PlayerSessionView = nativeViewFixture()): import("../api/schemas").NativeRunJourney {
+  const path={session_id:view.metadata.session_id,session_state_version:view.metadata.state_version,
+    scenario_id:"death_certificate",scenario_content_version:"death-certificate-1.1.0",visit:null};
+  return {schema_version:"native-run-journey/v1",session_id:path.session_id,run_id:view.run_context!.run_id,
+    run_state_version:3,lifecycle_status:"active",run_context:view.run_context!,path,current:path,
+    predecessor:null,successor:null,next_transition:null,arrival:null};
 }

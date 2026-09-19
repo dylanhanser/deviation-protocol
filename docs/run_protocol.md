@@ -1,31 +1,178 @@
 # Run Protocol, Difficulty, and World Profiles
 
-## Current S7-2 publication and S7-3 planning status
+## Current S7-3 implementation status
 
-S7-2 implementation is published at
-`6dfbd37d127386b589a1e6c0c43b831aefd70279`, subject
-`feat(run): implement P3.3-S7-2 same-line world continuation`, parent
-`2c272487a2f12c60c28ada95dd9a3f1edf1d42ba`. The S7-3 planning preflight verified
-clean main/HEAD/local origin/main at that exact commit, 0/0, empty index and no
-Git conflict/operation/lock, without fetching. Current status supersedes the
-explicitly historical candidate checkpoints below; published plans and earlier
-reviews are not rewritten. No separate lifecycle-closeout task is due.
+S7-2 implementation is published at `6dfbd37d127386b589a1e6c0c43b831aefd70279`.
+The independently approved [S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
+is published at `0ea295e358f526c5101856e4dc2370d66b23b938`, the clean aligned
+main/HEAD/local origin/main baseline verified for this implementation without
+fetching. P01–P09 are explicitly approved. P02 is operative: the engine determines
+eligibility and destination; the player confirms whether to continue, and
+cancellation before submission consumes no eligibility. The published plan's
+PROPOSED/unapproved language remains frozen historical candidate wording.
 
-The [S7-3 five-document plan candidate](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
-proposes a single new visit to the existing receipt world, in a new verification
-archive region after the real held-receipt ending. It preserves prior world
-consequences and actual PlayerState, supplies new actions/endings and three-visit
-GET history/recovery, then explicit exit. P01–P09 remain **PROPOSED**. In
-particular, player consent to this engine-selected return is an explicit proposed
-amendment to the no-approve/no-veto rule below, not an already approved reading
-of that rule. The new policy becomes applicable only after explicit approval;
-no arbitrary destination choice or client-owned eligibility is proposed.
+The local implementation candidate adds the approved archive journey described
+below. Required automated verification is recorded; the complete candidate and
+its identities are frozen in the external handoff. The latest focused review returned CHANGES_REQUIRED: F1 is closed and the
+original ACTIVE-View mismatch is corrected, but automatic Journey/status
+synchronization still enabled exit from inconsistent reads. That remaining
+finding is corrected locally; next is focused independent re-review of this
+correction, its direct dependencies and replacement evidence. No implementation approval token,
+commit, browser acceptance, deployment, real Provider acceptance, limited trial
+or broader release is claimed. S7 and Phase 3.3 remain incomplete; S7-4 owns
+canon-preserving line transitions/normal completion and S7-5 final integration.
+DF-001/DF-002 remain deferred under existing containment and reassessment rules.
 
-S7-3 planning is authorized; implementation is not. Next is one substantive
-independent plan review, with the plan's single operative token and dormant
-implementation token. S7-4 retains canon-preserving line transitions and normal
-completion; S7-5 retains final integration/parent criteria reconciliation.
-S7 and Phase 3.3 remain incomplete. Existing DF-001/DF-002 dispositions persist.
+## S7-3 implementation candidate evidence
+
+The implemented path is actual first-world RESOLVED or FAILED -> ordinary
+second-world continuation -> OBSERVE/TALK/hold -> explicit archive confirmation
+-> archive OBSERVE -> seal/RESOLVED or defer/FAILED -> three-visit GET history and
+recovery -> explicit 5→6 exit -> separately confirmed same-character admission
+and first action. All three profiles and permitted objective boundaries finish;
+public depletion and resource-only zero fixtures are separately identified.
+
+Archive entry carries the complete latest ended PlayerState, including zero
+composure, without fees, replenishment, items, rewards, character revision or a
+new clock. The two original world roots remain immutable. New active revision 5
+is distinguished from old terminal revision 5; new termination is revision 6.
+One immutable `run_world_visit_entries` record, third visit, successful receipt,
+Session initialization, Run CAS and current-position CAS share one commit.
+Strict prefix reconstruction validates historical position 4 from committed
+S7-2 evidence without fabricating a second persisted position row.
+
+New required archive content is independently pinned to raw SHA-256
+`fa0af413ee0db565d9fa2cc3d46971518fccef123790a21fb9f16155be4edc39`.
+Its authored public route is documented in [receipt_archive_v1](scenarios/receipt_archive_v1.md).
+GET `run-journey` supplies complete path/current/neighbor associations and trusted
+path-specific arrival. POST `run-revisit` preserves immutable replay after turns,
+exit and later admission. Old continuation POST replay remains valid; old
+continuation GET returns `RUN_CONTINUATION_NOT_AVAILABLE` on three-visit families.
+View, public-run-context/v1 and recovery storage v1 retain their meanings.
+
+Evidence is retained outside the repository at
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-3-implementation-20260919`.
+`R01-R10.json` maps acceptance responsibilities to exact command records, raw logs,
+exit codes and per-file source identities. Earlier-source runs are progressive
+proof, not automatically final-source evidence; overlapping counts are not added.
+The original review returned **CHANGES_REQUIRED** for F1 (confirmed POST target
+replaced during recovery) and the original F2 (terminal Journey/ACTIVE View).
+The next 610,849-byte candidate, +5,537/-333, SHA-256
+`45a46eba6c47f253f96b8087d49bf9cf5c7d1a054c19059be28578d0d153a88f`,
+was reviewed at
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-3-focused-rereview-20260919`.
+That latest **CHANGES_REQUIRED** verdict closes F1 and the original ACTIVE-View
+mismatch, but reproduces one remaining blocker: automatic synchronization enabled
+exit using terminal Journey 6 with active Run-status 5. The current correction
+awaits the same reviewer's focused re-review; no approval is implied.
+
+The incoming 70-file snapshot, unchanged rendered diagnostic, replacement evidence,
+complete corrected candidate and incoming-to-corrected delta are saved at
+`C:/Users/dylanmonster/AppData/Local/Temp/deviation-s7-3-consistency-correction-20260919`.
+Each patch has its own bytes, line changes and SHA-256 in the external manifest;
+all other candidate paths and protected files remain byte-identical. Backend,
+content, migrations, dependencies, published plans and DF-001/DF-002 are unchanged.
+Existing API-001 covers the correction; Guardrail impact: None.
+
+One shared consistency rule now validates automatic synchronization, explicit
+recovery and confirmed exit publication. The pair is bound to the loaded View
+and client; generation/client/target checks reject superseded reads. Pending or
+contradictory responses cannot authorize exit, continuation/revisit or dependent
+action submission, including a previously opened confirmation. Separately read
+snapshots may advance: only matching GET reconciliation restores authority,
+without rewriting responses, automatic POST retry or uncertain-request disposal.
+Run lifecycle stays distinct from current and historical Session lifecycle;
+active Runs with ended Sessions and old terminal-5/new active-5 remain supported.
+The retained confirmed continuation POST still determines successor identity.
+
+Final `web-final-02` passed **409 tests with one existing skip**, all 12 files,
+in 250.23 seconds. `static-final-03` passed typecheck, lint and deterministic Demo
+build. The final rendered diagnostic independently exercises the real App with
+the review fixture and confirms disabled exit and zero POST. Source-bound commands
+are recorded in the new `command-evidence-index.json` and `R01-R10.json`. The previous correction's
+`web-final-02` (398 passed, one existing skip) and `static-final-02` are historical
+for changed Web source; focused and affected results overlap and are not added.
+The new rendered regressions cover both completion orders, reverse and same-revision
+lifecycle contradictions, schema-valid association mismatches, matching controls,
+ended history in an active Run, confirmation invalidation, retained uncertain
+requests, matching GET recovery and late client/target responses. F1/F2 regressions
+and legacy/native compatibility cases remain in the complete Web suite.
+
+The original rendered diagnostic is preserved unchanged: it passes on preserved
+incoming source by asserting the defect, and fails as expected on corrected
+source because exit remains disabled. A separately labelled acceptance derivative
+uses the same valid fixtures and asserts disabled exit, no confirmation and zero
+POST. Raw commands, logs, nonzero/intermediate attempts and final-source identities
+are retained, including the incoming diagnostic's command-path and sandbox
+collection failures. The same narrow Offline entry point was escalated after the
+sandbox denial; it ran only the rendered diagnostic wrapper and built-in offline
+metadata/compile/dependency checks, not a broad backend suite.
+Unchanged source, dependency and environment identities and rehashed prior
+artifacts support reuse of the accepted backend, Offline, MySQL, S2 and migration
+evidence below. Saved database restoration remains historical, not a new observation.
+`public-final-01` passed 26 public/explicitly labelled resource-only journeys,
+including all 18 profile/objective/ending permutations and eight resource-only
+zero cases. These counts overlap focused evidence and are not added to it.
+`mysql-affected-runtime-03` passed all 283 affected continuation, admission, exit,
+turn-mechanics and character-binding tests against the new head.
+`mysql-regional-final-02` passed all 119 collected regional and 010 migration cases;
+two subsequently added legacy/pre-admission preservation controls passed in
+`mysql-legacy-preservation-final-01`, with unchanged existing test bodies verified
+by an AST comparison. `mysql-shared-schema-final-01` passed 52 affected schema,
+Run and character-persistence cases; 16 unrelated historical S3 fault cases were
+explicitly deselected. These groups are separate from Offline database skips.
+`canonical-offline-04` completed successfully: 3077 passed, 709 skipped, 1 deselected, 2 warnings in 2305.45s (0:38:25).
+Compilation, dependency consistency, Alembic heads/history and whitespace
+checks also passed through the canonical Offline entry point. The one
+deselected S2 exhaustive resolver node uses the separately verified original
+5,624,910-call proof. The earlier `canonical-offline-03` was stopped at the
+user's request and is not a passing run. On resumption, relevant source and
+dependency identities were rechecked before reusing the successful Web and
+MySQL records; this Offline run accessed neither databases nor real Providers.
+
+Real MySQL work is restricted to mysql+asyncmy / deviation_protocol_test. Its
+recorded actual initial state is MySQL 8.0.43, revision 20260916_0007, 19 tables,
+zero application rows and a free shared lock. The completed schema groups and
+`database-final-check-01` verify exact restoration of that observed state,
+including every CREATE TABLE, row, constraint/enforcement and named-lock state.
+A failed concurrency-test cleanup was inspected and repaired by exact
+recorded test identities; `race-database-restoration-01` proves full restoration.
+The historical 009 current-read fixture initially held a metadata read lock
+across 010 DDL. Its exact blocked test query was released, the observed partial
+prefix and owned rows were inspected, and `metadata-database-restoration-01`
+restored the complete initial state. The fixture now establishes 009 before
+opening its stale reader. A nullable-column fault also made MySQL rewrite a
+CHECK literal's charset marker; `nullable-database-restoration-01` restored the
+exact original DDL, and the fixture now restores that marker too.
+`mysql-final-boundaries-03` passed all seven replacement corruption, preflight,
+ORM and historical current-read checks. Nonzero runs are not counted as successful.
+The current-writer migration race also needed its starting revision moved from
+008 to 009: its shared Alembic proxy had paused 009 before 010 existed. Both race
+tasks now finish before cleanup. The failed attempt left an empty, valid 010
+schema; `migration-race-restoration-01` restored the exact recorded initial state.
+The first sandbox attempt's
+public-journey-01 raw log was overwritten before unique-label enforcement was
+added; that missing first log is an explicit evidence limitation. Later failures
+and their successful replacements remain separate.
+
+The section-10 inventory governs implementation. Current-head test fixtures,
+Demo snapshot/replay inventories, composition route lists and native Web fixtures
+are direct consumers and change mechanically.
+The exact public route/component inventories in `tests/unit/test_player_character_api.py`
+also require the two new endpoints and their closed DTOs; this dependency is
+recorded before updating those assertions, with focused and Offline verification.
+The exact classifier-query inventory in
+`tests/unit/test_run_protocol_binding_persistence.py` also needs the new regional
+entry read between world-position and character reconstruction. This mechanical
+test dependency is recorded before its assertion update; the query must remain
+present to detect orphaned regional evidence even for an old-family request.
+Historical migration contracts remain isolated; old packs, published plans and migrations 001–009 are protected.
+Unchanged owners retain responsibility through their current shared service or
+parser. A per-path disposition and complete candidate identities accompany the
+external reviewer handoff. No product scope beyond the published plan is added.
+
+Guardrail impact: None. Regression checks enforce existing authority, transaction,
+recovery and evidence-retention rules; no new reusable rule is introduced.
 
 ### S7-2 publication and local browser evidence
 
@@ -330,8 +477,8 @@ published at `9fab18d`; implementation is published at
 terminal-CHECK correction. Bounded local Demo browser acceptance covers both
 endings, exit/re-entry and recovery. S7-2 has an independently approved published plan and approved P01–P08;
 its implementation is published at `6dfbd37` with inspected bounded local browser
-evidence. S7-3 has an authorized documentation plan candidate with P01–P09 still
-PROPOSED; S7-3 implementation and S7-4/5 remain unauthorized. DF-002
+evidence. S7-3 has an approved published plan and P01–P09; its local implementation
+candidate awaits focused independent re-review. S7-4/5 remain outside this increment. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
@@ -672,8 +819,8 @@ post-ending Run exit is published at `41d68aac` under its approved published
 plan (`9fab18d`). The [published S7-2 plan](phase_3_3_s7_2_same_line_world_continuation_plan.md)
 authorizes the first same-line successor; its product choices and technical plan
 are approved. Implementation is published at `6dfbd37` with inspected bounded
-local browser evidence. The S7-3 plan candidate is ready for independent plan
-review and P01–P09 disposition; later S7 allocation is preserved.
+local browser evidence. The S7-3 plan is published at `0ea295e` with P01–P09 approved; the local
+implementation candidate awaits focused independent re-review. Later S7 allocation is preserved.
 DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
@@ -982,19 +1129,19 @@ weighting, anti-repeat, progression and priority-injection remain Deferred.
 
 ### Important-world revisits
 
-Status: **Approved product design — not implemented**
+Status: **Bounded S7-3 archive route implemented as a local candidate; general
+revisit selection remains deferred. Independent implementation review pending.**
 
-The scoped S7-3 candidate above proposes P02 as a narrow amendment to the
-no-approve/no-veto sentence below: the engine selects the sole eligible region,
-while the player explicitly consents to continuing there. That amendment is
-PROPOSED, not operative; the sentence is preserved until product approval. The
-candidate does not grant world selection, unlock or canon authority to the client.
+P02 in the published, independently approved S7-3 plan amends the former
+no-approve/no-veto wording: the engine determines eligibility and destination;
+the player confirms whether to continue. Cancellation before submission consumes
+no eligibility. The player does not select a destination or grant unlock/canon
+authority. The implemented bounded route is the held receipt's archive visit;
+general arbitrary revisits remain outside this increment.
 
 - An explicitly authored important world may remain eligible for later engine
   selection after the player has already visited it.
-- The player cannot directly choose or request a later-world revisit and cannot
-  approve, veto, or otherwise authorize an engine-proposed revisit. The
-  complete revisit decision is engine-owned.
+- The engine owns selection and eligibility; the player owns consent to continue.
 - Revisiting a world is not automatically a scenario restart or state reset.
 - Confirmed world state, important NPC state, player-caused consequences,
   discovered facts, and unresolved events persist unless an engine-authorized
@@ -1455,8 +1602,8 @@ implementation published at `86c258e9`. S6 plan is published at `4365721`;
 its implementation is independently approved and published at `2f144599`. S7-1
 is published at `41d68aac` under its approved published plan; the S7-2
 plan is approved and published at `2c272487`, with P01–P08 approved. Implementation
-is published at `6dfbd37`. S7-3 documentation planning is authorized; the proposed
-decisions await approval. S7-3 implementation and S7-4/5 remain unauthorized.
+is published at `6dfbd37`. S7-3 plan is published at `0ea295e` with P01–P09 approved; its authorized
+implementation candidate awaits focused independent re-review. S7-4/5 remain outside this increment.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
@@ -2310,8 +2457,8 @@ Phase 3.3 is acceptable only when:
   S6 public integration is independently approved and published at `2f144599`;
   S7-1 is published at `41d68aac` under its approved published plan.
   S7-2 minimum later-world continuity is published at `6dfbd37` with automated
-  and bounded local browser evidence. S7-3's proposed regional-return contract
-  awaits independent plan review and explicit product approval.
+  and bounded local browser evidence. S7-3's approved regional-return plan is published at `0ea295e`; its local
+  implementation candidate awaits focused independent re-review.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2352,7 +2499,7 @@ and [replacement evidence](#s7-1-nullable-terminal-check-correction) remain hist
 [Publication and subsequent browser acceptance](#s7-1-publication-and-local-browser-evidence)
 record current status separately from the original automated execution below.
 Neither S7 nor Phase 3.3 is complete; S7-2 is published at `6dfbd37`, and the
-S7-3 plan candidate awaits independent plan review. No limited
+S7-3 implementation candidate awaits focused independent re-review. No limited
 user trial, broader release, deployment or real Provider acceptance is claimed.
 The frozen plan and historical reviews retain their candidate-time wording.
 
@@ -2620,9 +2767,9 @@ Current code, C01–C10 automated evidence, source applicability, documentation
 synchronization and the frozen review package are recorded at the top of this
 document, with subsequent publication at `6dfbd37` and inspected local browser
 evidence above. This synchronization issues no independent approval or broader
-readiness claim. S7-3's documentation proposal now awaits its own plan review;
-S7-3 implementation, S7-4/5 and parent criteria 10–12 completion remain outside
-the delivered increment. S7 and Phase 3.3 are incomplete.
+readiness claim. S7-3 now has an approved published plan and a separately authorized local
+implementation candidate awaiting focused independent re-review after the automatic Journey/status consistency correction; S7-4/5
+and parent criteria 10–12 completion remain outside the delivered increment. S7 and Phase 3.3 are incomplete.
 
 ## Related documents
 

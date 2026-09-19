@@ -24,12 +24,12 @@ WORLD_ROWS=(orm.RunWorldPositionRow,orm.RunWorldVisitRow,orm.RunWorldStateRow)
 
 
 @asynccontextmanager
-async def continuation_case(engine,monkeypatch):
+async def continuation_case(engine,monkeypatch,*,head="20260918_0010"):
     initial=await schema_state(engine)
     original=initial[0]["alembic_version"][1][0][0]
     assert original in ("20260916_0007","20260917_0008","20260918_0009")
     with monkeypatch.context() as patch:
-        patch.setattr(admission,"HEAD","20260918_0009")
+        patch.setattr(admission,"HEAD",head)
         try:
             async with admission.native_runtime(engine) as case:
                 patch.setattr(main,"create_engine",lambda:engine)
@@ -40,6 +40,7 @@ async def continuation_case(engine,monkeypatch):
                 renderer=Renderer()
                 services.turn_orchestrator.narrative_provider=renderer
                 services.content_registry.resolve("undelivered_receipt","undelivered-receipt-1.0.0").turn_orchestrator.narrative_provider=renderer
+                services.content_registry.resolve("receipt_archive","receipt-archive-1.0.0").turn_orchestrator.narrative_provider=renderer
                 app=main.create_app(services=services)
                 app.state.api_services=services
                 app.dependency_overrides[get_current_principal]=lambda:case.runtime.principal
@@ -53,6 +54,8 @@ async def continuation_case(engine,monkeypatch):
                     async with case.factory.begin() as session:
                         case.scope.session_ids.update((await session.scalars(sa.select(orm.RunSessionParticipationRow.session_id).where(
                             orm.RunSessionParticipationRow.run_id.in_(case.scope.run_ids)))).all())
+                        if head == "20260918_0010":
+                            await session.execute(sa.delete(orm.RunWorldVisitEntryRow).where(orm.RunWorldVisitEntryRow.run_id.in_(case.scope.run_ids)))
                         for model in WORLD_ROWS:
                             await session.execute(sa.delete(model).where(model.run_id.in_(case.scope.run_ids)))
         finally:
@@ -215,9 +218,22 @@ async def test_s7_2_mysql_unknown_commit_and_exact_retry(mysql_engine,monkeypatc
 async def test_s7_2_mysql_downgrade_current_read_ignores_stale_snapshot(mysql_engine,monkeypatch):
     from tests.integration.test_mysql_run_protocol_binding import SCRIPT
     async with continuation_case(mysql_engine,monkeypatch) as case:
+        entered,*_=await continue_source(case,profile="difficulty.silent-hunting-ground")
+        rid=entered["run_context"]["run_id"]
+        # Establish historical 009 before holding a read snapshot. Reinsert only
+        # this test's exact genuine public-play rows to exercise a stale reader;
+        # current production writers require 010, and DDL cannot cross that reader.
+        await migrate_to(mysql_engine,"20260918_0009")
+        saved={}
+        async with mysql_engine.begin() as connection:
+            for model in WORLD_ROWS:
+                saved[model]=[dict(row) for row in (await connection.execute(sa.select(model.__table__).where(model.run_id==rid))).mappings()]
+                await connection.execute(sa.delete(model).where(model.run_id==rid))
         async with mysql_engine.connect() as stale:
             assert await stale.scalar(sa.text("SELECT COUNT(*) FROM run_world_states"))==0
-            await continue_source(case,profile="difficulty.silent-hunting-ground")
+            async with mysql_engine.begin() as connection:
+                for model in reversed(WORLD_ROWS):
+                    await connection.execute(sa.insert(model),saved[model])
             assert await stale.scalar(sa.text("SELECT COUNT(*) FROM run_world_states"))==0
             before=await schema_state(mysql_engine)
             module=SCRIPT.get_revision("20260918_0009").module
@@ -236,6 +252,7 @@ async def test_s7_2_mysql_downgrade_current_read_ignores_stale_snapshot(mysql_en
             assert any("run_world_states" in sql and "FOR UPDATE" in sql for sql in statements)
             assert not any(sql.lstrip().startswith(("ALTER TABLE","DROP TABLE")) for sql in statements)
             assert await schema_state(mysql_engine)==before
+        await migrate_to(mysql_engine,"20260918_0010")
 
 
 async def test_s7_2_mysql_migration_preserves_old_active_and_terminated_families(mysql_engine,monkeypatch):
@@ -251,7 +268,7 @@ async def test_s7_2_mysql_migration_preserves_old_active_and_terminated_families
         case.scope.run_ids.add(active.json()["run_context"]["run_id"]);case.scope.session_ids.add(active.json()["session_id"])
         before=await schema_state(mysql_engine)
         await migrate_to(mysql_engine,"20260917_0008")
-        await migrate_to(mysql_engine,"20260918_0009")
+        await migrate_to(mysql_engine,"20260918_0010")
         assert await schema_state(mysql_engine)==before
         assert (await case.client.get(f"/v1/sessions/{sid}/view")).json()==ended
         assert (await case.client.get(f'/v1/sessions/{active.json()["session_id"]}/run-status')).json()["run_state_version"]==3
@@ -493,8 +510,11 @@ async def test_s7_2_mysql_migration_and_writer_share_physical_lock(mysql_engine,
         async def write():return await case.client.post(f"/v1/sessions/{sid}/run-continuation",json=body,headers={"Idempotency-Key":"ddl.continue"})
         with monkeypatch.context() as patch:
             if migration_first:
-                await migrate_to(mysql_engine,"20260917_0008")
-                module=SCRIPT.get_revision("20260918_0009").module
+                # Start immediately before the current writer's migration. The
+                # shared Alembic op proxy also intercepts earlier migrations;
+                # pausing 009 would expose an unfinished 010 schema to the writer.
+                await migrate_to(mysql_engine,"20260918_0009")
+                module=SCRIPT.get_revision("20260918_0010").module
                 original_bind=module.op.get_bind
                 class Owner:
                     def __init__(self,connection):self.connection=connection
@@ -504,7 +524,7 @@ async def test_s7_2_mysql_migration_and_writer_share_physical_lock(mysql_engine,
                             held.set();await_only(release.wait())
                         return self.connection.execute(statement,*args,**kwargs)
                 patch.setattr(module.op,"get_bind",lambda:Owner(original_bind()))
-                first=asyncio.create_task(migrate_to(mysql_engine,"20260918_0009"))
+                first=asyncio.create_task(migrate_to(mysql_engine,"20260918_0010"))
             else:
                 original=SqlAlchemyRunRepository.compare_and_swap_current
                 async def pause(repository,run,**kwargs):
@@ -518,13 +538,16 @@ async def test_s7_2_mysql_migration_and_writer_share_physical_lock(mysql_engine,
             try:
                 await wait_for_named_lock_waiters(mysql_engine,1)
                 assert not second.done()
-            finally:release.set()
-            outcomes=await asyncio.wait_for(asyncio.gather(first,second,return_exceptions=True),30)
+            finally:
+                release.set()
+                outcomes=await asyncio.wait_for(asyncio.gather(first,second,return_exceptions=True),30)
+                await migrate_to(mysql_engine,"20260918_0010")
         if migration_first:
             assert outcomes[0] is None and outcomes[1].status_code==200,outcomes
         else:
             assert outcomes[0].status_code==200,outcomes[0].text
             assert isinstance(outcomes[1],RuntimeError) and "continuation evidence exists" in str(outcomes[1]),outcomes[1]
+        await migrate_to(mysql_engine,"20260918_0010")
         assert (await case.client.get(f"/v1/sessions/{sid}/run-continuation")).json()["successor"] is not None
 
 

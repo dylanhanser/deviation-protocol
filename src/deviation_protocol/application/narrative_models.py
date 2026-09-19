@@ -108,8 +108,8 @@ class NarrativeRequest(NarrativeBoundaryModel):
     """Vendor-neutral, player-safe, bounded input to a narrative provider."""
 
     def with_compiled_world_visit_context(self, context):
-        from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1
-        if type(context) is not CompiledWorldVisitContextV1:
+        from deviation_protocol.application.world_visit_context import CompiledWorldVisitContextV1, CompiledRegionalVisitContextV1
+        if type(context) not in (CompiledWorldVisitContextV1, CompiledRegionalVisitContextV1):
             raise NarrativeRequestRejectedError()
         context.validated_object()
         detached = NarrativeRequest.model_validate(self.model_dump(mode="python"))

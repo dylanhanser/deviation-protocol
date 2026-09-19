@@ -3162,6 +3162,8 @@ def test_creation_openapi_injects_the_exact_validation_schema_inventory() -> Non
     assert native_components <= set(schemas)
     native_components |= {"NativeRunContinuationRequest", "NativeRunContinuationResultResponse",
         "NativeRunContinuationStatusResponse", "NativeRunPredecessorResponse", "NativeWorldVisitResponse", "NativeWorldArrivalResponse"}
+    native_components |= {"NativeRunRevisitRequest", "NativeJourneyVisitResponse", "NativeVisitAssociationResponse",
+        "NativeJourneyArrivalResponse", "NativeNextTransitionResponse", "NativeRunJourneyResponse", "NativeRunRevisitResultResponse"}
     assert native_components <= set(schemas)
     assert len(set(schemas) - native_components) == 75
     assert all(schemas[name] == definition for name, definition in generated.items())
@@ -3508,6 +3510,8 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
     }
 
     assert public_routes == {
+        ("/v1/sessions/{session_id}/run-journey", ("GET",)),
+        ("/v1/sessions/{session_id}/run-revisit", ("POST",)),
         ("/v1/sessions/{session_id}/run-continuation", ("GET",)),
         ("/v1/sessions/{session_id}/run-continuation", ("POST",)),
         ("/v1/sessions/{session_id}/run-status", ("GET",)),
@@ -3536,7 +3540,8 @@ def test_player_character_activation_preserves_exact_route_inventory() -> None:
     assert all(
         (path in {_ELIGIBLE_PATH, "/v1/run-entry-options", "/v1/runs/native",
             "/v1/sessions/{session_id}/run-status", "/v1/sessions/{session_id}/run-exit",
-            "/v1/sessions/{session_id}/run-continuation"} or "run" not in path.casefold())
+            "/v1/sessions/{session_id}/run-continuation", "/v1/sessions/{session_id}/run-journey",
+            "/v1/sessions/{session_id}/run-revisit"} or "run" not in path.casefold())
         and "mutation" not in path.casefold()
         and "bind" not in path.casefold()
         for path, _ in public_routes

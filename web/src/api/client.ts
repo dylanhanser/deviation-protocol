@@ -5,7 +5,7 @@ import { ApiClientError } from "./errors";
 import { nativeRunStatusSchema, type NativeRunStatus } from "./schemas";
 import type { FrozenRunExit } from "../runExit";
 import type { FrozenRunContinuation } from "../runContinuation";
-import { nativeRunContinuationStatusSchema, nativeRunContinuationResultSchema } from "./schemas";
+import { nativeRunJourneySchema, nativeRunRevisitResultSchema, nativeRunContinuationStatusSchema, nativeRunContinuationResultSchema } from "./schemas";
 import { assertNativeResponse, validateSetup, type FrozenNativeEntry } from "../runSetup";
 import { runEntryOptionsSchema, nativeRunEntryResponseSchema, type RunEntryOptions,
   type NativeRunEntryRequest, type NativeRunEntryResponse, type PublicRunProfile, type PublicEntryWorld } from "./schemas";
@@ -103,6 +103,23 @@ async function parseJsonBody(response: Response): Promise<unknown> {
 }
 
 export class PublicApiClient {
+  async getNativeRunJourney(sessionId: string, signal?: AbortSignal) {
+    const id=sessionPathIdSchema.parse(sessionId);
+    const result=await this.request(`v1/sessions/${encodeURIComponent(id)}/run-journey`,
+      {method:"GET",...(signal === undefined ? {} : {signal})},200,nativeRunJourneySchema);
+    if (result.session_id !== id) throw responseError(200,"CONTRACT_MISMATCH");
+    return result;
+  }
+  async transitionNativeRun(attempt: import("../runJourney").FrozenJourneyTransition, signal?: AbortSignal) {
+    if (attempt.kind === "first_continuation") return this.continueNativeRun(attempt,signal);
+    const result=await this.request(attempt.url,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":attempt.key},
+      body:attempt.serializedBody,...(signal === undefined ? {} : {signal})},200,nativeRunRevisitResultSchema);
+    const body=JSON.parse(attempt.serializedBody) as {expected_session_state_version:number};
+    if (result.source_session_id !== attempt.sessionId || result.run_id !== attempt.runId || result.source_session_state_version !== body.expected_session_state_version)
+      throw responseError(200,"CONTRACT_MISMATCH");
+    return result;
+  }
+
   async getNativeRunContinuation(sessionId: string, signal?: AbortSignal) {
     const id=sessionPathIdSchema.parse(sessionId);
     const result=await this.request(`v1/sessions/${encodeURIComponent(id)}/run-continuation`,
