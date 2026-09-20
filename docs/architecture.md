@@ -59,7 +59,8 @@ at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`. S6 plan is approved and published
 implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
 S7-2 follows its independently approved plan at `2c272487`; implementation is
 published at `6dfbd37` with bounded local browser evidence. The S7-3 plan is independently approved and published at `0ea295e`;
-P01–P09 are approved and its local implementation candidate awaits focused independent re-review after the automatic Journey/status consistency correction. Phase 3.3
+P01–P09 are approved and implementation is published at `0b20dcd` with bounded
+local browser evidence. S7-4 is a proposed documentation plan, not implementation. Phase 3.3
 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
@@ -284,8 +285,8 @@ resolution. S3's published component and the published S4 implementation are
 described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
 at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 plan is published at `0ea295e`, P01–P09 are approved, and its authorized
-local implementation candidate awaits focused independent re-review.
-S7-4/5 remain outside this increment. The
+implementation is published at `0b20dcd` with inspected bounded browser evidence.
+S7-4's new plan is PROPOSED; S7-5 retains final integration. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1752,7 +1753,7 @@ S7-3 adds the bounded held-receipt archive revisit and one-use regional entry.
 Authorized canon transitions and final integration remain allocated to S7-4/5.
 S7 and Phase 3.3 remain incomplete.
 
-## P3.3-S7-3 regional revisit implementation candidate
+## P3.3-S7-3 published regional revisit
 
 The [published S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
 is independently approved at `0ea295e358f526c5101856e4dc2370d66b23b938`.
@@ -1760,7 +1761,7 @@ P01–P09 are approved; candidate-time wording in that protected plan is history
 P02 authorizes explicit consent to the engine-selected destination. Cancellation
 before submission consumes no eligibility; clients cannot select or unlock worlds.
 
-The candidate preserves strict S7-2 v1 prefixes and adds closed active 4→5 /
+The implementation published at `0b20dcd` preserves strict S7-2 v1 prefixes and adds closed active 4→5 /
 terminal 5→6 suffixes, v2 visit/position carriers and immutable regional entry
 on migration 010. It distinguishes old terminal 5 from new active 5. Exactly two
 world roots, three visits, one regional entry and one current position are
@@ -1816,7 +1817,47 @@ writes. The old continuation GET rejects three-visit families explicitly;
 original continuation/admission/exit receipts remain replayable.
 
 [Implementation evidence and limits](run_protocol.md#s7-3-implementation-candidate-evidence)
-remain separate from independent approval and browser acceptance. The candidate
-is unstaged/uncommitted and awaits focused independent re-review after the latest CHANGES_REQUIRED verdict (F1 closed, original ACTIVE-View mismatch corrected, automatic Journey/status consistency corrected locally). S7-4 owns
-canon-preserving line transitions/normal completion; S7-5 final integration.
-S7 and Phase 3.3 remain incomplete.
+remain separate from publication and the subsequently inspected
+[bounded browser evidence](run_protocol.md#s7-3-publication-and-bounded-browser-evidence).
+Earlier CHANGES_REQUIRED/correction records remain history; implementation is
+published at `0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597`. S7-4 owns
+canon-preserving line transitions/normal completion; its plan below is PROPOSED.
+S7-5 owns final integration. S7 and Phase 3.3 remain incomplete.
+
+## P3.3-S7-4 proposed canon closure and normal completion
+
+Status: **Documentation plan candidate only; P01–P09 PROPOSED.** The
+[S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
+owns the exact proposed contracts and sole review-token convention. No approved
+S7-3 decision or reserved completed enum authorizes this new writer.
+
+The recommended increment uses the existing two worlds/three visits. Only the
+fully proven archive seal ending qualifies for explicit completion. A new
+`NativeRunRegionalCompletedV1` wraps the exact active revision-5 regional prefix
+and one `COMPLETE_REVISITED_NATIVE_RUN` 5→6 receipt. Its canonical evidence records
+the same line's second-world verification disposition moving from open_unresolved
+to closed_unresolved while hold, unproven delivery and seal remain true. This is
+new engine-owned world state with event/snapshot/memory provenance, not a model
+summary, replacement line, fourth Session or rewritten historical fact. Existing
+termination remains a distinct alternative with no completion evidence.
+
+One native UoW appends revision/receipt and CASes current, historicalizing only
+this Run's binding. No Session, world root/visit/entry/position, character or
+PlayerState changes. The position remains visit three/version5. New complete
+reconstruction validates the immutable prefix and completion suffix before any
+history, replay or eligibility result; old v1 families/receipts retain meaning.
+Historical reads/replay remain authorized after later admission/retirement;
+fresh actions never run on a terminal family. One namespace and existing evidence
+MEDIUMBLOB suffice; proposed migration 011 changes only the three Run mutation
+CHECKs from actual source head 010, with exact old-row preservation and downgrade
+refusal on any completion/partial evidence. The plan specifies null enforcement,
+FK preservation, pinned lock order, physical-owner cleanup and unknown outcomes.
+
+Fixed closure notices need no new scenario pack or Provider. Production/Demo
+share rules and atomic trial-store validation. New completion status/result and
+explicit completed-only v2 Journey/status branches preserve old public v1 shapes.
+The Web uses a shared association/lifecycle rule for reads, sync, controls,
+confirmation and submission, retaining confirmed POST authority and GET-only
+reconciliation. S7-4 acceptance requires fresh changed-boundary MySQL, Demo,
+rendered Web and cross-process proof; browser execution needs separate authority.
+No implementation, runtime verification or broader-readiness claim is made here.

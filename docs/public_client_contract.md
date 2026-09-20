@@ -95,8 +95,9 @@ implemented and published at `41d68aac13ca9129b7f6e08fad5f015987603fda`.
 Its [bounded local browser evidence](run_protocol.md#s7-1-publication-and-local-browser-evidence)
 is distinct from the earlier S6 report. S7-2 implementation is published at
 `6dfbd37`, with automated and bounded local browser evidence described below.
-S7-3 public changes follow its approved plan published at `0ea295e`; the local
-implementation candidate awaits focused independent re-review after the automatic Journey/status consistency correction.
+S7-3 public changes follow its approved plan published at `0ea295e`;
+implementation is published at `0b20dcd` with inspected bounded browser evidence.
+S7-4's completion extension is PROPOSED in the plan linked below.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1714,7 +1715,7 @@ This planning task performed no new browser execution. S7/Phase 3.3 remain incom
 
 ## P3.3-S7-3 journey navigation and regional return
 
-Status: **Corrected local implementation candidate; focused independent re-review pending after correction of the remaining automatic Journey/status finding (CHANGES_REQUIRED).** The
+Status: **Implementation published at `0b20dcd`; bounded local browser evidence inspected.** The
 [S7-3 plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md#8-public-contracts-and-recovery-across-three-visits)
 owns exact fields, validation, errors, compatibility and client transitions.
 The plan is independently approved and published at `0ea295e`; P01–P09 are
@@ -1784,9 +1785,50 @@ store/transport for actual play through three visits, both archive endings,
 storage-only remount, historical navigation, exit and fresh admission/first action.
 Additional transport faults cover contradictory identities, lost response, storage
 failure, client replacement and legitimate progressed versions. Final complete Web, typecheck, lint and deterministic Demo build evidence is bound
-to the new correction package. The latest CHANGES_REQUIRED review closed F1 and
-the original ACTIVE-View mismatch, and identified automatic Journey/status
-synchronization as the remaining blocker. That correction now awaits the same
-reviewer's focused re-review. See [the evidence map](run_protocol.md#s7-3-implementation-candidate-evidence)
-for source applicability and limits. No new browser acceptance is claimed.
-S7 and Phase 3.3 remain incomplete.
+to the historical correction package. Earlier CHANGES_REQUIRED findings and their
+corrections remain historical records; current implementation is published at
+`0b20dcd`. See [the evidence map](run_protocol.md#s7-3-implementation-candidate-evidence)
+and [inspected browser record](run_protocol.md#s7-3-publication-and-bounded-browser-evidence)
+for distinct source applicability and limits. No browser was run in this planning
+task. S7 and Phase 3.3 remain incomplete.
+
+## P3.3-S7-4 proposed explicit completion contract
+
+Status: **PROPOSED; not implemented or product-approved.** Exact fields, strings,
+versions, state combinations, errors and acceptance are owned by
+[S7-4 sections 6–11](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md#9-api-demo-and-web-contracts).
+New P01–P09 need explicit disposition; S7-3 approvals do not cover them.
+
+The proposed player flow is archive OBSERVE/seal → authoritative completion offer
+→ explicit confirm → completed journey with preserved unresolved facts → reload
+and three-visit history → explicit return to setup/fresh admission. Archive defer
+and other nonqualifying endings retain existing exit/continuation rules. Completion
+is never automatic from RESOLVED, FAILED, an empty pool or local storage clear.
+Explicit termination remains a separate mutually exclusive outcome.
+
+Add GET `run-completion` and POST `run-complete` under the existing Session path.
+POST accepts only two expected versions and Idempotency-Key; response binds the
+immutable original archive association to completed6 and a completion ID/outcome.
+The GET's closed offer/reason/summary never grants authority independently of
+complete family reconstruction. Existing run-status/run-journey routes retain
+unchanged v1 responses on old families and use separate completed-only v2 branches
+on the new family. Do not widen original v1 semantics or View/run-context/storage.
+Completed history is still ended history; current remains visit three, no new
+Session or visit, and all fresh writes on that Run are disabled.
+
+All ended-current mutation controls require matching View, Journey, Run-status
+and completion status under one shared validator. Apply it to initial/recovery
+load, automatic synchronization, enablement, confirmation and final submission.
+Schema-valid but contradictory reads disable affected writes and allow safe GET;
+they never replace retained confirmed POST identity. Explicit retry preserves
+frozen URL/key/body/association through uncertain outcomes. No automatic POST on
+reload, history, recovery or restart. Old exact receipts remain replayable after
+completion and later admission without changing the current character binding.
+
+Completion neither sets nor removes Session-only recovery storage. Existing
+transition storage-before-View remains. GET-only 3→2→1→2→3 history never replaces
+current recovery identity, so historical refresh restores current visit three.
+Only explicit return-to-setup clears storage after confirmed/matching completion;
+failed clear blocks new admission. New character/profile/world selections and
+admission confirmation remain separate. DF-001/DF-002 stay deferred; browser
+acceptance is separately authorized and S7-5 retains final reconciliation.
