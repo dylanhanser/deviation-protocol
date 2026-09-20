@@ -60,7 +60,7 @@ implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
 S7-2 follows its independently approved plan at `2c272487`; implementation is
 published at `6dfbd37` with bounded local browser evidence. The S7-3 plan is independently approved and published at `0ea295e`;
 P01–P09 are approved and implementation is published at `0b20dcd` with bounded
-local browser evidence. S7-4 is a proposed documentation plan, not implementation. Phase 3.3
+local browser evidence. S7-4 has an approved published plan and an unstaged implementation candidate. Phase 3.3
 remains incomplete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
@@ -286,7 +286,7 @@ described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
 at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 plan is published at `0ea295e`, P01–P09 are approved, and its authorized
 implementation is published at `0b20dcd` with inspected bounded browser evidence.
-S7-4's new plan is PROPOSED; S7-5 retains final integration. The
+S7-4's approved plan has an implementation candidate; S7-5 retains final integration. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1821,17 +1821,16 @@ remain separate from publication and the subsequently inspected
 [bounded browser evidence](run_protocol.md#s7-3-publication-and-bounded-browser-evidence).
 Earlier CHANGES_REQUIRED/correction records remain history; implementation is
 published at `0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597`. S7-4 owns
-canon-preserving line transitions/normal completion; its plan below is PROPOSED.
+canon-preserving line transitions/normal completion; its approved implementation contract is below.
 S7-5 owns final integration. S7 and Phase 3.3 remain incomplete.
 
-## P3.3-S7-4 proposed canon closure and normal completion
+## P3.3-S7-4 canon closure and normal completion candidate
 
-Status: **Documentation plan candidate only; P01–P09 PROPOSED.** The
-[S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
-owns the exact proposed contracts and sole review-token convention. No approved
-S7-3 decision or reserved completed enum authorizes this new writer.
-
-The recommended increment uses the existing two worlds/three visits. Only the
+Status: **Corrected implementation candidate; focused independent re-review pending after CHANGES_REQUIRED.**
+The [published S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
+and P01–P09, including P04, are approved at `684f7d1`. Frozen candidate-time
+wording remains historical. The [implementation/evidence owner](run_protocol.md#s7-4-implementation-candidate-evidence)
+records scope and verification. This increment uses two worlds/three visits. Only the
 fully proven archive seal ending qualifies for explicit completion. A new
 `NativeRunRegionalCompletedV1` wraps the exact active revision-5 regional prefix
 and one `COMPLETE_REVISITED_NATIVE_RUN` 5→6 receipt. Its canonical evidence records
@@ -1848,7 +1847,7 @@ reconstruction validates the immutable prefix and completion suffix before any
 history, replay or eligibility result; old v1 families/receipts retain meaning.
 Historical reads/replay remain authorized after later admission/retirement;
 fresh actions never run on a terminal family. One namespace and existing evidence
-MEDIUMBLOB suffice; proposed migration 011 changes only the three Run mutation
+MEDIUMBLOB suffice; migration 011 changes only the three Run mutation
 CHECKs from actual source head 010, with exact old-row preservation and downgrade
 refusal on any completion/partial evidence. The plan specifies null enforcement,
 FK preservation, pinned lock order, physical-owner cleanup and unknown outcomes.
@@ -1860,4 +1859,5 @@ The Web uses a shared association/lifecycle rule for reads, sync, controls,
 confirmation and submission, retaining confirmed POST authority and GET-only
 reconciliation. S7-4 acceptance requires fresh changed-boundary MySQL, Demo,
 rendered Web and cross-process proof; browser execution needs separate authority.
-No implementation, runtime verification or broader-readiness claim is made here.
+The candidate remains unstaged and uncommitted; no independent approval, browser
+acceptance, broader readiness, S7 or Phase 3.3 completion is claimed.

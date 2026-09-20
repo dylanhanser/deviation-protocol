@@ -216,7 +216,7 @@ def test_run_migration_matches_shared_metadata_and_is_linear(
         # Preserve historical 005 and apply each frozen additive amendment.
         table = recorder.metadata.tables[table_name]
         scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-        for revision in ("20260917_0008", "20260918_0009", "20260918_0010"):
+        for revision in ("20260917_0008", "20260918_0009", "20260918_0010", "20260920_0011"):
             for owner, name, old, new in scripts.get_revision(revision).module._CONSTRAINTS:
                 if owner == table_name:
                     constraint = next(c for c in table.constraints if c.name == name)
@@ -236,7 +236,7 @@ def test_run_migration_matches_shared_metadata_and_is_linear(
     )
 
     scripts = ScriptDirectory.from_config(Config(str(ROOT / "alembic.ini")))
-    assert scripts.get_heads() == ["20260918_0010"]
+    assert scripts.get_heads() == ["20260920_0011"]
     revision = scripts.get_revision("20260729_0005")
     assert revision is not None
     assert revision.down_revision == "20260728_0004"
@@ -312,7 +312,7 @@ def test_mysql_run_migration_upgrades_only_the_designated_test_database(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("DATABASE_URL", _safe_database_url())
-    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260918_0010")
+    command.upgrade(Config(str(ROOT / "alembic.ini")), "20260920_0011")
 
 
 @pytest.mark.integration
@@ -363,7 +363,7 @@ async def test_mysql_run_schema_is_exact_and_binding_seam_is_nullable(
             ).scalars()
         )
 
-    assert revision == "20260918_0010"
+    assert revision == "20260920_0011"
     assert tables == set(RUN_TABLES) | {"run_protocol_bindings", "run_entry_world_bindings", "run_world_states", "run_world_visits", "run_world_positions", "run_world_visit_entries"}
     assert game_session_run_columns == set()
     expected_binding_columns = {

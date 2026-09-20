@@ -115,7 +115,7 @@ MIGRATION_PATH = (
 )
 MIGRATION_REVISION = "20260728_0004"
 MIGRATION_PARENT = "20260719_0003"
-CURRENT_HEAD_REVISION = "20260918_0010"
+CURRENT_HEAD_REVISION = "20260920_0011"
 
 LEGACY_MAPPED_TABLES = {
     "domain_events",
@@ -904,6 +904,7 @@ def test_migration_is_one_linear_head_after_0003() -> None:
         item.revision for item in scripts.walk_revisions()
     ) == (
         CURRENT_HEAD_REVISION,
+        "20260918_0010",
         "20260918_0009",
         "20260917_0008",
         "20260916_0007",

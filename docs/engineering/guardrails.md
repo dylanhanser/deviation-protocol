@@ -105,18 +105,33 @@ Observed failure:
 - Continuation waiting on a final turn read the newly committed ending through
   locking reads but read the old active job through a repeatable-read snapshot,
   incorrectly classifying the completed Session as corrupt.
+- A downgrade probe accepted malformed old evidence because it checked only
+  command keys; invalid field types still passed its old-family classifier.
+- Historical migration tests directly amended 008 CHECKs while their shared
+  runtime fixture deployed 010. Teardown then refused the mismatched schema and
+  subsequent tests inherited it.
 
 Rule:
 
 - Use MySQL 8, SQLAlchemy `AsyncSession`, and `asyncmy`.
 - Never add a SQLite fallback.
 - Tests may write only to `deviation_protocol_test`.
+- Verify each schema-changing suite's actual migration and runtime-fixture
+  preconditions before combining selections. After failed restoration, stop
+  later schema mutations, inspect the exact failed prefix, and restore the
+  recorded initial rows/constraints/lock state before proceeding.
+- Downgrade evidence classification must validate frozen carrier types and
+  bounds as well as discriminators and canonical bytes; malformed old evidence
+  requires operator inspection before any DDL. Discriminators are structural
+  fields, not substrings inside legal opaque keys.
 - Repositories do not commit.
 - State, snapshot, events, response, job state, and version commit atomically.
 - Idempotency binds the complete request and uses locks plus unique constraints.
 - Locked finalization must use current reads for every mutable prerequisite,
   including active-job exclusion; a prior consistent snapshot must not be mixed
-  with freshly locked Session state.
+  with freshly locked Session state. The validated snapshot scenario runtime
+  owns ending state; the Session action-loop phase must not bypass ended-source
+  job exclusion during reconstruction.
 - When equality spans persisted timestamps, choose one transaction timestamp
   at a precision supported by every participating column before constructing
   evidence. Do not repair or relax equality after database truncation.
@@ -133,6 +148,11 @@ Enforcement:
 - `test_s7_2_mysql_final_turn_revalidation` observes the real Session lock wait,
   rejects stale detached preparation and proves explicit retry after completion.
 - Alembic consistency checks
+- `test_a09_old_terminated_six_preserved_and_partial_evidence_refused` corrupts
+  each legacy command field and verifies refusal with unchanged schema/rows.
+- Migration 011 tests compare full schema/data/enforcement and free-lock state
+  with the observed initial state after every successful or injected-failure case;
+  `codex_workflow.md` requires compatible sequential groups and failure records.
 - Native admission through normal production composition with a fractional
   clock and real MySQL, followed by complete reconstruction and owned replay
 - Migration 007 live-owner invalidation/disposal regression:

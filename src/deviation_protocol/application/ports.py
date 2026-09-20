@@ -53,6 +53,7 @@ if TYPE_CHECKING:
         NativeRunContinuedTerminatedV1,
         NativeRunRegionalRevisitV1,
         NativeRunRegionalRevisitTerminatedV1,
+        NativeRunRegionalCompletedV1,
         ContinuedNativeRunExitEvidenceV1,
         NativeRunExitEvidenceV1,
         LegacyRunCompatibilityV1,
@@ -416,13 +417,13 @@ class RunProtocolBindingRepository(ABC):
     @abstractmethod
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
         raise NotImplementedError
 
     @abstractmethod
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
         raise NotImplementedError
 
 
@@ -546,6 +547,7 @@ class RunMutationReceiptRepository(ABC):
         exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | None = None,
         continuation_evidence: NativeRunContinuationEvidenceV1 | None = None,
         revisit_evidence=None,
+        completion_evidence=None,
     ) -> None:
         raise NotImplementedError
 

@@ -24,7 +24,7 @@ from deviation_protocol.domain.run_protocol_binding import (
     NativeRunContinuedV1, NativeRunContinuedTerminatedV1,
     ContinuedNativeRunExitRequestV1, ContinuedNativeRunExitEvidenceV1,
     terminate_continued_native_run,
-    NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1,
+    NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1,
     RevisitedNativeRunExitRequestV1, RevisitedNativeRunExitEvidenceV1, terminate_revisited_native_run,
 )
 
@@ -70,7 +70,7 @@ class RunExitService:
         family = await get(run_id=participation.run_id)
         if type(family) is LegacyRunCompatibilityV1:
             raise RunExitError("NATIVE_RUN_REQUIRED")
-        if type(family) not in (NativeRunAdmissionV1, NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1):
+        if type(family) not in (NativeRunAdmissionV1, NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
             raise SnapshotInvalidError(session_id)
         revalidate_run_model(family, type(family))
         if participation not in family.canonical_run.trusted_participation_references:
@@ -115,7 +115,7 @@ class RunExitService:
     def _status(family, character, persisted, state):
         run = family.canonical_run
         ended = state.scenario_runtime is not None and state.scenario_runtime.ending_status.value in ("RESOLVED", "FAILED")
-        return dict(schema_version="native-run-status/v1", session_id=persisted.session.session_id,
+        return dict(schema_version="native-run-status/v2" if type(family) is NativeRunRegionalCompletedV1 else "native-run-status/v1", session_id=persisted.session.session_id,
             run_id=run.run_id.value, run_state_version=run.state_version.value,
             session_state_version=persisted.session.state_version, lifecycle_status=run.lifecycle_status.value,
             can_exit=type(family) in (NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1)
@@ -151,7 +151,7 @@ class RunExitService:
                     raise SnapshotInvalidError(session_id)
                 run = family.canonical_run
                 continued = type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
-                revisited = type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1)
+                revisited = type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1)
                 expected_version = 5 if revisited else 4 if continued else 3
                 request_type = RevisitedNativeRunExitRequestV1 if revisited else ContinuedNativeRunExitRequestV1 if continued else NativeRunExitRequestV1
                 request = request_type(schema="run.terminate-revisited-native-request/v1" if revisited else "run.terminate-continued-native-request/v1" if continued else "run.terminate-native-request/v1",
@@ -170,7 +170,7 @@ class RunExitService:
                     if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) or family.exit_evidence.request != request:
                         raise SnapshotInvalidError(session_id)
                     return self._status(family, character, persisted, state)
-                if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or session_id != run.trusted_participation_references[-1].session_id:
+                if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1) or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or session_id != run.trusted_participation_references[-1].session_id:
                     raise RunExitError("RUN_EXIT_NOT_AVAILABLE")
                 if (command.expected_run_state_version != expected_version
                         or command.expected_session_state_version != persisted.session.state_version):

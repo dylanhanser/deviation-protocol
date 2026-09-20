@@ -17,7 +17,7 @@ from deviation_protocol.domain.player_character import PlayerCharacterLifecycle
 from deviation_protocol.domain.run import revalidate_run_model, RunMutationKind
 from deviation_protocol.domain.run_protocol_binding import (
     NativeRunAdmissionV1, NativeRunContinuedV1, NativeRunContinuedTerminatedV1,
-    NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, revisit_native_region,
+    NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1, revisit_native_region,
 )
 from deviation_protocol.domain.world_continuation import DESTINATION_WORLD, WorldRefV1, RegionRefV1
 from deviation_protocol.domain.world_revisit import (
@@ -39,7 +39,7 @@ class RunRevisitCommand(RunExitCommand):
 
 
 def regional_family(family):
-    return family.revisited if type(family) is NativeRunRegionalRevisitTerminatedV1 else family
+    return family.revisited if type(family) in (NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1) else family
 
 
 def regional_result(family):
@@ -131,13 +131,13 @@ class RunRegionalRevisitService:
                 transition = dict(kind="regional_revisit", world_title="未送达的回执", region_title="核验档案室", notice=ARCHIVE_NOTICE)
             arrival = None
             if index == 1:
-                prefix = regional_family(family).continued if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1) else family
+                prefix = regional_family(family).continued if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1) else family
                 if type(prefix) is NativeRunContinuedTerminatedV1:
                     prefix = prefix.continued
                 arrival = project_world_arrival(prefix)
             elif index == 2:
                 arrival = regional_arrival()
-            return dict(schema_version="native-run-journey/v1", session_id=session_id,
+            result = dict(schema_version="native-run-journey/v1", session_id=session_id,
                 run_id=run.run_id.value, run_state_version=run.state_version.value,
                 lifecycle_status=run.lifecycle_status.value,
                 run_context=project_native_context(_result(original_admission(family))),
@@ -145,6 +145,10 @@ class RunRegionalRevisitService:
                 predecessor=associations[index - 1] if index else None,
                 successor=associations[index + 1] if index + 1 < len(associations) else None,
                 next_transition=transition, arrival=arrival)
+            if type(family) is NativeRunRegionalCompletedV1:
+                from deviation_protocol.application.run_completion_service import completion_projection
+                result.update(schema_version="native-run-journey/v2", completion=completion_projection(family))
+            return result
 
     async def revisit(self, principal, *, session_id, command):
         revalidate_run_model(command, RunRevisitCommand)
@@ -261,7 +265,7 @@ class RunRegionalRevisitService:
     def _replay(family, receipt, request, session_id):
         if receipt.fingerprint.value != request.fingerprint():
             raise RunRevisitError("IDEMPOTENCY_CONFLICT")
-        if (type(family) not in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1)
+        if (type(family) not in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1)
                 or regional_family(family).revisit_evidence.request != request):
             raise SnapshotInvalidError(session_id)
         return regional_result(family)

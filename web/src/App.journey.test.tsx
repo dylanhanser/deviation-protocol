@@ -9,7 +9,7 @@ import App from "./App";
 import { PublicApiClient } from "./api/client";
 import { ARCHIVE_NOTICE, nativeRunStatusSchema, nativeRunJourneySchema, nativeRunRevisitResultSchema, playerSessionViewSchema, nativeRunEntryResponseSchema, playerCharacterCreationResultSchema, actionRequestSchema, type NativeJourneyAssociation } from "./api/schemas";
 import { SESSION_RECOVERY_STORAGE_KEY } from "./sessionRecovery";
-import { endedViewFixture, nativeViewFixture } from "./test/fixtures";
+import { endedViewFixture, nativeViewFixture, completionStatusFixture } from "./test/fixtures";
 
 configure({asyncUtilTimeout:10000});
 
@@ -250,6 +250,7 @@ it.each(["target","visit","predecessor","content","matching","progressed","clien
       events.push(`${method} ${route}`);
       let body:unknown;
       if(method==="POST") {expect(route).toBe("/v1/sessions/second/run-revisit");posted=true;body=pair.result;}
+      else if(route.endsWith("/run-completion")) body=completionStatusFixture(route.includes("/second/") ? posted?pair.historical:pair.before : pair.after);
       else if(route.endsWith("/run-status")) body={schema_version:"native-run-status/v1",session_id:"second",run_id:pair.result.run_id,
         run_state_version:posted?5:4,session_state_version:7,lifecycle_status:"active",can_exit:!posted};
       else if(route.endsWith("/run-journey")) {
@@ -362,7 +363,7 @@ it("F2 exit reconciliation requires matching Journey and Run lifecycle snapshots
   sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,JSON.stringify({version:1,session_id:"third"}));
   const client=new PublicApiClient({baseUrl:"http://exit-recovery/",fetchImplementation:async(input,init)=>{
     const route=new URL(String(input)).pathname;events.push(`${init?.method??"GET"} ${route}`);
-    const body=route.endsWith("/view") ? view : route.endsWith("/run-journey") ?
+    const body=route.endsWith("/run-completion") ? completionStatusFixture(nativeRunJourneySchema.parse({...journey,run_state_version:phase==="terminated"?6:5,lifecycle_status:phase==="terminated"?"terminated":"active"})) : route.endsWith("/view") ? view : route.endsWith("/run-journey") ?
       nativeRunJourneySchema.parse({...journey,run_state_version:phase==="terminated"?6:5,lifecycle_status:phase==="terminated"?"terminated":"active"}) :
       {schema_version:"native-run-status/v1",session_id:"third",run_id:pair.result.run_id,session_state_version:7,
         run_state_version:phase==="active"?5:6,lifecycle_status:phase==="active"?"active":"terminated",can_exit:phase==="active"};
@@ -396,22 +397,24 @@ function consistencyFixture() {
 it.each(["journey-first","status-first"])("consistency automatic sync %s: schema-valid contradictions block every POST and recover by GET",async(order)=>{
   for(const mode of ["terminal-active","active-terminal","same-revision","session","run","session-version"] as const) {
     const f=consistencyFixture(),calls:string[]=[];
-    let matching=false,journeyReads=0,release:(()=>void)|undefined;
+    let matching=false,journeyReads=0,statusReads=0,release:(()=>void)|undefined;
     const client=new PublicApiClient({baseUrl:"http://consistency/",fetchImplementation:async(input,init)=>{
       const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
       let body:unknown;
-      if(route.endsWith("/view"))body=f.view;
+      if(route.endsWith("/run-completion"))body=completionStatusFixture(f.journey);
+      else if(route.endsWith("/view"))body=f.view;
       else if(route.endsWith("/run-journey")) {
         journeyReads++;
-        body=nativeRunJourneySchema.parse({...f.journey,...(!matching&&mode==="terminal-active"?{run_state_version:6,lifecycle_status:"terminated"}:{})});
+        body=nativeRunJourneySchema.parse({...f.journey,...(!matching&&journeyReads>1&&mode==="terminal-active"?{run_state_version:6,lifecycle_status:"terminated"}:{})});
         if(!matching && order==="status-first" && journeyReads===2)await new Promise<void>(r=>{release=r;});
       } else {
-        body=nativeRunStatusSchema.parse({...f.status,...(!matching ?
+        if(route.endsWith("/run-status"))statusReads++;
+        body=nativeRunStatusSchema.parse({...f.status,...(!matching && statusReads>1 ?
           mode==="active-terminal"?{run_state_version:6,lifecycle_status:"terminated",can_exit:false}:
           mode==="same-revision"?{lifecycle_status:"terminated",can_exit:false}:
           mode==="session"?{session_id:"other"}:mode==="run"?{run_id:"other.run"}:
           mode==="session-version"?{session_state_version:8}:{} : {})});
-        if(route.endsWith("/run-status") && !matching && order==="journey-first")await new Promise<void>(r=>{release=r;});
+        if(route.endsWith("/run-status") && !matching && statusReads===2 && order==="journey-first")await new Promise<void>(r=>{release=r;});
       }
       return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
     }});
@@ -444,7 +447,7 @@ it.each(["active","terminated","historical"])("consistency matching %s preserves
     run_state_version:journey.run_state_version,lifecycle_status:journey.lifecycle_status,can_exit:mode==="active"});
   const client=new PublicApiClient({baseUrl:"http://consistent/",fetchImplementation:async(input,init)=>{
     const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
-    return new Response(JSON.stringify(route.endsWith("/view")?playerSessionViewSchema.parse(view):route.endsWith("/run-journey")?journey:status),
+    return new Response(JSON.stringify(route.endsWith("/run-completion")?completionStatusFixture(journey):route.endsWith("/view")?playerSessionViewSchema.parse(view):route.endsWith("/run-journey")?journey:status),
       {status:200,headers:{"Content-Type":"application/json"}});
   }});
   sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,JSON.stringify({version:1,session_id:view.metadata.session_id}));
@@ -467,7 +470,7 @@ it.each(["open-confirmation","uncertain-request","history-read"])("consistency %
   const client=new PublicApiClient({baseUrl:"http://confirmation/",fetchImplementation:async(input,init)=>{
     const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
     if(init?.method==="POST")throw new TypeError("lost response");
-    const body=route.endsWith("/view")?f.view:route.endsWith("/run-journey")?
+    const body=route.endsWith("/run-completion")?completionStatusFixture(f.journey):route.endsWith("/view")?f.view:route.endsWith("/run-journey")?
       nativeRunJourneySchema.parse({...f.journey,...(!matching?{run_state_version:6,lifecycle_status:"terminated"}:{})}):f.status;
     return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
   }});
@@ -494,7 +497,7 @@ it.each(["open-confirmation","uncertain-request","history-read"])("consistency %
 });
 
 it.each(["client","target"])("consistency late matching response after %s replacement cannot reopen controls",async(mode)=>{
-  const f=consistencyFixture(),calls:string[]=[];let release:(()=>void)|undefined,old=true;
+  const f=consistencyFixture(),calls:string[]=[];let release:(()=>void)|undefined,old=true,statusReads=0;
   const fetchImplementation:typeof fetch=async(input,init)=>{
     const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
     const current=structuredClone(f),replacement=route.includes("/replacement.third/");
@@ -504,11 +507,13 @@ it.each(["client","target"])("consistency late matching response after %s replac
       current.status.session_id="replacement.third";
     }
     let body:unknown;
-    if(route.endsWith("/view"))body=playerSessionViewSchema.parse(current.view);
+    if(route.endsWith("/run-completion"))body=completionStatusFixture(current.journey);
+    else if(route.endsWith("/view"))body=playerSessionViewSchema.parse(current.view);
     else if(route.endsWith("/run-journey"))body=nativeRunJourneySchema.parse({...current.journey,...(!old?{run_state_version:6,lifecycle_status:"terminated"}:{})});
     else {
       body=nativeRunStatusSchema.parse(current.status);
-      if(old && route.endsWith("/run-status"))await new Promise<void>(r=>{release=r;});
+      if(route.endsWith("/run-status"))statusReads++;
+      if(old && statusReads===2 && route.endsWith("/run-status"))await new Promise<void>(r=>{release=r;});
     }
     return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
   };
@@ -522,20 +527,21 @@ it.each(["client","target"])("consistency late matching response after %s replac
       const input=screen.getByLabelText("Session ID");await user.clear(input);await user.type(input,"replacement.third");
       await user.click(screen.getByRole("button",{name:"读取 PlayerSessionView"}));
     }
-    await within(await screen.findByRole("region",{name:"旅程状态"})).findByText(/CONTRACT_MISMATCH/);
+    if(mode==="client") await screen.findByRole("button",{name:"手动重试安全 GET"});
+    else await waitFor(()=>expect(screen.getAllByText(/CONTRACT_MISMATCH/).length).toBeGreaterThan(0));
     await act(async()=>{release!();});
-    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
+    expect(screen.queryByRole("button",{name:"结束本次旅程"})).not.toBeInTheDocument();
     expect(screen.queryByRole("button",{name:"确认永久结束"})).not.toBeInTheDocument();
     expect(screen.queryByRole("button",{name:"返回设置"})).not.toBeInTheDocument();
     expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
   } finally {mounted.unmount();}
-});
+},20000);
 
 it("consistency revisit confirmation rechecks shared authority and preserves GET-only recovery",async()=>{
   const pair=recoveryPair(),calls:string[]=[];let matching=true;
   const client=new PublicApiClient({baseUrl:"http://revisit-consistency/",fetchImplementation:async(input,init)=>{
     const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
-    const body=route.endsWith("/view")?pair.source:route.endsWith("/run-journey")?pair.before:
+    const body=route.endsWith("/run-completion")?completionStatusFixture(pair.before):route.endsWith("/view")?pair.source:route.endsWith("/run-journey")?pair.before:
       nativeRunStatusSchema.parse({schema_version:"native-run-status/v1",session_id:"second",run_id:pair.result.run_id,
         session_state_version:7,run_state_version:4,lifecycle_status:matching?"active":"terminated",can_exit:matching});
     return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});

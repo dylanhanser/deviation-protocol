@@ -189,6 +189,7 @@ class RunMutationKind(StrEnum):
     TERMINATE_CONTINUED_NATIVE_RUN = "TERMINATE_CONTINUED_NATIVE_RUN"
     REVISIT_NATIVE_REGION = "REVISIT_NATIVE_REGION"
     TERMINATE_REVISITED_NATIVE_RUN = "TERMINATE_REVISITED_NATIVE_RUN"
+    COMPLETE_REVISITED_NATIVE_RUN = "COMPLETE_REVISITED_NATIVE_RUN"
 
 
 class RunMutationProvenance(_StrictFrozenModel):
@@ -325,6 +326,15 @@ class CanonicalRun(_StrictFrozenModel):
                 or current.occurred_at < creation.occurred_at
             ):
                 raise ValueError("termination requires the exact native revision-four successor")
+        elif self.lifecycle_status is RunLifecycleStatus.COMPLETED:
+            if (self.state_version.value != 6
+                    or current.prior_state_version != RunStateVersion(value=5)
+                    or current.mutation_kind is not RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN
+                    or tuple(p.joined_state_version.value for p in self.trusted_participation_references) != (3, 4, 5)
+                    or self.player_character_binding is None
+                    or self.player_character_binding.inactivated_at != current.occurred_at
+                    or current.occurred_at < creation.occurred_at):
+                raise ValueError("completion requires the exact regional revision-six successor")
         elif self.lifecycle_status is not RunLifecycleStatus.PRE_FIRST_TURN:
             raise ValueError("current Run implementation permits no terminal lifecycle state")
         if (current.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,
@@ -337,6 +347,9 @@ class CanonicalRun(_StrictFrozenModel):
                 and self.lifecycle_status is not RunLifecycleStatus.ACTIVE):
             raise ValueError("continuation mutation requires active lifecycle")
         binding = self.player_character_binding
+        if (current.mutation_kind is RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN
+                and self.lifecycle_status is not RunLifecycleStatus.COMPLETED):
+            raise ValueError("completion mutation requires completed lifecycle")
         if binding is not None:
             if (
                 binding.run_id != self.run_id
@@ -347,7 +360,7 @@ class CanonicalRun(_StrictFrozenModel):
             if (
                 (self.lifecycle_status.is_active_line and (
                     binding.binding_state != "active" or binding.inactivated_at is not None))
-                or (self.lifecycle_status is RunLifecycleStatus.TERMINATED and (
+                or (self.lifecycle_status in (RunLifecycleStatus.TERMINATED, RunLifecycleStatus.COMPLETED) and (
                     binding.binding_state != "historical" or binding.inactivated_at is None
                     or binding.inactivated_at < binding.bound_at))
             ):
@@ -374,7 +387,7 @@ class CanonicalRun(_StrictFrozenModel):
         )
         sessions = tuple(item.session_id for item in self.trusted_participation_references)
         expected_successor_versions = set(range(2, self.state_version.value + 1))
-        if self.lifecycle_status is RunLifecycleStatus.TERMINATED:
+        if self.lifecycle_status in (RunLifecycleStatus.TERMINATED, RunLifecycleStatus.COMPLETED):
             expected_successor_versions.remove(self.state_version.value)
         participation_versions = set(versions)
         missing_versions = expected_successor_versions - participation_versions

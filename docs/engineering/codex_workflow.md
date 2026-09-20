@@ -326,6 +326,19 @@ MySQL integration tests may run only after safely confirming:
 
 Never display the complete URL.
 
+Before combining schema-changing test groups, inspect each group's migration
+target and shared runtime fixture, not just its test name or the current
+Alembic head. A historical migration's direct amendment can conflict with a
+shared fixture that now deploys a later schema. S7-4 verification confirmed
+this when historical 008 tests used the current 010 runtime fixture: teardown
+refused the mismatched CHECKs and later groups inherited that failure. Run
+compatible groups sequentially with explicit preconditions; use verified
+applicable historical evidence for unchanged migration internals. If a group
+fails restoration, stop schema-changing testing, record actual rows and
+constraints, inspect and repair only the known failed prefix, and verify the
+recorded initial state before starting another group. Preserve failed logs;
+never count a later passing group as making the earlier run pass.
+
 On Windows, pytest can reach 100% test progress and then fail its final cleanup
 of the shared temporary-directory link `pytest-current`. S7-2 verification
 repeatedly observed sandbox `WinError 5` at that boundary. Progress dots do not
@@ -333,7 +346,16 @@ establish a successful verification: retain the raw log and nonzero exit, then
 rerun the exact operation outside the sandbox under the repository escalation
 rule. Do not relabel the interrupted run as a canonical pass or delete unrelated
 pytest temporary directories. If the same operation fails outside the sandbox,
-diagnose its OS permissions or file locks normally.
+diagnose its OS permissions or file locks normally. S7-4 reproduced denial of
+that shared temporary root outside the sandbox; the affected script tests passed
+with a new task-owned `--basetemp`. Verify that the resolved replacement path is
+inside the task workspace and does not already exist before using it. Preserve
+the failed command and identify the successful affected-test replacement; do not
+remove another session's temporary directories or silently relabel the broad run.
+Reconcile exact affected node outcomes as well as command exits: S7-4 replacement
+commands covered 211 passes and one existing Windows symlink-privilege skip, not
+212 passes. Preserve the skipped node, reason and unexercised assertion; do not
+add overlapping selection totals.
 
 A sandbox network failure does not prove that a provider key is invalid.
 

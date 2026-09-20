@@ -1,3 +1,5 @@
+import { assertCompletionHistory, assertCompletionAuthorities, assertCompletionSubmission, assertCompletionReconciliation, assertConfirmedCompletion, freezeRunCompletion, type FrozenRunCompletion } from "./runCompletion";
+import type { NativeRunCompletionStatus, NativeRunCompletionResult } from "./api/schemas";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
 
 import { publicApiClient, type PublicApiClient } from "./api/client";
@@ -739,12 +741,37 @@ export default function App({
   const choices = useRef({profileId,worldId,overrides});
   const nativeExpected = useRef<NativeViewAssociation | null>(null);
   const confirmedContinuation = useRef<ConfirmedContinuation | null>(null);
+  const confirmedCompletion=useRef<{attempt:FrozenRunCompletion;result:NativeRunCompletionResult}|null>(null);
+  const confirmedExit=useRef<NativeRunStatus|null>(null);
+  const [completionProof,setCompletionProof]=useState<{attempt:FrozenRunCompletion;result:NativeRunCompletionResult}|null>(null);
+  const [exitProof,setExitProof]=useState<NativeRunStatus|null>(null);
+  const [completionOwner,setCompletionOwner]=useState<PublicApiClient|null>(null);
+  const [exitOwner,setExitOwner]=useState<PublicApiClient|null>(null);
+  const completionAttemptRef=useRef<FrozenRunCompletion|null>(null);
+  const completionClientRef=useRef<PublicApiClient|null>(null);
+  const completionRetryBlockedRef=useRef(false);
+  const [completionRetryBlocked,setCompletionRetryBlocked]=useState(false);
+  const blockCompletionRetry=useCallback((blocked:boolean)=>{
+    completionRetryBlockedRef.current=blocked;setCompletionRetryBlocked(blocked);
+  },[]);
+  const exitConfirmationRef=useRef<{view:PlayerSessionView;authority:object;client:PublicApiClient}|null>(null);
+  const continuationConfirmationRef=useRef<{view:PlayerSessionView;authority:object;client:PublicApiClient}|null>(null);
   const validateSuccessorRead = useCallback(async(view: PlayerSessionView, signal: AbortSignal) => {
     const confirmed=confirmedContinuation.current;
     if (!view.run_context) return;
     const status=await client.getNativeRunJourney(view.metadata.session_id,signal);
     assertContinuationStatus(view,status);
     if (confirmed) assertConfirmedSuccessor(confirmed,view,status);
+    if (view.scenario_status==="ENDED") {
+      const [runStatus,completion]=await Promise.all([client.getNativeRunStatus(view.metadata.session_id,signal),
+        client.getNativeRunCompletion(view.metadata.session_id,signal)]);
+      const authority={journey:status,status:runStatus,completion};
+      assertCompletionAuthorities(view,authority);
+      if(completionAttemptRef.current) assertCompletionReconciliation(completionAttemptRef.current,view,authority);
+      if(confirmedCompletion.current) assertConfirmedCompletion(confirmedCompletion.current,view,authority);
+      if(confirmedExit.current && JSON.stringify(confirmedExit.current)!==JSON.stringify(runStatus))
+        throw new ApiClientError("Confirmed exit association mismatch",{kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+    }
     return status;
   },[client]);
   const latestClient = useRef(client);
@@ -788,9 +815,13 @@ export default function App({
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
   const [runAuthority, setRunAuthority] = useState<{
     owner: LoadedSession; client: PublicApiClient;
-    journey: NativeRunContinuationStatus; status: NativeRunStatus | null;
+    journey: NativeRunContinuationStatus; status: NativeRunStatus | null; completion:NativeRunCompletionStatus|null;
   } | null>(null);
   const [runStatus, setRunStatus] = useState<NativeRunStatus | null>(null);
+  const [completionStatus,setCompletionStatus]=useState<NativeRunCompletionStatus|null>(null);
+  const [completionConfirm,setCompletionConfirm]=useState<FrozenRunCompletion|null>(null);
+  const [completionAttempt,setCompletionAttempt]=useState<FrozenRunCompletion|null>(null);
+  const [completionError,setCompletionError]=useState<string|null>(null);
   const [exitConfirm, setExitConfirm] = useState(false);
   const [exitAttempt, setExitAttempt] = useState<FrozenRunExit | null>(null);
   const exitAttemptRef = useRef<FrozenRunExit | null>(null);
@@ -865,6 +896,10 @@ export default function App({
     setContinuationStatus(null); setContinuationConfirm(false); setContinuationAttempt(null); continuationAttemptRef.current = null;
     setContinuationError(null); setHistoricalSession(null); setHistoricalJourney(null); setHistoryLoading(false);
     setRunStatus(null); setExitConfirm(false); setExitAttempt(null); exitAttemptRef.current = null;
+    setCompletionStatus(null);setCompletionConfirm(null);setCompletionAttempt(null);completionAttemptRef.current=null;
+    confirmedCompletion.current=null;confirmedExit.current=null;setCompletionProof(null);setExitProof(null);
+    setCompletionOwner(null);setExitOwner(null);setCompletionError(null);completionClientRef.current=null;
+    blockCompletionRetry(false);
     setExitError(null); setExitClearFailed(false);
     loadedSessionRef.current = null;
     setLoadedSession(null);
@@ -874,7 +909,8 @@ export default function App({
     setOperationError(null);
     setRecoveryInterruption(null);
   }, [setManualSessionId, setRunStatus, setExitConfirm, setExitAttempt, setExitError, setExitClearFailed,
-    setContinuationStatus, setContinuationConfirm, setContinuationAttempt, setContinuationError, setHistoricalSession]);
+    setContinuationStatus, setContinuationConfirm, setContinuationAttempt, setContinuationError, setHistoricalSession,
+    setCompletionConfirm,setCompletionStatus,setCompletionAttempt,setCompletionError,setCompletionProof,setExitProof,setCompletionOwner,setExitOwner,blockCompletionRetry]);
 
   const enterRecoveryStorageFailure = useCallback(
     (failure: SessionRecoveryStorageFailure) => {
@@ -1032,7 +1068,7 @@ export default function App({
     if (previousClientRef.current !== client) {
       setContinuationStatus(null); setContinuationConfirm(false);
       setContinuationError(null); setHistoricalSession(null); setHistoricalJourney(null); setHistoryLoading(false);
-      setRunStatus(null); setExitConfirm(false);
+      setRunStatus(null); setExitConfirm(false);setCompletionStatus(null);setCompletionConfirm(null);
       setExitError(null); setExitClearFailed(false);
       nativeExpected.current = null;
       previousCatalogue.current = null;
@@ -1074,6 +1110,8 @@ export default function App({
 
   useEffect(() => {
     const current=loadedSession;
+    const previouslyBlocked=completionRetryBlockedRef.current;
+    if(completionAttemptRef.current) blockCompletionRetry(true);
     const controller=new AbortController();
     const generation=operationGenerationRef.current;
     let active=true;
@@ -1087,40 +1125,54 @@ export default function App({
       // separate owner-bound authority stays invalid until the reads agree.
       setContinuationStatus(previous => previous?.session_id === current?.sessionId &&
         previous?.path.session_state_version === current?.view.metadata.state_version ? previous : null);
-      setContinuationConfirm(false); setExitConfirm(false);
+      setContinuationConfirm(false); setExitConfirm(false);setCompletionConfirm(null);
       if (!current?.view.run_context || current.stale !== null) return;
-      const [journey,status]=await Promise.all([
+      const [journey,status,completion]=await Promise.all([
         client.getNativeRunJourney(current.sessionId,controller.signal),
         current.view.scenario_status === "ENDED" ? client.getNativeRunStatus(current.sessionId,controller.signal) : Promise.resolve(null),
+        current.view.scenario_status === "ENDED" ? client.getNativeRunCompletion(current.sessionId,controller.signal) : Promise.resolve(null),
       ]);
       if (!isCurrent()) return;
       assertContinuationStatus(current.view,journey);
       if (confirmedContinuation.current) assertConfirmedCurrent(confirmedContinuation.current,journey);
       if (confirmedContinuation.current?.result.session_id === current.sessionId)
         assertConfirmedSuccessor(confirmedContinuation.current,current.view,journey);
-      if (status) assertJourneyRunStatus(current.view,journey,status);
+      if (status && completion) {
+        assertCompletionAuthorities(current.view,{journey,status,completion});
+        if(completionAttemptRef.current) assertCompletionReconciliation(completionAttemptRef.current,current.view,{journey,status,completion});
+        if(confirmedCompletion.current) assertConfirmedCompletion(confirmedCompletion.current,current.view,{journey,status,completion});
+        if(confirmedExit.current && JSON.stringify(confirmedExit.current)!==JSON.stringify(status))
+          throw new ApiClientError("Confirmed exit association mismatch",{kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+      }
       setContinuationStatus(journey); setRunStatus(status);
-      setRunAuthority({owner:current,client,journey,status});
+      setCompletionStatus(completion);
+      setRunAuthority({owner:current,client,journey,status,completion});
+      blockCompletionRetry(false);
       setContinuationError(null); setExitError(null);
-      if (status?.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current=null;}
+
     };
     void synchronize().catch((error:unknown)=>{
       if (!isCurrent()) return;
       setRunAuthority(null);
+      blockCompletionRetry(previouslyBlocked || (error instanceof ApiClientError && error.reason==="CONTRACT_MISMATCH"));
       setContinuationError(formatApiClientError(error));
       if (current?.view.scenario_status === "ENDED") setExitError(formatApiClientError(error));
     });
     return ()=>{active=false;controller.abort();};
-  },[client,loadedSession]);
+  },[client,loadedSession,blockCompletionRetry]);
 
   function hasRunAuthority(current: LoadedSession | null): boolean {
     if (!current || current.stale || !runAuthority || runAuthority.owner !== current || runAuthority.client !== client ||
-        runAuthority.journey !== continuationStatus || runAuthority.status !== runStatus) return false;
+        runAuthority.journey !== continuationStatus || runAuthority.status !== runStatus || runAuthority.completion !== completionStatus) return false;
     try {
       assertContinuationStatus(current.view,runAuthority.journey);
       if (current.view.scenario_status === "ENDED") {
-        if (!runAuthority.status) return false;
-        assertJourneyRunStatus(current.view,runAuthority.journey,runAuthority.status);
+        if (!runAuthority.status || !runAuthority.completion) return false;
+        const authorities={journey:runAuthority.journey,status:runAuthority.status,completion:runAuthority.completion};
+        assertCompletionAuthorities(current.view,authorities);
+        if(completionAttempt) assertCompletionReconciliation(completionAttempt,current.view,authorities);
+        if(completionProof) assertConfirmedCompletion(completionProof,current.view,authorities);
+        if(exitProof && JSON.stringify(exitProof)!==JSON.stringify(runAuthority.status)) return false;
       }
       return true;
     } catch {return false;}
@@ -1826,7 +1878,7 @@ export default function App({
 
   async function handleManualRead(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (historicalSession || historyLoading || continuationAttemptRef.current) return;
+    if (historicalSession || historyLoading || continuationAttemptRef.current || completionAttemptRef.current) return;
     if (
       foregroundOperationRef.current !== null ||
       mutationAttemptRef.current !== null ||
@@ -1945,7 +1997,7 @@ export default function App({
   }
 
   async function handleExplicitViewRefresh() {
-    if (historicalSession || historyLoading || continuationAttemptRef.current) return;
+    if (historicalSession || historyLoading || continuationAttemptRef.current || completionAttemptRef.current) return;
     const current = loadedSessionRef.current;
     if (
       current === null ||
@@ -1987,7 +2039,7 @@ export default function App({
   }
 
   function handleExplicitSessionClear() {
-    if (historicalSession || historyLoading || continuationAttemptRef.current) return;
+    if (historicalSession || historyLoading || continuationAttemptRef.current || completionAttemptRef.current) return;
     explicitlyAbandonSession();
   }
 
@@ -1996,7 +2048,7 @@ export default function App({
   }
 
   async function handleActionRequest(requestFactory: () => ActionRequest) {
-    if (historicalSession || continuationAttemptRef.current || exitAttemptRef.current) return;
+    if (historicalSession || continuationAttemptRef.current || exitAttemptRef.current || completionAttemptRef.current) return;
     const current = loadedSessionRef.current;
     if (current?.view.run_context &&
         (continuationError || continuationStatus?.session_id !== current.sessionId ||
@@ -2188,12 +2240,15 @@ export default function App({
 
   async function handleContinuation(retry=false) {
     const current=loadedSessionRef.current;
-    if (!current || current.stale || historicalSession || foregroundOperationRef.current || exitAttemptRef.current ||
+    if (!current || current.stale || historicalSession || foregroundOperationRef.current || exitAttemptRef.current || completionAttemptRef.current ||
         !hasRunAuthority(current)) return;
     let attempt=continuationAttemptRef.current;
     if (!retry) {
       if (attempt || !continuationConfirm || !continuationStatus || continuationStatus.lifecycle_status !== "active" ||
           continuationStatus.current.session_id !== current.sessionId) return;
+      const opened=continuationConfirmationRef.current;
+      if(!opened || opened.client!==client || JSON.stringify(opened.view)!==JSON.stringify(current.view) ||
+          JSON.stringify(opened.authority)!==JSON.stringify({journey:continuationStatus,status:runStatus,completion:completionStatus}))return;
       attempt=freezeRunContinuation(current.view,continuationStatus,idempotencyKeyFactory());
       continuationAttemptRef.current=attempt;setContinuationAttempt(attempt);setContinuationConfirm(false);
     }
@@ -2263,7 +2318,7 @@ export default function App({
   async function navigateHistory(direction: "previous" | "next" | "current" = "previous") {
     const current=loadedSessionRef.current;
     if (direction === "current" && historyLoading) invalidateForegroundOperation();
-    if (!current || foregroundOperationRef.current || continuationAttemptRef.current || exitAttemptRef.current) return;
+    if (!current || foregroundOperationRef.current || continuationAttemptRef.current || exitAttemptRef.current || completionAttemptRef.current) return;
     const displayed=historicalSession ?? current;
     const operation=beginForegroundOperation("reading",{clearSession:false});
     if (!operation) return;
@@ -2273,12 +2328,14 @@ export default function App({
       const signal=operation.controller.signal;
       const from=await client.getNativeRunJourney(displayed.sessionId,signal);
       assertContinuationStatus(displayed.view,from);
+      if (confirmedCompletion.current) assertCompletionHistory(confirmedCompletion.current,from);
       if (confirmedContinuation.current) assertConfirmedCurrent(confirmedContinuation.current,from);
       const target=direction === "current" ? from.current : direction === "previous" ? from.predecessor : from.successor;
       if (!target || from.current.session_id!==current.sessionId) throw new Error("缺少完整的历史关联");
       const view=await client.getSessionView(target.session_id,signal);
       const status=await client.getNativeRunJourney(target.session_id,signal);
       assertContinuationStatus(view,status);assertNativeView(view,current.view.run_context);
+      if (confirmedCompletion.current) assertCompletionHistory(confirmedCompletion.current,status);
       if (!sameAssociation(target,status.path) || !sameAssociation(from.current,status.current) ||
           from.run_state_version!==status.run_state_version || from.lifecycle_status!==status.lifecycle_status)
         throw new Error("历史关联发生变化，请重新读取");
@@ -2293,14 +2350,54 @@ export default function App({
     finally {if(isCurrentOperation(operation)) setHistoryLoading(false);finishForegroundOperation(operation);}
   }
 
+  async function handleCompletion(retry=false) {
+    const current=loadedSessionRef.current;
+    if(!current || current.stale || historicalSession || foregroundOperationRef.current || exitAttemptRef.current ||
+        continuationAttemptRef.current || completionClientRef.current!==client) return;
+    let attempt=completionAttemptRef.current;
+    if(retry && (completionRetryBlockedRef.current || (confirmedCompletion.current && !hasRunAuthority(current)))) return;
+    if(!retry) {
+      if(attempt || !completionConfirm || !hasRunAuthority(current) || !runAuthority?.status || !runAuthority.completion) return;
+      try {assertCompletionSubmission(completionConfirm,current.view,{journey:runAuthority.journey,status:runAuthority.status,completion:runAuthority.completion});}
+      catch(error) {setCompletionError(formatApiClientError(error));return;}
+      attempt=completionConfirm;completionAttemptRef.current=attempt;setCompletionAttempt(attempt);setCompletionConfirm(null);
+    }
+    if(!attempt || attempt.sessionId!==current.sessionId || attempt.runId!==current.view.run_context?.run_id)return;
+    if(JSON.stringify(attempt.source)!==JSON.stringify(current.view) || (retry && completionRetryBlockedRef.current)) return;
+    const operation=beginForegroundOperation("submitting",{clearSession:false});
+    if(!operation)return;
+    setCompletionError(null);setRunAuthority(null);
+    try {
+      const result=await client.completeNativeRun(attempt,operation.controller.signal);
+      if(!isCurrentOperation(operation) || loadedSessionRef.current!==current)return;
+      if(confirmedCompletion.current && JSON.stringify(confirmedCompletion.current.result)!==JSON.stringify(result))
+        throw new ApiClientError("Confirmed completion replay mismatch",{kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+      confirmedCompletion.current ??= {attempt,result:structuredClone(result)};setCompletionProof(confirmedCompletion.current);
+      const [journey,status,completion]=await Promise.all([client.getNativeRunJourney(current.sessionId,operation.controller.signal),
+        client.getNativeRunStatus(current.sessionId,operation.controller.signal),client.getNativeRunCompletion(current.sessionId,operation.controller.signal)]);
+      if(!isCurrentOperation(operation) || loadedSessionRef.current!==current)return;
+      assertConfirmedCompletion(confirmedCompletion.current,current.view,{journey,status,completion});
+      setContinuationStatus(journey);setRunStatus(status);setCompletionStatus(completion);
+      setRunAuthority({owner:current,client,journey,status,completion});
+      completionAttemptRef.current=null;setCompletionAttempt(null);
+    } catch(error) {if(isCurrentOperation(operation)){
+      if(error instanceof ApiClientError && error.reason==="CONTRACT_MISMATCH") blockCompletionRetry(true);
+      setCompletionError(formatApiClientError(error));
+    }}
+    finally {finishForegroundOperation(operation);}
+  }
+
   async function handleRunExit(retry = false) {
-    if (historicalSession || continuationAttemptRef.current) return;
+    if (historicalSession || continuationAttemptRef.current || completionAttemptRef.current) return;
     const current = loadedSessionRef.current;
     if (!current || current.stale || exitClearFailed || foregroundOperationRef.current ||
-        !hasRunAuthority(current) || !runStatus?.can_exit || continuationStatus?.current.session_id !== current.sessionId) return;
+        exitConfirmationRef.current?.client!==client || !hasRunAuthority(current)) return;
     let attempt = exitAttemptRef.current;
     if (!retry) {
-      if (attempt || !exitConfirm || !runStatus) return;
+      if (attempt || !exitConfirm || !runStatus || !hasRunAuthority(current) || !runStatus.can_exit ||
+          continuationStatus?.current.session_id!==current.sessionId || !exitConfirmationRef.current ||
+          exitConfirmationRef.current.client!==client || JSON.stringify(exitConfirmationRef.current.view)!==JSON.stringify(current.view) ||
+          JSON.stringify(exitConfirmationRef.current.authority)!==JSON.stringify({journey:continuationStatus,status:runStatus,completion:completionStatus})) return;
       attempt = freezeRunExit(current.view, runStatus, idempotencyKeyFactory());
       exitAttemptRef.current = attempt; setExitAttempt(attempt); setExitConfirm(false);
     }
@@ -2312,14 +2409,20 @@ export default function App({
       const status = await client.exitNativeRun(attempt, operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current) return;
       assertRunStatus(current.view, status);
+      if(confirmedExit.current && JSON.stringify(confirmedExit.current)!==JSON.stringify(status))
+        throw new ApiClientError("Confirmed exit replay mismatch",{kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+      confirmedExit.current ??= structuredClone(status);setExitProof(confirmedExit.current);
       // A confirmed exit advances the Run. Retain the request until a matching
       // GET confirms the pair; never synthesize a terminal Journey from status.
       setRunAuthority(null);
       const journey=await validateSuccessorRead(current.view,operation.controller.signal);
       if (!isCurrentOperation(operation) || loadedSessionRef.current !== current || !journey) return;
-      assertJourneyRunStatus(current.view,journey,status);
+      const completion=await client.getNativeRunCompletion(current.sessionId,operation.controller.signal);
+      if (!isCurrentOperation(operation) || loadedSessionRef.current!==current) return;
+      assertCompletionAuthorities(current.view,{journey,status,completion});
       setContinuationStatus(journey); setRunStatus(status);
-      setRunAuthority({owner:current,client,journey,status});
+      setCompletionStatus(completion);
+      setRunAuthority({owner:current,client,journey,status,completion});
       setExitAttempt(null); exitAttemptRef.current = null;
     } catch (error) {
       if (isCurrentOperation(operation)) {
@@ -2335,6 +2438,8 @@ export default function App({
     if (!current || foregroundOperationRef.current || exitClearFailed) return;
     const operation = beginForegroundOperation("reading", {clearSession:false});
     if (!operation) return;
+    const previouslyBlocked=completionRetryBlockedRef.current;
+    if(completionAttemptRef.current) blockCompletionRetry(true);
     setRunAuthority(null); setRunStatus(null);
     try {
       const view = await client.getSessionView(current.sessionId, operation.controller.signal);
@@ -2351,15 +2456,18 @@ export default function App({
       assertJourneyRunStatus(view,journey,status);
       commitLoadedSession(current.sessionId, view, null);
       setRunStatus(status); setExitError(null);
-      if (status.lifecycle_status === "terminated") {setExitAttempt(null); exitAttemptRef.current = null;}
+
     } catch (error) {
-      if (isCurrentOperation(operation)) setExitError(formatApiClientError(error));
+      if (isCurrentOperation(operation)) {
+        blockCompletionRetry(previouslyBlocked || (error instanceof ApiClientError && error.reason==="CONTRACT_MISMATCH"));
+        setExitError(formatApiClientError(error));
+      }
     } finally {finishForegroundOperation(operation);}
   }
 
   function returnToSetup() {
-    if (historicalSession || continuationAttemptRef.current) return;
-    if (runStatus?.lifecycle_status !== "terminated" || foregroundOperationRef.current || !loadedSessionRef.current) return;
+    if (historicalSession || continuationAttemptRef.current || completionAttemptRef.current) return;
+    if ((runStatus?.lifecycle_status !== "terminated" && runStatus?.lifecycle_status !== "completed") || exitAttemptRef.current || foregroundOperationRef.current || !loadedSessionRef.current) return;
     if (!hasRunAuthority(loadedSessionRef.current)) return;
     const cleared = clearSessionRecoveryRecord();
     if (!cleared.ok) {setExitClearFailed(true); return;}
@@ -2416,7 +2524,7 @@ export default function App({
     import.meta.env.VITE_APP_MODE === "deterministic-demo";
   const prePlayControlsDisabled =
     historicalSession !== null || historyLoading || continuationAttempt !== null ||
-    exitAttempt !== null || exitClearFailed ||
+    exitAttempt !== null || completionAttempt !== null || exitClearFailed ||
     foregroundOperation !== null ||
     mutationAttempt !== null ||
     recoveryInterruption !== null ||
@@ -2654,7 +2762,7 @@ export default function App({
             disabled={
               historicalSession !== null || historyLoading || continuationAttempt !== null ||
               foregroundOperation !== null ||
-              exitAttempt !== null || exitClearFailed ||
+              exitAttempt !== null || completionAttempt !== null || exitClearFailed ||
               mutationAttempt !== null ||
               recoveryInterruption !== null ||
               recoveryStorageFailure !== null
@@ -2673,7 +2781,7 @@ export default function App({
               type="submit"
               disabled={
                 foregroundOperation !== null ||
-                exitAttempt !== null || exitClearFailed ||
+                exitAttempt !== null || completionAttempt !== null || exitClearFailed ||
                 mutationAttempt !== null ||
                 recoveryInterruption !== null ||
                 recoveryStorageFailure !== null ||
@@ -2708,7 +2816,7 @@ export default function App({
         {recoveryStorageFailure === null &&
         recoveryInterruption === null &&
         recoveryRecord !== null ? (
-          <button type="button" disabled={historicalSession !== null || historyLoading || continuationAttempt !== null || exitAttempt !== null || exitClearFailed} onClick={handleExplicitSessionClear}>
+          <button type="button" disabled={historicalSession !== null || historyLoading || continuationAttempt !== null || exitAttempt !== null || completionAttempt !== null || exitClearFailed} onClick={handleExplicitSessionClear}>
             清除本标签页 Session
           </button>
         ) : null}
@@ -2781,10 +2889,11 @@ export default function App({
               <p>上一世界结局：{continuationStatus.arrival.previous_ending_title}（{continuationStatus.arrival.previous_ending_status}）</p>
               <p>{continuationStatus.arrival.entry_notice}</p>
             </div> : null}
-          {continuationStatus?.predecessor ? <button type="button" disabled={foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null}
+          {continuationStatus?.predecessor ? <button type="button" disabled={foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null || completionAttempt !== null}
             onClick={()=>void navigateHistory()}>查看上一世界历史</button> : null}
-          {runAuthorityReady && continuationStatus?.next_transition ? <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null}
-            onClick={()=>{setExitConfirm(false);setContinuationConfirm(true);}}>继续当前旅程</button> : null}
+          {runAuthorityReady && continuationStatus?.next_transition ? <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null || completionAttempt !== null}
+            onClick={()=>{if(!hasRunAuthority(loadedSession))return;setExitConfirm(false);setCompletionConfirm(null);
+              continuationConfirmationRef.current={view:structuredClone(loadedSession.view),authority:structuredClone({journey:continuationStatus,status:runStatus,completion:completionStatus}),client};setContinuationConfirm(true);}}>继续当前旅程</button> : null}
           {continuationConfirm ? <div role="dialog" aria-label="确认继续旅程">
             <p>将进入《{continuationStatus?.next_transition?.world_title}》的{continuationStatus?.next_transition?.region_title}。{continuationStatus?.next_transition?.notice}</p>
             <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={()=>void handleContinuation()}>{continuationStatus?.next_transition?.kind === "regional_revisit" ? "确认进入核验档案室" : "确认进入下一世界"}</button>
@@ -2802,15 +2911,16 @@ export default function App({
 
       {!historicalSession && loadedSession?.view.run_context && loadedSession.view.scenario_status === "ENDED" ? (
         <section className="panel" aria-label="旅程状态">
-          {runAuthorityReady && runStatus?.lifecycle_status === "terminated" ? <>
-            <p>本次旅程已永久结束。结局与历史仍可阅读。</p>
+          {runAuthorityReady && (runStatus?.lifecycle_status === "terminated" || runStatus?.lifecycle_status === "completed") && !completionAttempt && !exitAttempt ? <>
+            {runStatus?.lifecycle_status==="completed" ? <><p>{completionStatus?.completion?.title}</p><p>{completionStatus?.completion?.notice}</p></> : <p>本次旅程已永久结束。结局与历史仍可阅读。</p>}
             {exitClearFailed ? <p role="alert">恢复记录清除失败；请重试。清除成功前不能进入新旅程。</p> : null}
             <button type="button" disabled={foregroundOperation !== null} onClick={returnToSetup}>
               {exitClearFailed ? "重试清除并返回设置" : "返回设置"}
             </button>
           </> : <>
-            <button type="button" disabled={!runAuthorityReady || !runStatus?.can_exit || exitAttempt !== null || continuationAttempt !== null || foregroundOperation !== null || loadedSession.stale !== null}
-              onClick={() => {setContinuationConfirm(false);setExitConfirm(true);}}>结束本次旅程</button>
+            <button type="button" disabled={!runAuthorityReady || !runStatus?.can_exit || exitAttempt !== null || completionAttempt !== null || continuationAttempt !== null || foregroundOperation !== null || loadedSession.stale !== null}
+              onClick={() => {if(!hasRunAuthority(loadedSession))return;setContinuationConfirm(false);setCompletionConfirm(null);
+                setExitOwner(client);exitConfirmationRef.current={view:structuredClone(loadedSession.view),authority:structuredClone({journey:continuationStatus,status:runStatus,completion:completionStatus}),client};setExitConfirm(true);}}>结束本次旅程</button>
             {exitConfirm ? <div role="dialog" aria-label="确认结束旅程">
               <p>本次旅程将永久结束，结局与历史保留。再次进入会创建新的旅程，不是继续当前旅程。</p>
               <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={() => void handleRunExit()}>确认永久结束</button>
@@ -2818,9 +2928,24 @@ export default function App({
             </div> : null}
             {exitAttempt ? <>
               <p>结束请求尚未确认。可读取旅程状态，或手动重试原请求。</p>
-              <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={() => void handleRunExit(true)}>重试原结束请求</button>
+              <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null || exitOwner!==client} onClick={() => void handleRunExit(true)}>重试原结束请求</button>
             </> : null}
           </>}
+          {runAuthorityReady && completionStatus?.can_complete && !completionAttempt ? <>
+            <p>待确认：{completionStatus.offer?.notice}</p>
+            <button type="button" disabled={foregroundOperation!==null || exitAttempt!==null || continuationAttempt!==null}
+              onClick={()=>{if(!runAuthority?.status || !runAuthority.completion || !hasRunAuthority(loadedSession))return;
+                setExitConfirm(false);setContinuationConfirm(false);completionClientRef.current=client;setCompletionOwner(client);
+                setCompletionConfirm(freezeRunCompletion(loadedSession.view,{journey:runAuthority.journey,status:runAuthority.status,completion:runAuthority.completion},idempotencyKeyFactory()));}}>完成本次旅程</button>
+          </> : null}
+          {completionConfirm ? <div role="dialog" aria-label="确认完成旅程">
+            <p>{completionConfirm.authority.completion.offer?.notice}</p>
+            <button type="button" disabled={!runAuthorityReady || foregroundOperation!==null} onClick={()=>void handleCompletion()}>确认结案并完成旅程</button>
+            <button type="button" onClick={()=>setCompletionConfirm(null)}>取消完成</button>
+          </div> : null}
+          {completionAttempt ? <><p>完成请求尚未确认。读取状态不会重发请求。</p>
+            <button type="button" disabled={foregroundOperation!==null || completionOwner!==client || completionRetryBlocked || (completionProof!==null && !runAuthorityReady)} onClick={()=>void handleCompletion(true)}>重试原完成请求</button></> : null}
+          {completionError ? <p role="alert">{completionError}</p> : null}
           {exitError ? <p role="alert">{exitError}</p> : null}
           <button type="button" disabled={foregroundOperation !== null || exitClearFailed} onClick={() => void reconcileRunExit()}>读取旅程状态</button>
         </section>

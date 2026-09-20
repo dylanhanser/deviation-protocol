@@ -36,7 +36,7 @@ import {
   scenarioCatalogFixture,
   synchronousActionResponseFixture,
   runOptionsFixture,
-  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture,
+  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture, completionStatusFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
@@ -60,6 +60,9 @@ it("pauses a native confirmed-202 identity mismatch while retaining GET recovery
 it.each([true,false])("native setup follows authoritative action affordances and rejects missing context: ending=%s",async (ending) => {
   const admitted=nativeEntryFixture(); let views=0,entries=0,actions=0;
   vi.spyOn(PublicApiClient.prototype,"getNativeRunJourney").mockImplementation(async()=>nativeJourneyFixture(nativeViewFixture(views>1 ? endedViewFixture("RESOLVED") : activeViewFixture)));
+  vi.spyOn(PublicApiClient.prototype,"getNativeRunStatus").mockResolvedValue({schema_version:"native-run-status/v1",session_id:admitted.session_id,
+    run_id:admitted.run_context.run_id,session_state_version:7,run_state_version:3,lifecycle_status:"active",can_exit:true});
+  vi.spyOn(PublicApiClient.prototype,"getNativeRunCompletion").mockResolvedValue(completionStatusFixture(nativeJourneyFixture(nativeViewFixture(endedViewFixture("RESOLVED")))));
   server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
     http.post(`${apiOrigin}/v1/runs/native`,() => {entries++;return HttpResponse.json(admitted);}),
     http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {

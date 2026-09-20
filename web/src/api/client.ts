@@ -1,3 +1,5 @@
+import { nativeRunCompletionStatusSchema, nativeRunCompletionResultSchema } from "./schemas";
+import { assertCompletionResult, type FrozenRunCompletion } from "../runCompletion";
 import type { z } from "zod";
 
 import { configuredApiBaseUrl, normalizeApiBaseUrl } from "./config";
@@ -103,6 +105,20 @@ async function parseJsonBody(response: Response): Promise<unknown> {
 }
 
 export class PublicApiClient {
+  async getNativeRunCompletion(sessionId:string,signal?:AbortSignal) {
+    const id=sessionPathIdSchema.parse(sessionId);
+    const result=await this.request(`v1/sessions/${encodeURIComponent(id)}/run-completion`,
+      {method:"GET",...(signal===undefined?{}:{signal})},200,nativeRunCompletionStatusSchema);
+    if(result.session_id!==id) throw responseError(200,"CONTRACT_MISMATCH");
+    return result;
+  }
+  async completeNativeRun(attempt:FrozenRunCompletion,signal?:AbortSignal) {
+    const result=await this.request(attempt.url,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":attempt.key},
+      body:attempt.serializedBody,...(signal===undefined?{}:{signal})},200,nativeRunCompletionResultSchema);
+    assertCompletionResult(attempt,result);
+    return result;
+  }
+
   async getNativeRunJourney(sessionId: string, signal?: AbortSignal) {
     const id=sessionPathIdSchema.parse(sessionId);
     const result=await this.request(`v1/sessions/${encodeURIComponent(id)}/run-journey`,

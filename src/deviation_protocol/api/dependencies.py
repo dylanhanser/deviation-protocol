@@ -37,6 +37,7 @@ class ApiServices:
     content_registry: object | None = None
     run_continuation_service: object | None = None
     run_revisit_service: object | None = None
+    run_completion_service: object | None = None
 
     def __post_init__(self):
         if self.native_run_admission_service is not None:
@@ -62,6 +63,9 @@ class ApiServices:
             if self.run_continuation_service is not None and self.run_revisit_service is None:
                 from deviation_protocol.application.run_revisit_service import RunRegionalRevisitService
                 object.__setattr__(self, "run_revisit_service", RunRegionalRevisitService(self.run_continuation_service))
+            if self.run_revisit_service is not None and self.run_completion_service is None:
+                from deviation_protocol.application.run_completion_service import RunCompletionService
+                object.__setattr__(self, "run_completion_service", RunCompletionService(self.run_revisit_service))
         elif getattr(self.session_service, "native_view_coordinator", None) is not None:
             raise ValueError("native View without native admission")
 

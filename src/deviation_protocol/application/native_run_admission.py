@@ -401,9 +401,12 @@ class NativeRunAdmissionService(RunEntryService):
                 or evidence.player_character.pre_entry_record_revision != command.expected_record_revision
                 or evidence.entry_world != command.entry_world):
             return _decision("IDEMPOTENCY_CONFLICT")
-        admission = await uow.run_protocol_bindings.get_classified_for_update(run_id=receipt.result.run_id)
-        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1
-        if type(admission) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1):
+        try:
+            admission = await uow.run_protocol_bindings.get_classified_for_update(run_id=receipt.result.run_id)
+        except ValueError:
+            raise SnapshotInvalidError("invalid historical native Run family") from None
+        from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1
+        if type(admission) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
             revalidate_run_model(admission, type(admission))
             admission = admission.admission
         if type(admission) is not NativeRunAdmissionV1:

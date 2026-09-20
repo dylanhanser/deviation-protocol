@@ -24,7 +24,7 @@ export function assertJourney(view: PlayerSessionView, journey: NativeRunJourney
   if (view.metadata.session_id !== path.session_id || view.metadata.state_version !== path.session_state_version ||
       view.narrative_frame.scenario_id !== path.scenario_id || view.metadata.content_version !== path.scenario_content_version ||
       (path.session_id !== journey.current.session_id && view.scenario_status !== "ENDED") ||
-      ((journey.next_transition !== null || journey.lifecycle_status === "terminated") && view.scenario_status !== "ENDED")) mismatch();
+      ((journey.next_transition !== null || journey.lifecycle_status !== "active") && view.scenario_status !== "ENDED")) mismatch();
 }
 export function assertJourneyRunStatus(view: PlayerSessionView, journey: NativeRunJourney, status: NativeRunStatus): void {
   assertJourney(view,journey);
@@ -52,7 +52,11 @@ export function assertConfirmedCurrent(confirmed: ConfirmedTransition, journey: 
   const {source,sourceAssociation,result}=confirmed;
   assertTransitionResult(source,result);
   nativeRunJourneySchema.parse(journey);
-  const target=journey.current;
+  const target=[journey.path,journey.current,journey.predecessor,journey.successor].find(
+    association=>association?.visit?.visit_ordinal===result.visit.visit_ordinal);
+  if (!target) mismatch();
+  const count=journey.current.visit?.visit_ordinal;
+  if (count!==result.visit.visit_ordinal && !(result.visit.visit_ordinal===2 && count===3)) mismatch();
   if (journey.run_id !== result.run_id || JSON.stringify(journey.run_context) !== JSON.stringify(result.run_context) ||
       target.session_id !== result.session_id || target.scenario_id !== result.scenario_id ||
       target.scenario_content_version !== result.scenario_content_version || !sameVisit(target.visit,result.visit) ||
@@ -98,5 +102,7 @@ export function assertNeighbor(from: NativeRunJourney, to: NativeRunJourney): vo
   const reciprocal=to.predecessor?.session_id === from.session_id ? to.predecessor : to.successor;
   if (!expected || !reciprocal || !sameAssociation(expected,to.path) || !sameAssociation(reciprocal,from.path) ||
       !sameAssociation(from.current,to.current) || from.run_state_version !== to.run_state_version ||
-      from.lifecycle_status !== to.lifecycle_status || JSON.stringify(from.run_context) !== JSON.stringify(to.run_context)) mismatch();
+      from.lifecycle_status !== to.lifecycle_status ||
+      (from.schema_version === "native-run-journey/v2" && (to.schema_version !== "native-run-journey/v2" ||
+        JSON.stringify(from.completion) !== JSON.stringify(to.completion))) || JSON.stringify(from.run_context) !== JSON.stringify(to.run_context)) mismatch();
 }

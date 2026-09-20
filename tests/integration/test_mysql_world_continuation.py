@@ -54,7 +54,7 @@ async def continuation_case(engine,monkeypatch,*,head="20260918_0010"):
                     async with case.factory.begin() as session:
                         case.scope.session_ids.update((await session.scalars(sa.select(orm.RunSessionParticipationRow.session_id).where(
                             orm.RunSessionParticipationRow.run_id.in_(case.scope.run_ids)))).all())
-                        if head == "20260918_0010":
+                        if head in ("20260918_0010", "20260920_0011"):
                             await session.execute(sa.delete(orm.RunWorldVisitEntryRow).where(orm.RunWorldVisitEntryRow.run_id.in_(case.scope.run_ids)))
                         for model in WORLD_ROWS:
                             await session.execute(sa.delete(model).where(model.run_id.in_(case.scope.run_ids)))

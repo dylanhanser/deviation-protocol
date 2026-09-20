@@ -1014,6 +1014,8 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
     install_run_continuation_routes(app)
     from deviation_protocol.api.run_revisit_routes import install_run_revisit_routes
     install_run_revisit_routes(app)
+    from deviation_protocol.api.run_completion_routes import install_run_completion_routes
+    install_run_completion_routes(app)
 
     # Starlette does not dispatch an empty path parameter to an APIRoute, so the
     # normal parameter validation handler cannot see this one malformed spelling

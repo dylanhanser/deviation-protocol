@@ -415,10 +415,38 @@ export function nativeViewFixture(view: PlayerSessionView = activeViewFixture): 
     .replaceAll('public-alpha-1.0.0','death-certificate-1.1.0')) as PlayerSessionView;
   return {...copy,run_context:copy.run_context ?? nativeEntryFixture().run_context};
 }
-export function nativeJourneyFixture(view: PlayerSessionView = nativeViewFixture()): import("../api/schemas").NativeRunJourney {
+export function nativeJourneyFixture(view: PlayerSessionView = nativeViewFixture()): Extract<import("../api/schemas").NativeRunJourney,{schema_version:"native-run-journey/v1"}> {
   const path={session_id:view.metadata.session_id,session_state_version:view.metadata.state_version,
     scenario_id:"death_certificate",scenario_content_version:"death-certificate-1.1.0",visit:null};
   return {schema_version:"native-run-journey/v1",session_id:path.session_id,run_id:view.run_context!.run_id,
     run_state_version:3,lifecycle_status:"active",run_context:view.run_context!,path,current:path,
     predecessor:null,successor:null,next_transition:null,arrival:null};
+}
+
+export function completionStatusFixture(journey:import("../api/schemas").NativeRunJourney):import("../api/schemas").NativeRunCompletionStatus {
+  return {schema_version:"native-run-completion-status/v1",session_id:journey.session_id,run_id:journey.run_id,
+    run_state_version:journey.run_state_version,lifecycle_status:journey.lifecycle_status,run_context:journey.run_context,
+    path:journey.path,current:journey.current,can_complete:false,
+    reason:journey.lifecycle_status!=="active"?"run_terminal":journey.path.session_id!==journey.current.session_id?"not_current_visit":"route_not_eligible",
+    offer:null,completion:journey.schema_version==="native-run-journey/v2"?journey.completion:null};
+}
+
+export function completionJourneyFixture() {
+  const view=nativeViewFixture(endedViewFixture());
+  Object.assign(view.metadata,{session_id:"third",content_version:"receipt-archive-1.0.0",state_version:2});
+  Object.assign(view.player_state,{session_id:"third",content_version:"receipt-archive-1.0.0",state_version:2});
+  view.narrative_frame.scenario_id="receipt_archive";view.ending_id="receipt_archive.ending.unresolved_sealed";
+  const association=(ordinal:2|3):import("../api/schemas").NativeJourneyAssociation=>({session_id:ordinal===2?"second":"third",
+    session_state_version:ordinal===2?3:2,scenario_id:ordinal===2?"undelivered_receipt":"receipt_archive",
+    scenario_content_version:ordinal===2?"undelivered-receipt-1.0.0":"receipt-archive-1.0.0",visit:{visit_id:`visit.${ordinal}`,visit_ordinal:ordinal,
+      world_id:"world.undelivered_receipt",world_version:1,region_id:ordinal===2?"region.undelivered_receipt.dispatch_hall":"region.undelivered_receipt.verification_archive",region_version:1}});
+  const journey:Extract<import("../api/schemas").NativeRunJourney,{schema_version:"native-run-journey/v1"}>={schema_version:"native-run-journey/v1",session_id:"third",
+    run_id:view.run_context!.run_id,run_state_version:5,lifecycle_status:"active",run_context:view.run_context!,path:association(3),current:association(3),
+    predecessor:association(2),successor:null,next_transition:null,arrival:{previous_ending_status:"RESOLVED",previous_ending_title:"回执待核，发运暂缓",
+      entry_notice:"会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。"}};
+  const status:import("../api/schemas").NativeRunStatus={schema_version:"native-run-status/v1",session_id:"third",run_id:journey.run_id,
+    run_state_version:5,session_state_version:2,lifecycle_status:"active",can_exit:true};
+  const completion:import("../api/schemas").NativeRunCompletionStatus={...completionStatusFixture(journey),can_complete:true,reason:"eligible",
+    offer:{title:"完成本次旅程：保留待核事项",notice:"封存待核记录已确认；可以将本次旅程以待核事项保留结案。发运暂缓继续有效，送达仍未得到证明。"}};
+  return {view,journey,status,completion};
 }

@@ -3,10 +3,11 @@ from copy import deepcopy
 import json
 
 from fastapi import Depends, Request
+from pydantic import TypeAdapter
 
 from deviation_protocol.api.dependencies import get_api_services, get_current_principal
 from deviation_protocol.api.errors import error_response
-from deviation_protocol.api.schemas import NativeRunRevisitRequest, NativeRunJourneyResponse, NativeRunRevisitResultResponse
+from deviation_protocol.api.schemas import NativeRunRevisitRequest, NativeRunJourneyResponse, NativeRunRevisitResultResponse, NativeRunJourneyUnion
 from deviation_protocol.application.run_revisit_service import RunRevisitCommand, RunRevisitError
 from deviation_protocol.application.ports import (NativeRunAdmissionOutcomeUnknownError,
     NativeRunAdmissionLockError, NativeRunAdmissionWriteConflictError, RunWriteConflictError,
@@ -30,7 +31,7 @@ def install_run_revisit_routes(app):
         try:
             result = (await service.journey(principal, session_id=session_id) if command is None
                 else await service.revisit(principal, session_id=session_id, command=command))
-            return (NativeRunJourneyResponse if command is None else NativeRunRevisitResultResponse).model_validate(result)
+            return TypeAdapter(NativeRunJourneyUnion).validate_python(result) if command is None else NativeRunRevisitResultResponse.model_validate(result)
         except RunRevisitError as error:
             return error_response(409, error.code, "Run regional revisit cannot be performed")
         except NativeRunAdmissionOutcomeUnknownError:
@@ -44,7 +45,7 @@ def install_run_revisit_routes(app):
             return error_response(409, "SNAPSHOT_INVALID", "Session state is unavailable or incompatible")
 
     @app.get("/v1/sessions/{session_id}/run-journey", operation_id="get_native_run_journey",
-        response_model=NativeRunJourneyResponse, responses=_public_error_responses(404, 409, 422, 500, 503), tags=["runs"])
+        response_model=NativeRunJourneyUnion, responses=_public_error_responses(404, 409, 422, 500, 503), tags=["runs"])
     async def status(session_id: SessionPathId, request: Request,
                      principal=Depends(get_current_principal), services=Depends(get_api_services)):
         names = [name.lower() for name, _ in request.scope["headers"]]

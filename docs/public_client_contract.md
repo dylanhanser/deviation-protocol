@@ -97,7 +97,7 @@ is distinct from the earlier S6 report. S7-2 implementation is published at
 `6dfbd37`, with automated and bounded local browser evidence described below.
 S7-3 public changes follow its approved plan published at `0ea295e`;
 implementation is published at `0b20dcd` with inspected bounded browser evidence.
-S7-4's completion extension is PROPOSED in the plan linked below.
+S7-4's approved completion extension is implemented in the candidate described below.
 
 The native transport rejects query parameters, duplicate raw Content-Type or
 Idempotency-Key headers, duplicate JSON members at any depth, BOM/non-UTF-8,
@@ -1792,21 +1792,23 @@ and [inspected browser record](run_protocol.md#s7-3-publication-and-bounded-brow
 for distinct source applicability and limits. No browser was run in this planning
 task. S7 and Phase 3.3 remain incomplete.
 
-## P3.3-S7-4 proposed explicit completion contract
+## P3.3-S7-4 explicit completion candidate contract
 
-Status: **PROPOSED; not implemented or product-approved.** Exact fields, strings,
+Status: **Corrected implementation candidate; focused independent re-review pending after CHANGES_REQUIRED.** Exact fields, strings,
 versions, state combinations, errors and acceptance are owned by
 [S7-4 sections 6–11](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md#9-api-demo-and-web-contracts).
-New P01–P09 need explicit disposition; S7-3 approvals do not cover them.
+P01–P09, including P04, are approved in published `684f7d1`; frozen plan wording
+is historical. [Implementation and evidence](run_protocol.md#s7-4-implementation-candidate-evidence)
+own the current unstaged/uncommitted candidate and verification limits.
 
-The proposed player flow is archive OBSERVE/seal → authoritative completion offer
+The implemented player flow is archive OBSERVE/seal → authoritative completion offer
 → explicit confirm → completed journey with preserved unresolved facts → reload
 and three-visit history → explicit return to setup/fresh admission. Archive defer
 and other nonqualifying endings retain existing exit/continuation rules. Completion
 is never automatic from RESOLVED, FAILED, an empty pool or local storage clear.
 Explicit termination remains a separate mutually exclusive outcome.
 
-Add GET `run-completion` and POST `run-complete` under the existing Session path.
+GET `run-completion` and POST `run-complete` use the existing Session path.
 POST accepts only two expected versions and Idempotency-Key; response binds the
 immutable original archive association to completed6 and a completion ID/outcome.
 The GET's closed offer/reason/summary never grants authority independently of
@@ -1820,8 +1822,12 @@ All ended-current mutation controls require matching View, Journey, Run-status
 and completion status under one shared validator. Apply it to initial/recovery
 load, automatic synchronization, enablement, confirmation and final submission.
 Schema-valid but contradictory reads disable affected writes and allow safe GET;
-they never replace retained confirmed POST identity. Explicit retry preserves
-frozen URL/key/body/association through uncertain outcomes. No automatic POST on
+they never replace retained confirmed POST identity. An uncertain completion
+also retains its frozen URL/key/body/association: a known contradiction blocks
+both retry control and dispatch until matching reconciliation. Pending reads
+block dispatch; a transient read failure cannot erase an established mismatch.
+Coherent completed GETs may permit explicit exact retry without becoming a
+replacement for the frozen source identity or a confirmed POST. No automatic POST on
 reload, history, recovery or restart. Old exact receipts remain replayable after
 completion and later admission without changing the current character binding.
 

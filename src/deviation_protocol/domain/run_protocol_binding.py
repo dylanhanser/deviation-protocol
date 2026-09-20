@@ -591,6 +591,62 @@ class NativeRunRegionalRevisitTerminatedV1(BaseModel):
         return self
 
 
+from deviation_protocol.domain.run_completion import NativeRunCompletionEvidenceV1
+
+
+def complete_revisited_native_run(revisited: NativeRunRegionalRevisitV1,
+        evidence: NativeRunCompletionEvidenceV1, *, occurred_at: datetime) -> CanonicalRun:
+    revalidate_run_model(revisited, NativeRunRegionalRevisitV1)
+    revalidate_run_model(evidence, NativeRunCompletionEvidenceV1)
+    run, request = revisited.canonical_run, evidence.request
+    if (request.run_id != run.run_id.value
+            or request.continuous_story_line_id != run.continuous_story_line_id.value
+            or request.source_session_id != revisited.visit.session_id
+            or occurred_at != datetime.fromisoformat(evidence.occurred_at.replace("Z", "+00:00"))
+            or occurred_at < run.current_mutation_provenance.occurred_at):
+        raise ValueError("completion does not bind the regional prefix")
+    for source, visit in zip(evidence.sources, (*revisited.continued.visits, revisited.visit)):
+        if ((source.visit_id, source.visit_ordinal, source.session_id,
+             source.world.world_id, source.world.world_version,
+             source.region.region_id, source.region.region_version)
+                != (visit.visit_id, visit.visit_ordinal, visit.session_id,
+                    visit.world_id, visit.world_version, visit.region_id, visit.region_version)):
+            raise ValueError("completion changes a prior visit")
+    if (evidence.sources[0].snapshot_sha256 != revisited.continued.source_root.snapshot_sha256
+            or evidence.sources[1].snapshot_sha256 != revisited.entry.base_snapshot_sha256):
+        raise ValueError("completion changes a frozen source snapshot")
+    binding = ReservedPlayerCharacterBinding(**{**run.player_character_binding.__dict__,
+        "binding_state": "historical", "inactivated_at": occurred_at})
+    provenance = RunMutationProvenance(target_run_id=run.run_id,
+        target_continuous_story_line_id=run.continuous_story_line_id,
+        prior_state_version=run.state_version, resulting_state_version=RunStateVersion(value=6),
+        mutation_kind=RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN,
+        operation_id=request.operation_id(), source_reference=RunAuthoritySourceRef(value=request.source_reference),
+        occurred_at=occurred_at)
+    return CanonicalRun(**{**run.__dict__, "state_version": RunStateVersion(value=6),
+        "lifecycle_status": RunLifecycleStatus.COMPLETED, "player_character_binding": binding,
+        "current_mutation_provenance": provenance})
+
+
+class NativeRunRegionalCompletedV1(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True, revalidate_instances="always")
+    revisited: NativeRunRegionalRevisitV1
+    canonical_run: CanonicalRun
+    completion_evidence: NativeRunCompletionEvidenceV1
+
+    @property
+    def admission(self):
+        return self.revisited.admission
+
+    @model_validator(mode="after")
+    def _association(self):
+        validate_canonical_run(self.canonical_run)
+        if self.canonical_run != complete_revisited_native_run(self.revisited, self.completion_evidence,
+                occurred_at=self.canonical_run.current_mutation_provenance.occurred_at):
+            raise ValueError("invalid completed regional family")
+        return self
+
+
 _ClassifiedRun = (LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1
                  | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1
-                 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1)
+                 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1)

@@ -100,12 +100,21 @@ CHANGES_REQUIRED reviews and corrections remain historical evidence, not current
 unstaged-candidate status. Inspected [bounded browser evidence](docs/run_protocol.md#s7-3-publication-and-bounded-browser-evidence)
 records both representative routes, ineligible-ending and restart recovery checks;
 its storage/depleted-resource/private-authority limits remain explicit.
-The [S7-4 plan candidate](docs/phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
-proposes qualified archive sealing → explicit canon-preserving closure and normal
-Run completion, with P01–P09 PROPOSED. Next is one substantive independent plan
-review; no implementation is authorized. S7-5 retains final integration and parent
-acceptance reconciliation. No limited-trial, broader-release, S7 or Phase 3.3
-completion is claimed. DF-001/DF-002 remain deferred.
+The [published S7-4 plan](docs/phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
+is independently approved at `684f7d17fe3f389ac29747ea59946d4e2e272953`.
+P01–P09, including P04, are explicitly approved. Frozen PROPOSED wording is
+historical. The authorized S7-4 implementation candidate adds qualified archive
+sealing → separate explicit completion consent → completed6 with unresolved facts
+preserved, history/reload and separately confirmed same-character fresh admission.
+Its [implementation and evidence](docs/run_protocol.md#s7-4-implementation-candidate-evidence)
+remain unstaged and uncommitted. Independent review returned CHANGES_REQUIRED:
+three P2 defects (ended-source job exclusion, uncertain completion retry and
+opaque-key downgrade classification), missing final-preflight failure proof,
+and corrected replacement accounting. The correction candidate awaits focused
+independent re-review of these findings and direct dependencies, preserving
+applicable earlier conclusions. Browser acceptance remains separately authorized. S7-5 retains final
+integration and parent acceptance reconciliation. No limited-trial, broader-release,
+S7 or Phase 3.3 completion is claimed. DF-001/DF-002 remain deferred.
 See [S6 implementation and evidence](docs/run_protocol.md#p33-s6-implementation-candidate-evidence).
 
 ## Phase 3.3 current status and ordered priority
@@ -259,8 +268,8 @@ is published at `6dfbd37d127386b589a1e6c0c43b831aefd70279`; inspected local
 browser evidence now covers both source classes and the complete bounded loop.
 S7-3 implementation is published at `0b20dcd`, with recorded automated evidence
 and inspected bounded local browser journeys. Its published plan and P01–P09
-are approved for S7-3 only. The S7-4 documentation candidate awaits one substantive
-independent plan review and user disposition of its new PROPOSED P01–P09;
+are approved for S7-3 only. The S7-4 plan and P01–P09 are approved at `684f7d1`; its corrected implementation candidate awaits focused
+independent re-review after CHANGES_REQUIRED;
 S7-5 retains final integration and parent acceptance reconciliation.
 No separate S6 closeout or decomposition gate is due.
 Phase 3.4 remains later. Phase 6 is paused under
@@ -783,7 +792,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.1c | Implemented and complete | [Canonical same-tab recovery contract](docs/architecture.md#phase-31c-web-same-tab-recovery-contract) |
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
-| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation independently approved and published at `2f144599`; two CHANGES_REQUIRED reviews preserved as history; representative local deterministic Demo browser journey demonstrated with bounded recovery limitations; DF-001/DF-002 deferred; S7-1 plan approved and published at `9fab18d`, implementation published at `41d68aac` with bounded both-ending browser acceptance; earlier nullable terminal-CHECK CHANGES_REQUIRED/correction retained as history; S7-2 plan independently approved and published at `2c272487`, P01–P08 approved, implementation published at `6dfbd37` with inspected bounded both-source browser journeys; four P2 findings/corrections retained as history; S7-3 plan published at `0ea295e`, P01–P09 approved, implementation published at `0b20dcd` with inspected bounded browser evidence; S7-4 documentation plan candidate and new P01–P09 PROPOSED, next independent plan review; S7-5 retains final integration; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
+| Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation independently approved and published at `2f144599`; two CHANGES_REQUIRED reviews preserved as history; representative local deterministic Demo browser journey demonstrated with bounded recovery limitations; DF-001/DF-002 deferred; S7-1 plan approved and published at `9fab18d`, implementation published at `41d68aac` with bounded both-ending browser acceptance; earlier nullable terminal-CHECK CHANGES_REQUIRED/correction retained as history; S7-2 plan independently approved and published at `2c272487`, P01–P08 approved, implementation published at `6dfbd37` with inspected bounded both-source browser journeys; four P2 findings/corrections retained as history; S7-3 plan published at `0ea295e`, P01–P09 approved, implementation published at `0b20dcd` with inspected bounded browser evidence; S7-4 plan independently approved and published at `684f7d1`, P01–P09 approved; corrected implementation candidate awaits focused independent re-review after CHANGES_REQUIRED; S7-5 retains final integration; Phase 3.3 incomplete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
 | Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
@@ -1323,7 +1332,7 @@ S7-2 plan is independently approved and published at `2c272487`; P01–P08 are
 approved; implementation is published at `6dfbd37` with inspected bounded local
 browser evidence. S7-3 plan is published at `0ea295e`, P01–P09 are approved,
 and implementation is published at `0b20dcd` with inspected bounded browser
-evidence. S7-4 is a documentation plan candidate with new P01–P09 PROPOSED;
+evidence. S7-4 has an approved published plan/P01–P09 and an unstaged implementation candidate;
 S7-5 retains final integration. DF-001 and reassessed DF-002
 remain deferred. Phase 3.3 remains incomplete.**
 
@@ -1651,15 +1660,16 @@ real-MySQL verification.
   at `41d68aac`. S7-2 first same-line continuation is published at `6dfbd37`,
   with automated and bounded local browser evidence. The S7-3 revisit/regional
   plan is approved and published at `0ea295e`; implementation is published at
-  `0b20dcd` with inspected bounded local browser evidence. S7-4's proposed plan
-  awaits independent review and product acceptance; S7-5 remains future work.
+  `0b20dcd` with inspected bounded local browser evidence. S7-4's implementation candidate
+  awaits focused independent re-review after CHANGES_REQUIRED under its approved
+  plan/P01–P09. S7-5 remains future work.
 - Later authored-world weighting, visits/regions/world state, progression,
   anti-repeat, anti-farming, continuity recovery priority, world-line transition
   and their physical schema choices remain S7-owned. S5 mechanics and trusted
   compilation are published; S6 public discovery and Session recovery are
   published. S7-2's bounded visits/state/selection and S7-3's one-use archive
   revisit/regional progression are published. Generalized expansion remains
-  deferred; S7-4's bounded canon transition/completion proposal and S7-5 final
+  deferred; S7-4's bounded canon transition/completion candidate and S7-5 final
   integration retain the published allocation. The S3 persistence
   schema is frozen by its plan, independently approved and published at
   `465c53d24ea96e64988dce8ef4c8a015d0e72814`, and implemented at `a53f8e65`.

@@ -17,8 +17,10 @@ from deviation_protocol.domain.world_continuation import (
 )
 
 # Approved raw UTF-8 deployment bytes, fixed independently of runtime input.
-# This pack's .gitattributes override preserves its frozen CRLF bytes; do not
-# normalize or refresh this pin on load.
+# Preserve each pack's independent frozen bytes, including its line endings;
+# never normalize or refresh a pin on load.
+SOURCE_CONTENT_IDENTITY = ("death_certificate", "death-certificate-1.1.0")
+SOURCE_CONTENT_SHA256 = "7cb4b45d527c96a7d7477b14053a3d85acf532d41f50dd7499656a6e53ab1ec0"
 DESTINATION_CONTENT_IDENTITY = ("undelivered_receipt", "undelivered-receipt-1.0.0")
 DESTINATION_CONTENT_SHA256 = "74af55faf2eca0dd826be1f025272d070c23a2000383183e886ec823f495582c"
 ARCHIVE_CONTENT_IDENTITY = ("receipt_archive", "receipt-archive-1.0.0")
@@ -61,6 +63,11 @@ class SessionContentBundle:
                 or len(self.scenario_catalog.scenarios) != 1
                 or self.scenario_catalog.scenarios[0].scenario_id != self.scenario_id):
             raise ValueError("invalid content bundle identity")
+        if (self.scenario_id == SOURCE_CONTENT_IDENTITY[0]
+                or self.content_version == SOURCE_CONTENT_IDENTITY[1]):
+            if ((self.scenario_id, self.content_version) != SOURCE_CONTENT_IDENTITY
+                    or self.content_sha256 != SOURCE_CONTENT_SHA256):
+                raise ValueError("required source content identity mismatch")
         if (self.scenario_id == DESTINATION_CONTENT_IDENTITY[0]
                 or self.content_version == DESTINATION_CONTENT_IDENTITY[1]):
             if ((self.scenario_id, self.content_version) != DESTINATION_CONTENT_IDENTITY

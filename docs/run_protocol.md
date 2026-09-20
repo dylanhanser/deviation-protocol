@@ -1,23 +1,21 @@
 # Run Protocol, Difficulty, and World Profiles
 
-## Current S7-3 publication and S7-4 planning status
+## Current S7-3 publication and S7-4 implementation status
 
-S7-3 implementation is published at
-`0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597`, the clean aligned HEAD/main/local
-origin/main baseline inspected without fetch for this planning task. Its
-independently approved [plan](phase_3_3_s7_3_world_revisit_regional_progression_plan.md)
-is published at `0ea295e358f526c5101856e4dc2370d66b23b938`; P01–P09 are approved
-for S7-3. P02 remains operative: engine eligibility/destination, player consent,
-and zero eligibility consumption on cancellation before submission. Frozen
-PROPOSED/unapproved plan wording and previous CHANGES_REQUIRED/correction records
-remain history. Publication is not inferred independent approval by this task.
+S7-3 remains published at `0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597` with
+its approved plan and the bounded historical browser evidence below.
+The [published S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
+and P01–P09, including P04, are independently approved at
+`684f7d17fe3f389ac29747ea59946d4e2e272953`. That was the clean, aligned
+HEAD/main/local origin/main baseline inspected without fetch for implementation.
+Frozen PROPOSED/unapproved wording is historical and the plan bytes remain unchanged.
 
-The [S7-4 plan candidate](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
-proposes one qualified, explicitly confirmed archive closure and normal completion,
-with new P01–P09 PROPOSED. Next is one substantive independent plan review, not
-implementation or another lifecycle-closeout task. S7-5 retains final integration
-and parent acceptance reconciliation. S7/Phase 3.3 remain incomplete; DF-001/DF-002
-remain deferred. No real Provider, production or broader-release acceptance.
+The authorized S7-4 implementation is an unstaged, uncommitted candidate. Next is
+one substantive independent implementation review, followed by separately authorized
+browser acceptance. No implementation approval token is issued here. S7-5 retains
+final integration and parent reconciliation. S7 and Phase 3.3 remain incomplete;
+DF-001/DF-002 retain their existing containment. No real Provider, production,
+limited-trial or broader-release acceptance is claimed.
 
 ## S7-3 publication and bounded browser evidence
 
@@ -58,34 +56,147 @@ was not a reproduced product blocker and creates no new deferred finding here.
 This is bounded integrated local play, not limited-trial or broader-release
 readiness, independent implementation approval, S7 or Phase 3.3 completion.
 
-## S7-4 proposed canon-preserving completion
+## S7-4 implementation candidate evidence
 
-The [new plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
-consolidates P01–P09, exact technical contracts, implementation dependencies and
-A01–A12 acceptance. It is PROPOSED and not implementation authority. Only the
-fully reconstructed active regional5 archive seal ending would offer explicit
-normal completion. Archive defer and nonqualifying endings retain existing exits;
-neither RESOLVED nor FAILED nor lack of a destination proves completion.
+Independent implementation review returned **CHANGES_REQUIRED**: three P2 defects
+(R1 ended-source live-job exclusion, R2 uncertain retry after contradictory GET,
+R3 opaque-key downgrade classification), missing final-preflight failure proof,
+and replacement-node accounting. The corrected candidate awaits focused
+independent re-review; the original candidate received no approval.
 
-The proposed authorized world-line transition is same-identity, Run-owned
-verification disposition open_unresolved→closed_unresolved for world two. It
-preserves dispatch hold, unproven delivery, sealed record and all old history.
-The permanent ContinuousStoryLineId, character reference, frozen profile/entry
-world, two roots, three visits and position5 stay unchanged. One receipt records
-that exact canon transition with committed event/snapshot/memory provenance while
-one atomic 5→completed6 operation historicalizes the old binding. Existing
-5→terminated6 is a different outcome without closure evidence. There is no
-fourth Session, fact rewrite, resource grant/refill or cross-line copy.
+Correction evidence and the new complete candidate binding are under the sibling
+`s7-4-correction` directory of the original evidence directory below. Its
+`review-handoff.md`, `acceptance.json`, `verification-report.md` and corrected
+`offline-replacement-coverage.json` supersede current claims in the prior package;
+`prior-evidence` and `review-diagnostics` remain immutable historical records.
 
-Proposed migration011 follows actual source010 and changes only three mutation
-CHECKs; existing receipt evidence stores the immutable completion record. Exact
-old/new family reconstruction, receipt-before-eligibility replay, current-read
-locking, rollback/uncertainty and safe downgrade are mandatory. API/Demo/Web use
-explicit completion projections and completed-only public v2 branches while
-preserving old v1 meanings, current-versus-displayed identity and GET-only history.
-The plan's sole operative plan-review token and dormant implementation token
-introduce no additional gates. Browser acceptance remains separately authorized;
-S7-5 retains final parent reconciliation. Guardrail impact: None.
+Shared reconstruction uses the validated snapshot runtime ending and current
+locking job reads, rejecting an ended source with a live job before projection
+or replay. Active archives retain live-job support. Uncertain Web requests retain
+exact identity while known contradictions block retry until matching GETs; no
+automatic resend occurs. Migration011 classifies structural discriminators and
+closed typed carriers, permitting legal opaque completion-like text. Final
+preflight fault cases cover both directions with all three durable CHECK changes,
+primary/cleanup precedence, physical-owner disposal and exact restoration.
+
+The approved player flow is public admission → actual first-world RESOLVED or
+FAILED ending → unchanged continuation → second-world hold → archive revisit →
+OBSERVE/seal → completion offer → separate confirmation → completed Run with
+unchanged history → reload → explicit setup clear and separately confirmed
+same-character admission/first action. Archive defer retains ordinary exit.
+Cancel and no consent leave active5 unchanged; completion is never inferred
+from RESOLVED or an empty destination pool.
+
+`NativeRunRegionalCompletedV1` reconstructs the original regional5 prefix and
+one `COMPLETE_REVISITED_NATIVE_RUN` suffix. The receipt is the immutable completion
+record: `receipt-archive-closure/v1` authorizes `close_unresolved_verification/v1`
+for the same Run, line and second world, open_unresolved → closed_unresolved.
+Dispatch remains held, delivery unproven and the archive sealed. Three independently
+pinned content identities, validated source snapshots, persisted hold/seal decisions,
+applied-event references and completed-memory links bind the record. Corrupt or
+partial evidence fails before any owned history, replay or fresh eligibility.
+
+One native UoW stages revision6, current CAS5→6 and the receipt, historicalizing
+only this Run's binding. Position stays at5. No Session, event, root, entry,
+visit, PlayerState or character revision changes. Character-first locks, the shared
+named lock and pinned physical owner remain; final-turn prerequisites use current
+reads. Exact receipts precede fresh eligibility and fixed notices are projected
+after leaving the UoW. Commit/cleanup uncertainty requires safe GET or explicit
+exact retry, with no hidden retry or compensation. Demo uses the same reconstruction
+and validates its complete trial store before publication.
+
+Migration `20260920_0011` follows frozen010 and appends only three CHECK branches,
+mirrored in ORM. Required nullable terminal operands explicitly reject NULL.
+Current locking probes reject complete/partial completion or malformed/unsupported
+evidence before downgrade DDL; genuine old terminated6 remains permitted. Each
+ALTER is statement durable; failure records its completed prefix and disposes the
+physical owner. Completion writers verify deployed011 and enforced exact CHECKs.
+Migrations001–010 and all three scenario-pack bytes remain protected.
+
+GET `run-completion` and POST `run-complete` expose the plan's closed contracts.
+Old families keep their v1 status/journey; completed6 uses separate v2 branches.
+The Web binds View/Journey/status/completion on load, automatic synchronization,
+control enablement, confirmation and submission. It freezes exact consent and
+retains confirmed POST identity across contradictory GETs. Completion creates no
+Session and performs no recovery-storage write. Three-visit history and reload
+use GET; explicit return-to-setup alone removes storage, and removal failure blocks
+new admission. DF-002's ready/explicit-clear/full-reload containment remains.
+
+Evidence is saved outside the repository at
+`C:/Users/dylanmonster/.codex/visualizations/2026/09/20/01a0bd35-07da-75e0-8879-b7581e92fb20/s7-4-evidence`.
+`acceptance.json` maps A01–A12 to actual commands, raw logs, exit statuses and
+source/environment identities. `review-handoff.md` and `candidate-manifest.json`
+identify the final review bytes and complete binary/full-index Git patch, including
+new files. They do not issue independent approval. Development failures are retained
+and superseded only by identified successful replacements; overlapping runs are
+not added as unique pass totals. Synthetic corruption/resource fixtures are labelled
+separately from public gameplay.
+
+The unchanged exhaustive S2 node is reused only after verifying locatable original
+proof/log/counter hashes, all six applicable source/dependency identities, Python
+and platform: 5,624,910 resolver calls. Changed completion and011 boundaries use
+fresh tests. Required verification status and remaining limitations are recorded
+in the external acceptance ledger; no unrun check is represented as passed.
+
+Fresh automated command results (overlapping selections, never a summed total):
+
+| Evidence record | Result and scope |
+| --- | --- |
+| `offline-completion-final` | 47 passed: complete completion domain/API/reconstruction/service suites through sanitized canonical Offline. |
+| `offline-legacy-final` | 1 passed: later legacy/standalone/native-required, missing-Session and strict GET regression. |
+| `offline-scripts-replacement` | 42 passed: script/verification tests with a new task-owned temporary directory. |
+| `offline-catalog-replacement`, `offline-scenario-replacement`, `offline-old-exit-replacement` | Separate 190 passed/1 skipped, 36 passed and 1 passed selections replace affected content/scenario and old-exit temporary-directory errors. |
+| `mysql-canonical-02` | 276 passed: completion/011 plus native admission/turn/exit and character binding. |
+| `mysql-world-consumers-final` | 117 passed: affected existing world continuation/revisit consumers. |
+| `mysql-final-shared` | 44 passed: shared Run/character suites with explicit011 precondition and actual007 restoration. |
+| `mysql-migration-final` | 44 passed: final011 fault matrix, old populated families, partial evidence and malformed legacy carrier refusal. |
+| `mysql-final-edges-02`, `mysql-unique-final` | Separate 2-test and 1-test passes: old-transition replay races/partial evidence and actual1062 receipt conflict with total rollback. |
+| `web-full-02` | 424 passed, 1 skipped across 14 suites; final narrow history/replay additions additionally pass 15 and 60 selected tests in their identified records. |
+| `cross-process-export-final` | 2 passed: both source ending classes, seeds1/9173, four full trace/store exports with per-profile byte identity. |
+| `web-type-handoff`, `web-lint-handoff`, `web-build-handoff` | Exit0 typecheck, lint and deterministic-demo build on final Web production bytes. |
+
+Successful canonical commands also run compileall, pip dependency consistency,
+Alembic single-head/history and diff checks. Broad Offline records retain their
+nonzero outcomes: original stale shared assertions were corrected, and default
+Windows pytest temporary-root permissions also failed outside the sandbox.
+The final broad run recorded 2,916 passed, 772 skipped, one exhaustive-S2
+node deselected and 212 setup errors, with no failed test bodies. Every error
+trace identifies the same default temporary-root permission denial. The exact
+replacement dispositions are **211 passed and one platform skip**, verified by
+the corrected `offline-replacement-coverage.json`. The unchanged scaffold test
+`test_output_directory_symlink_is_rejected_without_touching_target` skipped
+because Windows denied symlink creation (WinError1314); its rejection assertion
+was not exercised. This existing platform limitation is accepted for that node,
+not counted as a pass. The replacement commands use new verified
+task-owned `--basetemp` directories;
+external raw logs, failure dispositions and final-source applicability distinguish
+that replacement from a clean broad run. No failed command is relabelled passed.
+
+The first broad MySQL selection incorrectly mixed historical008 direct CHECK
+amendments with its now010 shared runtime fixture. Its failed teardown and
+cascaded failures remain recorded. Explicit inspected empty-schema repair restored
+actual007 before compatible sequential replacements. Unchanged corrected008
+internals have separately verified historical source/dependency/environment/log
+applicability; this is not a current-runtime pass claim for the old fixture.
+Final read-only observation equals the actual initial007 schema, all rows,
+constraints/enforcement and free shared lock in `deviation_protocol_test`.
+
+Public gameplay and synthetic resource fixtures remain distinct. Frozen packs
+have no skills, so valid skill/cooldown maps remain empty; separately labelled
+supported inventory/wallet and zero-composure fixtures prove preservation without
+claiming acquisition gameplay. Race tests observe their own real connections and
+locks; unavailable global database diagnostic privileges were not changed.
+Browser acceptance and real Provider/Live remain unrun.
+
+Section10's dependency inventory governs the candidate. Necessary mechanical
+extensions are recorded before edits in `dependency-extensions.md`: original
+source-content pin, closed public GET route unions, head/metadata assertions and
+ended-View test transports. Session/turn orchestration, world-visit context,
+Demo composition and UoW need no new writer; their existing delegation composes
+the new closed family. There is no S7-5 implementation or final parent acceptance.
+Guardrail impact: DB-001 updated for verified schema-precondition/restoration
+sequencing and strict downgrade-carrier type/bound classification. The matching verification procedure is recorded in
+`docs/engineering/codex_workflow.md`; DF-001/DF-002 retain their existing containment.
 
 ## S7-3 implementation candidate evidence
 
@@ -546,8 +657,8 @@ terminal-CHECK correction. Bounded local Demo browser acceptance covers both
 endings, exit/re-entry and recovery. S7-2 has an independently approved published plan and approved P01–P08;
 its implementation is published at `6dfbd37` with inspected bounded local browser
 evidence. S7-3 has an approved published plan and P01–P09; implementation is
-published at `0b20dcd` with inspected bounded browser evidence. S7-4's new plan
-is PROPOSED; S7-5 retains final integration. DF-002
+published at `0b20dcd` with inspected bounded browser evidence. S7-4's approved plan
+has an implementation candidate; S7-5 retains final integration. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
 Phase 3.3 remains incomplete.**
 
@@ -890,7 +1001,7 @@ authorizes the first same-line successor; its product choices and technical plan
 are approved. Implementation is published at `6dfbd37` with inspected bounded
 local browser evidence. S7-3 plan is published at `0ea295e` with P01–P09
 approved; implementation is published at `0b20dcd` with bounded browser evidence.
-S7-4 planning is PROPOSED and later S7 allocation is preserved.
+S7-4 implementation awaits independent review and later S7 allocation is preserved.
 DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
@@ -1205,7 +1316,7 @@ priority expansion remain deferred.
 ### Important-world revisits
 
 Status: **Bounded S7-3 archive route published at `0b20dcd`; general revisit
-selection remains deferred. S7-4 completion rules are PROPOSED separately.**
+selection remains deferred. S7-4 completion rules are approved and implemented in the candidate above.**
 
 P02 in the published, independently approved S7-3 plan amends the former
 no-approve/no-veto wording: the engine determines eligibility and destination;
@@ -1678,7 +1789,7 @@ its implementation is independently approved and published at `2f144599`. S7-1
 is published at `41d68aac` under its approved published plan; the S7-2
 plan is approved and published at `2c272487`, with P01–P08 approved. Implementation
 is published at `6dfbd37`. S7-3 plan is published at `0ea295e` with P01–P09
-approved; implementation is published at `0b20dcd`. S7-4's plan is PROPOSED;
+approved; implementation is published at `0b20dcd`. S7-4's approved plan has an implementation candidate;
 S7-5 retains final integration.
 Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
 
@@ -2535,7 +2646,7 @@ Phase 3.3 is acceptable only when:
   S7-2 minimum later-world continuity is published at `6dfbd37` with automated
   and bounded local browser evidence. S7-3's approved regional-return plan is
   published at `0ea295e`; implementation is published at `0b20dcd` with inspected
-  bounded browser evidence. S7-4's proposed plan defines the next bounded work.
+  bounded browser evidence. S7-4's approved plan defines the bounded implementation candidate.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2559,8 +2670,9 @@ Phase 3.3 is acceptable only when:
 - Reward anti-farming rules.
 - Recovery-priority weighting.
 - World-line transition representation: the bounded same-line closure in the
-  [S7-4 candidate](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
-  is PROPOSED; broader transitions remain deferred.
+  [published S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
+  is approved and implemented in the candidate awaiting focused independent
+  re-review; broader transitions remain deferred.
 - How world-line consistency validation represents permanent canon approved
   after `Chaotic` presentation.
 
@@ -2578,7 +2690,7 @@ and [replacement evidence](#s7-1-nullable-terminal-check-correction) remain hist
 [Publication and subsequent browser acceptance](#s7-1-publication-and-local-browser-evidence)
 record current status separately from the original automated execution below.
 Neither S7 nor Phase 3.3 is complete; S7-2 is published at `6dfbd37`, and the
-S7-3 implementation is published at `0b20dcd`. S7-4 planning is PROPOSED. No limited
+S7-3 implementation is published at `0b20dcd`. S7-4 implementation awaits independent review. No limited
 user trial, broader release, deployment or real Provider acceptance is claimed.
 The frozen plan and historical reviews retain their candidate-time wording.
 
@@ -2847,7 +2959,7 @@ synchronization and the frozen review package are recorded at the top of this
 document, with subsequent publication at `6dfbd37` and inspected local browser
 evidence above. This synchronization issues no independent approval or broader
 readiness claim. S7-3 has an approved published plan and implementation at
-`0b20dcd`, with inspected bounded browser evidence. S7-4's plan is PROPOSED;
+`0b20dcd`, with inspected bounded browser evidence. S7-4's approved plan has an implementation candidate;
 S7-5 and parent criteria 10–12 completion remain outside the delivered increment. S7 and Phase 3.3 are incomplete.
 
 ## Related documents

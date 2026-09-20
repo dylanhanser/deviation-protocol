@@ -552,7 +552,7 @@ class NativeRunJourneyResponse(BaseModel):
                 raise ValueError("regional arrival mismatch")
             if ordinal == 2 and self.arrival.previous_ending_title == "回执待核，发运暂缓":
                 raise ValueError("continued arrival mismatch")
-        if self.run_state_version != count + 2 + (self.lifecycle_status == "terminated"):
+        if self.run_state_version != count + 2 + (self.lifecycle_status != "active"):
             raise ValueError("journey lifecycle mismatch")
         if self.next_transition is not None:
             if (self.path != self.current or self.lifecycle_status != "active" or count == 3
@@ -584,3 +584,107 @@ class ErrorDetail(BaseModel):
 class ErrorResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
     error: ErrorDetail
+
+
+class NativeRunCompletionRequest(NativeRunExitRequest):
+    pass
+
+
+class NativeRunCanonOutcomeResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    dispatch: Literal["held"]
+    delivery: Literal["unproven"]
+    record: Literal["sealed"]
+    verification: Literal["closed_unresolved"]
+
+
+class NativeRunCompletionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    completion_id: str = Field(pattern=r"^[0-9a-f]{64}$")
+    outcome: Literal["unresolved_record_preserved"]
+    title: Literal["待核事项保留，核验旅程已结案"]
+    notice: Literal["本次旅程已正常完成。发运暂缓继续有效，送达仍未得到证明；旧记录与资源保持原状。"]
+    canon_outcome: NativeRunCanonOutcomeResponse
+
+
+class NativeRunCompletionOfferResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    title: Literal["完成本次旅程：保留待核事项"]
+    notice: Literal["封存待核记录已确认；可以将本次旅程以待核事项保留结案。发运暂缓继续有效，送达仍未得到证明。"]
+
+
+class NativeRunCompletedStatusResponse(NativeRunStatusResponse):
+    schema_version: Literal["native-run-status/v2"]
+    lifecycle_status: Literal["completed"]
+    run_state_version: int = Field(ge=6, le=6)
+    can_exit: Literal[False]
+
+
+class NativeRunCompletedJourneyResponse(NativeRunJourneyResponse):
+    schema_version: Literal["native-run-journey/v2"]
+    lifecycle_status: Literal["completed"]
+    run_state_version: int = Field(ge=6, le=6)
+    next_transition: None
+    completion: NativeRunCompletionResponse
+
+    @model_validator(mode="after")
+    def _completed(self):
+        if self.current.visit is None or self.current.visit.visit_ordinal != 3:
+            raise ValueError("completion requires the third visit")
+        return self
+
+
+NativeRunStatusUnion = Annotated[NativeRunStatusResponse | NativeRunCompletedStatusResponse, Field(discriminator="schema_version")]
+NativeRunJourneyUnion = Annotated[NativeRunJourneyResponse | NativeRunCompletedJourneyResponse, Field(discriminator="schema_version")]
+
+
+class NativeRunCompletionStatusResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    schema_version: Literal["native-run-completion-status/v1"]
+    session_id: SafeId64
+    run_id: SafeId128
+    run_state_version: int = Field(ge=3, le=6)
+    lifecycle_status: Literal["active", "terminated", "completed"]
+    run_context: PublicNativeRunContext
+    path: NativeVisitAssociationResponse
+    current: NativeVisitAssociationResponse
+    can_complete: bool
+    reason: Literal["eligible", "run_terminal", "not_current_visit", "character_ineligible",
+                    "session_not_ended", "ending_not_eligible", "route_not_eligible"]
+    offer: NativeRunCompletionOfferResponse | None
+    completion: NativeRunCompletionResponse | None
+
+    @model_validator(mode="after")
+    def _association(self):
+        count = self.current.visit.visit_ordinal if self.current.visit else 1
+        if (self.run_id != self.run_context.run_id or self.session_id != self.path.session_id
+                or self.run_state_version != count + 2 + (self.lifecycle_status != "active")
+                or self.can_complete != (self.reason == "eligible")
+                or self.can_complete != (self.offer is not None)
+                or (self.lifecycle_status == "completed") != (self.completion is not None)
+                or (self.lifecycle_status != "active") != (self.reason == "run_terminal")):
+            raise ValueError("completion status association")
+        if self.can_complete and (self.lifecycle_status != "active" or count != 3 or self.path != self.current):
+            raise ValueError("invalid completion offer")
+        if self.lifecycle_status == "completed" and count != 3:
+            raise ValueError("invalid completed position")
+        return self
+
+
+class NativeRunCompletionResultResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    schema_version: Literal["native-run-completion-result/v1"]
+    source_session_id: SafeId64
+    source_session_state_version: int = Field(ge=0, le=2**63 - 1)
+    run_id: SafeId128
+    resulting_run_state_version: int = Field(ge=6, le=6)
+    lifecycle_status: Literal["completed"]
+    run_context: PublicNativeRunContext
+    visit: NativeJourneyVisitResponse
+    completion: NativeRunCompletionResponse
+
+    @model_validator(mode="after")
+    def _association(self):
+        if self.run_id != self.run_context.run_id or self.visit.visit_ordinal != 3:
+            raise ValueError("completion result association")
+        return self

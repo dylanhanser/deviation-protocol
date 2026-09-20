@@ -8,6 +8,19 @@ from deviation_protocol.application.session_content_registry import SessionConte
 ROOT=Path(__file__).parents[2]/"config/scenarios"
 
 
+def test_completion_source_pack_has_an_independent_pin():
+    from dataclasses import replace
+    from deviation_protocol.application.session_content_registry import SOURCE_CONTENT_SHA256
+    raw=(ROOT/"death_certificate_v1.json").read_bytes()
+    assert hashlib.sha256(raw).hexdigest()==SOURCE_CONTENT_SHA256=="7cb4b45d527c96a7d7477b14053a3d85acf532d41f50dd7499656a6e53ab1ec0"
+    bundle=SessionContentBundle.from_bytes(raw)
+    alternate_lines=raw.replace(b"\r\n",b"\n") if b"\r\n" in raw else raw.replace(b"\n",b"\r\n")
+    assert alternate_lines!=raw
+    for payload in (raw+b" ",alternate_lines):
+        with pytest.raises(ValueError):SessionContentBundle.from_bytes(payload)
+    with pytest.raises(ValueError):replace(bundle,content_sha256="0"*64)
+
+
 def test_exact_preloaded_bundles_never_merge_or_fallback(monkeypatch):
     old=(ROOT/"death_certificate_v1.json").read_bytes()
     new=(ROOT/"undelivered_receipt_v1.json").read_bytes()

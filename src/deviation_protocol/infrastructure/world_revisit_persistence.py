@@ -3,6 +3,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 from deviation_protocol.domain.run import revalidate_run_model
+from deviation_protocol.domain.scenario import EndingStatus
 from deviation_protocol.domain.run_protocol_binding import (
     NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1,
     continue_native_run, revisit_native_region, decode_revisited_native_run_exit_evidence,
@@ -59,7 +60,7 @@ def regional_position_from_storage(row):
 def reconstruct_regional_family(*, admission, run, mutations, creation_evidence,
         roots, visits, positions, entries, source_session, source_snapshot,
         destination_session, destination_snapshot, destination_event, source_events,
-        regional_session, regional_snapshot, regional_event, registry):
+        regional_session, regional_snapshot, regional_event, registry, regional_has_active_job, regional_events=()):
     from deviation_protocol.application.scenario_initialization import _seal_regional_base, initialize_scenario_state
     from deviation_protocol.application.story_director import DeterministicStoryDirector
     from deviation_protocol.application.narrative_outcome_policy import state_fingerprint
@@ -149,6 +150,11 @@ def reconstruct_regional_family(*, admission, run, mutations, creation_evidence,
                                    "scenario_content_version": entry.scenario_content_version},
         "regional Session/initial event association")
     latest = bundle.validate_snapshot(sp["state_json"])
+    # Session.phase is the action-loop phase; the validated runtime owns ending.
+    _require(latest.scenario_runtime.ending_status is EndingStatus.ACTIVE or not regional_has_active_job,
+             "ended archive has active narrative job")
+    from deviation_protocol.infrastructure.run_completion_persistence import validate_sealed_archive, reconstruct_completed_suffix
+    validate_sealed_archive(revisited, latest, regional_events)
     _require(latest.player.player_id == initial.player.player_id
         and latest.player.character_definition_id == initial.player.character_definition_id,
         "regional current player identity")
@@ -159,6 +165,16 @@ def reconstruct_regional_family(*, admission, run, mutations, creation_evidence,
         _require(run == revisited.canonical_run, "regional active suffix")
         return revisited
     _require(run.state_version.value == 6, "regional terminal suffix version")
+    from deviation_protocol.domain.run import RunLifecycleStatus
+    if run.lifecycle_status is RunLifecycleStatus.COMPLETED:
+        # The prefix above consumed only the first four receipts and the actual
+        # position at five. Stored history has independently bound that revision;
+        # the fifth receipt now belongs exclusively to the completion suffix.
+        first = registry.resolve(prefix.source_root.scenario_id, prefix.source_root.scenario_content_version).validate_snapshot(source_snapshot.state_json)
+        return reconstruct_completed_suffix(prefix=revisited, run=run, receipt=mutations[-1],
+            states=(first, base_state, latest),
+            versions=(source_session.state_version, destination_session.state_version, regional_session.state_version),
+            event_sets=((), source_events, regional_events), registry=registry)
     exit_evidence = decode_revisited_native_run_exit_evidence(mutations[-1].operation_evidence_canonical)
     _ended(latest, ending_id=exit_evidence.ending_id, ending_status=exit_evidence.ending_status)
     _require(exit_evidence.request.player_id == evidence.request.player_id

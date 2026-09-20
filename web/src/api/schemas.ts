@@ -10,7 +10,7 @@ export const nativeRunExitRequestSchema = z.object({
   expected_run_state_version: positiveSafeIntegerSchema,
   expected_session_state_version: nonNegativeIntegerSchema.safe(),
 }).strict();
-export const nativeRunStatusSchema = z.object({
+export const nativeRunStatusV1Schema = z.object({
   schema_version: z.literal("native-run-status/v1"),
   session_id: safeId64Schema,
   run_id: safeId128Schema,
@@ -20,6 +20,10 @@ export const nativeRunStatusSchema = z.object({
   can_exit: z.boolean(),
 }).strict().refine((s) => s.lifecycle_status === "active"
   ? [3, 4, 5].includes(s.run_state_version) : [4, 5, 6].includes(s.run_state_version) && !s.can_exit);
+export const nativeRunCompletedStatusSchema = z.strictObject({schema_version:z.literal("native-run-status/v2"),
+  session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.literal(6),
+  session_state_version:nonNegativeIntegerSchema.safe(),lifecycle_status:z.literal("completed"),can_exit:z.literal(false)});
+export const nativeRunStatusSchema = z.discriminatedUnion("schema_version",[nativeRunStatusV1Schema,nativeRunCompletedStatusSchema]);
 export type NativeRunStatus = z.infer<typeof nativeRunStatusSchema>;
 const dateTimeSchema = z.iso.datetime({ offset: true });
 
@@ -1299,7 +1303,13 @@ export const nativeJourneyAssociationSchema = z.strictObject({session_id:safeId6
 export const ARCHIVE_NOTICE = "会签暂缓仍然有效，送达仍未得到证明。你进入核验档案室，决定如何保留这项待核记录；原有资源不会恢复。";
 const journeyArrivalSchema = z.strictObject({previous_ending_status:z.enum(["RESOLVED","FAILED"]),
   previous_ending_title:codePointBoundedStringSchema(1,120,"ending title"),entry_notice:codePointBoundedStringSchema(1,300,"entry notice")});
-export const nativeRunJourneySchema = z.strictObject({schema_version:z.literal("native-run-journey/v1"),
+export const nativeRunCompletionSchema=z.strictObject({completion_id:z.string().regex(/^[0-9a-f]{64}$/),
+  outcome:z.literal("unresolved_record_preserved"),title:z.literal("待核事项保留，核验旅程已结案"),
+  notice:z.literal("本次旅程已正常完成。发运暂缓继续有效，送达仍未得到证明；旧记录与资源保持原状。"),
+  canon_outcome:z.strictObject({dispatch:z.literal("held"),delivery:z.literal("unproven"),record:z.literal("sealed"),verification:z.literal("closed_unresolved")})});
+export const nativeRunCompletionOfferSchema=z.strictObject({title:z.literal("完成本次旅程：保留待核事项"),
+  notice:z.literal("封存待核记录已确认；可以将本次旅程以待核事项保留结案。发运暂缓继续有效，送达仍未得到证明。")});
+export const nativeRunJourneyV1Schema = z.strictObject({schema_version:z.literal("native-run-journey/v1"),
   session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5),z.literal(6)]),
   lifecycle_status:z.enum(["active","terminated"]),run_context:publicNativeRunContextSchema,
   path:nativeJourneyAssociationSchema,current:nativeJourneyAssociationSchema,
@@ -1335,6 +1345,43 @@ export const nativeRunJourneySchema = z.strictObject({schema_version:z.literal("
     a.entry_notice==="上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。" :
     a.previous_ending_title==="记录成为现实" && a.entry_notice==="上一世界以失败结果结束。你带着原有状态抵达发运大厅，当前队列已经消耗四格期限。";
 });
+export const nativeRunCompletedJourneySchema = z.strictObject({schema_version:z.literal("native-run-journey/v2"),
+  session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5),z.literal(6)]),
+  lifecycle_status:z.literal("completed"),run_context:publicNativeRunContextSchema,
+  path:nativeJourneyAssociationSchema,current:nativeJourneyAssociationSchema,
+  predecessor:nativeJourneyAssociationSchema.nullable(),successor:nativeJourneyAssociationSchema.nullable(),
+  next_transition:z.strictObject({kind:z.enum(["first_continuation","regional_revisit"]),
+    world_title:codePointBoundedStringSchema(1,120,"world title"),region_title:codePointBoundedStringSchema(1,120,"region title"),
+    notice:codePointBoundedStringSchema(1,300,"notice")}).nullable(),arrival:journeyArrivalSchema.nullable(),completion:nativeRunCompletionSchema
+}).refine(j => {
+  const ordinal=j.path.visit?.visit_ordinal ?? 1, last=j.current.visit?.visit_ordinal ?? 1;
+  if (j.session_id !== j.path.session_id || j.run_id !== j.run_context.run_id || ordinal>last ||
+      j.run_state_version !== last+2+(1)) return false;
+  const rows=[j.path,j.current,j.predecessor,j.successor].filter(a=>a!==null);
+  if (rows.some(a=>(a.visit===null)!==(last===1))) return false;
+  if ((j.predecessor===null)!==(ordinal===1) || (j.successor===null)!==(ordinal===last)) return false;
+  if (j.predecessor && j.predecessor.visit?.visit_ordinal !== ordinal-1) return false;
+  if (j.successor && j.successor.visit?.visit_ordinal !== ordinal+1) return false;
+  for (let i=0;i<rows.length;i++) for (let k=i+1;k<rows.length;k++) {
+    const a=rows[i]!, b=rows[k]!;
+    if ((a.visit?.visit_ordinal ?? 1)===(b.visit?.visit_ordinal ?? 1)) {
+      if (JSON.stringify(a)!==JSON.stringify(b)) return false;
+    } else if (a.session_id===b.session_id || a.visit?.visit_id===b.visit?.visit_id) return false;
+  }
+  const offer=j.next_transition;
+  if (offer && (ordinal!==last || last===3 ||
+      offer.kind!==(last===1 ? "first_continuation" : "regional_revisit") ||
+      offer.world_title!=="未送达的回执" || offer.region_title!==(last===1 ? "发运大厅" : "核验档案室") ||
+      (last===2 && offer.notice!==ARCHIVE_NOTICE))) return false;
+  const a=j.arrival;
+  if (ordinal===1) return a===null;
+  if (!a) return false;
+  if (ordinal===3) return a.previous_ending_status==="RESOLVED" && a.previous_ending_title==="回执待核，发运暂缓" && a.entry_notice===ARCHIVE_NOTICE;
+  return a.previous_ending_status==="RESOLVED" ? ["规程已中断","记录已被质疑"].includes(a.previous_ending_title) &&
+    a.entry_notice==="上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。" :
+    a.previous_ending_title==="记录成为现实" && a.entry_notice==="上一世界以失败结果结束。你带着原有状态抵达发运大厅，当前队列已经消耗四格期限。";
+}).refine(j=>j.run_state_version===6 && j.current.visit?.visit_ordinal===3 && j.next_transition===null);
+export const nativeRunJourneySchema=z.discriminatedUnion("schema_version",[nativeRunJourneyV1Schema,nativeRunCompletedJourneySchema]);
 export const nativeRunRevisitResultSchema = z.strictObject({schema_version:z.literal("native-run-revisit-result/v1"),
   source_session_id:safeId64Schema,source_session_state_version:nonNegativeIntegerSchema.safe(),run_id:safeId128Schema,
   resulting_run_state_version:z.literal(5),session_id:safeId64Schema,initial_session_state_version:z.literal(0),
@@ -1345,3 +1392,23 @@ export type NativeRunJourney = z.infer<typeof nativeRunJourneySchema>;
 export type NativeJourneyAssociation = z.infer<typeof nativeJourneyAssociationSchema>;
 export type NativeRunRevisitResult = z.infer<typeof nativeRunRevisitResultSchema>;
 export type NativeTransitionResult = NativeRunRevisitResult | NativeRunContinuationResult;
+
+export const nativeRunCompletionStatusSchema=z.strictObject({schema_version:z.literal("native-run-completion-status/v1"),
+  session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5),z.literal(6)]),
+  lifecycle_status:z.enum(["active","terminated","completed"]),run_context:publicNativeRunContextSchema,
+  path:nativeJourneyAssociationSchema,current:nativeJourneyAssociationSchema,can_complete:z.boolean(),
+  reason:z.enum(["eligible","run_terminal","not_current_visit","character_ineligible","session_not_ended","ending_not_eligible","route_not_eligible"]),
+  offer:nativeRunCompletionOfferSchema.nullable(),completion:nativeRunCompletionSchema.nullable()
+}).refine(c=>c.session_id===c.path.session_id && c.run_id===c.run_context.run_id &&
+  c.run_state_version===(c.current.visit?.visit_ordinal??1)+2+(c.lifecycle_status==="active"?0:1) &&
+  c.can_complete===(c.reason==="eligible") && c.can_complete===(c.offer!==null) &&
+  (c.lifecycle_status==="completed")===(c.completion!==null) &&
+  (c.lifecycle_status!=="active")===(c.reason==="run_terminal") &&
+  (!c.can_complete || c.lifecycle_status==="active" && c.run_state_version===5 && JSON.stringify(c.path)===JSON.stringify(c.current)) &&
+  (c.lifecycle_status!=="completed" || c.current.visit?.visit_ordinal===3));
+export const nativeRunCompletionResultSchema=z.strictObject({schema_version:z.literal("native-run-completion-result/v1"),
+  source_session_id:safeId64Schema,source_session_state_version:nonNegativeIntegerSchema.safe(),run_id:safeId128Schema,
+  resulting_run_state_version:z.literal(6),lifecycle_status:z.literal("completed"),run_context:publicNativeRunContextSchema,
+  visit:nativeJourneyVisitSchema,completion:nativeRunCompletionSchema}).refine(c=>c.run_id===c.run_context.run_id && c.visit.visit_ordinal===3);
+export type NativeRunCompletionStatus=z.infer<typeof nativeRunCompletionStatusSchema>;
+export type NativeRunCompletionResult=z.infer<typeof nativeRunCompletionResultSchema>;

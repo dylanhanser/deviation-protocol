@@ -147,7 +147,7 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("native mechanics catalogue is incompatible")
 
     async def load(self, uow, game_session, state, definition):
-        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, NativeRunTerminatedV1, LegacyRunCompatibilityV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1
+        from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1, NativeRunTerminatedV1, LegacyRunCompatibilityV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1
         session_id = game_session.session_id
         try:
             participation = await uow.run_participations.get(session_id)
@@ -170,9 +170,9 @@ class NativeTurnMechanicsCoordinator:
                 raise NativeTurnBindingError(session_id)
             return None
         classified = family
-        if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1):
+        if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
             revalidate_run_model(family, type(family))
-            regional = family.revisited if type(family) is NativeRunRegionalRevisitTerminatedV1 else family
+            regional = family.revisited if type(family) in (NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1) else family
             if participation not in family.canonical_run.trusted_participation_references:
                 raise NativeTurnBindingError(session_id)
             if participation.joined_state_version.value == 5:

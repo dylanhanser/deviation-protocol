@@ -741,7 +741,7 @@ async def _active_run_for_character(
         for item in maps.run_mutation_receipts.values()
         if item.result_player_character_id == identity
     )
-    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1
+    from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1
     active = []
     for identity in sorted(run_ids):
         run = _run_from_maps(maps, RunId(value=identity))
@@ -750,9 +750,9 @@ async def _active_run_for_character(
         binding = run.player_character_binding
         if binding.applicable_character_reference.player_character_id != player_character_id:
             raise RunStoredRecordIntegrityError("surviving binding character mismatch")
-        if run.lifecycle_status is RunLifecycleStatus.TERMINATED:
+        if run.lifecycle_status in (RunLifecycleStatus.TERMINATED, RunLifecycleStatus.COMPLETED):
             family = await classifier(run_id=run.run_id)
-            if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1):
+            if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
                 raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
         elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
             if run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
@@ -1407,7 +1407,7 @@ class DemoRunRepository(RunRepository):
         self._uow._ensure_open()
         run = validate_canonical_run(run)
         prior = run.current_mutation_provenance.prior_state_version
-        if run.current_mutation_provenance.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
+        if run.current_mutation_provenance.mutation_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN):
             self._uow._require_native_writer()
         if (
             prior is None
@@ -1420,6 +1420,7 @@ class DemoRunRepository(RunRepository):
                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,
                 RunMutationKind.REVISIT_NATIVE_REGION,
                 RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,
+                RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN,
             }
         ):
             raise RunStoredRecordIntegrityError(
@@ -1773,6 +1774,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
             RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1,
             RunOperationNamespace.REVISIT_NATIVE_REGION_V1,
             RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1,
+            RunOperationNamespace.COMPLETE_REVISITED_NATIVE_V1,
         }:
             raise ValueError("minimum Run mutation repository rejects namespace")
         stored = self._uow._visible_authority_maps().run_mutation_receipts.get(
@@ -1801,6 +1803,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         exit_evidence: NativeRunExitEvidenceV1 | None = None,
         continuation_evidence=None,
         revisit_evidence=None,
+        completion_evidence=None,
     ) -> None:
         self._uow._ensure_open()
         if (
@@ -1813,6 +1816,7 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
                 (RunOperationNamespace.CONTINUE_NATIVE_V1, RunMutationKind.CONTINUE_NATIVE_RUN),
                 (RunOperationNamespace.REVISIT_NATIVE_REGION_V1, RunMutationKind.REVISIT_NATIVE_REGION),
                 (RunOperationNamespace.TERMINATE_REVISITED_NATIVE_V1, RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN),
+                (RunOperationNamespace.COMPLETE_REVISITED_NATIVE_V1, RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN),
                 (RunOperationNamespace.TERMINATE_CONTINUED_NATIVE_V1, RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN),
                 (
                     RunOperationNamespace.ATTACH_SESSION_V1,
@@ -1846,14 +1850,16 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
         )
         participation = result.participation_reference
         character_reference = result.applicable_character_reference
-        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN):
+        if receipt.command_kind in (RunMutationKind.TERMINATE_NATIVE_RUN,RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN,RunMutationKind.CONTINUE_NATIVE_RUN,RunMutationKind.REVISIT_NATIVE_REGION,RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN,RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN):
             self._uow._require_native_writer()
             from deviation_protocol.domain.run_protocol_binding import NativeRunExitEvidenceV1,ContinuedNativeRunExitEvidenceV1
             from deviation_protocol.domain.world_continuation import NativeRunContinuationEvidenceV1
             from deviation_protocol.domain.run import canonical_run_operation_bytes, revalidate_run_model
             from deviation_protocol.domain.world_revisit import NativeRunRegionalRevisitEvidenceV1
             from deviation_protocol.domain.run_protocol_binding import RevisitedNativeRunExitEvidenceV1
+            from deviation_protocol.domain.run_completion import NativeRunCompletionEvidenceV1
             carrier, kind = {
+                RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN: (completion_evidence, NativeRunCompletionEvidenceV1),
                 RunMutationKind.CONTINUE_NATIVE_RUN: (continuation_evidence, NativeRunContinuationEvidenceV1),
                 RunMutationKind.REVISIT_NATIVE_REGION: (revisit_evidence, NativeRunRegionalRevisitEvidenceV1),
                 RunMutationKind.TERMINATE_NATIVE_RUN: (exit_evidence, NativeRunExitEvidenceV1),
@@ -2437,12 +2443,16 @@ def _classify_demo_run(maps, run_id, sessions, snapshots, events, registry=None,
                         and job.status in ACTIVE_NARRATIVE_JOB_STATUSES for job in jobs.values()),
                         "regional source has active narrative job")
                     regional_rows = session_rows(participations[2])
+                    regional_has_active_job = any(job.session_id == participations[2].session_id
+                        and job.status in ACTIVE_NARRATIVE_JOB_STATUSES for job in jobs.values())
                     return reconstruct_regional_family(admission=admission, run=current_run, mutations=mutations,
                         creation_evidence=evidence, roots=world_rows[0], visits=world_rows[1], positions=world_rows[2],
                         entries=world_rows[3], source_session=rows[0], source_snapshot=rows[2],
                         destination_session=destination_rows[0], destination_event=destination_rows[1],
                         destination_snapshot=destination_rows[2], regional_session=regional_rows[0],
                         regional_event=regional_rows[1], regional_snapshot=regional_rows[2],
+                        regional_events=tuple(e for e in events if e.session_id == participations[2].session_id),
+                        regional_has_active_job=regional_has_active_job,
                         source_events=tuple(e for e in events if e.session_id == participations[1].session_id), registry=registry)
                 b._require(not world_rows[3], "entry on old continued family")
                 return reconstruct_continued_family(admission=admission,run=current_run,mutations=mutations,

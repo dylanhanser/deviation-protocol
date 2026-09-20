@@ -22,7 +22,7 @@ import {
   runEntryResponseFixture,
   scenarioCatalogFixture,
   runOptionsFixture,
-  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture,
+  nativeEntryFixture, nativeViewFixture, nativeJourneyFixture, completionStatusFixture,
 } from "./test/fixtures";
 import { server } from "./test/server";
 
@@ -44,6 +44,7 @@ describe("S7-1 explicit exit and return to setup", () => {
       run_state_version:3, lifecycle_status:"active" as const, can_exit:true};
     const terminal = {...active,run_state_version:4,lifecycle_status:"terminated" as const,can_exit:false};
     const status = vi.spyOn(client,"getNativeRunStatus").mockResolvedValue(active);
+    vi.spyOn(client,"getNativeRunCompletion").mockImplementation(async () => completionStatusFixture(await journey.getMockImplementation()!(view.metadata.session_id)));
     const exit = vi.spyOn(client,"exitNativeRun").mockImplementation(async () => {
       status.mockResolvedValue(terminal);
       journey.mockResolvedValue({...nativeJourneyFixture(view),run_state_version:4,lifecycle_status:"terminated"});
@@ -71,7 +72,7 @@ describe("S7-1 explicit exit and return to setup", () => {
     expect(c.entry).not.toHaveBeenCalled();
   });
 
-  it("reconciles a lost committed response using GET only", async () => {
+  it("keeps a lost committed response through GET and requires exact explicit retry", async () => {
     const c = setup();
     c.exit.mockImplementation(async () => {
       c.status.mockResolvedValue(c.terminal);
@@ -85,8 +86,13 @@ describe("S7-1 explicit exit and return to setup", () => {
     await screen.findByRole("button",{name:"重试原结束请求"});
     await waitFor(() => expect(screen.getByRole("button",{name:"读取旅程状态"})).toBeEnabled());
     fireEvent.click(screen.getByRole("button",{name:"读取旅程状态"}));
+    await waitFor(()=>expect(screen.getByRole("button",{name:"重试原结束请求"})).toBeEnabled());
+    expect(screen.queryByRole("button",{name:"返回设置"})).not.toBeInTheDocument();
+    expect(c.exit).toHaveBeenCalledTimes(1);
+    c.exit.mockResolvedValue(c.terminal);
+    fireEvent.click(screen.getByRole("button",{name:"重试原结束请求"}));
     await screen.findByRole("button",{name:"返回设置"});
-    expect(c.exit).toHaveBeenCalledTimes(1); expect(c.entry).not.toHaveBeenCalled();
+    expect(c.exit).toHaveBeenCalledTimes(2); expect(c.entry).not.toHaveBeenCalled();
   });
 
   it("retries the exact exit and keeps storage-clear retry separate", async () => {
@@ -122,7 +128,7 @@ describe("S7-1 explicit exit and return to setup", () => {
     const c = setup(); c.status.mockResolvedValue({...c.active,[field]:field === "session_state_version" ? c.active.session_state_version + 1 : "other"});
     render(<App client={c.client}/>);
     await waitFor(() => expect(c.status).toHaveBeenCalled());
-    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
+    expect(screen.queryByRole("button",{name:"结束本次旅程"})).not.toBeInTheDocument();
     expect(c.exit).not.toHaveBeenCalled();
   });
 
@@ -153,10 +159,17 @@ describe("S7-1 explicit exit and return to setup", () => {
     await act(async () => {resolve(c.terminal);});
     expect(screen.queryByRole("button",{name:"返回设置"})).not.toBeInTheDocument();
     expect(next.exit).not.toHaveBeenCalled();
+    expect(screen.getByRole("button",{name:"重试原结束请求"})).toBeDisabled();
+    expect(next.exit).not.toHaveBeenCalled();
+    mounted.rerender(<App client={c.client}/>);
+    c.exit.mockResolvedValue(c.terminal);c.status.mockResolvedValue(c.terminal);
+    c.journey.mockResolvedValue({...nativeJourneyFixture(c.view),run_state_version:4,lifecycle_status:"terminated"});
+    await waitFor(() => expect(screen.getByRole("button",{name:"读取旅程状态"})).toBeEnabled());
+    fireEvent.click(screen.getByRole("button",{name:"读取旅程状态"}));
     await waitFor(() => expect(screen.getByRole("button",{name:"重试原结束请求"})).toBeEnabled());
     fireEvent.click(screen.getByRole("button",{name:"重试原结束请求"}));
     await screen.findByRole("button",{name:"返回设置"});
-    expect(next.exit.mock.calls[0]?.[0]).toBe(c.exit.mock.calls[0]?.[0]);
+    expect(c.exit.mock.calls[1]?.[0]).toBe(c.exit.mock.calls[0]?.[0]);
   });
 
   it("reassesses DF-002: separate GET retries restore return-to-setup discovery without admission", async () => {

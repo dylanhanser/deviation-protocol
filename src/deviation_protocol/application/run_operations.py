@@ -44,6 +44,7 @@ TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-native-result/v1"
 CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.continue-native-result/v1"
 TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-continued-native-result/v1"
 REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION = "run.revisit-native-region-result/v1"
+COMPLETE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.complete-revisited-native-result/v1"
 TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION = "run.terminate-revisited-native-result/v1"
 ATTACH_SESSION_RESULT_SCHEMA_VERSION = "run.attach-session-result/v1"
 BIND_PLAYER_CHARACTER_RESULT_SCHEMA_VERSION = (
@@ -65,6 +66,7 @@ class RunOperationNamespace(StrEnum):
     CONTINUE_NATIVE_V1 = "run.continue-native/v1"
     TERMINATE_CONTINUED_NATIVE_V1 = "run.terminate-continued-native/v1"
     REVISIT_NATIVE_REGION_V1 = "run.revisit-native-region/v1"
+    COMPLETE_REVISITED_NATIVE_V1 = "run.complete-revisited-native/v1"
     TERMINATE_REVISITED_NATIVE_V1 = "run.terminate-revisited-native/v1"
 
 
@@ -233,6 +235,12 @@ class RunSafeResult(_StrictFrozenModel):
                     or participation.continuous_story_line_id != self.continuous_story_line_id
                     or participation.joined_state_version.value != 5):
                 raise ValueError("regional result requires exact active revision five")
+        elif self.result_schema_version == COMPLETE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION:
+            if (self.lifecycle_status is not RunLifecycleStatus.COMPLETED
+                    or self.resulting_state_version.value != 6
+                    or self.participation_reference is not None
+                    or self.applicable_character_reference is not None):
+                raise ValueError("completion requires exact completed revision six")
         elif self.result_schema_version == TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION:
             if (self.lifecycle_status is not RunLifecycleStatus.TERMINATED
                     or self.resulting_state_version.value != 6
@@ -320,6 +328,10 @@ class StoredRunSuccessReceipt(_StrictFrozenModel):
     @model_validator(mode="after")
     def validate_receipt_bindings(self) -> StoredRunSuccessReceipt:
         expected = {
+            RunMutationKind.COMPLETE_REVISITED_NATIVE_RUN: (
+                RunOperationNamespace.COMPLETE_REVISITED_NATIVE_V1,
+                COMPLETE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION,
+            ),
             RunMutationKind.REVISIT_NATIVE_REGION: (
                 RunOperationNamespace.REVISIT_NATIVE_REGION_V1,
                 REVISIT_NATIVE_REGION_RESULT_SCHEMA_VERSION,
