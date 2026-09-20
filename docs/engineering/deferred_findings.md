@@ -49,11 +49,15 @@ The already-fixed S3 planning findings remain historical closures, not open debt
   reliance with a language-independent assertion and rerun both locales.
 - **Closure evidence:** none; the production guard works, but the locale-fragile
   assertion has not been changed within this S3 path budget.
+- **S7-5 checkpoint:** still deferred. The focused canonical Offline run used
+  the existing process-local containment and passed; this does not exercise or
+  fix both locales. Verification-tooling ownership and the existing stabilization
+  reassessment remain unchanged. See [S7-5 evidence](../phase_3_3_s7_5_integration_acceptance.md).
 
 ### DF-002 — Partial discovery refresh after Demo startup race
 
-- **ID / status:** DF-002 / reassessed and deferred for the S7-1 implementation candidate and bounded local
-  playable milestone; no wider-release approval.
+- **ID / status:** DF-002 / reassessed and deferred through the S7-5 integration
+  candidate and bounded local playable milestone; no wider-release approval.
 - **Affected feature/path:** Web setup discovery recovery in `web/src/App.tsx`;
   the observed “刷新可用选项” action refreshes entry options while scenario and
   character discovery error sections remain after the documented startup race.
@@ -92,5 +96,15 @@ The already-fixed S3 planning findings remain historical closures, not open debt
   is recorded above. Reassess again at the post-playable stabilization checkpoint before wider release,
   or sooner if reachability/impact expands or reload fails to restore the flow.
   Escalate if containment fails under the workflow's blocking criteria.
-- **Closure evidence:** none; no general discovery-refresh fix or browser rerun
-  accompanies this reassessment. Separate error sections and GET retries remain.
+- **Closure evidence:** none; no general discovery-refresh fix or rerun of the
+  original coupled startup race. Separate error sections and GET retries remain.
+- **S7-5 checkpoint:** S7-4 browser acceptance at `f49ee342` observed the old
+  Session404 → explicit clear → backend-ready full reload containment, with eight
+  GET and zero POST across the complete backend-only restart window. Its original
+  coupled frontend/backend startup race was not reproduced; individual restart
+  click counts are unavailable. Applicable rendered Web coverage preserves
+  separate discovery GET retries and disabled confirmation until valid explicit
+  selections. No broadened impact or failed containment was found; no closure,
+  new release restriction or new repair commitment is asserted. The existing Web
+  owner and post-playable stabilization checkpoint before wider release remain.
+  See [S7-5 evidence and limits](../phase_3_3_s7_5_integration_acceptance.md).

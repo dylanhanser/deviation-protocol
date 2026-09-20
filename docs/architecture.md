@@ -60,8 +60,9 @@ implementation is published at `2f144599`. S7-1 exit is published at `41d68aac`;
 S7-2 follows its independently approved plan at `2c272487`; implementation is
 published at `6dfbd37` with bounded local browser evidence. The S7-3 plan is independently approved and published at `0ea295e`;
 P01–P09 are approved and implementation is published at `0b20dcd` with bounded
-local browser evidence. S7-4 has an approved published plan and an unstaged implementation candidate. Phase 3.3
-remains incomplete.
+local browser evidence. S7-4 implementation is approved and published at `f49ee342`.
+[S7-5 integration/acceptance](phase_3_3_s7_5_integration_acceptance.md) is ready for
+independent review; formal Phase 3.3 closure remains pending.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -286,7 +287,7 @@ described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
 at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 plan is published at `0ea295e`, P01–P09 are approved, and its authorized
 implementation is published at `0b20dcd` with inspected bounded browser evidence.
-S7-4's approved plan has an implementation candidate; S7-5 retains final integration. The
+S7-4 is approved and published at `f49ee342`; S7-5 integration/acceptance awaits review. The
 complete Run Protocol and Phase 3.3 remain incomplete.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
@@ -1750,7 +1751,7 @@ The Web keeps successor storage v1/current recovery separate from historical
 display, validates the reciprocal GET edge and complete View associations, and
 returns by GET without enabling predecessor writes or accepting stale reads.
 S7-3 adds the bounded held-receipt archive revisit and one-use regional entry.
-Authorized canon transitions and final integration remain allocated to S7-4/5.
+The bounded canon transition is published in S7-4; S7-5 reconciles final integration for independent review.
 S7 and Phase 3.3 remain incomplete.
 
 ## P3.3-S7-3 published regional revisit
@@ -1822,11 +1823,11 @@ remain separate from publication and the subsequently inspected
 Earlier CHANGES_REQUIRED/correction records remain history; implementation is
 published at `0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597`. S7-4 owns
 canon-preserving line transitions/normal completion; its approved implementation contract is below.
-S7-5 owns final integration. S7 and Phase 3.3 remain incomplete.
+S7-5 integration/acceptance is ready for independent review. Formal S7 and Phase 3.3 closure remains pending.
 
-## P3.3-S7-4 canon closure and normal completion candidate
+## P3.3-S7-4 published canon closure and normal completion
 
-Status: **Corrected implementation candidate; focused independent re-review pending after CHANGES_REQUIRED.**
+Status: **Independently approved and published at `f49ee342`.**
 The [published S7-4 plan](phase_3_3_s7_4_canon_preserving_line_transition_run_completion_plan.md)
 and P01–P09, including P04, are approved at `684f7d1`. Frozen candidate-time
 wording remains historical. The [implementation/evidence owner](run_protocol.md#s7-4-implementation-candidate-evidence)
@@ -1857,7 +1858,8 @@ share rules and atomic trial-store validation. New completion status/result and
 explicit completed-only v2 Journey/status branches preserve old public v1 shapes.
 The Web uses a shared association/lifecycle rule for reads, sync, controls,
 confirmation and submission, retaining confirmed POST authority and GET-only
-reconciliation. S7-4 acceptance requires fresh changed-boundary MySQL, Demo,
-rendered Web and cross-process proof; browser execution needs separate authority.
-The candidate remains unstaged and uncommitted; no independent approval, browser
-acceptance, broader readiness, S7 or Phase 3.3 completion is claimed.
+reconciliation. Required S7-4 MySQL, Demo, rendered Web and cross-process evidence
+and subsequent authorized browser acceptance are reconciled in the
+[S7-5 record](phase_3_3_s7_5_integration_acceptance.md). S7-5 changes tests/status
+only; production and migration bytes remain published S7-4 bytes. Broader readiness
+and formal S7/Phase 3.3 completion are not claimed.
