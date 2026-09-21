@@ -1,3 +1,5 @@
+import { ZodError, type core } from "zod";
+
 export type ApiClientErrorKind =
   | "api"
   | "aborted"
@@ -42,7 +44,17 @@ export class ApiClientError extends Error {
   }
 }
 
+function isActionLineBreakIssue(issue: core.$ZodIssue): boolean {
+  if (issue.code === "invalid_union") {
+    return issue.errors.some((issues) => issues.some(isActionLineBreakIssue));
+  }
+  return issue.code === "custom" && issue.params?.inputViolation === "action-line-break";
+}
+
 export function formatApiClientError(error: unknown): string {
+  if (error instanceof ZodError && error.issues.some(isActionLineBreakIssue)) {
+    return "当前输入仅支持单行文字，请删除换行后重试。";
+  }
   if (!(error instanceof ApiClientError)) {
     return "发生未知错误，请稍后重试。";
   }

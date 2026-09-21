@@ -14,6 +14,7 @@ import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPr
 import { objectiveNames, type RunEntryOptions, type NativeRunEntryResponse, type PublicNativeRunContext } from "./api/schemas";
 import {
   actionRequestSchema,
+  singleLineActionTextSchema,
   idempotencyKeySchema,
   minimalPlayerCharacterCreationRequestSchema,
   runEntryRequestSchema,
@@ -362,6 +363,13 @@ function FreeActionForm({
     if (disabled) {
       return;
     }
+    if (affordance.input_kind !== "NONE") {
+      const singleLine = singleLineActionTextSchema.safeParse(text);
+      if (!singleLine.success) {
+        setValidationError(formatApiClientError(singleLine.error));
+        return;
+      }
+    }
     const targetIsAllowed =
       targetId === "" ||
       affordance.targets.some((target) => target.target_id === targetId);
@@ -440,9 +448,12 @@ function FreeActionForm({
             <textarea
               id={`${fieldPrefix}-text`}
               value={text}
-              onChange={(event) => setText(event.target.value)}
-              aria-describedby={`${fieldPrefix}-limit`}
-              aria-invalid={inputTooLong}
+              onChange={(event) => {
+                setText(event.target.value);
+                setValidationError(null);
+              }}
+              aria-describedby={`${fieldPrefix}-limit${validationError === null ? "" : ` ${fieldPrefix}-error`}`}
+              aria-invalid={inputTooLong || validationError !== null}
               required
               rows={3}
             />
@@ -460,7 +471,7 @@ function FreeActionForm({
         )}
 
         {validationError === null ? null : (
-          <p role="alert">{validationError}</p>
+          <p id={`${fieldPrefix}-error`} role="alert">{validationError}</p>
         )}
         <button
           type="submit"

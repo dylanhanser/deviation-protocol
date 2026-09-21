@@ -778,9 +778,17 @@ export const publicActionAffordanceSetSchema = z
     }
   });
 
+// Check raw CR/LF before trimming; other character policies remain unchanged.
+export const singleLineActionTextSchema = z.string().refine(
+  (value) => !/[\r\n]/u.test(value),
+  {
+    message: "action text contains a line break",
+    params: { inputViolation: "action-line-break" },
+  },
+);
+
 const playerActionTextSchema = (maximum: number) =>
-  z
-    .string()
+  singleLineActionTextSchema
     .refine((value) => !/[\p{Cc}\p{Cf}]/u.test(value), {
       message: "action text contains a Unicode control character",
     })

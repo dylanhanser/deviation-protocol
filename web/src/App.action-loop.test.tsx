@@ -218,6 +218,59 @@ function actionForm(buttonName: string): HTMLFormElement {
   return form;
 }
 
+describe("action input line-break feedback", () => {
+  it.each([
+    ["提交观察", "行动描述", "第一行\n第二行"],
+    ["提交交谈", "对话内容", "第一行\r\n第二行"],
+    ["提交观察", "行动描述", "\n原文\n"],
+    ["提交交谈", "对话内容", "\r原文\r"],
+    ["提交观察", "行动描述", "第一行\r第二行"],
+    ["提交交谈", "对话内容", "\r\n原文\r\n"],
+  ])("blocks %s with %j input and lets the player correct it", async (buttonName, label, text) => {
+    const bodies: Record<string, unknown>[] = [];
+    let viewReads = 0;
+    server.use(
+      scenarioHandler(),
+      http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
+        viewReads += 1;
+        return HttpResponse.json(freeActionViewFixture(viewReads));
+      }),
+      http.post(`${apiOrigin}/v1/sessions/session-public-1/actions`, async ({ request }) => {
+        const body = await request.json() as Record<string, unknown>;
+        bodies.push(body);
+        return HttpResponse.json(synchronousActionResponseFixture(body.client_request_id as string, 2));
+      }),
+    );
+    const user = userEvent.setup();
+    renderActionApp();
+    await loadSession(user);
+    const recoveryBefore = storedRecoveryRecord();
+    const form = actionForm(buttonName);
+    const input = within(form).getByLabelText(label);
+    fireEvent.change(input, { target: { value: text } });
+    // HTML textareas normalize CR/CRLF to LF; raw variants are also tested at the client boundary.
+    const editableText = (input as HTMLTextAreaElement).value;
+    await user.click(within(form).getByRole("button", { name: buttonName }));
+    expect(await within(form).findByRole("alert")).toHaveTextContent("当前输入仅支持单行文字，请删除换行后重试。");
+    expect(input).toHaveValue(editableText);
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByText("发生未知错误，请稍后重试。")).not.toBeInTheDocument();
+    expect(bodies).toHaveLength(0);
+    expect(viewReads).toBe(1);
+    expect(storedRecoveryRecord()).toEqual(recoveryBefore);
+    expect(within(form).getByRole("button", { name: buttonName })).toBeEnabled();
+
+    fireEvent.change(input, { target: { value: "核对公开记录" } });
+    expect(within(form).queryByRole("alert")).not.toBeInTheDocument();
+    expect(input).toHaveAttribute("aria-invalid", "false");
+    await user.click(within(form).getByRole("button", { name: buttonName }));
+    await waitFor(() => expect(viewReads).toBe(2));
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.[label === "对话内容" ? "dialogue" : "description"]).toBe("核对公开记录");
+    expect(screen.queryByText("当前输入仅支持单行文字，请删除换行后重试。")).not.toBeInTheDocument();
+  });
+});
+
 function withSessionId(
   view: PlayerSessionView,
   sessionId: string,

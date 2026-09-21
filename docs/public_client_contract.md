@@ -1505,6 +1505,14 @@ target would be a separate domain-contract change, not a UI assumption.
 - `NONE` means no player-authored input; currently this is `CONTINUE`.
 - `DESCRIPTION` uses `description`, currently with a 150-character limit.
 - `DIALOGUE` uses `dialogue`, currently with a 200-character limit.
+- Before trimming or sending a gameplay POST, Web rejects raw CR and LF line
+  breaks (including CRLF) with
+  `当前输入仅支持单行文字，请删除换行后重试。` and retains the editable input.
+  Editing clears the form message; valid single-line submission remains available.
+  Only typed CR/LF action-text failures receive this message. This adds no new
+  rule for Unicode U+2028/U+2029. Other schema, network and server errors retain
+  their existing handling; frontend and backend `Cc`/`Cf` validation, canonical
+  normalization and action signatures remain unchanged.
 - A decision uses `CHOOSE`, the current public `decision_id`, and one displayed
   `choice_id`; it has no text, target or tool payload.
 - Clients never infer action type, decision state or ending from narrative text.
