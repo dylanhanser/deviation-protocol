@@ -15,6 +15,7 @@ from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
 
 from deviation_protocol.api.dependencies import (
     ApiServices,
+    get_api_services,
     get_current_principal,
     get_player_character_service,
     get_run_entry_service,
@@ -958,7 +959,11 @@ def build_default_services(
         uow_factory=uow_factory,catalog=archive_pack.content_catalog,scenario_catalog=archive_pack,
         native_coordinator=archive_coordinator,narrative_provider=provider,provider_name="deepseek",
         model_name=deepseek_settings.model if deepseek_settings is not None else "deepseek-v4-flash")
+    from deviation_protocol.application.escort_encounter_services import build_escort_bundle
+    escort_bundle = build_escort_bundle(
+        SCENARIO_PACK.with_name("wind_gate_v1.json"), uow_factory=uow_factory)
     registry = SessionContentRegistry((
+        escort_bundle,
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=orchestrator),
         SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),
         SessionContentBundle.from_bytes(archive_path.read_bytes(),session_service=archive_service,turn_orchestrator=archive_orchestrator)))
@@ -1246,11 +1251,18 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         response_model=PublicScenarioCatalog,
         responses=_public_error_responses(500),
         tags=["scenarios"],
+        response_model_exclude_none=True,
     )
     async def list_scenarios(
         service: SessionService = Depends(get_session_service),
+        services: ApiServices = Depends(get_api_services),
     ) -> PublicScenarioCatalog:
-        return service.list_public_scenarios()
+        descriptions = list(service.list_public_scenarios().scenarios)
+        if services.content_registry is not None:
+            for bundle in services.content_registry.standalone_bundles():
+                descriptions.extend(item.model_copy(update={"entry_mode": "SESSION"})
+                    for item in bundle.session_service.list_public_scenarios().scenarios)
+        return PublicScenarioCatalog(scenarios=tuple(descriptions))
 
     @app.post(
         "/v1/sessions",
@@ -1263,7 +1275,13 @@ def create_app(*, services: ApiServices | None = None) -> FastAPI:
         request: CreateSessionRequest,
         principal: RequestPrincipal = Depends(get_current_principal),
         service: SessionService = Depends(get_session_service),
+        services: ApiServices = Depends(get_api_services),
     ) -> SessionCreationResult:
+        if services.content_registry is not None:
+            for bundle in services.content_registry.standalone_bundles():
+                if bundle.scenario_id == request.scenario_id:
+                    service = bundle.session_service
+                    break
         result = await service.create(
             principal,
             client_request_id=request.client_request_id,

@@ -188,33 +188,41 @@ class FirstPhaseTurnOrchestrator:
                 native_family=native_family,
             )
 
-            expected_version = game_session.state_version
-            resulting_version = expected_version
-            if resolution.state_changed:
-                resulting_version = expected_version + 1
-                await self._persist_state_change(
-                    uow=uow,
-                    submission=submission,
-                    game_session=game_session,
-                    resolution=resolution,
-                    definition=definition,
-                    expected_version=expected_version,
-                )
+            return await self._commit_local_result(
+                uow, submission, game_session, state, resolution, narrative_frame, definition
+            )
 
-            response = self._build_response(
-                submission,
-                resolution,
-                resulting_version,
-                narrative_frame,
+    async def _commit_local_result(
+        self, uow, submission, game_session, original_state, resolution,
+        narrative_frame, definition,
+    ) -> TurnResponse:
+        expected_version = game_session.state_version
+        resulting_version = expected_version
+        if resolution.state_changed:
+            resulting_version = expected_version + 1
+            await self._persist_state_change(
+                uow=uow,
+                submission=submission,
+                game_session=game_session,
+                resolution=resolution,
+                definition=definition,
+                expected_version=expected_version,
             )
-            await uow.turn_requests.add(
-                submission,
-                response.action_signature,
-                self._route_for(resolution.status),
-                response=response.to_persistence(),
-            )
-            await uow.commit()
-            return response
+
+        response = self._build_response(
+            submission,
+            resolution,
+            resulting_version,
+            narrative_frame,
+        )
+        await uow.turn_requests.add(
+            submission,
+            response.action_signature,
+            self._route_for(resolution.status),
+            response=response.to_persistence(),
+        )
+        await uow.commit()
+        return response
 
     async def _persist_state_change(
         self,

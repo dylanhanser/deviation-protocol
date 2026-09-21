@@ -13,7 +13,8 @@ gameplay, content, dependency, migration or Provider code.
 The reading/identity implementation was subsequently independently approved and
 published at `74693e37fe1257614240822d50abc476f575c198`.
 The 2026-09-21 D1 product decision and implementation status below supersede only
-D1's proposal status; external research, alternatives and D2/D3 remain unchanged.
+D1's proposal status. The later bounded D2+D3 approval below supersedes only
+the approved short-story scope; external research and broader alternatives remain unchanged.
 
 ## Existing implementation, not assumed gaps
 
@@ -154,7 +155,9 @@ benefit, confidence from local evidence and cost, not stars.
 
 The table preserves the original consolidated recommendations and alternatives.
 D1 was approved on 2026-09-21 with the exact choices recorded below; D2/D3 are
-still Proposed/unapproved. This is not a new gate on published work.
+historical proposals at that checkpoint. The bounded approval below now applies;
+the general conflict API and persistent-consequence alternatives remain unapproved.
+This is not a new gate on published work.
 
 | Choice | Exact recommended starting choice | Alternative / consequence |
 | --- | --- | --- |
@@ -182,8 +185,9 @@ instead approved this first version for Web display only, with an exact Unicode
 code-point limit and the selected-visit cutoff. Prompt inclusion remains future,
 unapproved work.
 
-Component implemented in the current uncommitted candidate; this is product
-authorization plus implementation evidence, not independent implementation approval.
+Historical D1 implementation checkpoint: the then-uncommitted component recorded
+product authorization and implementation evidence, not independent implementation
+approval. D1 is completed at the supplied baseline and is not reopened here.
 `GET /v1/sessions/{session_id}/run-recap` supplies a closed `native-run-recap/v1`
 companion projection. The ordinary API and deterministic Demo use the same reader
 and DTO. Web displays a compact native disclosure after the primary reading area.
@@ -382,3 +386,66 @@ this presentation-only change. No newly established reusable authority rule.
 [bg-flow-tests]: https://github.com/boardgameio/boardgame.io/blob/5e9a2c94bde803fae8b081958c406c4d0a7be8ae/src/core/flow.test.ts#L23
 [bg-phases]: https://github.com/boardgameio/boardgame.io/blob/5e9a2c94bde803fae8b081958c406c4d0a7be8ae/docs/documentation/phases.md
 [bg-stages]: https://github.com/boardgameio/boardgame.io/blob/5e9a2c94bde803fae8b081958c406c4d0a7be8ae/docs/documentation/stages.md
+
+
+## D2+D3 bounded approval and implementation candidate (2026-09-21)
+
+The owner explicitly approved the four recommended defaults: one independent,
+versioned Session story **风闸前的同行者**, deterministic explicit choices with
+at most three accepted submissions and one recoverable branch, safe withdrawal
+without injury or resource loss, and fixed server templates with zero Provider
+calls. This supersedes the earlier proposal status only for this exact slice.
+The earlier ConflictIntent/Context/ResolutionPlan sketches are not implemented
+and remain unapproved generalization, not missing requirements for this slice.
+
+The uncommitted candidate adds `wind_gate_v1.json` (`wind-gate-1.0.0`) and an
+encounter-specific policy. It uses normal public Session creation, reads,
+CHOOSE submissions and SQL persistence; the deterministic Demo uses the same
+content, policy and local pipeline with its existing process store. The story is
+not a Run visit, fourth world or D1 recap source. Frozen published packs remain
+byte-identical. There is no new dependency, migration or public conflict API.
+
+| Active phase / position / condition | Choice | Result |
+| --- | --- | --- |
+| 接应 / platform / 慌乱 | 先扶稳同行者 | 转移 / platform / 扶稳 |
+| 接应 / platform / 慌乱 | 立即带向通道 | 转移 / midpoint / 失衡 |
+| 转移 / platform / 扶稳 | 沿扶手护送到出口 | 过门 / inner door / 扶稳 |
+| 转移 / midpoint / 失衡 | 停步抓牢扶手，扶稳对方 | 过门 / inner door / 扶稳 |
+| 转移 / midpoint / 失衡 | 继续抢行 | FAILED / safe refuge / no temporary condition |
+| 过门 / inner door / 扶稳 | 结伴进入候船室 | RESOLVED / waiting room / no temporary condition |
+| Any active phase | 一起撤入避风间 | FAILED / safe refuge / no temporary condition |
+
+There are three active phases; the content schema's final settlement phase is
+not another playable phase. The protected participant is exactly one adult,
+bound to this Session at creation. Wind and the closing corridor are the hazard;
+no hostile NPC, real-time deadline, HP, dice, injury, death, reward, XP, talent,
+equipment, cooldown, resource cost or cross-world penalty is introduced.
+
+One declared finite mutable fact stores the encounter's position in this table.
+慌乱 / 扶稳 / 失衡 are mutually exclusive projections of that state, persisted
+through the existing v3 snapshot and explicit `EscortTransitionRecorded` event.
+Every terminal choice replaces active state with success or withdrawal. Its
+condition projection becomes null; immutable event and narrative history remain.
+Closing a tab is not an ending and does not clear an active condition. No cleanup
+worker, automatic write, retry, clock tick or successor adoption is added.
+
+The server validates phase/location/state/decision history, exact Session-bound
+companion identity, uniqueness and visibility, the player's authored identity,
+state version and bound decision. CHOOSE still carries no target IDs. The local
+pipeline locks, replays exact committed requests, validates a detached candidate,
+and commits events, declarative memory, snapshot/version, attempt-zero local
+narrative record and public response in one transaction. Rejected submissions
+persist none of these. Reused keys with different payloads conflict. Provider
+prepare/generate/finalize/retry/fallback paths are never entered by this story.
+
+The public contract owns the explicit presentation fields and standalone entry.
+Tests cover the authored routes, terminal cleanup, snapshot reload, illegal and
+cross-Session state, stale choices, no-write GET/replay/rejection, resource
+preservation, Provider non-entry, ownership, and injected rollback. Focused real
+MySQL public-entry tests use only the established test harness and test-owned
+Session rows; service reconstruction is not a database-server restart. Web
+rendered tests are not browser acceptance. Exact commands, raw failures/passes
+and final candidate identity are handed off outside the repository. This remains
+an implementation candidate for one independent review, not self-approval,
+production readiness or authority to commit. DF-001/DF-002 retain their existing
+dispositions and conditions; D1, Phase 3.3 and multiline feedback are not reopened.

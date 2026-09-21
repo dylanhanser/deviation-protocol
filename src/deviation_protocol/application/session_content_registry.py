@@ -35,6 +35,7 @@ class SessionContentBundle:
     scenario_catalog: ScenarioCatalog
     session_service: Any = None
     turn_orchestrator: Any = None
+    standalone: bool = False
 
     @classmethod
     def from_bytes(cls, payload: bytes, **services) -> SessionContentBundle:
@@ -56,6 +57,10 @@ class SessionContentBundle:
                    hashlib.sha256(payload).hexdigest(), catalog, **services)
 
     def __post_init__(self):
+        from deviation_protocol.application.escort_encounter import CONTENT_IDENTITY, CONTENT_SHA256
+        if (self.scenario_id == CONTENT_IDENTITY[0] or self.content_version == CONTENT_IDENTITY[1]) and (
+                (self.scenario_id, self.content_version) != CONTENT_IDENTITY or self.content_sha256 != CONTENT_SHA256):
+            raise ValueError("standalone encounter content identity mismatch")
         if (type(self.scenario_id) is not str or type(self.content_version) is not str
                 or type(self.content_sha256) is not str or len(self.content_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in self.content_sha256)
@@ -111,6 +116,9 @@ class SessionContentRegistry:
         if ARCHIVE_CONTENT_IDENTITY not in by_identity:
             raise ValueError("required archive content missing")
         self._bundles = MappingProxyType(by_identity)
+
+    def standalone_bundles(self) -> tuple[SessionContentBundle, ...]:
+        return tuple(bundle for bundle in self._bundles.values() if bundle.standalone)
 
     def resolve(self, scenario_id: str, content_version: str) -> SessionContentBundle:
         if type(scenario_id) is not str or type(content_version) is not str:

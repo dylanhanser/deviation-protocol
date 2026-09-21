@@ -1960,3 +1960,50 @@ admission confirmation remain separate. DF-001/DF-002 stay deferred. Separately
 authorized S7-4 browser acceptance demonstrates the bounded completion/exit/history/
 fresh-entry/restart flow; storage-call ordering remains rendered-test evidence,
 not browser-observed. S7-5 final reconciliation is independently approved and published at `a35a1bf`.
+
+
+## Bounded standalone escort Session (D2+D3)
+
+The approved `wind_gate` / `wind-gate-1.0.0` story is discovered through
+`GET /v1/scenarios`. Its description adds `entry_mode: "SESSION"`; existing Run
+entries omit this optional marker. Web lists it as an independent short story,
+uses its authored default character with `POST /v1/sessions`, and never sends it
+to Run admission. Existing create idempotency, ownership and recovery rules apply.
+Only this explicitly registered standalone bundle extends discovery/creation;
+the registry does not expose continuation-only packs as new starts.
+
+The View adds an optional, explicitly projected `encounter` object for this story:
+`presentation_version: 1`, `objective`, `danger`, `companion`, `player_position`,
+`companion_position`, `condition` and `outcome`. The strings are fixed public
+copy, never runtime mutable-fact keys or mechanical authority. `condition` is
+exactly 慌乱, 扶稳, 失衡 or explicit null. `outcome` is ACTIVE, SUCCESS or
+SAFE_WITHDRAWAL and must agree with the existing Session lifecycle and ending
+status. Terminal outcomes always have null condition. Other Views omit this
+object; old snapshots and existing response semantics remain supported.
+
+Only `action_affordances.choices` supplies executable choices. The existing
+CHOOSE body remains `turn_id`, `client_request_id`, `action_type`, `decision_id`
+and `choice_id`; the server binds the companion, and extra target arrays are
+rejected. A stale decision or unavailable choice produces a local rejection
+without committing a response, state, event or step. Contradictory stored
+encounter state returns the existing opaque SNAPSHOT_INVALID conflict. Exact
+committed retries replay the original response even after later progression;
+changed-payload key reuse conflicts. GET and reading controls never progress it.
+
+Normal SQL and deterministic Demo share the content, policy and local-template
+orchestrator. Fixed result narrative and the attempt-zero committed local record
+are atomically persisted; no Provider prepare/generate/finalize/fallback runs.
+The Web entry uses the existing foreground generation and mutation lock, freezes
+the create body for explicit same-request retries, retains a confirmed creation
+response when View/storage fails, and thereafter retries only the missing read
+or storage operation. It validates Session/content/character association before
+exposing controls. Refresh reads the existing authoritative Session snapshot.
+No internal state keys, revision mechanics or policy terms are added to the
+encounter's player-facing reading/actions. Historical/Run recovery behavior is
+unchanged; this story has no Run association or journey recap.
+
+Automated rendering does not establish browser usability. Later bounded browser
+acceptance should start the short story, take the 失衡 recovery route, refresh at
+the midpoint, finish successfully, then exercise safe withdrawal in a separate
+Session; check visible state/choices, keyboard focus and pending-button locking.
+No browser acceptance or database-server restart is claimed by implementation.

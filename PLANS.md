@@ -126,11 +126,19 @@ Their candidate-time research and verification records remain historical.
 On 2026-09-21 the product owner approved D1: deterministic same-Run journey
 recap, Web UI only (no prompt integration), bounded by the visit being read,
 with a hard 2,000-Unicode-code-point budget and explicit required-content overflow.
-The D1 component is implemented in the current uncommitted candidate, with
-focused deterministic API and rendered Web verification; no browser acceptance
-or broader readiness is claimed. [The public contract](docs/public_client_contract.md#d1-read-only-journey-recap)
-owns source/cutoff/budget semantics. D2/D3 remain Proposed/unapproved.
-This work does not start Phase 3.4, Phase 6, Phase 7, or a new content pack.
+D1 is completed at the supplied published baseline; this work does not reopen
+its implementation, review or acceptance. No broader readiness is inferred. [The public contract](docs/public_client_contract.md#d1-read-only-journey-recap)
+owns source/cutoff/budget semantics.
+On 2026-09-21 the owner approved the exact bounded D2+D3 defaults for
+[风闸前的同行者](docs/open_source_comparison.md#d2d3-bounded-approval-and-implementation-candidate-2026-09-21):
+an independent versioned Session, deterministic choices, safe withdrawal and
+fixed templates with zero Provider calls. The current uncommitted implementation
+candidate uses the normal Session persistence path and adds only this content
+pack and its dedicated policy/presentation. Focused public MySQL and rendered
+Web evidence is recorded in the implementation handoff; database restart and
+browser acceptance are not claimed. One independent candidate review remains.
+This does not start Phase 3.4, Phase 6, Phase 7 or general conflict/status mechanics;
+DF-001/DF-002 retain their existing conditions.
 See [S6 implementation and evidence](docs/run_protocol.md#p33-s6-implementation-candidate-evidence).
 
 ## Phase 3.3 current status and ordered priority

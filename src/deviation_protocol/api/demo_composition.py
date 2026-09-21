@@ -693,7 +693,11 @@ def build_demo_runtime(
         scenario_event_issuer=DeterministicDemoScenarioEventIssuer(),clock=runtime_generators.clock,
         event_id_generator=runtime_generators.event_id,job_id_generator=runtime_generators.job_id,
         lease_token_generator=runtime_generators.lease_token,worker_id_generator=runtime_generators.worker_id)
+    from deviation_protocol.application.escort_encounter_services import build_escort_bundle
+    escort_bundle = build_escort_bundle(
+        SCENARIO_PACK.with_name("wind_gate_v1.json"), uow_factory=runtime_store.unit_of_work, generators=runtime_generators)
     registry = SessionContentRegistry((
+        escort_bundle,
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=dispatcher),
         SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),
         SessionContentBundle.from_bytes(archive_path.read_bytes(),session_service=archive_service,turn_orchestrator=archive_orchestrator)))

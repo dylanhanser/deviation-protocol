@@ -43,6 +43,18 @@ export function SessionReading({ view, staleKind, readingIdentity = "current", j
       <NarrativeText text={view.presentation.scene_summary} />
     </section>
 
+    {view.encounter ? <section aria-labelledby="escort-heading">
+      <h3 id="escort-heading">同行状况</h3>
+      <p>目标：{view.encounter.objective}</p>
+      {view.encounter.outcome === "ACTIVE" ? <p>眼前的危险：{view.encounter.danger}</p> : null}
+      <dl className="compact-list">
+        <div><dt>同行者</dt><dd>{view.encounter.companion}</dd></div>
+        <div><dt>你的位置</dt><dd>{view.encounter.player_position}</dd></div>
+        <div><dt>同行者的位置</dt><dd>{view.encounter.companion_position}</dd></div>
+        <div><dt>临时状态</dt><dd>{view.encounter.condition ?? "已结束"}</dd></div>
+      </dl>
+    </section> : null}
+
     <section aria-labelledby="narrative-heading">
       <h3 id="narrative-heading">{historical ? "历史公开正文" : unconfirmed ? "所显示访问的公开正文" : "当前公开正文"}</h3>
       <NarrativeText text={latestNarrative ?? "当前尚无已接受的叙事正文。"} />
@@ -108,7 +120,7 @@ export function SessionReading({ view, staleKind, readingIdentity = "current", j
       </section>
     </details>
 
-    <details className="reading-details">
+    {view.encounter ? null : <details className="reading-details">
       <summary>场景提示与技术信息</summary>
       <section aria-labelledby="suggestions-heading">
         <h3 id="suggestions-heading">建议行动（只读）</h3>
@@ -134,6 +146,6 @@ export function SessionReading({ view, staleKind, readingIdentity = "current", j
         </div>)}</dl>
         <p>表现：{view.run_context.presentation.world_tone} / {view.run_context.presentation.reality_boundary} / {view.run_context.presentation.relationship_overlay}</p>
       </section> : null}
-    </details>
+    </details>}
   </article>;
 }

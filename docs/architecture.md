@@ -1880,3 +1880,38 @@ and subsequent authorized browser acceptance are reconciled in the
 [S7-5 record](phase_3_3_s7_5_integration_acceptance.md). S7-5 changes tests/status
 only; production and migration bytes remain published S7-4 bytes. Broader readiness
 and formal S7/Phase 3.3 completion are not claimed.
+
+
+### D2+D3 bounded standalone encounter
+
+The approved 风闸前的同行者 implementation is one pinned, versioned standalone
+Session bundle, not a Run/world extension or a general conflict subsystem.
+`EscortEncounterPolicy` independently validates its closed phase/location/state
+combinations and Session-derived protected NPC identity, uniqueness and visibility.
+Composition injects that policy only into its Session service and local turn
+orchestrator; the generic Director does not branch on scenario IDs. The existing
+scenario schema supplies declared choices, finite mutable-fact transitions,
+locations, endings and fixed result templates. No schema migration is needed.
+
+Temporary condition is a projection of one persisted finite state, with terminal
+success/withdrawal values carrying no active condition. Snapshot v3, event history
+and the existing memory completion rules remain the durable representation.
+`EscortTransitionRecorded` binds the authoritative player/companion and before/
+after state to the accepted step through the ordinary event envelope. No temporary
+condition is promoted to long-term canon, a character resource or a Run penalty.
+
+`FirstPhaseTurnOrchestrator` exposes its existing local commit block as a helper.
+The dedicated escort orchestrator uses its locked local action pipeline and the
+existing durable local-template commit helper, bypassing Provider preparation and
+all external generation machinery. Atomic SQL persistence covers events, memory,
+snapshot/version, fixed narrative and response. Refused submissions leave no
+persisted response authority; exact committed requests retain existing replay.
+Demo changes only the repository/UoW adapter and deterministic ID/clock issuers.
+Normal production composition uses the same bundle with SQLAlchemy/MySQL.
+
+The [public contract](public_client_contract.md#bounded-standalone-escort-session-d2d3)
+owns discovery and safe encounter projection. The
+[decision record](open_source_comparison.md#d2d3-bounded-approval-and-implementation-candidate-2026-09-21)
+preserves the earlier proposal and exact later approval, state table and non-goals.
+This candidate changes no existing frozen pack, Run lifecycle, D1 source,
+multiline validation, Provider configuration or deferred-finding disposition.

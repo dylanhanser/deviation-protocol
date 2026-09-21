@@ -1,0 +1,722 @@
+{
+  "schema_version": 1,
+  "content_version": "wind-gate-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "wind-gate-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.wind_gate.traveler",
+        "display_name": "旅人",
+        "tags": [
+          "player"
+        ]
+      },
+      {
+        "definition_id": "character.wind_gate.adult",
+        "display_name": "成年同行者",
+        "tags": [
+          "npc"
+        ]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.wind_gate.companion",
+        "character_definition_id": "character.wind_gate.adult",
+        "display_name": "成年同行者",
+        "persona_summary": "希望与你一起安全进入候船室，也接受一起撤回避风间。"
+      }
+    ],
+    "items": [],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "wind_gate",
+      "schema_version": 1,
+      "content_version": "wind-gate-1.0.0",
+      "title": "风闸前的同行者",
+      "summary": "阵风穿过渡口通道，外侧风闸正在关闭。护送一位成年同行者进入候船室，或一起撤入避风间。阅读和等待不会推进危险。",
+      "initial_phase_id": "wind_gate.reception",
+      "initial_location_id": "wind_gate.platform",
+      "phases": [
+        {
+          "phase_id": "wind_gate.reception",
+          "title": "接应",
+          "visible_location_ids": [
+            "wind_gate.platform",
+            "wind_gate.midpoint",
+            "wind_gate.door",
+            "wind_gate.refuge",
+            "wind_gate.waiting"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "decision_window_ids": [
+            "wind_gate.decision.initial"
+          ],
+          "transitions": [
+            {
+              "transition_id": "wind_gate.transition.reception_steady",
+              "target_phase_id": "wind_gate.transfer",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "steady"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.reception_unsteady",
+              "target_phase_id": "wind_gate.transfer",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "unsteady"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.reception_success",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "success"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.reception_withdrawn",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "max_uses": 1
+            }
+          ],
+          "rapid_decision_allowed": true,
+          "terminal": false
+        },
+        {
+          "phase_id": "wind_gate.transfer",
+          "title": "转移",
+          "visible_location_ids": [
+            "wind_gate.platform",
+            "wind_gate.midpoint",
+            "wind_gate.door",
+            "wind_gate.refuge",
+            "wind_gate.waiting"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "decision_window_ids": [
+            "wind_gate.decision.steady",
+            "wind_gate.decision.unsteady"
+          ],
+          "transitions": [
+            {
+              "transition_id": "wind_gate.transition.transfer_door",
+              "target_phase_id": "wind_gate.exit",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "door"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.transfer_success",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "success"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.transfer_withdrawn",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "max_uses": 1
+            }
+          ],
+          "rapid_decision_allowed": true,
+          "terminal": false
+        },
+        {
+          "phase_id": "wind_gate.exit",
+          "title": "过门",
+          "visible_location_ids": [
+            "wind_gate.platform",
+            "wind_gate.midpoint",
+            "wind_gate.door",
+            "wind_gate.refuge",
+            "wind_gate.waiting"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "decision_window_ids": [
+            "wind_gate.decision.door"
+          ],
+          "transitions": [
+            {
+              "transition_id": "wind_gate.transition.exit_success",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "success"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "wind_gate.transition.exit_withdrawn",
+              "target_phase_id": "wind_gate.resolution",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "max_uses": 1
+            }
+          ],
+          "rapid_decision_allowed": true,
+          "terminal": false
+        },
+        {
+          "phase_id": "wind_gate.resolution",
+          "title": "同行的结果",
+          "visible_location_ids": [
+            "wind_gate.platform",
+            "wind_gate.midpoint",
+            "wind_gate.door",
+            "wind_gate.refuge",
+            "wind_gate.waiting"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "decision_window_ids": [],
+          "transitions": [],
+          "rapid_decision_allowed": false,
+          "terminal": true
+        }
+      ],
+      "locations": [
+        {
+          "location_id": "wind_gate.platform",
+          "title": "入口平台",
+          "summary": "你与成年同行者一起位于入口平台。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.wind_gate.companion"
+          ]
+        },
+        {
+          "location_id": "wind_gate.midpoint",
+          "title": "通道中段",
+          "summary": "你与成年同行者一起位于通道中段。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.wind_gate.companion"
+          ]
+        },
+        {
+          "location_id": "wind_gate.door",
+          "title": "内门前",
+          "summary": "你与成年同行者一起位于内门前。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.wind_gate.companion"
+          ]
+        },
+        {
+          "location_id": "wind_gate.refuge",
+          "title": "避风间",
+          "summary": "你与成年同行者一起位于避风间。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.wind_gate.companion"
+          ]
+        },
+        {
+          "location_id": "wind_gate.waiting",
+          "title": "候船室",
+          "summary": "你与成年同行者一起位于候船室。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.wind_gate.companion"
+          ]
+        }
+      ],
+      "npc_references": [
+        {
+          "npc_definition_id": "npc.wind_gate.companion"
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "wind_gate.fact.encounter",
+          "kind": "MUTABLE",
+          "visibility": "HIDDEN",
+          "value": "initial",
+          "mutable_transitions": [
+            {
+              "from_value": "initial",
+              "to_value": "steady",
+              "event_type": "wind_gate.event.choice_0"
+            },
+            {
+              "from_value": "initial",
+              "to_value": "unsteady",
+              "event_type": "wind_gate.event.choice_1"
+            },
+            {
+              "from_value": "initial",
+              "to_value": "withdrawn",
+              "event_type": "wind_gate.event.choice_6"
+            },
+            {
+              "from_value": "steady",
+              "to_value": "door",
+              "event_type": "wind_gate.event.choice_2"
+            },
+            {
+              "from_value": "steady",
+              "to_value": "withdrawn",
+              "event_type": "wind_gate.event.choice_7"
+            },
+            {
+              "from_value": "unsteady",
+              "to_value": "door",
+              "event_type": "wind_gate.event.choice_3"
+            },
+            {
+              "from_value": "unsteady",
+              "to_value": "withdrawn",
+              "event_type": "wind_gate.event.choice_4"
+            },
+            {
+              "from_value": "unsteady",
+              "to_value": "withdrawn",
+              "event_type": "wind_gate.event.choice_8"
+            },
+            {
+              "from_value": "door",
+              "to_value": "success",
+              "event_type": "wind_gate.event.choice_5"
+            },
+            {
+              "from_value": "door",
+              "to_value": "withdrawn",
+              "event_type": "wind_gate.event.choice_9"
+            }
+          ]
+        }
+      ],
+      "clues": [],
+      "clue_groups": [],
+      "threat_clocks": [],
+      "decision_windows": [
+        {
+          "decision_id": "wind_gate.decision.initial",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "initial"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "wind_gate.choice.initial_steady",
+              "action_type": "choose",
+              "label_hint": "先扶稳同行者",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_0",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "steady"
+                }
+              ],
+              "new_location_id": "wind_gate.platform",
+              "server_narrative_text": "你伸手扶住同行者，让对方抓稳扶手。慌乱消退，你们仍在平台，准备一起转移。"
+            },
+            {
+              "action_id": "wind_gate.choice.initial_unsteady",
+              "action_type": "choose",
+              "label_hint": "立即带向通道",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_1",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "unsteady"
+                }
+              ],
+              "new_location_id": "wind_gate.midpoint",
+              "server_narrative_text": "你带着同行者走到通道中段。阵风让对方失衡；现在停步扶稳仍可继续，继续抢行将迫使你们撤入避风间。"
+            },
+            {
+              "action_id": "wind_gate.choice.initial_withdrawn",
+              "action_type": "choose",
+              "label_hint": "一起撤入避风间",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_6",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "new_location_id": "wind_gate.refuge",
+              "server_narrative_text": "你与同行者一起撤入避风间。两人安全，无人受伤；本次护送结束，未到达候船室。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "wind_gate.decision.steady",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "steady"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "wind_gate.choice.steady_door",
+              "action_type": "choose",
+              "label_hint": "沿扶手护送到出口",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_2",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "door"
+                }
+              ],
+              "new_location_id": "wind_gate.door",
+              "server_narrative_text": "你们沿扶手稳步转移到内门前。同行者保持扶稳，可以结伴进入候船室。"
+            },
+            {
+              "action_id": "wind_gate.choice.steady_withdrawn",
+              "action_type": "choose",
+              "label_hint": "一起撤入避风间",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_7",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "new_location_id": "wind_gate.refuge",
+              "server_narrative_text": "你与同行者一起撤入避风间。两人安全，无人受伤；本次护送结束，未到达候船室。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "wind_gate.decision.unsteady",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "unsteady"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "wind_gate.choice.unsteady_door",
+              "action_type": "choose",
+              "label_hint": "停步抓牢扶手，扶稳对方",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_3",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "door"
+                }
+              ],
+              "new_location_id": "wind_gate.door",
+              "server_narrative_text": "你停步抓牢扶手，扶稳同行者，再一同移到内门前。失衡消退，你们可以结伴进门。"
+            },
+            {
+              "action_id": "wind_gate.choice.unsteady_rush",
+              "action_type": "choose",
+              "label_hint": "继续抢行",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_4",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "new_location_id": "wind_gate.refuge",
+              "server_narrative_text": "继续抢行让通道难以通过。你立即护着同行者转入旁侧避风间。两人都安全，无人受伤；这次未能到达候船室。"
+            },
+            {
+              "action_id": "wind_gate.choice.unsteady_withdrawn",
+              "action_type": "choose",
+              "label_hint": "一起撤入避风间",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_8",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "new_location_id": "wind_gate.refuge",
+              "server_narrative_text": "你与同行者一起撤入避风间。两人安全，无人受伤；本次护送结束，未到达候船室。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "wind_gate.decision.door",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "door"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "wind_gate.choice.door_success",
+              "action_type": "choose",
+              "label_hint": "结伴进入候船室",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_5",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "success"
+                }
+              ],
+              "new_location_id": "wind_gate.waiting",
+              "server_narrative_text": "你们结伴穿过内门，抵达候船室。护送成功，两人安全；临时状态已结束。"
+            },
+            {
+              "action_id": "wind_gate.choice.door_withdrawn",
+              "action_type": "choose",
+              "label_hint": "一起撤入避风间",
+              "target_ids": [
+                "npc.wind_gate.companion"
+              ],
+              "server_event_type": "wind_gate.event.choice_9",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "wind_gate.fact.encounter",
+                  "value": "withdrawn"
+                }
+              ],
+              "new_location_id": "wind_gate.refuge",
+              "server_narrative_text": "你与同行者一起撤入避风间。两人安全，无人受伤；本次护送结束，未到达候船室。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "wind_gate.ending.success",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "success"
+            }
+          ]
+        },
+        {
+          "ending_id": "wind_gate.ending.withdrawn",
+          "status": "FAILED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "wind_gate.fact.encounter",
+              "value": "withdrawn"
+            }
+          ]
+        }
+      ],
+      "narrative_length": {
+        "minimum": 1,
+        "target": 100,
+        "maximum": 1000
+      },
+      "memory_rules": [
+        {
+          "rule_id": "wind_gate.memory.started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "wind_gate.memory.completed",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioDecisionSelected",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "wind_gate.ending.success",
+            "wind_gate.ending.withdrawn"
+          ]
+        }
+      ],
+      "public_client": {
+        "title": "风闸前的同行者",
+        "hook": "阵风穿过渡口通道，外侧风闸正在关闭。护送一位成年同行者进入候船室，或一起撤入避风间。阅读和等待不会推进危险。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.wind_gate.traveler",
+            "description": "与成年同行者一起穿过渡口通道的旅人。"
+          }
+        ],
+        "default_character_definition_id": "character.wind_gate.traveler",
+        "scenes": [
+          {
+            "phase_id": "wind_gate.reception",
+            "title": "接应",
+            "summary": "阵风穿过渡口通道，外侧风闸正在关闭。护送一位成年同行者进入候船室，或一起撤入避风间。阅读和等待不会推进危险。"
+          },
+          {
+            "phase_id": "wind_gate.transfer",
+            "title": "转移",
+            "summary": "扶稳同行者再转移；若失衡仍继续抢行，只能安全撤回。"
+          },
+          {
+            "phase_id": "wind_gate.exit",
+            "title": "过门",
+            "summary": "两人已到内门前，可以结伴进入候船室，也可以一起撤回。"
+          },
+          {
+            "phase_id": "wind_gate.resolution",
+            "title": "同行的结果",
+            "summary": "本次同行已结束。两人安全，临时状态不再生效。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "wind_gate.ending.success",
+            "title": "护送成功",
+            "summary": "两人已抵达候船室，临时状态已结束。"
+          },
+          {
+            "ending_id": "wind_gate.ending.withdrawn",
+            "title": "安全撤回",
+            "summary": "两人安全撤入避风间，未到达候船室。无人受伤，没有资源损失。"
+          }
+        ],
+        "actions": [
+          {
+            "action_type": "CONTINUE",
+            "label": "继续"
+          }
+        ]
+      }
+    }
+  ]
+}

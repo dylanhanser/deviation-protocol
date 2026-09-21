@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Mapping
-from dataclasses import dataclass, field as dataclass_field
+from dataclasses import dataclass, field as dataclass_field, replace
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 import copy
@@ -176,6 +176,7 @@ class PublicScenarioDescription(BaseModel):
         max_length=16
     )
     default_character_definition_id: str
+    entry_mode: Literal["SESSION"] | None = None
 
 
 class PublicScenarioCatalog(BaseModel):
@@ -565,6 +566,9 @@ from deviation_protocol.application.public_run_protocol import PublicNativeRunCo
 from pydantic.json_schema import SkipJsonSchema
 
 
+from deviation_protocol.application.escort_encounter import PublicEscortEncounter
+
+
 class PlayerSessionView(BaseModel):
     """Reconnect-safe aggregate built only from validated player projections."""
 
@@ -584,9 +588,17 @@ class PlayerSessionView(BaseModel):
     ] = Field(default=(), max_length=MAX_VIEW_RECENT_NARRATIVES)
     ending_id: str | None = None
     run_context: PublicNativeRunContext | SkipJsonSchema[None] = None
+    encounter: PublicEscortEncounter | None = None
 
     @model_validator(mode="after")
     def validate_view_shape(self) -> PlayerSessionView:
+        if self.encounter is not None and (
+            self.run_context is not None
+            or (self.encounter.outcome == "ACTIVE") != (self.scenario_status == "ACTIVE")
+            or (self.encounter.outcome == "SUCCESS" and self.ending_status != "RESOLVED")
+            or (self.encounter.outcome == "SAFE_WITHDRAWAL" and self.ending_status != "FAILED")
+        ):
+            raise ValueError("encounter lifecycle contradicts Session")
         if (
             self.metadata.session_id != self.player_state.session_id
             or self.metadata.state_version != self.player_state.state_version
@@ -624,6 +636,8 @@ class PlayerSessionView(BaseModel):
         data["ending_status"] = self.ending_status
         if self.run_context is None:
             data.pop("run_context", None)
+        if self.encounter is None:
+            data.pop("encounter", None)
         return data
 
 
@@ -653,6 +667,7 @@ class SessionService:
     ) = None
     native_view_coordinator: Any = None
     native_controller_resolver: Any = None
+    encounter_policy: Any = None
 
     def __post_init__(self) -> None:
         if (self.native_view_coordinator is None) != (self.native_controller_resolver is None):
@@ -1040,6 +1055,9 @@ class SessionService:
                 except ScenarioInitializationError:
                     raise InvalidScenarioDefinitionError(definition.scenario_id) from None
                 state = started.candidate_state
+                if self.encounter_policy is not None:
+                    self.encounter_policy.initialize(state, session.session_id, definition)
+                    started = replace(started, frame=self.story_director.plan_frame(state, definition))
                 initial_frame = bind_public_decision_frame(
                     started.frame,
                     session_id=session.session_id,
@@ -1229,6 +1247,8 @@ class SessionService:
                 session_id, limit=MAX_VIEW_RECENT_NARRATIVES
             )
             return PlayerSessionView(
+                encounter=(self.encounter_policy.project(state, session_id, definition)
+                           if self.encounter_policy is not None else None),
                 run_context=run_context,
                 metadata=self._metadata(persisted),
                 narrative_frame=frame,
@@ -1392,6 +1412,10 @@ class SessionService:
             or runtime.scenario_content_version != session.scenario_version
         ):
             raise SnapshotSessionMismatchError(session.session_id)
+        if self.encounter_policy is not None:
+            self.encounter_policy.validate(state, session.session_id, self._scenario_definition(session.scenario_id))
+            if session.state_version != len(state.scenario_runtime.decisions_made):
+                raise SnapshotInvalidError(session.session_id)
         return state
 
     def validate_run_entry_replay_initialization(

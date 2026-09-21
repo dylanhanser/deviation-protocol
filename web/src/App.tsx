@@ -14,6 +14,9 @@ import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPr
 import { objectiveNames, type RunEntryOptions, type NativeRunEntryResponse, type PublicNativeRunContext } from "./api/schemas";
 import {
   actionRequestSchema,
+  createSessionRequestSchema,
+  type CreateSessionRequest,
+  type SessionCreationResult,
   singleLineActionTextSchema,
   idempotencyKeySchema,
   minimalPlayerCharacterCreationRequestSchema,
@@ -80,7 +83,13 @@ interface NativeEntryAttempt extends MutationAttemptBase {
   frozen: FrozenNativeEntry;
   retainedResponse?: NativeRunEntryResponse;
 }
-type MutationAttempt = PlayerCharacterCreateAttempt | RunEntryAttempt | NativeEntryAttempt;
+interface SessionCreateAttempt extends MutationAttemptBase {
+  kind: "session-create";
+  exactFrozenBody: Readonly<CreateSessionRequest>;
+  contentVersion: string;
+  retainedResponse?: SessionCreationResult;
+}
+type MutationAttempt = PlayerCharacterCreateAttempt | RunEntryAttempt | NativeEntryAttempt | SessionCreateAttempt;
 
 type ViewStaleKind =
   | "transport-uncertain"
@@ -509,10 +518,10 @@ function ActionPanel({
 
   return (
     <section className="panel action-panel" aria-labelledby="actions-heading">
-      <p className="eyebrow">action_affordances · {affordances.mode}</p>
+      {view.encounter ? null : <p className="eyebrow">action_affordances · {affordances.mode}</p>}
       <h2 id="actions-heading">当前可执行行动</h2>
       <p className="supporting-copy">
-        这里只提交当前权威 View 明确提供的行动；服务器 Gateway 与策略仍是最终权威。
+        {view.encounter ? "选择接下来如何带同行者一起行动。" : "这里只提交当前权威 View 明确提供的行动；服务器 Gateway 与策略仍是最终权威。"}
       </p>
       {disabledReason === null ? null : (
         <p className="disabled-reason">行动已禁用：{disabledReason}</p>
@@ -874,7 +883,7 @@ export default function App({
           return;
         }
         setScenarios(catalog.scenarios);
-        const firstScenario = catalog.scenarios[0];
+        const firstScenario = catalog.scenarios.find(item => item.entry_mode !== "SESSION");
         setSelectedScenarioId(firstScenario?.scenario_id ?? "");
       })
       .catch((error: unknown) => {
@@ -1394,6 +1403,14 @@ export default function App({
     if (current === null || current.generation !== attempt.generation) {
       return;
     }
+    if (current.kind === "session-create") {
+      if (!current.uncertaintyTainted && !current.retainedResponse &&
+          (isDocumentedApiResult(error, 409, ["IDEMPOTENCY_CONFLICT"]) ||
+           isDocumentedApiResult(error, 422, ["REQUEST_VALIDATION_FAILED", "INVALID_SCENARIO_DEFINITION"]))) {
+        clearMutationAttempt(current.generation);setOperationError(formatApiClientError(error));
+      } else retainUncertainMutation(current.generation, error);
+      return;
+    }
     if (current.kind === "native-entry") {
       if (nativeFailureIsUncertain(current.uncertaintyTainted, error)) {
         retainUncertainMutation(current.generation, error); return;
@@ -1511,6 +1528,36 @@ export default function App({
         return;
       }
 
+      if (attempt.kind === "session-create") {
+        const created = attempt.retainedResponse ?? await client.createSession(attempt.exactFrozenBody, operation.controller.signal);
+        if (!isCurrentOperation(operation)) return;
+        if (created.scenario_id !== attempt.exactFrozenBody.scenario_id ||
+            created.character_definition_id !== attempt.exactFrozenBody.character_definition_id ||
+            created.content_version !== attempt.contentVersion || created.narrative_frame.scenario_id !== created.scenario_id) {
+          throw new ApiClientError("Story creation association changed", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+        }
+        updateMutationAttempt(attempt.generation, current => current.kind === "session-create" ? {...current,retainedResponse:created} : current);
+        if (!persistRecoveryRecord(created.session_id)) {
+          updateMutationAttempt(attempt.generation, current => ({...current,inFlight:false}));return;
+        }
+        setManualSessionId(created.session_id);
+        try {
+          const restored = await client.getSessionView(created.session_id, operation.controller.signal);
+          if (!isCurrentOperation(operation)) return;
+          if (restored.metadata.session_id !== created.session_id || restored.run_context ||
+              restored.narrative_frame.scenario_id !== created.scenario_id ||
+              restored.metadata.content_version !== created.content_version ||
+              restored.metadata.character_definition_id !== created.character_definition_id || !restored.encounter) {
+            throw new ApiClientError("Story View association changed", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+          }
+          commitLoadedSession(created.session_id, restored);
+          clearMutationAttempt(attempt.generation);
+        } catch(error: unknown) {
+          if (!isCurrentOperation(operation)) return;
+          retainUncertainMutation(attempt.generation,error);
+        }
+        return;
+      }
       const entered = attempt.kind === "native-entry"
         ? attempt.retainedResponse ?? await client.enterNativeRun(attempt.frozen, operation.controller.signal)
         : await client.enterRun(attempt.exactFrozenBody, attempt.idempotencyKey, operation.controller.signal);
@@ -1594,6 +1641,19 @@ export default function App({
     }
   }
 
+  function handleStoryStart(story: PublicScenarioDescription) {
+    if (prePlayControlsDisabled || story.entry_mode !== "SESSION" || foregroundOperationRef.current !== null || mutationAttemptRef.current !== null) return;
+    const key = buildMutationIdentity();
+    if (key === null) return;
+    const body = createSessionRequestSchema.safeParse({client_request_id:key,
+      scenario_id:story.scenario_id, character_definition_id:story.default_character_definition_id});
+    if (!body.success) {setOperationError("无法创建本次故事的请求身份，请重试。");return;}
+    const generation = ++mutationGenerationRef.current;
+    installAndSendMutation({kind:"session-create", generation, idempotencyKey:key,
+      exactFrozenBody:Object.freeze(body.data), contentVersion:story.content_version,
+      uncertaintyTainted:false, inFlight:true}, "entering");
+  }
+
   function handlePlayerCharacterCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (
@@ -1650,7 +1710,7 @@ export default function App({
       recoveryStorageFailure !== null ||
       requiredCatalogRefresh !== null ||
       entryMode !== "legacy" ||
-      selectedScenario === undefined ||
+      selectedScenario === undefined || selectedScenario.entry_mode === "SESSION" ||
       selectedPlayerCharacter === undefined
     ) {
       return;
@@ -2422,6 +2482,16 @@ export default function App({
     requiredCatalogRefresh !== null;
 
   const entryControls = <>
+      {scenarios?.some(story => story.entry_mode === "SESSION") ?
+        <section className="panel" aria-labelledby="short-story-heading">
+          <h2 id="short-story-heading">独立短篇</h2>
+          <p>独立保存的短篇，不进入旅程，也不消耗旅程资源。</p>
+          {scenarios.filter(story => story.entry_mode === "SESSION").map(story =>
+            <div key={story.scenario_id}>
+              <h3>{story.title}</h3><p>{story.hook}</p>
+              <button type="button" disabled={prePlayControlsDisabled} onClick={() => handleStoryStart(story)}>开始《{story.title}》</button>
+            </div>)}
+        </section> : null}
       <section className="panel" aria-label="进入方式">
         <p>进入请求尚未确认并保存时仅保存在内存中；刷新页面将无法恢复该请求。已保存的进度仅限此标签页。</p>
         <fieldset disabled={prePlayControlsDisabled}>
@@ -2490,7 +2560,7 @@ export default function App({
               value={selectedScenarioId}
               onChange={(event) => handleScenarioChange(event.target.value)}
             >
-              {scenarios.map((scenario) => (
+              {scenarios.filter(scenario => scenario.entry_mode !== "SESSION").map((scenario) => (
                 <option key={scenario.scenario_id} value={scenario.scenario_id}>
                   {scenario.title}
                 </option>
@@ -2651,7 +2721,7 @@ export default function App({
       <header className="hero">
         <p className="eyebrow">Public Web Client</p>
         <h1>Deviation Protocol</h1>
-        <p>所有行动控件均来自最新的权威 action_affordances。</p>
+        <p>{loadedSession?.view.encounter ? "故事会在你做出选择后继续。" : "所有行动控件均来自最新的权威 action_affordances。"}</p>
         {isDeterministicDemo ? (
           <p className="demo-warning">{DETERMINISTIC_DEMO_WARNING}</p>
         ) : null}
@@ -2890,7 +2960,7 @@ export default function App({
           }
         />
       )}
-      {loadedSession !== null ? <>{entryControls}{manualRecoveryControls}</> : null}
+      {loadedSession !== null ? <>{loadedSession.view.encounter ? null : entryControls}{manualRecoveryControls}</> : null}
     </main>
   );
 }

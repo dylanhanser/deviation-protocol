@@ -83,6 +83,7 @@ export const publicScenarioDescriptionSchema = z
     hook: plainStringSchema,
     playable_characters: z.array(publicPlayableCharacterSchema).max(16),
     default_character_definition_id: plainStringSchema,
+    entry_mode: z.literal("SESSION").optional(),
   })
   .superRefine((scenario, context) => {
     const roleIds = new Set(
@@ -1113,10 +1114,22 @@ export type PublicNativeRunContext = z.infer<typeof publicNativeRunContextSchema
 export type NativeRunEntryRequest = z.infer<typeof nativeRunEntryRequestSchema>;
 export type NativeRunEntryResponse = z.infer<typeof nativeRunEntryResponseSchema>;
 
+export const escortEncounterSchema = z.strictObject({
+  presentation_version: z.literal(1),
+  objective: plainStringSchema,
+  danger: plainStringSchema,
+  companion: plainStringSchema,
+  player_position: plainStringSchema,
+  companion_position: plainStringSchema,
+  condition: z.enum(["慌乱", "扶稳", "失衡"]).nullable(),
+  outcome: z.enum(["ACTIVE", "SUCCESS", "SAFE_WITHDRAWAL"]),
+}).refine(e => (e.outcome === "ACTIVE") === (e.condition !== null));
+
 export const playerSessionViewSchema = z
   .object({
     metadata: sessionMetadataSchema,
     run_context: publicNativeRunContextSchema.optional(),
+    encounter: escortEncounterSchema.optional(),
     narrative_frame: narrativeFrameSchema,
     player_state: playerVisibleStateProjectionSchema,
     player_memory: playerMemoryProjectionSchema,
@@ -1154,6 +1167,12 @@ export const playerSessionViewSchema = z
       });
     }
 
+    if (view.encounter && (view.run_context !== undefined ||
+        (view.encounter.outcome === "ACTIVE") !== (view.scenario_status === "ACTIVE") ||
+        (view.encounter.outcome === "SUCCESS" && view.ending_status !== "RESOLVED") ||
+        (view.encounter.outcome === "SAFE_WITHDRAWAL" && view.ending_status !== "FAILED"))) {
+      context.addIssue({code: "custom", message: "encounter lifecycle contradicts Session"});
+    }
     const isActive = view.scenario_status === "ACTIVE";
     const lifecycleIsValid = isActive
       ? view.ending_id == null &&
