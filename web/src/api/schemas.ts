@@ -6,6 +6,23 @@ const safeId128Schema = z.string().min(1).max(128).regex(safeIdPattern);
 const positiveSafeIntegerSchema = z.number().int().positive().safe();
 const plainStringSchema = z.string();
 const nonNegativeIntegerSchema = z.number().int().nonnegative();
+export const journeyRecapSchema = z.strictObject({
+  schema_version: z.literal("native-run-recap/v1"),
+  session_id: safeId64Schema,
+  context: z.strictObject({
+    run_id: safeId128Schema, run_state_version: positiveSafeIntegerSchema,
+    session_state_version: nonNegativeIntegerSchema.safe(), scenario_id: safeId128Schema,
+    content_version: safeId128Schema, cutoff_visit: z.number().int().min(1).max(3),
+    scope: z.enum(["current", "historical"]),
+    lifecycle_at_cutoff: z.enum(["active", "completed", "terminated"]),
+  }).nullable(),
+  status: z.enum(["complete", "incomplete", "unavailable_evidence", "unavailable_overflow"]),
+  text: z.string().refine(text => Array.from(text).length <= 2000),
+}).refine(r => (r.status === "complete" || r.status === "incomplete")
+  ? r.context !== null && r.text.length > 0 : r.text === "")
+  .refine(r => r.status !== "unavailable_overflow" || r.context !== null)
+  .refine(r => r.context?.scope !== "historical" || r.context.lifecycle_at_cutoff === "active");
+export type JourneyRecap = z.infer<typeof journeyRecapSchema>;
 export const nativeRunExitRequestSchema = z.object({
   expected_run_state_version: positiveSafeIntegerSchema,
   expected_session_state_version: nonNegativeIntegerSchema.safe(),

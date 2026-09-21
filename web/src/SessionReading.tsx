@@ -1,6 +1,7 @@
 import type { PlayerSessionView } from "./api/schemas";
 import { objectiveNames } from "./api/schemas";
 import { objectiveLabels } from "./runSetup";
+import type { ReactNode } from "react";
 
 /** Accepted public copy stays plain text, including apparent HTML or Markdown. */
 function NarrativeText({ text }: { text: string }) {
@@ -11,10 +12,11 @@ function NarrativeText({ text }: { text: string }) {
   </div>;
 }
 
-export function SessionReading({ view, staleKind, readingIdentity = "current" }: {
+export function SessionReading({ view, staleKind, readingIdentity = "current", journeyRecap }: {
   view: PlayerSessionView;
   staleKind: string | null;
   readingIdentity?: "current" | "historical" | "unconfirmed";
+  journeyRecap?: ReactNode;
 }) {
   const historical = readingIdentity === "historical";
   const unconfirmed = readingIdentity === "unconfirmed";
@@ -66,6 +68,8 @@ export function SessionReading({ view, staleKind, readingIdentity = "current" }:
       {view.player_state.resources.length === 0 && view.public_clocks.length === 0 ?
         <p>没有公开的资源或时钟。</p> : null}
     </section>
+
+    {journeyRecap}
 
     <details className="reading-details">
       <summary>回看此前正文（{earlierNarratives.length} 段）</summary>

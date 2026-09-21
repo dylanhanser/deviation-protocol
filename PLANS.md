@@ -121,10 +121,16 @@ DF-001/DF-002 and all evidence limitations remain; this is neither real Provider
 acceptance, production readiness, limited-trial nor broader-release approval.
 
 The separately authorized [open-source comparison and reading improvements](docs/open_source_comparison.md)
-are a new, unapproved working-tree candidate. They improve existing presentation
-without changing gameplay, memory authority, API, or recovery behavior. Proposed
-cross-world recap and generalized conflict choices are recommendations only;
-this work does not start Phase 3.4, Phase 6, Phase 7, or a new content pack.
+were independently approved and published at `74693e37fe1257614240822d50abc476f575c198`.
+Their candidate-time research and verification records remain historical.
+On 2026-09-21 the product owner approved D1: deterministic same-Run journey
+recap, Web UI only (no prompt integration), bounded by the visit being read,
+with a hard 2,000-Unicode-code-point budget and explicit required-content overflow.
+The D1 component is implemented in the current uncommitted candidate, with
+focused deterministic API and rendered Web verification; no browser acceptance
+or broader readiness is claimed. [The public contract](docs/public_client_contract.md#d1-read-only-journey-recap)
+owns source/cutoff/budget semantics. D2/D3 remain Proposed/unapproved.
+This work does not start Phase 3.4, Phase 6, Phase 7, or a new content pack.
 See [S6 implementation and evidence](docs/run_protocol.md#p33-s6-implementation-candidate-evidence).
 
 ## Phase 3.3 current status and ordered priority

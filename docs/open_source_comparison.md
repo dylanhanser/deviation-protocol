@@ -6,9 +6,14 @@ Inspection date: **2026-09-20**. Baseline:
 independent approval of Phase 3.3/S7-5. Current status is synchronized in
 [PLANS](../PLANS.md); frozen plans and the S7-5 candidate-time record are unchanged.
 
-**Disposition:** research and a compatible Web implementation candidate, not
-independent approval. Recommendations below are not approved product requirements.
-No backend, gameplay, content, dependency, migration or Provider code changes.
+**Historical disposition (2026-09-20):** research and a compatible Web implementation
+candidate, not independent approval. At that checkpoint the recommendations below
+were not approved product requirements, and the candidate changed no backend,
+gameplay, content, dependency, migration or Provider code.
+The reading/identity implementation was subsequently independently approved and
+published at `74693e37fe1257614240822d50abc476f575c198`.
+The 2026-09-21 D1 product decision and implementation status below supersede only
+D1's proposal status; external research, alternatives and D2/D3 remain unchanged.
 
 ## Existing implementation, not assumed gaps
 
@@ -141,18 +146,19 @@ benefit, confidence from local evidence and cost, not stars.
 | 1. Setup/metadata dominate; repeated, flattened prose | ink output separate from choices | **Implemented:** story/actions precede setup during play; plain paragraphs; earlier segments in disclosure | Read the scene and decide without scanning a dashboard | S / high | Existing DTOs only; no dependency | Render order, multiline literal markup, one latest segment; current choice/recovery regressions |
 | 2. Historical View labelled current; recency window looks like full history | ink save boundary; ST context identity | **Implemented:** read-only historical label, visit-scoped bounded recap, Session-keyed disclosures | Avoid confusing a past scene with current progress | S / high | No navigation, storage or POST change | Three-visit GET navigation, refresh/current return, stale/terminal controls |
 | 3. Memory counters obscure scope and truncation | ST context limits; local projector already exposes flags | **Implemented:** distinguish lagging index from truncated projection, returned/total counts, explicit visit scope | Know what the game is showing and what is missing | S / high | No facts reconstructed from references or prose | CURRENT+truncated and REBUILD_REQUIRED+truncated render distinctly; source View unchanged |
-| 4. No readable cross-world recap or summary refresh | ST bounded inclusion; ink explicit state | **Proposed D1:** server-rendered same-Run recap of approved public evidence | Recall why the next world matters | M / medium | Versioned read/prompt projection; no new database technology; new product scope decision | Both first-world endings → hold → archive; old content version; foreign Run; missing evidence; refresh adds no writes |
+| 4. No readable cross-world recap or summary refresh | ST bounded inclusion; ink explicit state | **D1 approved; component implemented in the current candidate:** deterministic same-Run recap of verified public evidence | Recall why the next world matters | M / medium | Separately versioned read projection; Web only, no prompts or new persistence | Both first-world endings → hold → archive; exact content version; foreign Run; missing evidence; refresh adds no writes |
 | 5. Existing rules lack general participant/objective contracts | Evennia actions; boardgame phases/moves | **Proposed D2:** closed conflict intent/context/plan with independent policies, one committed segment per submitted action | Combat, negotiation, pursuit and infiltration can change a situation meaningfully | M–L / medium | New mechanics/content contract; reuse UoW, no engine replacement | Two genres and two conflict objectives; illegal target; terminal; replay; failure consequence and rollback |
 | 6. No approved wounds/probabilities/golden identity | Evennia exemplifies choices we must not silently inherit | **Proposed D3:** non-lethal authored prototype first; persistent injury/randomness separate | Playable feedback before permanent balance mistakes | L if persistent / medium | User chooses consequence scope; no silent HP/dice/death/rewards | Approved outcome table plus exact replay and source-of-truth checks |
 
 ## Product decisions
 
-These are consolidated recommendations for later authorization, not a new gate
-on the compatible changes already made.
+The table preserves the original consolidated recommendations and alternatives.
+D1 was approved on 2026-09-21 with the exact choices recorded below; D2/D3 are
+still Proposed/unapproved. This is not a new gate on published work.
 
 | Choice | Exact recommended starting choice | Alternative / consequence |
 | --- | --- | --- |
-| D1 — next memory improvement | Same-Run, read-only **旅程回顾** built deterministically from already validated visit/ending/public-fact evidence; no model call. Proposed ceiling 2,000 characters inside the existing total prompt budget if later enabled for rendering. Default scope excludes other Runs even for the same character. | Character-wide recall needs explicit participation/provenance and logical identity across Runs; generated summaries also need quality evaluation, refresh and contradiction policy. Both cost more and must not reuse local scenario keys as global identity. |
+| D1 — approved bounded scope | Same-Run, read-only **旅程回顾** built deterministically from validated visit/ending/public-fact evidence; no model call. **Approved:** Web UI only, cutoff at the visit being read, hard 2,000 Unicode code points with required consequences first and explicit required overflow. Other Runs are excluded even for the same character. The original suggestion of possible later prompt inclusion remains unapproved and is not implemented. | Character-wide recall needs explicit participation/provenance and logical identity across Runs; generated summaries also need quality evaluation, refresh and contradiction policy. Both cost more and must not reuse local scenario keys as global identity. |
 | D2 — first general conflict slice | An authored, deterministic, non-lethal **escape/protection encounter**, using goal, participants, eligibility, position/conditions, approved costs/effects and explicit end conditions. Keep the same reading/action flow. Failure changes position, objective progress or a declared danger clock instead of forcing identical repeated attacks. | Begin with a lethal duel or universal combat mode: requires HP/injury/death and balance decisions immediately; begin with negotiation only: cheaper, weaker physical-conflict feedback. No dice probabilities are selected here. |
 | D3 — initial consequences | Temporary, encounter-local named conditions and authored consequences; no new persistent injury, death, cooldown, reward or progression rule in the first prototype. Reuse an existing resource only when its authored contract explicitly permits that encounter cost; otherwise cost values await the encounter's reviewed table. | Persistent wounds/cross-world penalties have stronger continuity value but require character/world compatibility and persistence semantics. HP/damage is an optional later world mechanic, not the universal engine base. |
 
@@ -167,6 +173,125 @@ never rewrite a fixed fact or silently treat absence as falsity. A later generat
 summary is disposable presentation, never an input to mechanics or a memory plan.
 No vector/graph store is needed for this small bounded surface. Golden memory and
 NPC promotion remain under their frozen future identity/capacity requirements.
+
+### D1 approved implementation scope (2026-09-21)
+
+Decision history: the original recommendation proposed a 2,000-character ceiling
+inside the existing total prompt budget if later enabled for rendering. The owner
+instead approved this first version for Web display only, with an exact Unicode
+code-point limit and the selected-visit cutoff. Prompt inclusion remains future,
+unapproved work.
+
+Component implemented in the current uncommitted candidate; this is product
+authorization plus implementation evidence, not independent implementation approval.
+`GET /v1/sessions/{session_id}/run-recap` supplies a closed `native-run-recap/v1`
+companion projection. The ordinary API and deterministic Demo use the same reader
+and DTO. Web displays a compact native disclosure after the primary reading area.
+Historical scope ends at the selected visit; later visits and later Run completion
+or termination are excluded. The same selected latest visit may display a verified
+whole-Run terminal result separately from its own ending.
+
+Owned Run reconstruction and each included version-matched Session snapshot,
+content bundle and runtime are required. Fixed public templates are registered
+against the three exact deployed pack identities/digests. Unknown versions fail
+closed; no latest-pack substitution. Scene summaries are optional public context.
+Text, arrivals, memory projections, browser state and model output are not proof.
+No prompt integration, persistence/cache worker, memory mutation, new gameplay,
+recovery adoption or POST is added. DF-001/DF-002 retain their dispositions.
+See [the complete public contract](public_client_contract.md#d1-read-only-journey-recap).
+
+#### D1 verification record
+
+Commands below ran from the repository root unless marked `web/`. No database,
+real Provider, service startup, browser, dependency installation or subagent was
+used. Offline runs use the existing sanitized runner; `PYTEST_ADDOPTS` supplies
+explicit paths/selection despite its generic `full offline pytest` stage label.
+
+| Exact command | Result |
+| --- | --- |
+| `$env:PYTEST_ADDOPTS='tests/unit/test_journey_recap.py -v -x'; .\scripts\verify.ps1 -Mode Offline` | Pre-F1 candidate: 8 passed, exit 0; earlier 8-pass runs were superseded by strengthened read-boundary instrumentation/association checks, not added to totals |
+| `$env:PYTEST_ADDOPTS='tests/unit/test_session_content_registry.py tests/unit/test_run_revisit_service.py -k "content or transport or pack or bundle or configuration" -v'; .\scripts\verify.ps1 -Mode Offline` | 17 passed, 24 deselected, exit 0; excludes unrelated staging/rollback and gameplay matrices |
+| `npm run test:run -- src/JourneyRecap.test.tsx src/SessionReading.test.tsx src/api/client.test.ts src/api/schemas.test.ts` (`web/`) | 3 files, 138 passed, exit 0; the last selector matches no separate file; schema coverage is in the selected recap/client tests |
+| `npm run test:run -- src/App.journey.test.tsx -t 'reading identity'` (`web/`) | 4 passed, 28 unselected/skipped, exit 0 |
+| `npm run test:run -- src/App.test.tsx` (`web/`) | 52 passed, exit 0 |
+| `npm run typecheck`, `npm run lint`, `npm run build` (`web/`) | Each final command exit 0 |
+
+The Offline runner also passed strict offline diagnostics, repository-Python
+compileall, pip check, offline Alembic heads/history and Git whitespace checks.
+Alembic metadata inspection did not connect to a database. The existing Pydantic
+`schema` shadowing warning remains a warning. No exhaustive S2 or full Offline/Web
+suite is claimed. Unchanged persistence/concurrency/migration/Provider internals
+reuse their published evidence; no new real-MySQL atomicity proof is asserted.
+
+Failed/incomplete records: the initial baseline command
+`$env:PYTEST_ADDOPTS='tests/unit/test_run_revisit_api.py -q'; .\scripts\verify.ps1 -Mode Offline`
+selected a wider historical gameplay matrix than needed. It was stopped by ending
+only its verified test processes; pytest exited -1 and the runner exited 1. Its
+progress dots establish no completed-suite result. It was not rerun; the bounded
+checks above cover the direct dependencies. The first Web lint exited 1 because
+the recap component exported a non-component helper; making that helper private
+resolved the error, and final typecheck/lint/build passed. These records are not
+relabeled as successful runs.
+
+Evidence scope: deterministic public HTTP play covers both first-world ending
+classes, held receipt, sealed archive, completion versus explicit termination,
+historical cutoff, same-character new-Run separation and repeatable reads. Snapshot
+equality plus direct commit/session-lock interception verifies the read boundary.
+Synthetic projection-source tests cover optional-copy absence and separately
+registered older-version copy; required overflow uses boundary tests and an injected
+over-budget projection through the real HTTP response contract. These are not
+claims that deployed content naturally reaches overflow or loses optional copy.
+Rendered tests observe GET methods, storage set/remove calls, stale/client replacement,
+current/history labels and existing controls. They do not prove browser layout,
+real-network timing, database isolation or production readiness. D2/D3, multiline
+validation and DF-001/DF-002 are unchanged. Guardrail impact: **None**.
+
+F1 correction (2026-09-21): the independent verdict was **CHANGES_REQUIRED**.
+The reviewed 69,050-byte patch had SHA-256
+`9cada9761eece4302c0a219b6b0ad6e9dce86a31af7e889d62bd6c44a9c483d9`.
+The reader constrained `undelivered_receipt.ending.receipt_held` to
+`dispatch_held == true` but omitted the symmetric constraint for
+`undelivered_receipt.ending.dispatch_closed == dispatch released`: its required
+`dispatch_held` value is false. The exact-version copy registration now includes
+that second constraint. Either contradiction returns `unavailable_evidence`
+with empty text; it does not choose a source, emit partial conclusions or repair
+state. Two parametrized HTTP regressions each exercise normal public play and
+then one conflicting snapshot boolean, covering all four combinations, strict
+response deserialization, unchanged store and intercepted commit/session locks.
+Only the rule, its tests and this validation record changed. The corrected
+uncommitted candidate awaits the original reviewer's focused F1 rereview; this
+record is not approval and introduces no new review stage.
+
+Exact correction verification (repository root, `pwsh`): all runs below use
+`$env:PYTHONDONTWRITEBYTECODE='1'`; the UTF-8 runs additionally set
+`$env:PYTHONIOENCODING='utf-8'; $env:PYTHONUTF8='1'`. For the unchanged original
+diagnostic, `$probeRoot` is
+`C:/Users/dylanmonster/.codex/visualizations/2026/09/20/01a0bdf4-5693-7271-8d0a-6526f7c3f43c/d1-review`.
+Outer-runner logs and the incoming snapshot/correction delta are outside the
+repository in the implementation task's `d1-f1-correction` evidence directory.
+The runner's child output bypassed PowerShell's log pipeline: detailed pytest
+results are retained in this task's tool outputs, not those partial log files.
+The independent reviewer's files were not edited.
+
+| Exact command / selection | Correction result |
+| --- | --- |
+| `$env:PYTEST_ADDOPTS="$probeRoot/test_probe.py -v -s -p no:cacheprovider --confcutdir=$probeRoot"; .\scripts\verify.ps1 -Mode Offline` | Before correction: 1 failed, pytest/runner exit 1; reproduced `complete` on conflicting evidence. First capture had garbled Chinese output; preserved it and repeated with explicit UTF-8: again 1 failed, exit 1. Same unchanged diagnostic after correction: 1 passed, exit 0. No deselections/skips; these runs are not added together. |
+| `$env:PYTEST_ADDOPTS='tests/unit/test_journey_recap.py -v -p no:cacheprovider'; .\scripts\verify.ps1 -Mode Offline` | 10 passed, 0 deselected/skipped, pytest/runner exit 0; supersedes the pre-F1 8-test result for corrected source |
+| `$env:PYTEST_ADDOPTS='tests/unit/test_session_content_registry.py tests/unit/test_run_revisit_service.py -k "content or transport or pack or bundle or configuration" -v -p no:cacheprovider'; .\scripts\verify.ps1 -Mode Offline` | 17 passed, 24 deselected, 0 skipped, pytest/runner exit 0; same bounded dependency selection, not an additional aggregate total |
+| `git diff --check`; changed-file strict UTF-8/LF/no-BOM/final-newline/trailing-whitespace checks | Each exit 0, including the untracked Python files |
+
+Successful Offline runners also passed their existing strict diagnostics,
+`compileall`, `pip check`, offline Alembic metadata and whitespace stages.
+No separate Python linter is configured in `pyproject.toml`. The pre-existing
+Pydantic shadowing and Git LF-to-CRLF warnings remain warnings; no byte conversion
+was performed. Web code/contracts are unchanged, so their earlier evidence is
+reused without rerunning Web suites. No exhaustive resolver, broad historical
+matrix, browser, database or Provider verification was performed. The prior lint
+failure and stopped historical run above remain recorded as such. Fault injection
+is in-process Demo test data, not proof of a player-reachable mutation or database
+atomicity. Guardrail impact: **None**; existing authority/projection rules apply.
+
+### D2/D3 remain Proposed/unapproved
 
 D2 design sketch: `ConflictIntent` expresses the player's chosen intention;
 server-owned `ConflictContext` supplies participants, goal and local rules;

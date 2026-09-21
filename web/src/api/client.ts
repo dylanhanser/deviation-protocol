@@ -1,4 +1,4 @@
-import { nativeRunCompletionStatusSchema, nativeRunCompletionResultSchema } from "./schemas";
+import { journeyRecapSchema, nativeRunCompletionStatusSchema, nativeRunCompletionResultSchema } from "./schemas";
 import { assertCompletionResult, type FrozenRunCompletion } from "../runCompletion";
 import type { z } from "zod";
 
@@ -105,6 +105,13 @@ async function parseJsonBody(response: Response): Promise<unknown> {
 }
 
 export class PublicApiClient {
+  async getJourneyRecap(sessionId: string, signal?: AbortSignal) {
+    const id = sessionPathIdSchema.parse(sessionId);
+    const result = await this.request(`v1/sessions/${encodeURIComponent(id)}/run-recap`,
+      {method: "GET", ...(signal === undefined ? {} : {signal})}, 200, journeyRecapSchema);
+    if (result.session_id !== id) throw responseError(200, "CONTRACT_MISMATCH");
+    return result;
+  }
   async getNativeRunCompletion(sessionId:string,signal?:AbortSignal) {
     const id=sessionPathIdSchema.parse(sessionId);
     const result=await this.request(`v1/sessions/${encodeURIComponent(id)}/run-completion`,

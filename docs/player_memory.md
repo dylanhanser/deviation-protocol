@@ -15,7 +15,12 @@ Provider 已使用最多六段本 Session 的已接受正文、有界公开 memo
 目前为空字符串，没有摘要生成、刷新、压缩或重建 worker。
 本次 Web 阅读改进单独显示索引同步状态和投影截断状态，标明访问范围；
 正文回顾只读，不能生成新事实、NPC 身份或记忆。
-[后续方案](open_source_comparison.md#product-decisions) 尚未批准。
+[D1 旅程回顾](open_source_comparison.md#product-decisions) 已于 2026-09-21 获得产品批准，
+并在当前未提交候选中实现：仅 Web 展示，同一 Run，截止正在阅读的访问，正文上限
+2,000 个 Unicode 码点。它读取经所有权、参与关系、快照版本及精确内容版本验证的
+runtime/结局证据和公开文案，不拼接或更新 `PlayerMemoryState`，不进入 Prompt。
+缺失、冲突、可选内容省略与必要内容超限有显式状态；详见
+[公开回顾契约](public_client_contract.md#d1-read-only-journey-recap)。D2/D3 仍未批准。
 
 ## 唯一事实来源
 

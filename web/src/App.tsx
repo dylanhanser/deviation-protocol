@@ -1,4 +1,5 @@
 import { SessionReading } from "./SessionReading";
+import { JourneyRecap } from "./JourneyRecap";
 import { assertCompletionHistory, assertCompletionAuthorities, assertCompletionSubmission, assertCompletionReconciliation, assertConfirmedCompletion, freezeRunCompletion, type FrozenRunCompletion } from "./runCompletion";
 import type { NativeRunCompletionStatus, NativeRunCompletionResult } from "./api/schemas";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
@@ -2844,6 +2845,12 @@ export default function App({
           view={(historicalSession ?? loadedSession).view}
           staleKind={(historicalSession ?? loadedSession).stale?.kind ?? null}
           readingIdentity={readingIdentity}
+          journeyRecap={(historicalSession ?? loadedSession).view.run_context ? <JourneyRecap
+            client={client} view={(historicalSession ?? loadedSession).view}
+            journey={historicalSession ? historicalJourney : continuationStatus}
+            ready={readingIdentity !== "unconfirmed" && foregroundOperation === null && !historyLoading &&
+              (historicalSession ?? loadedSession).stale === null && continuationError === null}
+          /> : undefined}
         />
       )}
 

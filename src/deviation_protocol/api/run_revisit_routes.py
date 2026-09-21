@@ -20,6 +20,9 @@ from deviation_protocol.application.errors import (SnapshotInvalidError, Snapsho
 
 
 def install_run_revisit_routes(app):
+    from deviation_protocol.api.journey_recap_schema import JourneyRecapResponse
+    from deviation_protocol.application.journey_recap import read_recap, SCHEMA
+    from deviation_protocol.application.run_exit_service import RunExitError
     from deviation_protocol.api.main import (
         SessionPathId, _public_error_responses, _validate_run_entry_transport,
         _request_validation_failure, _reject_duplicate_json_members,
@@ -43,6 +46,27 @@ def install_run_revisit_routes(app):
                 SnapshotInvalidError, SnapshotNotFoundError, SnapshotSchemaVersionMismatchError,
                 SnapshotStateVersionMismatchError, SnapshotSessionMismatchError, SnapshotContentVersionMismatchError):
             return error_response(409, "SNAPSHOT_INVALID", "Session state is unavailable or incompatible")
+
+    @app.get("/v1/sessions/{session_id}/run-recap", operation_id="get_native_run_recap",
+        response_model=JourneyRecapResponse, responses=_public_error_responses(404, 409, 422, 500, 503), tags=["runs"])
+    async def recap(session_id: SessionPathId, request: Request,
+                    principal=Depends(get_current_principal), services=Depends(get_api_services)):
+        names = [name.lower() for name, _ in request.scope["headers"]]
+        if (any(names.count(name) > 1 for name in (b"content-type", b"content-length", b"transfer-encoding", b"idempotency-key"))
+                or request.scope["query_string"] or await request.body()):
+            _request_validation_failure()
+        if services.run_revisit_service is None:
+            return error_response(503, "RUN_RECAP_NOT_AVAILABLE", "Journey recap is not available")
+        try:
+            result = await read_recap(services.run_revisit_service, principal, session_id)
+        except (RunExitError, RunRevisitError) as error:
+            return error_response(409, error.code, "Journey recap is not available")
+        except (RunProtocolBindingStoredIntegrityError, RunStoredRecordIntegrityError,
+                SnapshotInvalidError, SnapshotNotFoundError, SnapshotSchemaVersionMismatchError,
+                SnapshotStateVersionMismatchError, SnapshotSessionMismatchError, SnapshotContentVersionMismatchError):
+            result = dict(schema_version=SCHEMA, session_id=session_id, context=None,
+                          status="unavailable_evidence", text="")
+        return JourneyRecapResponse.model_validate(result)
 
     @app.get("/v1/sessions/{session_id}/run-journey", operation_id="get_native_run_journey",
         response_model=NativeRunJourneyUnion, responses=_public_error_responses(404, 409, 422, 500, 503), tags=["runs"])

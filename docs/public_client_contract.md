@@ -1367,6 +1367,82 @@ action vocabulary, mutation, automatic scroll/focus or storage format changes.
 This is a bounded reading improvement, not implementation of the final three-action
 normalization model, full memory browser, or browser accessibility acceptance.
 
+## D1 read-only journey recap
+
+Product approval: 2026-09-21. Component implemented in the current uncommitted
+candidate. This separately versioned companion leaves all published View/Journey
+DTOs closed and unchanged. Normal API and deterministic Demo share the same
+server reader, public schema and authority semantics.
+
+`GET /v1/sessions/{session_id}/run-recap` has no query or request body and returns
+the closed `native-run-recap/v1` object:
+
+| Field | Meaning |
+| --- | --- |
+| `schema_version`, `session_id` | Exact projection version and requested owned Session |
+| `context` | Required for available/overflow results; nullable only when required evidence cannot establish a trustworthy association |
+| `context.run_id`, `run_state_version` | Same-Run identity and version for Web reconciliation |
+| `context.session_state_version`, `scenario_id`, `content_version` | Selected View's exact Session/content association |
+| `context.cutoff_visit`, `scope` | Canonical visit ordinal 1–3; `current` or `historical` |
+| `context.lifecycle_at_cutoff` | `active`, `completed`, `terminated`; historical earlier visits always exclude later terminal events |
+| `status` | `complete`, `incomplete`, `unavailable_evidence`, `unavailable_overflow` |
+| `text` | Plain display text, at most 2,000 Unicode code points; empty for unavailable results |
+
+`complete` means all selected recap sources are available, not a complete transcript
+or successful Run. `incomplete` explicitly identifies optional context missing or
+omitted for capacity. Required missing/conflicting evidence produces
+`unavailable_evidence`, never guessed text or a negative assertion. If required
+material alone exceeds the budget, `unavailable_overflow` returns no partial text.
+Both paragraph separators and astral characters count as Unicode code points;
+UTF-8 bytes and UTF-16 units do not define the limit. The limit applies to `text`,
+including fixed paragraph labels; UI scope/status/accessibility copy is outside it.
+
+Selection order is required unresolved consequences, required visit/outcome and
+applicable whole-Run terminal information, then optional recent scene summaries.
+Required items follow canonical participation/visit order; optional scenes follow
+descending visit ordinal. Items are never partially cut. A skipped optional item
+does not prevent a later shorter item fitting. Identical bound sources and projection
+version reproduce identical text and status.
+
+The authenticated controller/owned character, Run participation and reverse
+attachment are verified before the complete native family is reconstructed in
+one existing read UoW. Each included Session's version-matched snapshot is restored
+using its registered exact content bundle. The private binding retains Run/version,
+selected Session/version, ordered included Sessions/versions, snapshot digests,
+content identities/digests and projection version. It is neither returned as a hash
+nor persisted. Public runtime facts, validated ending state and persisted transition,
+completion/termination evidence supply authority; version-bound public content and
+registered fixed templates supply wording. The current three deployed packs are
+registered; unregistered older/newer content is unavailable, never replaced by the
+latest pack. A possibly truncated/stale memory projection, accepted prose, arrival,
+retrieval, client association or model output is not independent evidence.
+
+Earlier historical visits include only their canonical prefix. The current whole
+family is still validated for ownership/integrity: a later corrupt family can make
+the projection unavailable, but its later facts never enter earlier text. A Run
+completion/termination is shown only when reading its current final visit; a visit
+ending alone does not imply Run completion. New admission with the same character
+does not merge Runs. No schema migration, summary table, background work, Provider
+request, prompt field, canonical/event/memory/resource write or gameplay lock is
+introduced. Read transaction consistency is inherited from existing repositories;
+this projection introduces no new mutation or atomicity protocol.
+
+Missing/unauthorized Session remains indistinguishable safe 404; an owned legacy
+Session receives 409 `NATIVE_RUN_REQUIRED`. Known stored integrity failures produce
+a safe typed unavailable result, without private details. Transport validation is
+422; unconfigured recap service is 503. Internal unexpected failures retain the
+existing 500 handling. OpenAPI advertises the existing error envelope.
+
+Web reconciles the response with the validated displayed View/Journey, including
+Run/Session versions, content, cutoff and lifecycle. A pending/unconfirmed association
+withholds recap, and stale/client/visit replacement responses cannot replace another
+selection. A response with null context supplies only an unavailable notice, never
+reading identity. This presentation does not enable actions, alter existing write
+locks, adopt a successor, write recovery storage, or replay a POST. Its failure
+does not block gameplay. Existing explicit reading/navigation controls can refresh
+it. The native disclosure preserves literal text and existing accessibility/layout;
+no forced focus or scroll is added. No browser acceptance is claimed by rendered tests.
+
 ## Action affordances
 
 `action_affordances.mode` has three states:
