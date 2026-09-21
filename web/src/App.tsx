@@ -1,3 +1,4 @@
+import { SessionReading } from "./SessionReading";
 import { assertCompletionHistory, assertCompletionAuthorities, assertCompletionSubmission, assertCompletionReconciliation, assertConfirmedCompletion, freezeRunCompletion, type FrozenRunCompletion } from "./runCompletion";
 import type { NativeRunCompletionStatus, NativeRunCompletionResult } from "./api/schemas";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type FormEvent } from "react";
@@ -335,159 +336,6 @@ function isDescriptionActionType(
   return ["CUSTOM", "EXPLORE", "OBSERVE", "MOVE"].includes(actionType);
 }
 
-function ViewSummary({ loaded }: { loaded: LoadedSession }) {
-  const { view, stale } = loaded;
-  const latestNarrative = view.recent_narrative_texts.at(-1);
-
-  return (
-    <article
-      className={`view-summary${stale === null ? "" : " view-summary-stale"}`}
-      aria-labelledby="session-view-heading"
-    >
-      <header>
-        <p className="eyebrow">PlayerSessionView</p>
-        <h2 id="session-view-heading">{view.presentation.title}</h2>
-        <p>{view.presentation.scene_summary}</p>
-        {stale === null ? (
-          <p className="freshness-label">权威 View：当前</p>
-        ) : (
-          <p className="freshness-label stale-label">
-            权威 View：可能 stale（{stale.kind}）
-          </p>
-        )}
-      </header>
-
-      <dl className="metadata-grid">
-        <div>
-          <dt>Session ID</dt>
-          <dd>{view.metadata.session_id}</dd>
-        </div>
-        <div>
-          <dt>角色</dt>
-          <dd>{view.metadata.character_display_name}</dd>
-        </div>
-        <div>
-          <dt>状态版本</dt>
-          <dd>{view.metadata.state_version}</dd>
-        </div>
-        <div>
-          <dt>副本状态</dt>
-          <dd>{view.scenario_status}</dd>
-        </div>
-      </dl>
-
-      {view.run_context ? <section aria-label="Run 设置">
-        <h3>本次 Run 设置</h3>
-        <p>资源环境：{view.run_context.resource_pressure_label}</p>
-        <dl className="compact-list">{objectiveNames.map((name) => <div key={name}><dt>{objectiveLabels[name]}</dt><dd>{view.run_context?.objectives[name]}</dd></div>)}</dl>
-        <p>表现：{view.run_context.presentation.world_tone} / {view.run_context.presentation.reality_boundary} / {view.run_context.presentation.relationship_overlay}</p>
-      </section> : null}
-
-      <section aria-labelledby="scene-heading">
-        <h3 id="scene-heading">当前场景：{view.presentation.scene_title}</h3>
-        <p>
-          Frame {view.narrative_frame.frame_id} · 停止条件：
-          <strong>{view.narrative_frame.stop_condition}</strong>
-        </p>
-      </section>
-
-      <section aria-labelledby="narrative-heading">
-        <h3 id="narrative-heading">当前公开正文</h3>
-        <p>{latestNarrative ?? "当前尚无已接受的叙事正文。"}</p>
-      </section>
-
-      <section aria-labelledby="suggestions-heading">
-        <h3 id="suggestions-heading">建议行动（只读）</h3>
-        <p className="supporting-copy">
-          这些叙事提示不可直接提交；可执行控件只来自 action_affordances。
-        </p>
-        {view.narrative_frame.suggested_actions.length === 0 ? (
-          <p>当前 Frame 没有建议行动。</p>
-        ) : (
-          <ul>
-            {view.narrative_frame.suggested_actions.map((action) => (
-              <li key={action.action_id}>{action.label_hint}</li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="player-state-heading">
-        <h3 id="player-state-heading">公开玩家状态</h3>
-        <dl className="compact-list">
-          {view.player_state.attributes.map(([name, value]) => (
-            <div key={name}>
-              <dt>{name}</dt>
-              <dd>{value}</dd>
-            </div>
-          ))}
-          {view.player_state.resources.map((resource) => (
-            <div key={resource.resource_id}>
-              <dt>{resource.resource_id}</dt>
-              <dd>
-                {resource.current} / {resource.maximum}
-              </dd>
-            </div>
-          ))}
-        </dl>
-        <p>
-          背包 {view.player_state.inventory.length} · 装备
-          {view.player_state.equipped_items.length} · 技能
-          {view.player_state.skills.length} · 可见 NPC
-          {view.player_state.visible_npcs.length}
-        </p>
-      </section>
-
-      <section aria-labelledby="clock-heading">
-        <h3 id="clock-heading">公开时钟</h3>
-        {view.public_clocks.length === 0 ? (
-          <p>当前没有公开时钟。</p>
-        ) : (
-          <ul>
-            {view.public_clocks.map((clock) => (
-              <li key={clock.clock_id}>
-                {clock.clock_id}：{clock.value} / {clock.maximum}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-      <section aria-labelledby="memory-heading">
-        <h3 id="memory-heading">长期记忆</h3>
-        <p>
-          {view.player_memory.complete ? "索引完整" : "索引可能不完整"} · 副本
-          {view.player_memory.total_scenario_records} · NPC
-          {view.player_memory.total_npc_records} · 重要经历
-          {view.player_memory.total_significant_experiences}
-        </p>
-      </section>
-
-      <section aria-labelledby="recent-heading">
-        <h3 id="recent-heading">近期已接受正文</h3>
-        {view.recent_narrative_texts.length === 0 ? (
-          <p>暂无。</p>
-        ) : (
-          <ol>
-            {view.recent_narrative_texts.map((text, index) => (
-              <li key={`${index}-${text.slice(0, 24)}`}>{text}</li>
-            ))}
-          </ol>
-        )}
-      </section>
-
-      {view.ending_status !== null && view.presentation.ending != null ? (
-        <section className="ending" aria-labelledby="ending-heading">
-          <p className="eyebrow">{view.ending_status}</p>
-          <h3 id="ending-heading">{view.presentation.ending.title}</h3>
-          <p>{view.presentation.ending.summary}</p>
-          <p>Ending ID：{view.ending_id}</p>
-        </section>
-      ) : null}
-    </article>
-  );
-}
-
 function FreeActionForm({
   affordance,
   disabled,
@@ -813,6 +661,9 @@ export default function App({
     );
   const [manualSessionId, setManualSessionId] = useState("");
   const [loadedSession, setLoadedSession] = useState<LoadedSession | null>(null);
+  const [restoredReading, setRestoredReading] = useState<{
+    owner: LoadedSession; client: PublicApiClient; journey: NativeRunContinuationStatus;
+  } | null>(null);
   const [runAuthority, setRunAuthority] = useState<{
     owner: LoadedSession; client: PublicApiClient;
     journey: NativeRunContinuationStatus; status: NativeRunStatus | null; completion:NativeRunCompletionStatus|null;
@@ -885,6 +736,7 @@ export default function App({
   );
 
   const invalidateForegroundOperation = useCallback(() => {
+    setRestoredReading(null);
     operationGenerationRef.current += 1;
     const operation = foregroundOperationRef.current;
     operation?.controller.abort();
@@ -1153,6 +1005,7 @@ export default function App({
     };
     void synchronize().catch((error:unknown)=>{
       if (!isCurrent()) return;
+      setRestoredReading(null);
       setRunAuthority(null);
       blockCompletionRetry(previouslyBlocked || (error instanceof ApiClientError && error.reason==="CONTRACT_MISMATCH"));
       setContinuationError(formatApiClientError(error));
@@ -1235,6 +1088,7 @@ export default function App({
       };
       loadedSessionRef.current = next;
       setLoadedSession(next);
+      setRestoredReading(journey ? {owner:next,client,journey} : null);
       if (journey) setContinuationStatus(journey);
       if (confirmedContinuation.current?.result.session_id === record.session_id) {
         setContinuationAttempt(null);
@@ -1408,6 +1262,7 @@ export default function App({
       controller: new AbortController(),
       id: operationGenerationRef.current + 1,
     };
+    setRestoredReading(null);
     operationGenerationRef.current = operation.id;
     foregroundOperationRef.current = operation;
     setForegroundOperation(kind);
@@ -2483,6 +2338,24 @@ export default function App({
     setRunOptions(null); setOptionsError(null); setOptionsRefresh((n) => n + 1);
   }
 
+  // Only the owner-bound, reconciled authority identifies a restored native
+  // View as the current visit. Retained arrival text is not reading authority.
+  // Recovery already validated the complete association before publishing its
+  // View. Preserve that historical identity during the initial background sync,
+  // but never carry it across an operation, client, View or failed reconciliation.
+  const restoredHistory = restoredReading !== null && loadedSession?.stale === null &&
+    restoredReading.owner === loadedSession && restoredReading.client === client &&
+    restoredReading.journey === continuationStatus && continuationError === null && exitError === null &&
+    restoredReading.journey.current.session_id !== loadedSession.sessionId;
+  const readingIdentity = historicalSession !== null ? "historical"
+    : loadedSession?.view.run_context
+      ? foregroundOperation === null && !historyLoading
+        ? runAuthorityReady
+          ? runAuthority!.journey.current.session_id === loadedSession.sessionId ? "current" : "historical"
+          : restoredHistory ? "historical" : "unconfirmed"
+        : "unconfirmed"
+      : "current";
+
   const operationStatus =
     recoveryStorageFailure !== null
       ? "sessionStorage 处于安全锁定状态；不能创建、读取或提交行动。"
@@ -2506,6 +2379,10 @@ export default function App({
                         ? "一个操作结果尚未解决；只能手动重试完全相同的操作。"
                         : loadedSession?.stale !== null && loadedSession !== null
                           ? "当前 View 可能 stale；行动保持禁用，等待显式刷新。"
+                          : readingIdentity === "historical"
+                            ? "正在阅读历史访问；返回当前世界后才能操作当前进度。"
+                          : readingIdentity === "unconfirmed"
+                            ? "所显示访问与当前旅程的关联尚未确认。"
                           : loadedSession?.view.scenario_status === "ENDED"
                             ? "副本已结束；没有可执行行动。"
                             : loadedSession !== null
@@ -2532,21 +2409,7 @@ export default function App({
     recoveryRecord !== null ||
     requiredCatalogRefresh !== null;
 
-  return (
-    <main>
-      <header className="hero">
-        <p className="eyebrow">Public Web Client</p>
-        <h1>Deviation Protocol</h1>
-        <p>所有行动控件均来自最新的权威 action_affordances。</p>
-        {isDeterministicDemo ? (
-          <p className="demo-warning">{DETERMINISTIC_DEMO_WARNING}</p>
-        ) : null}
-      </header>
-
-      <p className="operation-status" role="status" aria-live="polite">
-        {operationStatus}
-      </p>
-
+  const entryControls = <>
       <section className="panel" aria-label="进入方式">
         <p>进入请求尚未确认并保存时仅保存在内存中；刷新页面将无法恢复该请求。已保存的进度仅限此标签页。</p>
         <fieldset disabled={prePlayControlsDisabled}>
@@ -2725,36 +2588,9 @@ export default function App({
         )}
       </section>
 
-      {mutationAttempt === null ? null : (
-        <section className="stale-warning" role="alert" aria-labelledby="mutation-retry-heading">
-          <h2 id="mutation-retry-heading">操作结果尚未解决</h2>
-          <p>
-            {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? "进入已确认，进度尚待保存；重试保存不会重新进入。" : null}
-            {mutationAttempt.kind === "run-entry" &&
-            mutationAttempt.entrySuccessAwaitingStorage
-              ? "Run entry 已成功，但 Session ID 尚未安全保存。清除存储锁定后，只能用完全相同的操作进行 replay。"
-              : MUTATION_UNCERTAIN_MESSAGE}
-          </p>
-          {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? <button type="button" onClick={handleNativeStorageRetry}>重试保存进度</button> : null}
-          {mutationAttempt.kind === "run-entry" ? (
-            <p>{RUN_DISCOVERY_LIMIT_MESSAGE}</p>
-          ) : null}
-          <button
-            type="button"
-            onClick={handleMutationRetry}
-            disabled={
-              mutationAttempt.inFlight ||
-              foregroundOperation !== null ||
-              recoveryStorageFailure !== null
-            }
-          >
-            {mutationAttempt.inFlight
-              ? "相同操作正在发送…"
-              : "手动重试完全相同的操作"}
-          </button>
-        </section>
-      )}
+  </>;
 
+  const manualRecoveryControls = (
       <section className="panel" aria-labelledby="restore-heading">
         <h2 id="restore-heading">手动读取已有 Session</h2>
         <form onSubmit={handleManualRead}>
@@ -2795,6 +2631,57 @@ export default function App({
           </fieldset>
         </form>
       </section>
+
+  );
+
+  return (
+    <main>
+      <header className="hero">
+        <p className="eyebrow">Public Web Client</p>
+        <h1>Deviation Protocol</h1>
+        <p>所有行动控件均来自最新的权威 action_affordances。</p>
+        {isDeterministicDemo ? (
+          <p className="demo-warning">{DETERMINISTIC_DEMO_WARNING}</p>
+        ) : null}
+      </header>
+
+      <p className="operation-status" role="status" aria-live="polite">
+        {operationStatus}
+      </p>
+
+      {loadedSession === null ? entryControls : null}
+
+      {mutationAttempt === null ? null : (
+        <section className="stale-warning" role="alert" aria-labelledby="mutation-retry-heading">
+          <h2 id="mutation-retry-heading">操作结果尚未解决</h2>
+          <p>
+            {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? "进入已确认，进度尚待保存；重试保存不会重新进入。" : null}
+            {mutationAttempt.kind === "run-entry" &&
+            mutationAttempt.entrySuccessAwaitingStorage
+              ? "Run entry 已成功，但 Session ID 尚未安全保存。清除存储锁定后，只能用完全相同的操作进行 replay。"
+              : MUTATION_UNCERTAIN_MESSAGE}
+          </p>
+          {mutationAttempt.kind === "native-entry" && mutationAttempt.retainedResponse ? <button type="button" onClick={handleNativeStorageRetry}>重试保存进度</button> : null}
+          {mutationAttempt.kind === "run-entry" ? (
+            <p>{RUN_DISCOVERY_LIMIT_MESSAGE}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={handleMutationRetry}
+            disabled={
+              mutationAttempt.inFlight ||
+              foregroundOperation !== null ||
+              recoveryStorageFailure !== null
+            }
+          >
+            {mutationAttempt.inFlight
+              ? "相同操作正在发送…"
+              : "手动重试完全相同的操作"}
+          </button>
+        </section>
+      )}
+
+      {loadedSession === null ? manualRecoveryControls : null}
 
       <div aria-live="polite">
         {loadedSession !== null ? (
@@ -2878,7 +2765,7 @@ export default function App({
       {loadedSession?.view.run_context ? <section className="panel" aria-label="世界续接与历史">
         {historyLoading && !historicalSession ? <button type="button" onClick={()=>void navigateHistory("current")}>返回当前世界</button> : null}
         {historicalSession ? <>
-          <p>正在阅读上一世界的历史。</p>
+          <p>正在阅读旅程历史；这里只读，不会改变当前进度。</p>
           {historicalJourney?.arrival ? <div aria-label="历史抵达说明"><p>{historicalJourney.arrival.previous_ending_title}</p><p>{historicalJourney.arrival.entry_notice}</p></div> : null}
           {historicalJourney?.predecessor ? <button type="button" disabled={foregroundOperation !== null} onClick={()=>void navigateHistory()}>查看上一世界历史</button> : null}
           {historicalJourney?.successor ? <button type="button" disabled={foregroundOperation !== null} onClick={()=>void navigateHistory("next")}>查看下一段旅程</button> : null}
@@ -2952,7 +2839,12 @@ export default function App({
       ) : null}
 
       {recoveryStorageFailure !== null || loadedSession === null ? null : (
-        <ViewSummary loaded={historicalSession ?? loadedSession} />
+        <SessionReading
+          key={(historicalSession ?? loadedSession).sessionId}
+          view={(historicalSession ?? loadedSession).view}
+          staleKind={(historicalSession ?? loadedSession).stale?.kind ?? null}
+          readingIdentity={readingIdentity}
+        />
       )}
 
       {historicalSession || recoveryStorageFailure !== null || loadedSession === null ? null : (
@@ -2980,6 +2872,7 @@ export default function App({
           }
         />
       )}
+      {loadedSession !== null ? <>{entryControls}{manualRecoveryControls}</> : null}
     </main>
   );
 }

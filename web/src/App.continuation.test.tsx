@@ -228,7 +228,7 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
       }
       await waitFor(()=>expect(screen.getByRole("button",{name:"查看上一世界历史"})).toBeEnabled());
       release(retained!);
-      await waitFor(()=>expect(screen.queryByText("正在阅读上一世界的历史。")).not.toBeInTheDocument());
+      await waitFor(()=>expect(screen.queryByText("正在阅读旅程历史；这里只读，不会改变当前进度。")).not.toBeInTheDocument());
       expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
       demo.transport.transform=null;
     }
@@ -242,19 +242,22 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
       };
       await user.click(screen.getByRole("button",{name:"查看上一世界历史"}));
       await waitFor(()=>expect(screen.getByRole("button",{name:"查看上一世界历史"})).toBeEnabled());
-      expect(screen.queryByText("正在阅读上一世界的历史。")).not.toBeInTheDocument();
+      expect(screen.queryByText("正在阅读旅程历史；这里只读，不会改变当前进度。")).not.toBeInTheDocument();
       expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
       demo.transport.transform=null;
     }
     await user.click(await screen.findByRole("button",{name:"查看上一世界历史"}));
-    await screen.findByText("正在阅读上一世界的历史。");
+    await screen.findByText("正在阅读旅程历史；这里只读，不会改变当前进度。");
+    expect(screen.getByText("正在阅读历史访问；返回当前世界后才能操作当前进度。"))
+      .toHaveAttribute("role", "status");
+    expect(screen.getByRole("article")).toHaveTextContent("历史访问（只读），不是当前进度。");
     expect(screen.queryByLabelText("抵达说明")).not.toBeInTheDocument();
     expect(screen.queryByRole("button",{name:"结束本次旅程"})).not.toBeInTheDocument();
     expect(screen.queryByRole("button",{name:"继续当前旅程"})).not.toBeInTheDocument();
     expect(screen.getByRole("button",{name:"清除本标签页 Session"})).toBeDisabled();
     expect(screen.getByRole("button",{name:"读取 PlayerSessionView"})).toBeDisabled();
     await user.click(screen.getByRole("button",{name:"返回当前世界"}));
-    await waitFor(()=>expect(screen.queryByText("正在阅读上一世界的历史。")).not.toBeInTheDocument());
+    await waitFor(()=>expect(screen.queryByText("正在阅读旅程历史；这里只读，不会改变当前进度。")).not.toBeInTheDocument());
     expect(screen.getByText(notice)).toBeInTheDocument();
     expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
     expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);

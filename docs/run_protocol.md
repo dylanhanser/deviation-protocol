@@ -13,11 +13,17 @@ Frozen PROPOSED/unapproved wording is historical and the plan bytes remain uncha
 S7-4 implementation is independently approved and published at
 `f49ee3420365b8481b4a12dac6ea82d0b6f52d83`. Subsequent separately authorized
 local browser acceptance is recorded below. The [S7-5 integration record](phase_3_3_s7_5_integration_acceptance.md)
-reconciles all twelve parent criteria and supported consumers, adds explicit
-recovery-input and old/new history regressions, and is ready for one independent
-review. It issues no approval. S7-5 publication and formal S7/Phase 3.3 closure
-remain pending; DF-001/DF-002 remain deferred. No real Provider, production,
-limited-trial or broader-release acceptance is claimed.
+reconciles all twelve parent criteria and supported consumers and adds explicit
+recovery-input and old/new history regressions. The user confirms its independent
+approval, exact-candidate commit verification, manual publication and clean
+aligned baseline confirmation. On 2026-09-20 this task independently observed
+clean HEAD/main/local origin/main at `a35a1bff588c6eb24535820b150bae5566d7b5f7`
+without fetching. Bounded S7 and Phase 3.3 are complete. The S7-5 record's
+candidate-time pending-review text and frozen plans remain historical; this
+status synchronization does not rewrite or issue independent approval.
+DF-001/DF-002 remain deferred. No real Provider, production, limited-trial or
+broader-release acceptance is claimed. The separate
+[reading/research candidate](open_source_comparison.md) adds no Run semantics.
 
 ## S7-4 publication and local browser evidence
 
@@ -237,7 +243,8 @@ extensions are recorded before edits in `dependency-extensions.md`: original
 source-content pin, closed public GET route unions, head/metadata assertions and
 ended-View test transports. Session/turn orchestration, world-visit context,
 Demo composition and UoW need no new writer; their existing delegation composes
-the new closed family. There is no S7-5 implementation or final parent acceptance.
+the new closed family. At this S7-4 candidate snapshot, S7-5 implementation and
+final parent acceptance had not yet occurred; current status is recorded above.
 Guardrail impact: DB-001 updated for verified schema-precondition/restoration
 sequencing and strict downgrade-carrier type/bound classification. The matching verification procedure is recorded in
 `docs/engineering/codex_workflow.md`; DF-001/DF-002 retain their existing containment.
@@ -702,9 +709,9 @@ endings, exit/re-entry and recovery. S7-2 has an independently approved publishe
 its implementation is published at `6dfbd37` with inspected bounded local browser
 evidence. S7-3 has an approved published plan and P01–P09; implementation is
 published at `0b20dcd` with inspected bounded browser evidence. S7-4 is approved
-and published at `f49ee342`; S7-5 integration/acceptance is ready for independent review. DF-002
+and published at `f49ee342`; S7-5 integration/acceptance is independently approved and published at `a35a1bf`. DF-002
 records the observed discovery-refresh issue with explicit reload containment.
-Phase 3.3 remains incomplete.**
+Phase 3.3 is complete within its approved bounded scope.**
 
 The playable-loop-first workflow amendment is published at `67a5d501`. See
 [PLANS.md](../PLANS.md#immediate-delivery-priority)
@@ -783,7 +790,8 @@ published at `41d68aac`; see [current evidence](#s7-1-publication-and-local-brow
 and [preserved implementation evidence](#p33-s7-1-implementation-candidate-evidence). DF-001/DF-002
 remain deferred. No separate S6 closeout,
 new story/world content, production Provider, S7 continuity or Phase 3.4 state
-is included. Phase 3.3 remains incomplete and no release readiness is claimed.
+is included. Phase 3.3 was incomplete at that component baseline; current bounded
+closure is recorded above. No broader release readiness is claimed.
 
 ## Goals
 
@@ -1045,7 +1053,7 @@ authorizes the first same-line successor; its product choices and technical plan
 are approved. Implementation is published at `6dfbd37` with inspected bounded
 local browser evidence. S7-3 plan is published at `0ea295e` with P01–P09
 approved; implementation is published at `0b20dcd` with bounded browser evidence.
-S7-4 is approved and published at `f49ee342`; S7-5 integration/acceptance awaits independent review.
+S7-4 is approved and published at `f49ee342`; S7-5 integration/acceptance is independently approved and published at `a35a1bf`.
 DF-001/DF-002 remain deferred.
 
 P3.3-S5 owns deterministic application by
@@ -1834,8 +1842,9 @@ is published at `41d68aac` under its approved published plan; the S7-2
 plan is approved and published at `2c272487`, with P01–P08 approved. Implementation
 is published at `6dfbd37`. S7-3 plan is published at `0ea295e` with P01–P09
 approved; implementation is published at `0b20dcd`. S7-4 is approved and published
-at `f49ee342`; S7-5 integration/acceptance awaits independent review.
-Phase 3.3 remains incomplete. No separate S4 publication-closeout task is required.
+at `f49ee342`; S7-5 integration/acceptance is independently approved and published at `a35a1bf`.
+This closes the bounded Phase 3.3 scope, retaining the existing deferrals and
+evidence limits. No separate S4 publication-closeout task is required.
 
 ### P3.3-S3 published implementation evidence
 
@@ -2083,7 +2092,8 @@ composition, atomic native turns, replay/reload and authored endings. Gameplay
 uses the exact approved coefficients and catalogue association. The integration
 is internal: public native discovery/admission, API/OpenAPI, Demo/Web activation
 and public recovery remain S6; later worlds/visits/continuity remain S7;
-relationship/residence state remains Phase 3.4. Phase 3.3 remains incomplete.
+relationship/residence state remains Phase 3.4. Phase 3.3 was incomplete at the
+S5 component baseline; current bounded closure is recorded above.
 
 The compiler emits closed `run-prompt-context/v1` canonical UTF-8 JSON, at most
 1,024 bytes, after all UoWs/AsyncSessions close. It includes exact numeric
@@ -2184,7 +2194,7 @@ clean worktree/index and no conflicts, operations or locks; no fetch occurred.
 Frozen plan wording is historical. The following records preserve implementation
 candidate evidence and its original limitations. S6 was subsequently independently
 approved and published at `2f144599`; the [publication/browser record](#s6-publication-and-local-browser-evidence)
-owns current status. Phase 3.3 remains incomplete.
+owns S6 status. Current Phase 3.3 closure is recorded under S7-5 above.
 
 The delivered journey is explicit character selection/creation -> profile/world
 and optional overrides/presentation -> confirmation -> shared S4 native admission
@@ -2691,7 +2701,7 @@ Phase 3.3 is acceptable only when:
   and bounded local browser evidence. S7-3's approved regional-return plan is
   published at `0ea295e`; implementation is published at `0b20dcd` with inspected
   bounded browser evidence. S7-4 implementation is approved and published at
-  `f49ee342`; S7-5 reconciles the complete bounded phase for independent review.
+  `f49ee342`; S7-5 closes the complete bounded phase at `a35a1bf`.
 - P3.3-S5 owns the exact numeric-to-`Scarce`/`Fluid`/`Generous` mechanics and
   prompt projection; its approved bands and implementation are published.
   S6 implements the same bands for public output, with exact numeric values preserved.
@@ -2730,8 +2740,10 @@ implementation was subsequently published at `41d68aac`; that earlier verdict
 and [replacement evidence](#s7-1-nullable-terminal-check-correction) remain history.
 [Publication and subsequent browser acceptance](#s7-1-publication-and-local-browser-evidence)
 record current status separately from the original automated execution below.
-Neither S7 nor Phase 3.3 is complete; S7-2 is published at `6dfbd37`, and the
-S7-3 implementation is published at `0b20dcd`; S7-4 at `f49ee342`. S7-5 integration/acceptance awaits independent review. No limited
+At the original S7-1 candidate checkpoint, neither S7 nor Phase 3.3 was complete.
+For current bounded closure, see the S7-5 publication status at the top of this
+document. S7-2 is published at `6dfbd37`, and the
+S7-3 implementation is published at `0b20dcd`; S7-4 at `f49ee342`. S7-5 integration/acceptance is independently approved and published at `a35a1bf`. No limited
 user trial, broader release, deployment or real Provider acceptance is claimed.
 The frozen plan and historical reviews retain their candidate-time wording.
 
@@ -2872,7 +2884,9 @@ At the historical correction checkpoint this finding was corrected locally,
 with no approval issued by the correction task; the replacement candidate then
 awaited focused independent re-review of its direct dependencies and evidence.
 The corrected implementation is now published at `41d68aac`. Preserve the
-earlier verdict and measurements below; neither S7 nor Phase 3.3 is complete.
+earlier verdict and measurements below; neither S7 nor Phase 3.3 was complete
+at that S7-1 correction checkpoint. Current bounded closure is recorded at the
+top of this document.
 
 The production delta is restricted to migration 008 and matching ORM checks:
 explicit `prior_state_version IS NOT NULL` and `binding_state IS NOT NULL` in
@@ -3001,8 +3015,7 @@ document, with subsequent publication at `6dfbd37` and inspected local browser
 evidence above. This synchronization issues no independent approval or broader
 readiness claim. S7-3 has an approved published plan and implementation at
 `0b20dcd`, with inspected bounded browser evidence; S7-4 is approved and published
-at `f49ee342`. The S7-5 record reconciles parent criteria 1–12 for independent
-review. Formal S7 and Phase 3.3 closure remains pending.
+at `f49ee342`. The approved S7-5 record reconciles parent criteria 1–12 at `a35a1bf`. Bounded S7 and Phase 3.3 are complete; broader readiness is unchanged.
 
 ## Related documents
 

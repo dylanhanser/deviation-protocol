@@ -70,7 +70,7 @@ recorded in [the S5 implementation record](run_protocol.md#p33-s5-implementation
 
 ## S6 deterministic native Demo rendering
 
-The separately authorized S6 candidate composes native S4 admission and S5
+The approved, published S6 implementation composes native S4 admission and S5
 mechanics in the in-memory Demo. The dispatcher proves the complete native or
 legacy family before choosing its delegate; the legacy script and historical
 replay trace stay intact. Native valid actions are not limited to that script.
@@ -85,8 +85,15 @@ not call rendering again. Dynamic Demo remains native-unavailable.
 This is fake deterministic expression, not production Provider activation.
 [Implementation evidence](run_protocol.md#p33-s6-implementation-candidate-evidence)
 records guard, corruption, atomicity, cross-process and public journey tests.
-The candidate awaits independent implementation review; browser evidence and
-real Provider/Live calls are omitted.
+S6 is published at `2f144599`, with later bounded deterministic Demo browser
+evidence reconciled by approved, published S7-5 at `a35a1bf`. Historical test
+records retain their original scope; no new real Provider/Live acceptance is
+implied. Current preparation passes an empty `public_story_summary`, up to six
+accepted Session-local fragments and the bounded memory projection, plus the
+authenticated native Run/visit context when applicable. There is no automatic
+cross-world summary refresh or retrieval service. The
+[reading/research candidate](open_source_comparison.md) changes display only;
+its proposed recap does not alter prompts or Provider behavior.
 
 ## Future Provider and narrative controls
 

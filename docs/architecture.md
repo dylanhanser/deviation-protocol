@@ -44,7 +44,8 @@ normal and mutated variations restore rows, schema, revision, and locks.
 S3 introduced no production writer. Published S4 below owns production
 native insertion and admission; S3 component fixtures retain their own helper. Run-entry caller authorization and Session
 behavior are unchanged. The component neither establishes an integrated playable
-game nor grants later-slice authority. Phase 3.3 remains incomplete.
+game nor grants later-slice authority. Phase 3.3 was incomplete at the S3 baseline;
+current bounded closure is recorded under S7-5 below.
 
 ## P3.3-S4 published internal admission component
 
@@ -61,8 +62,8 @@ S7-2 follows its independently approved plan at `2c272487`; implementation is
 published at `6dfbd37` with bounded local browser evidence. The S7-3 plan is independently approved and published at `0ea295e`;
 P01–P09 are approved and implementation is published at `0b20dcd` with bounded
 local browser evidence. S7-4 implementation is approved and published at `f49ee342`.
-[S7-5 integration/acceptance](phase_3_3_s7_5_integration_acceptance.md) is ready for
-independent review; formal Phase 3.3 closure remains pending.
+[S7-5 integration/acceptance](phase_3_3_s7_5_integration_acceptance.md) is independently
+approved and published at `a35a1bf`; bounded S7 and Phase 3.3 are complete.
 
 `NativeRunAdmissionService.enter` is available from normal `build_default_services`
 and the explicit native builder, with no connection opened during construction.
@@ -287,8 +288,9 @@ described above; S5 internal implementation and S6 public integration are
 published. S7-1 is published at `41d68aac` under the approved plan
 at `9fab18d`; S7-2 implementation is published at `6dfbd37`. S7-3 plan is published at `0ea295e`, P01–P09 are approved, and its authorized
 implementation is published at `0b20dcd` with inspected bounded browser evidence.
-S7-4 is approved and published at `f49ee342`; S7-5 integration/acceptance awaits review. The
-complete Run Protocol and Phase 3.3 remain incomplete.
+S7-4 is approved and published at `f49ee342`; S7-5 integration/acceptance is
+independently approved and published at `a35a1bf`, closing the bounded S7 and
+Phase 3.3 scope with DF-001/DF-002 and the existing evidence limits preserved.
 
 Legacy Run revisions 1/2/3 and their proof, binding, participation, V1
 evidence, replay, recovery, production, Demo, Web, and Dynamic Narrative
@@ -1148,6 +1150,20 @@ Ctrl+C launcher shutdown, and final owned-process and port cleanup. Phase 3.2b
 and Phase 3.2 are complete; this deterministic local Demo acceptance does not
 establish production readiness or implement later final-product systems.
 
+## Compatible reading presentation candidate
+
+The [2026-09-20 comparison](open_source_comparison.md) adds a pure Web
+`SessionReading` component after the existing client association checks. It
+receives the selected current/historical View and stale marker, renders plain
+text paragraphs, keeps resources/clocks visible and places bounded recaps,
+memory counts and diagnostics in native disclosures. App retains every request,
+consent, history-navigation, terminal and recovery handler. Setup controls follow
+the story during play without changing their disabled conditions. No backend,
+prompt, schema, content, dependency or persistence implementation changes.
+Memory remains local to each visit; Run history and authenticated arrival context
+provide separate bounded continuity. Proposed cross-world recap and conflict
+contracts are not implemented or approved by this research.
+
 ## Current public action composition
 
 `SessionService` derives `action_affordances` from the current locked/validated
@@ -1751,8 +1767,9 @@ The Web keeps successor storage v1/current recovery separate from historical
 display, validates the reciprocal GET edge and complete View associations, and
 returns by GET without enabling predecessor writes or accepting stale reads.
 S7-3 adds the bounded held-receipt archive revisit and one-use regional entry.
-The bounded canon transition is published in S7-4; S7-5 reconciles final integration for independent review.
-S7 and Phase 3.3 remain incomplete.
+The bounded canon transition is published in S7-4; S7-5 final integration is approved and published at `a35a1bf`.
+That publication closes the bounded S7/Phase 3.3 scope, without claiming
+production Provider acceptance or broader release readiness.
 
 ## P3.3-S7-3 published regional revisit
 
@@ -1823,7 +1840,7 @@ remain separate from publication and the subsequently inspected
 Earlier CHANGES_REQUIRED/correction records remain history; implementation is
 published at `0b20dcd1d0ec2a6264dacd9e27c3d9dc37d3c597`. S7-4 owns
 canon-preserving line transitions/normal completion; its approved implementation contract is below.
-S7-5 integration/acceptance is ready for independent review. Formal S7 and Phase 3.3 closure remains pending.
+S7-5 integration/acceptance is independently approved and published at `a35a1bf`. Bounded S7 and Phase 3.3 are complete; broader readiness is unchanged.
 
 ## P3.3-S7-4 published canon closure and normal completion
 

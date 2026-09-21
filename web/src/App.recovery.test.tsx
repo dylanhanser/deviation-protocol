@@ -69,7 +69,7 @@ describe("native admission and storage recovery", () => {
 
     function expectNoLoadedGameplay() {
       expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
-      expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+      expect(screen.queryByRole("article")).not.toBeInTheDocument();
       expect(screen.queryByRole("region", {name: "Run 设置"})).not.toBeInTheDocument();
     }
 
@@ -125,6 +125,7 @@ describe("native admission and storage recovery", () => {
           fireEvent.click(screen.getByRole("button", {name: "手动重试安全 GET"}));
         }
         await screen.findByText("当前 Session：session-public-1");
+        fireEvent.click(screen.getByText("场景提示与技术信息"));
         expect(screen.getByRole("region", {name: "Run 设置"})).toBeVisible();
         expect(events).toEqual(["admission", ...Array<string>(kind === "matching View" ? 1 : 3).fill("view after storage")]);
         expect(unexpectedPosts).toBe(0);
@@ -237,6 +238,7 @@ describe("native admission and storage recovery", () => {
         fireEvent.click(await screen.findByRole("button", {name: "重试读取权威 View"}));
         if (kind === "matching View") {
           await screen.findByText("当前 Session：session-public-1");
+          fireEvent.click(screen.getByText("场景提示与技术信息"));
           expect(screen.getByRole("region", {name: "Run 设置"})).toBeVisible();
         } else {
           await screen.findByText(/权威 View 读取失败：.*CONTRACT_MISMATCH/);
@@ -398,6 +400,7 @@ describe("native admission and storage recovery", () => {
     server.use(scenarioHandler(),...postGuards(() => {posts++;}),http.post(`${apiOrigin}/v1/runs/native`,() => {posts++;return HttpResponse.json(response);}),
       http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});}));
     const page=renderRecoveryApp(); await screen.findByText("当前 Session：session-public-1");
+    fireEvent.click(screen.getByText("场景提示与技术信息"));
     expect(screen.getByRole("region",{name:"Run 设置"})).toBeVisible(); page.unmount();
     server.use(http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json(errorFixture("SESSION_NOT_FOUND","Session was not found"),{status:404});}));
     renderRecoveryApp(); await screen.findByRole("heading",{name:"自动恢复已暂停"});
@@ -646,7 +649,7 @@ describe("same-tab Session reload recovery", () => {
       expect(actionIdentityFactory).not.toHaveBeenCalled();
       expect(screen.queryByText("当前 Session：old-session")).not.toBeInTheDocument();
       expect(screen.queryByText(/confirmed-202 request/)).not.toBeInTheDocument();
-      expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+      expect(screen.queryByRole("article")).not.toBeInTheDocument();
       expect(
         screen.queryByRole("heading", { name: "当前可执行行动" }),
       ).not.toBeInTheDocument();
@@ -774,7 +777,7 @@ describe("same-tab Session reload recovery", () => {
     expect(
       screen.queryByRole("heading", { name: "当前可执行行动" }),
     ).not.toBeInTheDocument();
-    expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
     expect(
       await screen.findByRole("button", { name: "进入 Run" }),
     ).toBeDisabled();
@@ -840,7 +843,7 @@ describe("same-tab Session reload recovery", () => {
     );
 
     expect(storedRecoveryRecord()).toBeNull();
-    expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("heading", { name: "当前可执行行动" }),
     ).not.toBeInTheDocument();

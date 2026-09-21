@@ -588,8 +588,9 @@ describe("Player Character selection and Run entry", () => {
     expect(
       screen.getByRole("button", { name: "检查灯塔信号" }),
     ).toBeVisible();
+    await user.click(screen.getByText("角色与记忆"));
     expect(screen.getByText("公开玩家状态")).toBeVisible();
-    expect(screen.getByText("clock.public.tide：2 / 8")).toBeVisible();
+    expect(screen.getByRole("region", {name: "当前资源与时钟"})).toHaveTextContent("clock.public.tide2 / 8");
     expect(entryBody).toEqual(runEntryRequestFixture);
     expect(entryKey).toBe("web-mutation-ui-test");
     expect(entryCount).toBe(1);
@@ -727,7 +728,7 @@ describe("Player Character selection and Run entry", () => {
       screen.getByText(/已进入 Run 并保存 Session：session-public-2/),
     ).toBeVisible();
     expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
-    expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
     expect(storedRecoveryRecord()).toEqual({
       version: 1,
       session_id: "session-public-2",
@@ -1060,7 +1061,8 @@ describe("manual PlayerSessionView reads", () => {
       screen.getByRole("button", { name: "读取 PlayerSessionView" }),
     );
 
-    expect(await screen.findByText("长期记忆")).toBeVisible();
+    await user.click(await screen.findByText("角色与记忆"));
+    expect(screen.getByText("长期记忆")).toBeVisible();
     expect(screen.getByText("当前公开正文")).toBeVisible();
     expect(readCount).toBe(1);
     expect(storedRecoveryRecord()).toEqual({
@@ -1089,6 +1091,7 @@ describe("manual PlayerSessionView reads", () => {
 
     expect(await screen.findByText("FAILED")).toBeVisible();
     expect(screen.getByRole("heading", { name: "信号沉没" })).toBeVisible();
+    await user.click(screen.getByText("场景提示与技术信息"));
     expect(screen.getByText("Ending ID：ending.public.failed")).toBeVisible();
     expect(screen.getByText(/停止条件：/)).toHaveTextContent("SCENARIO_ENDED");
   });
@@ -1136,10 +1139,11 @@ describe("manual PlayerSessionView reads", () => {
       screen.getByRole("button", { name: "读取 PlayerSessionView" }),
     );
     await screen.findByText("当前 Session：session-public-1");
-    expect(screen.getByText("PlayerSessionView")).toBeVisible();
+    expect(screen.getByRole("article")).toBeVisible();
 
-    await user.clear(input);
-    await user.type(input, "missing");
+    const currentInput = screen.getByLabelText("Session ID");
+    await user.clear(currentInput);
+    await user.type(currentInput, "missing");
     await user.click(
       screen.getByRole("button", { name: "读取 PlayerSessionView" }),
     );
@@ -1148,7 +1152,7 @@ describe("manual PlayerSessionView reads", () => {
       "HTTP 404 · SESSION_NOT_FOUND · Requested session was not found",
     );
     expect(screen.queryByText(/当前 Session：/)).not.toBeInTheDocument();
-    expect(screen.queryByText("PlayerSessionView")).not.toBeInTheDocument();
+    expect(screen.queryByRole("article")).not.toBeInTheDocument();
     expect(screen.queryByText("session-public-1")).not.toBeInTheDocument();
   });
 

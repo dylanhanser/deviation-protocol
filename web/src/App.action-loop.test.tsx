@@ -970,14 +970,14 @@ function readRenderedCanonicalPresentation(container: HTMLElement) {
   return {
     scenarioTitle: view.querySelector("#session-view-heading")?.textContent,
     sceneTitle: view.querySelector("#scene-heading")?.textContent,
-    sceneSummary: view.querySelector("#session-view-heading + p")?.textContent,
+    sceneSummary: view.querySelector("#scene-heading + .narrative-prose")?.textContent,
     choiceLabels: Array.from(
       container.querySelectorAll(".decision-choices button"),
       (button) => button.textContent,
     ),
     endingTitle: view.querySelector("#ending-heading")?.textContent ?? null,
     endingSummary:
-      view.querySelector("#ending-heading + p")?.textContent ?? null,
+      view.querySelector("#ending-heading + .narrative-prose")?.textContent ?? null,
   };
 }
 
@@ -1198,7 +1198,7 @@ describe("action_affordances and synchronous lifecycle", () => {
 
     await user.click(screen.getByRole("button", { name: "观察周围可见的环境。" }));
     await waitFor(() => expect(committedVersion).toBe(1));
-    expect(screen.getAllByText(anchor)).toHaveLength(2);
+    expect(screen.getAllByText(anchor)).toHaveLength(1);
 
     await submitCustom("检查可见的地面标记，但不要触碰任何物品。", 2);
     await user.click(screen.getByRole("button", { name: "询问发生了什么变化。" }));
@@ -1353,10 +1353,11 @@ describe("action_affordances and synchronous lifecycle", () => {
           within(suggestionGroup).getByRole("button", { name: text }),
         ).toBeVisible();
       }
+      await user.click(screen.getByText("角色与记忆"));
       const playerState = screen
         .getByRole("heading", { name: "公开玩家状态" })
         .closest("section");
-      expect(playerState).toHaveTextContent(`可见 NPC${visibleNpcs.length}`);
+      expect(playerState).toHaveTextContent(`可见 NPC ${visibleNpcs.length}`);
       expect(
         screen.getByRole("button", { name: "提交自由行动" }),
       ).toBeVisible();
@@ -1925,6 +1926,7 @@ describe("action_affordances and synchronous lifecycle", () => {
     expect(viewVersions).toEqual(
       Array.from({ length: 20 }, (_, version) => version),
     );
+    await user.click(screen.getByText("场景提示与技术信息"));
     expect(screen.getByText("ENDED")).toBeVisible();
     expect(screen.getByText("RESOLVED")).toBeVisible();
     expect(
@@ -1940,10 +1942,12 @@ describe("action_affordances and synchronous lifecycle", () => {
         "处置规程被阻止，你的生命状态获得了可验证的承认。",
       ),
     ).toBeVisible();
-    expect(screen.getByText("disposal_protocol：4 / 12")).toBeVisible();
-    expect(
-      screen.getByText("predicted_death_deadline：12 / 13"),
-    ).toBeVisible();
+    const conditions = screen.getByRole("region", { name: "当前资源与时钟" });
+    expect(within(conditions).getByText("disposal_protocol").parentElement)
+      .toHaveTextContent("disposal_protocol4 / 12");
+    expect(within(conditions).getByText("predicted_death_deadline").parentElement)
+      .toHaveTextContent("predicted_death_deadline12 / 13");
+    expect(conditions).toBeVisible();
     expect(
       screen.queryByRole("heading", { name: "当前可执行行动" }),
     ).not.toBeInTheDocument();
@@ -2434,6 +2438,7 @@ describe("action_affordances and synchronous lifecycle", () => {
     renderActionApp();
     await loadSession(user);
 
+    await user.click(screen.getByText("场景提示与技术信息"));
     expect(screen.getByText("叙事提示不可执行")).toBeVisible();
     expect(
       screen.queryByRole("button", { name: "叙事提示不可执行" }),
@@ -3148,7 +3153,7 @@ describe("HTTP 202 request-status lifecycle", () => {
     await user.click(within(talkForm).getByRole("button", { name: "提交交谈" }));
 
     await pollStarted.promise;
-    expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(2);
+    expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(1);
     expect(screen.queryAllByText("权威 View 已推进到版本 2。")).toHaveLength(0);
     expect(screen.queryAllByText("权威 View 已推进到版本 99。")).toHaveLength(0);
     expect(within(talkForm).getByRole("button", { name: "提交交谈" })).toBeDisabled();
@@ -3167,7 +3172,7 @@ describe("HTTP 202 request-status lifecycle", () => {
     expect(pollWait).toHaveBeenCalledTimes(1);
     expect(pollWait.mock.calls[0]?.[0]).toBe(2_000);
     expect(screen.getByText("权威 View：当前")).toBeVisible();
-    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(2);
+    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(1);
     expect(screen.queryAllByText("权威 View 已推进到版本 99。")).toHaveLength(0);
     expect(storedRecoveryRecord()).toEqual({
       version: 1,
@@ -3454,7 +3459,7 @@ describe("HTTP 202 request-status lifecycle", () => {
     expect(statusReads).toBe(1);
     expect(pollWait).not.toHaveBeenCalled();
     expect(screen.getByText("权威 View：当前")).toBeVisible();
-    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(2);
+    expect(screen.getAllByText("权威 View 已推进到版本 2。")).toHaveLength(1);
     expect(screen.queryAllByText("权威 View 已推进到版本 3。")).toHaveLength(0);
   });
 
@@ -3522,7 +3527,7 @@ describe("HTTP 202 request-status lifecycle", () => {
       expect(actionPosts).toBe(1);
       expect(statusReads).toBe(1);
       expect(viewReads).toBe(1);
-      expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(2);
+      expect(screen.getAllByText("权威 View 已推进到版本 1。")).toHaveLength(1);
       expect(screen.queryAllByText("权威 View 已推进到版本 2。")).toHaveLength(0);
     },
   );
@@ -3697,9 +3702,7 @@ describe("uncertain actions, stale Views and explicit refresh", () => {
       ).toBeVisible();
       expect(screen.getByText(/该行动可能已经到达服务器/)).toBeVisible();
       expect(screen.queryByText(/行动没有发生|行动未发生/)).not.toBeInTheDocument();
-      const retainedScene = screen
-        .getByRole("heading", { name: "当前场景：封锁线外" })
-        .closest("section");
+      const retainedScene = screen.getByText("场景提示与技术信息").closest("details");
       expect(retainedScene).toHaveTextContent(
         "Frame frame.public-alpha.free-1 · 停止条件：CONTINUE",
       );
@@ -3754,9 +3757,7 @@ describe("uncertain actions, stale Views and explicit refresh", () => {
       await waitFor(() => expect(viewReads).toBe(2));
       expect(screen.getByText("当前 Session：session-public-1")).toBeVisible();
       expect(screen.getByText("权威 View：当前")).toBeVisible();
-      const refreshedScene = screen
-        .getByRole("heading", { name: "当前场景：封锁线外" })
-        .closest("section");
+      const refreshedScene = screen.getByText("场景提示与技术信息").closest("details");
       expect(refreshedScene).toHaveTextContent(
         "Frame frame.public-alpha.free-3 · 停止条件：CONTINUE",
       );

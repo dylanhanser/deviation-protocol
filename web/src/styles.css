@@ -134,6 +134,39 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
+summary:focus-visible {
+  outline: 3px solid #d48633;
+  outline-offset: 2px;
+}
+
+.narrative-prose {
+  max-inline-size: 38em;
+  font-size: clamp(1rem, 0.95rem + 0.3vw, 1.15rem);
+  line-height: 1.9;
+  overflow-wrap: anywhere;
+}
+
+.narrative-prose p {
+  white-space: pre-wrap;
+  margin-block: 0 1.1em;
+}
+
+.reading-details {
+  margin-block: 1rem;
+  border-top: 1px solid #dfe5df;
+}
+
+.reading-details > summary {
+  min-height: 2.75rem;
+  padding-block: 0.75rem;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.narrative-history {
+  padding-inline-start: 1.5rem;
+}
+
 .operation-status,
 .stale-warning {
   margin: 1rem 0;

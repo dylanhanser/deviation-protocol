@@ -189,7 +189,7 @@ it.each(["seal","defer","confirmed-visit","confirmed-predecessor","lost-response
       await waitFor(()=>expect(within(screen.getByRole("article")).getByText(target!,{exact:true})).toBeInTheDocument(),{timeout:10000});
     }
     await screen.findByRole("button",{name:"封存待核记录"});
-    expect(screen.queryByText("正在阅读上一世界的历史。")).not.toBeInTheDocument();
+    expect(screen.queryByText("正在阅读旅程历史；这里只读，不会改变当前进度。")).not.toBeInTheDocument();
     expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
     expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
     expect(demo.calls.slice(marker).every(c=>c.method==="GET")).toBe(true);
@@ -394,6 +394,22 @@ function consistencyFixture() {
   return {view:playerSessionViewSchema.parse(view),journey:nativeRunJourneySchema.parse(journey),status};
 }
 
+function expectReadingIdentity(identity: "current" | "historical" | "unconfirmed") {
+  const article=within(screen.getByRole("article"));
+  const label=identity==="current" ? "权威 View：当前" : identity==="historical"
+    ? "历史访问（只读），不是当前进度。" : "访问关联尚未确认；此 View 不代表已确认的当前进度。";
+  expect(article.getByText(label)).toBeVisible();
+  expect(article.getByRole("region",{name:identity==="current" ? "当前资源与时钟"
+    : identity==="historical" ? "历史资源与时钟" : "所显示访问的资源与时钟"})).toHaveTextContent("8 / 10");
+  expect(article.getByRole("heading",{name:identity==="current" ? "眼下的状况"
+    : identity==="historical" ? "当时的状况" : "此 View 记录的状况"})).toBeVisible();
+  if(identity!=="current") {
+    expect(article.queryByText("权威 View：当前")).not.toBeInTheDocument();
+    expect(article.queryByText(/当前资源以上方显示为准/)).not.toBeInTheDocument();
+    expect(article.queryByRole("heading",{name:"眼下的状况"})).not.toBeInTheDocument();
+  }
+}
+
 it.each(["journey-first","status-first"])("consistency automatic sync %s: schema-valid contradictions block every POST and recover by GET",async(order)=>{
   for(const mode of ["terminal-active","active-terminal","same-revision","session","run","session-version"] as const) {
     const f=consistencyFixture(),calls:string[]=[];
@@ -420,11 +436,14 @@ it.each(["journey-first","status-first"])("consistency automatic sync %s: schema
     }});
     sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,JSON.stringify({version:1,session_id:"third"}));
     const mounted=render(<App client={client}/>),user=userEvent.setup();
+    const set=vi.spyOn(Storage.prototype,"setItem"),remove=vi.spyOn(Storage.prototype,"removeItem");
     try {
       await waitFor(()=>expect(release).toBeDefined());
+      expectReadingIdentity("unconfirmed");
       expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
       await act(async()=>{release!();});
       await within(screen.getByRole("region",{name:"旅程状态"})).findByText(/CONTRACT_MISMATCH/);
+      expectReadingIdentity("unconfirmed");
       await user.click(screen.getByRole("button",{name:"结束本次旅程"}));
       expect(screen.queryByRole("button",{name:"确认永久结束"})).not.toBeInTheDocument();
       expect(screen.queryByRole("button",{name:"继续当前旅程"})).not.toBeInTheDocument();
@@ -432,9 +451,11 @@ it.each(["journey-first","status-first"])("consistency automatic sync %s: schema
       expect(screen.queryByRole("button",{name:"返回设置"})).not.toBeInTheDocument();
       matching=true;await user.click(screen.getByRole("button",{name:"读取旅程状态"}));
       await waitFor(()=>expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled());
+      expectReadingIdentity("current");
       expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
       expect(JSON.parse(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)!).session_id).toBe("third");
-    } finally {mounted.unmount();sessionStorage.clear();}
+      expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
+    } finally {mounted.unmount();vi.restoreAllMocks();sessionStorage.clear();}
   }
 });
 
@@ -451,6 +472,8 @@ it.each(["active","terminated","historical"])("consistency matching %s preserves
       {status:200,headers:{"Content-Type":"application/json"}});
   }});
   sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,JSON.stringify({version:1,session_id:view.metadata.session_id}));
+  const stored=sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY);
+  const set=vi.spyOn(Storage.prototype,"setItem"),remove=vi.spyOn(Storage.prototype,"removeItem");
   const mounted=render(<App client={client}/>);
   try {
     if(mode==="terminated")await waitFor(()=>expect(screen.getByRole("button",{name:"返回设置"})).toBeEnabled());
@@ -462,7 +485,11 @@ it.each(["active","terminated","historical"])("consistency matching %s preserves
       expect(screen.queryByRole("button",{name:"继续当前旅程"})).not.toBeInTheDocument();
     }
     expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
-  } finally {mounted.unmount();}
+    expectReadingIdentity(mode==="historical"?"historical":"current");
+    expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
+    expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
+    expect(calls.filter(c=>c.endsWith("/view"))).toEqual([`GET /v1/sessions/${view.metadata.session_id}/view`]);
+  } finally {mounted.unmount();vi.restoreAllMocks();}
 });
 
 it.each(["open-confirmation","uncertain-request","history-read"])("consistency %s cannot authorize a POST after mismatching reconciliation",async(mode)=>{
@@ -560,4 +587,109 @@ it("consistency revisit confirmation rechecks shared authority and preserves GET
     await waitFor(()=>expect(screen.getByRole("button",{name:"继续当前旅程"})).toBeEnabled());
     expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
   } finally {mounted.unmount();}
+});
+
+it.each(["failed","contradictory"])("reading identity: restored history loses authority during pending and %s reconciliation",async(mode)=>{
+  const pair=recoveryPair(),calls:string[]=[];
+  let phase:"initial"|"pending"|"valid"="initial",release:(()=>void)|undefined;
+  const client=new PublicApiClient({baseUrl:"http://reading/",fetchImplementation:async(input,init)=>{
+    const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
+    let body:unknown;
+    if(route.endsWith("/view")) body=playerSessionViewSchema.parse(pair.source);
+    else if(route.endsWith("/run-completion")) body=completionStatusFixture(pair.historical);
+    else if(route.endsWith("/run-journey")) {
+      if(phase==="pending") {
+        await new Promise<void>(resolve=>{release=resolve;});
+        if(mode==="failed")throw new TypeError("journey unavailable");
+      }
+      body=nativeRunJourneySchema.parse({...pair.historical,...(phase==="pending"?{run_state_version:6,lifecycle_status:"terminated"}:{})});
+    } else body=nativeRunStatusSchema.parse({schema_version:"native-run-status/v1",session_id:"second",run_id:pair.result.run_id,
+      session_state_version:7,run_state_version:5,lifecycle_status:"active",can_exit:false});
+    return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
+  }});
+  const stored=JSON.stringify({version:1,session_id:"second"});sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,stored);
+  const set=vi.spyOn(Storage.prototype,"setItem"),remove=vi.spyOn(Storage.prototype,"removeItem");
+  const mounted=render(<App client={client}/>),user=userEvent.setup();
+  try {
+    await screen.findByText("历史访问（只读），不是当前进度。");
+    await act(async()=>{});
+    expectReadingIdentity("historical");
+    phase="pending";await user.click(screen.getByRole("button",{name:"读取旅程状态"}));
+    await waitFor(()=>expect(release).toBeDefined());expectReadingIdentity("unconfirmed");
+    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
+    await act(async()=>{release!();});
+    await waitFor(()=>expect(screen.getByRole("button",{name:"读取旅程状态"})).toBeEnabled());
+    expectReadingIdentity("unconfirmed");
+    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeDisabled();
+    phase="valid";await user.click(screen.getByRole("button",{name:"读取旅程状态"}));
+    await screen.findByText("历史访问（只读），不是当前进度。");expectReadingIdentity("historical");
+    expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
+    expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
+    expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
+    expect(calls.filter(c=>c.endsWith("/view"))).toEqual([
+      "GET /v1/sessions/second/view", // Initial recovery.
+      "GET /v1/sessions/second/view", // Explicit failed reconciliation.
+      "GET /v1/sessions/second/view", // Explicit successful reconciliation.
+    ]);
+  } finally {mounted.unmount();vi.restoreAllMocks();}
+});
+
+it("reading identity: explicit history and return keep current recovery storage and use only GET",async()=>{
+  const f=consistencyFixture(),pair=recoveryPair(),calls:string[]=[];
+  const historical=nativeRunJourneySchema.parse({...pair.historical,current:f.journey.current,successor:f.journey.current});
+  const client=new PublicApiClient({baseUrl:"http://reading-navigation/",fetchImplementation:async(input,init)=>{
+    const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
+    const second=route.includes("/second/"),journey=second?historical:f.journey;
+    const body=route.endsWith("/view") ? playerSessionViewSchema.parse(second?pair.source:f.view)
+      : route.endsWith("/run-journey") ? journey : route.endsWith("/run-completion") ? completionStatusFixture(journey) : f.status;
+    return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
+  }});
+  const stored=JSON.stringify({version:1,session_id:"third"});sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,stored);
+  const set=vi.spyOn(Storage.prototype,"setItem"),remove=vi.spyOn(Storage.prototype,"removeItem");
+  const mounted=render(<App client={client}/>),user=userEvent.setup();
+  try {
+    await screen.findByText("权威 View：当前");expectReadingIdentity("current");
+    await user.click(screen.getByRole("button",{name:"查看上一世界历史"}));
+    await screen.findByText("历史访问（只读），不是当前进度。");expectReadingIdentity("historical");
+    expect(screen.queryByRole("button",{name:"结束本次旅程"})).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button",{name:"返回当前世界"}));
+    await screen.findByText("权威 View：当前");expectReadingIdentity("current");
+    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled();
+    expect(calls.filter(c=>c.endsWith("/view"))).toEqual(["GET /v1/sessions/third/view","GET /v1/sessions/second/view","GET /v1/sessions/third/view"]);
+    expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
+    expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
+    expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
+  } finally {mounted.unmount();vi.restoreAllMocks();}
+});
+
+it("reading identity: late historical association from a replaced client cannot relabel the same Session",async()=>{
+  const pair=recoveryPair(),calls:string[]=[];let reads=0,release:(()=>void)|undefined;
+  const makeClient=(old:boolean)=>new PublicApiClient({baseUrl:"http://reading-late/",fetchImplementation:async(input,init)=>{
+    const route=new URL(String(input)).pathname;calls.push(`${init?.method??"GET"} ${route}`);
+    const journey=old?pair.historical:pair.before;
+    let body:unknown;
+    if(route.endsWith("/view"))body=playerSessionViewSchema.parse(pair.source);
+    else if(route.endsWith("/run-journey")) {
+      body=journey;
+      if(old && ++reads===2)await new Promise<void>(resolve=>{release=resolve;});
+    } else if(route.endsWith("/run-completion"))body=completionStatusFixture(journey);
+    else body=nativeRunStatusSchema.parse({schema_version:"native-run-status/v1",session_id:"second",run_id:pair.result.run_id,
+      session_state_version:7,run_state_version:journey.run_state_version,lifecycle_status:"active",can_exit:!old});
+    return new Response(JSON.stringify(body),{status:200,headers:{"Content-Type":"application/json"}});
+  }});
+  const stored=JSON.stringify({version:1,session_id:"second"});sessionStorage.setItem(SESSION_RECOVERY_STORAGE_KEY,stored);
+  const set=vi.spyOn(Storage.prototype,"setItem"),remove=vi.spyOn(Storage.prototype,"removeItem");
+  const mounted=render(<App client={makeClient(true)}/>);
+  try {
+    await waitFor(()=>expect(release).toBeDefined());
+    // The completed recovery read proved this history before the background read.
+    expectReadingIdentity("historical");
+    mounted.rerender(<App client={makeClient(false)}/>);
+    await screen.findByText("权威 View：当前");expectReadingIdentity("current");
+    await act(async()=>{release!();});expectReadingIdentity("current");
+    expect(screen.getByRole("button",{name:"结束本次旅程"})).toBeEnabled();
+    expect(calls.every(c=>c.startsWith("GET"))).toBe(true);
+    expect(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)).toBe(stored);
+    expect(set).not.toHaveBeenCalled();expect(remove).not.toHaveBeenCalled();
+  } finally {mounted.unmount();vi.restoreAllMocks();}
 });

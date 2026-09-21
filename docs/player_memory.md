@@ -1,5 +1,22 @@
 # 玩家长期记忆（Phase 2.3b）
 
+## 当前跨世界范围（2026-09-20 对账）
+
+Phase 3.3/S7-5 已独立批准并发布于 `a35a1bf`，不改变本文的记忆权威。
+S7 的访问、根状态、参与关系、续接/重访/完成凭据独立保存旅程历史；
+`prepare_world_continuation_initialization` 与 `prepare_regional_revisit_initialization`
+携带完整 `PlayerState`，为目标 Session 建立新的本地 memory/runtime，
+不把旧 Session 的 `PlayerMemoryState` 拼接进新副本。旧 Session 仍可按所有权只读访问。
+因此本文的单 scenario 生命周期限制不能解释为“整个产品没有跨世界旅程”，
+现有旅程历史也不能解释为“已实现角色级跨世界记忆检索”。
+
+Provider 已使用最多六段本 Session 的已接受正文、有界公开 memory projection，
+以及受认证的 Run/visit 注释；生产 narrative prepare 的 `public_story_summary`
+目前为空字符串，没有摘要生成、刷新、压缩或重建 worker。
+本次 Web 阅读改进单独显示索引同步状态和投影截断状态，标明访问范围；
+正文回顾只读，不能生成新事实、NPC 身份或记忆。
+[后续方案](open_source_comparison.md#product-decisions) 尚未批准。
+
 ## 唯一事实来源
 
 长期记忆只索引可信历史，不覆盖当前权威状态：

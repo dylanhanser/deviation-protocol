@@ -83,7 +83,8 @@ exclude internal evidence, compiled context, private state and hidden informatio
 presentation and model output create no mechanics or canon authority.
 
 Published S6 adds neither production Provider integration nor S7 continuity
-or Phase 3.4 relationship/residence state. Phase 3.3 remains incomplete.
+or Phase 3.4 relationship/residence state. Phase 3.3 was incomplete at that
+component baseline; current bounded closure is recorded under S7-5 below.
 [The S6 evidence record](run_protocol.md#s6-publication-and-local-browser-evidence)
 separates automated evidence from subsequently authorized representative local
 Demo browser acceptance, including its unobserved storage ordering, failed saved
@@ -1334,6 +1335,38 @@ after a failure ending. The value is projected only from the restored
 authoritative scenario runtime status. Clients must not infer success or
 failure from `ending_id`, ending presentation, narrative text or player memory.
 
+### Reading presentation (2026-09-20 compatible candidate)
+
+`SessionReading` consumes only the already validated `PlayerSessionView`. Scene
+and accepted prose precede secondary details; blank lines produce paragraphs,
+single newlines remain visible, and apparent HTML/Markdown remains literal text.
+The latest accepted segment appears once; earlier returned segments remain in
+chronological order under a native disclosure. This bounded window is explicitly
+not a complete transcript. Current resources/clocks and ending copy remain visible.
+Memory disclosures distinguish `complete`/`sync_status` from `truncated`, show
+returned/total counts, and label the displayed Session/visit scope.
+
+Historical reading is explicitly read-only and never labelled current progress.
+This includes restoring an older stored Session: the owner-bound, validated
+Journey association identifies its View as the current visit or an older visit.
+A recovery read that has already passed the existing full association checks
+may retain its historical label during the initial background reconciliation;
+that presentation evidence expires on a new operation, client/View replacement
+or failed reconciliation. Unvalidated, failed, contradictory or stale associations
+use unconfirmed reading and resource wording; retained arrival text cannot
+establish identity. Pending responses themselves never establish reading identity.
+Validated explicit history navigation remains historical, and legacy Views keep
+their existing presentation. Labels never adopt a successor, rewrite recovery
+storage or dispatch a request.
+The caller retains all historical navigation, lifecycle, consent and stale-response
+checks. Disclosure toggles dispatch no request and write no recovery storage.
+During play the existing setup/manual-read controls follow the reading/action
+area in DOM order; before entry they remain primary. Recovery and error notices,
+explicit confirmations and the exact Demo warning stay available. No DTO, API,
+action vocabulary, mutation, automatic scroll/focus or storage format changes.
+This is a bounded reading improvement, not implementation of the final three-action
+normalization model, full memory browser, or browser accessibility acceptance.
+
 ## Action affordances
 
 `action_affordances.mode` has three states:
@@ -1711,7 +1744,8 @@ in the correction evidence map; incoming counts remain historical. The [evidence
 source applicability. Subsequent authorized local browser results and their
 storage/request-body/private-authority limitations are recorded in
 [S7-2 publication evidence](run_protocol.md#s7-2-publication-and-local-browser-evidence).
-This planning task performed no new browser execution. S7/Phase 3.3 remain incomplete.
+That planning task performed no new browser execution; S7/Phase 3.3 were
+incomplete at its baseline. Current closure is recorded under S7-5 below.
 
 ## P3.3-S7-3 journey navigation and regional return
 
@@ -1790,7 +1824,8 @@ corrections remain historical records; current implementation is published at
 `0b20dcd`. See [the evidence map](run_protocol.md#s7-3-implementation-candidate-evidence)
 and [inspected browser record](run_protocol.md#s7-3-publication-and-bounded-browser-evidence)
 for distinct source applicability and limits. No browser was run in this planning
-task. S7 and Phase 3.3 remain incomplete.
+task. S7 and Phase 3.3 were incomplete at that planning baseline; current closure
+is recorded under S7-5 below.
 
 ## P3.3-S7-4 published explicit completion contract
 
@@ -1840,4 +1875,4 @@ failed clear blocks new admission. New character/profile/world selections and
 admission confirmation remain separate. DF-001/DF-002 stay deferred. Separately
 authorized S7-4 browser acceptance demonstrates the bounded completion/exit/history/
 fresh-entry/restart flow; storage-call ordering remains rendered-test evidence,
-not browser-observed. S7-5 final reconciliation is ready for independent review.
+not browser-observed. S7-5 final reconciliation is independently approved and published at `a35a1bf`.
