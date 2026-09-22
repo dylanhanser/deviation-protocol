@@ -1551,27 +1551,39 @@ under the published parent plan.
 
 ## Phase 3.4: NPC Relationship and Temporary Residence
 
-Status: **First bounded 雾哨站 slice implemented as an uncommitted candidate.**
+Status: **First bounded 雾哨站 slice published at
+`57b107e8b3c004c8ff8b07f8b6e50b925d093f31`; one bounded later visit is an
+uncommitted implementation candidate, pending independent review and browser acceptance.**
 
-Authorized against `96200883dd00d8639c91579b9518175e197ce856`: a second native
-starting world, adult patrol officer 岑舟 (32), two engine-confirmed relationship
-advancements, one optional residence with three unique activities, explicit
-departure, same-Session farewell, authored ending and existing explicit Run exit.
-It uses fixed text and the existing atomic snapshot/event/receipt persistence;
-there is no schema migration or published continuation-graph change. Later-Session
-NPC recovery and cross-Run relationship continuity remain unimplemented. The
-original 33-path candidate received independent `APPROVED`; subsequent browser
-acceptance was `FAILED` for one P2: the frozen station preparation displayed the
-literal original-world title. The presentation-only correction binds that title
-to the preparation's versioned public world definition and awaits focused
-independent re-review, then a narrow original-world/station label and refresh
-retest. The original approval and failed browser result remain historical;
-applicable A/B/C gameplay evidence is retained. This revised candidate is not
-independently approved, browser accepted, published or full Phase 3.4 completion.
-Prior Phase 3.3, D1, D2/D3, multiline feedback and opening
-talents remain published and closed. Opening talent browser A/B/C and D's
-independent automated-only evidence retain their original scope. DF-001/DF-002
-retain their existing dispositions; Phase 6/7 and Provider distribution stay paused.
+The published first slice includes same-Session relationship progression, optional
+residence, actual-only farewell and explicit Run exit. Its original independent
+approval, original browser `FAILED` title finding, focused title re-review and
+passing narrow browser retest remain historical evidence; publication is confirmed.
+They do not approve the new candidate.
+
+The authorized next increment adds one explicitly confirmed second Session in the
+same Run/world, 巡路风口, available from all four station endings while active.
+岑舟 references at most two verified previous experiences; the player helps remove
+an unstable signal light or safely bypasses it, then explicitly says goodbye.
+Visit ending retains the active Run; explicit exit terminates it. No third visit,
+new stay, relationship-state inheritance, rewards, costs or Provider calls are added.
+A separate closed evidence family binds exact content, source snapshot/events and
+NPC mapping. The narrow 0013 migration extends only three existing CHECKs; old
+roots and entry evidence remain valid. See the station contract for boundaries.
+
+Component/HTTP integration, targeted MySQL migration/recovery and Web automated
+checks are candidate evidence only. Independent patrol review returned
+`CHANGES_REQUIRED` for R1/P2: original admission/confirmation replay rejected the
+new continued and terminated Fog Run families. The correction adds those exact
+families to the shared historical replay path, with public Demo and MySQL
+regressions before continuation, after continuation and after explicit exit.
+R1 awaits focused independent re-review; the original failed reproduction and
+unaffected review conclusions remain applicable history.
+Browser acceptance follows independent review;
+no limited-trial/broader-release claim or full Phase 3.4 completion is made.
+D1, the bounded escort encounter, input feedback and opening talents remain
+published. DF-001/DF-002 retain their dispositions; Phase 6/7 and Provider
+production distribution remain outside this increment.
 
 Phase 3.4 owns engine-confirmed relationship progression, residence eligibility
 and lifecycle, bounded dialogue, temporary fixed-scene activities, departure,

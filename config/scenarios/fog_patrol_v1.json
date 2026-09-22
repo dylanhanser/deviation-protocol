@@ -1,0 +1,585 @@
+{
+  "schema_version": 1,
+  "content_version": "fog-patrol-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "fog-patrol-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.fog_station.traveler",
+        "display_name": "旅人",
+        "tags": [
+          "player"
+        ],
+        "resource_caps": [
+          {
+            "key": "composure",
+            "value": 100
+          }
+        ]
+      },
+      {
+        "definition_id": "character.fog_station.patrol",
+        "display_name": "岑舟",
+        "tags": [
+          "npc",
+          "adult"
+        ]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.fog_patrol.cen_zhou",
+        "character_definition_id": "character.fog_station.patrol",
+        "display_name": "岑舟",
+        "persona_summary": "32 岁的成年巡路员。谨慎、坦率，只谈已公开的巡路经历。尊重玩家离开的选择，不作永久承诺。"
+      }
+    ],
+    "items": [],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "fog_patrol",
+      "schema_version": 1,
+      "content_version": "fog-patrol-1.0.0",
+      "title": "巡路风口",
+      "summary": "沿着雾哨站外的巡路前行，风口处有一盏偏斜的信号灯。岑舟正在护栏内收拢绳索，灯架每次晃动，远雾中便亮起一道错位的光。",
+      "initial_phase_id": "fog_patrol.arrival",
+      "initial_location_id": "fog_patrol.path",
+      "phases": [
+        {
+          "phase_id": "fog_patrol.arrival",
+          "title": "风口再会",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_patrol.decision.arrival"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_patrol.transition.meet",
+              "target_phase_id": "fog_patrol.met",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "met"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_patrol.met",
+          "title": "摇晃的灯架",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_patrol.decision.met"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_patrol.transition.help",
+              "target_phase_id": "fog_patrol.secured",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "secured"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_patrol.transition.bypass",
+              "target_phase_id": "fog_patrol.passed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "passed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_patrol.secured",
+          "title": "灯火落下",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_patrol.decision.secured"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_patrol.transition.farewell_help",
+              "target_phase_id": "fog_patrol.helped",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "helped"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_patrol.passed",
+          "title": "背风小径",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_patrol.decision.passed"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_patrol.transition.farewell_bypass",
+              "target_phase_id": "fog_patrol.bypassed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "bypassed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_patrol.helped",
+          "title": "风口道别",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true,
+          "rapid_decision_allowed": false,
+          "decision_window_ids": [],
+          "action_time_costs": [],
+          "transitions": []
+        },
+        {
+          "phase_id": "fog_patrol.bypassed",
+          "title": "各循其路",
+          "visible_location_ids": [
+            "fog_patrol.path"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true,
+          "rapid_decision_allowed": false,
+          "decision_window_ids": [],
+          "action_time_costs": [],
+          "transitions": []
+        }
+      ],
+      "locations": [
+        {
+          "location_id": "fog_patrol.path",
+          "title": "巡路风口",
+          "summary": "护栏内的背风小径绕过灯架，坡下的雾光随着金属震动明灭。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.fog_patrol.cen_zhou"
+          ]
+        }
+      ],
+      "npc_references": [
+        {
+          "npc_definition_id": "npc.fog_patrol.cen_zhou"
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "fog_patrol.fact.progress",
+          "kind": "MUTABLE",
+          "visibility": "HIDDEN",
+          "value": "arrival",
+          "mutable_transitions": [
+            {
+              "from_value": "arrival",
+              "to_value": "met",
+              "event_type": "fog_patrol.event.meet"
+            },
+            {
+              "from_value": "met",
+              "to_value": "secured",
+              "event_type": "fog_patrol.event.help"
+            },
+            {
+              "from_value": "met",
+              "to_value": "passed",
+              "event_type": "fog_patrol.event.bypass"
+            },
+            {
+              "from_value": "secured",
+              "to_value": "helped",
+              "event_type": "fog_patrol.event.farewell_help"
+            },
+            {
+              "from_value": "passed",
+              "to_value": "bypassed",
+              "event_type": "fog_patrol.event.farewell_bypass"
+            }
+          ]
+        }
+      ],
+      "clues": [],
+      "clue_groups": [],
+      "threat_clocks": [],
+      "decision_windows": [
+        {
+          "decision_id": "fog_patrol.decision.arrival",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "arrival"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_patrol.choice.meet",
+              "action_type": "choose",
+              "label_hint": "走近岑舟，打个招呼",
+              "target_ids": [
+                "npc.fog_patrol.cen_zhou"
+              ],
+              "server_event_type": "fog_patrol.event.meet",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "met"
+                }
+              ],
+              "new_location_id": "fog_patrol.path",
+              "server_narrative_text": "岑舟抬起头，认出了你。他把绳索移向背风处，给你留出站脚的位置。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_patrol.decision.met",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "met"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_patrol.choice.help",
+              "action_type": "choose",
+              "label_hint": "在护栏内拉稳绳索，协助拆灯",
+              "target_ids": [
+                "npc.fog_patrol.cen_zhou"
+              ],
+              "server_event_type": "fog_patrol.event.help",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "secured"
+                }
+              ],
+              "new_location_id": "fog_patrol.path",
+              "server_narrative_text": "你稳住绳索，岑舟卸下灯具。金属不再颤动，雾中的错位光也熄灭了；你们把灯具放入巡路箱。"
+            },
+            {
+              "action_id": "fog_patrol.choice.bypass",
+              "action_type": "choose",
+              "label_hint": "沿背风小径安全绕行",
+              "target_ids": [
+                "npc.fog_patrol.cen_zhou"
+              ],
+              "server_event_type": "fog_patrol.event.bypass",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "passed"
+                }
+              ],
+              "new_location_id": "fog_patrol.path",
+              "server_narrative_text": "你沿护栏内的背风小径绕过灯架。岑舟收紧警戒绳，封住危险路段，留待巡路队处理。你没有参与拆灯。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_patrol.decision.secured",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "secured"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_patrol.choice.farewell_help",
+              "action_type": "choose",
+              "label_hint": "向岑舟道别，离开风口",
+              "target_ids": [
+                "npc.fog_patrol.cen_zhou"
+              ],
+              "server_event_type": "fog_patrol.event.farewell_help",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "helped"
+                }
+              ],
+              "new_location_id": "fog_patrol.path",
+              "server_narrative_text": "你与岑舟道别。他带着卸下的信号灯回站，你走到小径另一端。这一段旅程已经结束，暂时没有可继续的内容。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_patrol.decision.passed",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "passed"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_patrol.choice.farewell_bypass",
+              "action_type": "choose",
+              "label_hint": "向岑舟道别，继续走远",
+              "target_ids": [
+                "npc.fog_patrol.cen_zhou"
+              ],
+              "server_event_type": "fog_patrol.event.farewell_bypass",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_patrol.fact.progress",
+                  "value": "bypassed"
+                }
+              ],
+              "new_location_id": "fog_patrol.path",
+              "server_narrative_text": "你向岑舟道别。他留在警戒绳边，你沿小径走远。这一段旅程已经结束，暂时没有可继续的内容。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "fog_patrol.ending.helped",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "helped"
+            }
+          ]
+        },
+        {
+          "ending_id": "fog_patrol.ending.bypassed",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_patrol.fact.progress",
+              "value": "bypassed"
+            }
+          ]
+        }
+      ],
+      "narrative_length": {
+        "minimum": 1,
+        "target": 100,
+        "maximum": 1000
+      },
+      "memory_rules": [
+        {
+          "rule_id": "fog_patrol.memory.started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "fog_patrol.memory.completed",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioDecisionSelected",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "fog_patrol.ending.helped",
+            "fog_patrol.ending.bypassed"
+          ]
+        }
+      ],
+      "public_client": {
+        "title": "巡路风口",
+        "hook": "沿着雾哨站外的巡路前行，风口处有一盏偏斜的信号灯。岑舟正在护栏内收拢绳索，灯架每次晃动，远雾中便亮起一道错位的光。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.fog_station.traveler",
+            "description": "沿用当前旅程的角色，走到巡路风口。"
+          }
+        ],
+        "default_character_definition_id": "character.fog_station.traveler",
+        "scenes": [
+          {
+            "phase_id": "fog_patrol.arrival",
+            "title": "风口再会",
+            "summary": "沿着雾哨站外的巡路前行，风口处有一盏偏斜的信号灯。岑舟正在护栏内收拢绳索，灯架每次晃动，远雾中便亮起一道错位的光。"
+          },
+          {
+            "phase_id": "fog_patrol.met",
+            "title": "摇晃的灯架",
+            "summary": "岑舟已在背风侧系好承重绳。你可以在护栏内拉稳绳索，让他卸下信号灯，也可以沿背风小径绕行，由他封住危险路段。"
+          },
+          {
+            "phase_id": "fog_patrol.secured",
+            "title": "灯火落下",
+            "summary": "你稳住绳索，岑舟卸下灯具。金属不再颤动，雾中的错位光也熄灭了；你们把灯具放入巡路箱。"
+          },
+          {
+            "phase_id": "fog_patrol.passed",
+            "title": "背风小径",
+            "summary": "你沿护栏内的背风小径绕过灯架。岑舟收紧警戒绳，封住危险路段，留待巡路队处理。你没有参与拆灯。"
+          },
+          {
+            "phase_id": "fog_patrol.helped",
+            "title": "风口道别",
+            "summary": "你与岑舟道别。他带着卸下的信号灯回站，你走到小径另一端。这一段旅程已经结束，暂时没有可继续的内容。"
+          },
+          {
+            "phase_id": "fog_patrol.bypassed",
+            "title": "各循其路",
+            "summary": "你向岑舟道别。他留在警戒绳边，你沿小径走远。这一段旅程已经结束，暂时没有可继续的内容。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "fog_patrol.ending.helped",
+            "title": "风口道别",
+            "summary": "你与岑舟道别。他带着卸下的信号灯回站，你走到小径另一端。这一段旅程已经结束，暂时没有可继续的内容。"
+          },
+          {
+            "ending_id": "fog_patrol.ending.bypassed",
+            "title": "各循其路",
+            "summary": "你向岑舟道别。他留在警戒绳边，你沿小径走远。这一段旅程已经结束，暂时没有可继续的内容。"
+          }
+        ],
+        "actions": [
+          {
+            "action_type": "CONTINUE",
+            "label": "继续"
+          }
+        ]
+      }
+    }
+  ]
+}

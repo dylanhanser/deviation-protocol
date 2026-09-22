@@ -1,6 +1,8 @@
 """The sole atomic owner of the approved first-to-second world handoff."""
 from __future__ import annotations
 
+from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+
 from dataclasses import dataclass
 from datetime import timezone
 
@@ -40,7 +42,7 @@ class RunContinuationCommand(RunExitCommand):
 def original_admission(family):
     if type(family) is NativeRunAdmissionV1:
         return family
-    if type(family) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
+    if type(family) in (FogContinuedV1,FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
         return family.admission
     raise ValueError("complete native family required")
 
@@ -86,6 +88,9 @@ class RunContinuationService:
     content_registry: SessionContentRegistry
 
     def _eligible(self, family, character, persisted, state):
+        if persisted.session.scenario_id == "fog_station":
+            from deviation_protocol.application.fog_continuation_service import FogContinuationService
+            return FogContinuationService(self).eligible(family, character, persisted, state)
         runtime = state.scenario_runtime
         return (type(family) is NativeRunAdmissionV1
             and character.lifecycle is PlayerCharacterLifecycle.ACTIVE
@@ -94,6 +99,21 @@ class RunContinuationService:
             and bool(self.content_registry.continuation_pool()))
 
     def _status(self, family, character, persisted, state):
+        if type(family) in (FogContinuedV1, FogTerminatedV1):
+            from deviation_protocol.application.fog_continuation_service import fog_prefix, fog_visit, fog_result, fog_arrival
+            run, prefix = family.canonical_run, fog_prefix(family)
+            source = prefix.source_root
+            second = persisted.session.session_id == prefix.entry.session_id
+            return dict(schema_version="native-run-continuation-status/v1", session_id=persisted.session.session_id,
+                run_id=run.run_id.value, run_state_version=run.state_version.value,
+                session_state_version=persisted.session.state_version, lifecycle_status=run.lifecycle_status.value,
+                can_continue=False, current_session_id=prefix.entry.session_id,
+                visit=fog_visit(family, 2 if second else 1),
+                predecessor=dict(session_id=source.session_id, session_state_version=source.snapshot_state_version,
+                    scenario_id=source.scenario_id, scenario_content_version=source.scenario_content_version,
+                    visit=fog_visit(family, 1)) if second else None,
+                arrival=fog_arrival(family, self.content_registry) if second else None,
+                successor=None if second else fog_result(family))
         if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
             raise RunContinuationError("RUN_CONTINUATION_NOT_AVAILABLE")
         run = family.canonical_run
@@ -134,6 +154,13 @@ class RunContinuationService:
 
     async def continue_run(self, principal, *, session_id, command):
         revalidate_run_model(command,RunContinuationCommand)
+        async with self.authority.session_service.uow_factory() as reader:
+            owned = await reader.sessions.get_owned(session_id, principal.player_id)
+            if owned is None:
+                raise SessionNotFoundError(session_id)
+        if owned.session.scenario_id == "fog_station":
+            from deviation_protocol.application.fog_continuation_service import FogContinuationService
+            return await FogContinuationService(self).continue_run(principal, session_id=session_id, command=command)
         controller = await self.authority._controller(principal,session_id)
         async with self.authority.session_service.uow_factory() as reader:
             participation, (family,character,persisted,state) = await self._read(reader,principal,session_id,controller)

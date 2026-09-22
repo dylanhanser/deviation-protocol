@@ -1924,13 +1924,35 @@ owns discovery and safe encounter projection. The
 preserves the earlier proposal and exact later approval, state table and non-goals.
 This candidate changes no existing frozen pack, Run lifecycle, D1 source,
 multiline validation, Provider configuration or deferred-finding disposition.
-## Opening preparation candidate
+## Opening preparation (published)
 
-The approved opening-talents scope is implemented as an uncommitted candidate
+The approved opening-talents scope is published in the `57b107e8` baseline,
 described in [Opening talents](opening_talents.md). A new durable preparation
 repository participates in the existing native-admission UoW; confirmation uses
 the extracted commit-free admission staging seam. One Alembic migration adds
 only `opening_preparations`. Demo uses the same application/domain policy over
 its process store. Confirmed Run-bound selections are reconstructed before turn
 mechanics and affect only additional clock costs; old Runs remain explicitly
-talent-free. Independent review and browser acceptance are not claimed.
+talent-free. Its completed independent review and browser evidence retain their
+original scope and limitations; the patrol candidate does not reopen them.
+
+
+## Bounded same-world patrol continuation candidate
+
+From published `57b107e8`, `FogContinuationService` adds one closed branch from
+the four `fog_station/fog-station-1.0.0` endings to
+`fog_patrol/fog-patrol-1.0.0` within the same native Run/world. Application policies
+verify the finite source path and committed evidence, map the exact NPC definitions,
+and prepare fresh target runtime/NPC/memory with complete PlayerState transfer.
+`FogPatrolTurnOrchestrator` uses the existing atomic local-template pipeline;
+normal and Demo composition install the same bundle without Provider calls.
+
+Separate domain evidence carriers and infrastructure reconstruction preserve old
+closed codecs. The existing native UoW atomically writes revision 4, participation,
+Session initialization, receipt, one root, two visits, entry and position; explicit
+exit remains distinct at revision 5. Only three CHECK definitions change in 0013;
+no table/column/FK/uniqueness change or read-time repair is introduced. History is
+bound evidence for authored recollection, not inherited relationship eligibility.
+Public/Web projection admits exact content/region/ordinal associations and retains
+existing recovery and D1 behavior. See [the current contract](npc_relationship_residence.md#bounded-subsequent-visit-巡路风口-current-candidate).
+This uncommitted increment awaits independent review and browser acceptance.

@@ -2055,15 +2055,16 @@ reads. Network/storage/identity failures retain the route and block adoption;
 successful Session persistence supersedes it. Other entry recovery contracts
 remain unchanged.
 
-## Bounded Phase 3.4 station candidate
+## Bounded Phase 3.4 station and patrol continuation
 
 Normal application and deterministic Demo native discovery include
 `world.fog_station/1` -> `fog_station/fog-station-1.0.0`. Existing preparation,
 confirmation and native admission envelopes are unchanged. The Web accepts up to
 two distinct native world references; no world is selected or admitted by GET.
-Version-exact native Journey association validation accepts this starting world
-only with an unmaterialized single-Session path, matching admission world and no
-continuation offer. It cannot use the frozen S7 graph. Its exact content is
+Version-exact native Journey association validation accepts its initial
+unmaterialized single-Session path with matching admission world. The published
+first slice is at `57b107e8`; its new patrol continuation candidate adds the
+closed branch below, without changing the frozen S7 graph. Its exact content is
 registered for the existing read-only D1 scene/ending recap; this grants no new
 recap authority or model/memory write.
 
@@ -2082,5 +2083,36 @@ The panel is read-only and renders plain text. Historical reading preserves the
 existing history labels and current recovery target. Choices continue to come from
 the current authoritative affordances; no new endpoint, auto-write, retry, adoption
 or residence control bypasses existing mutation locks. The pack has no action clocks
-and the three activity slots are independent of talents. Full Phase 3.4, browser
-acceptance and cross-Session/cross-Run relationship recovery are not claimed.
+and the three activity slots are independent of talents. The published first
+slice retains its accepted review/browser evidence. Full Phase 3.4 and general
+relationship-state inheritance are not claimed.
+
+### Same-world second visit (uncommitted candidate)
+
+The existing `run-journey/v1` projection has one additional closed
+`next_transition.kind=fog_patrol`, offered only on an ended active first station
+Session at Run revision 3. Its fixed target is 雾哨站 / 巡路风口. Explicit
+confirmation uses the existing `POST /v1/sessions/{id}/run-continuation` body and
+idempotency key; no destination, relationship or history payload is accepted.
+The existing result/continuation-status envelopes admit the exact
+`fog_patrol/fog-patrol-1.0.0` + `world.fog_station/1` +
+`region.fog_station.patrol_pass/1` second-visit association. First visit is exactly
+`region.fog_station.station/1`; content/version/ordinal/world mixing is rejected.
+This transport extension does not relax the old closed stored evidence codecs.
+
+The same Run retains entry world and talents. Arrival annotation resolves the
+previous ending from the exact source public definition. Destination views have
+no inherited `relationship` panel; their author text references the previous
+visit. Private NPC mapping, source event IDs/digests and snapshots stay server-side.
+Journey current/predecessor/successor associations retain both visits; no third
+transition is returned. At the second ending the copy states there is no further
+content, while explicit Run exit remains available (4 -> 5 terminated).
+
+Web reuses its frozen confirmation intent, retained POST receipt comparisons,
+late-response isolation, current/history navigation and Session recovery. A lost
+response is reconciled through explicit GET or an explicit original-request retry;
+refresh performs GET only. History cannot change the saved current target or
+submit actions. New Web tests cover cancellation, one explicit POST, lost response,
+refresh at every choice/ending, both results and history round trips. Existing
+D1 cutoff and budget remain unchanged. Browser acceptance of this candidate is
+pending independent review; automated rendering is not browser evidence.

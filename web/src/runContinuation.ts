@@ -13,8 +13,8 @@ export function assertContinuationStatus(view: PlayerSessionView, status: Native
   if (!view.run_context || status.session_id !== view.metadata.session_id || status.run_id !== view.run_context.run_id ||
       status.session_state_version !== view.metadata.state_version) mismatch();
   if (status.successor) assertContinuationResult(view, status.successor);
-  if (status.visit?.visit_ordinal === 2 && (view.narrative_frame.scenario_id !== "undelivered_receipt" ||
-      view.metadata.content_version !== "undelivered-receipt-1.0.0")) mismatch();
+  if (status.visit?.visit_ordinal === 2 && (view.narrative_frame.scenario_id !== (status.visit.world_id === "world.fog_station" ? "fog_patrol" : "undelivered_receipt") ||
+      view.metadata.content_version !== (status.visit.world_id === "world.fog_station" ? "fog-patrol-1.0.0" : "undelivered-receipt-1.0.0"))) mismatch();
 }
 export function assertContinuationResult(source: PlayerSessionView, result: NativeRunContinuationResult): void {
   nativeRunContinuationResultSchema.parse(result);

@@ -843,6 +843,7 @@ def mutation_receipt_from_storage(
                 decode_revisited_native_run_exit_evidence)
         continued = stored.command_kind == RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN.value
         revisited = stored.command_kind == RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN.value
+        from deviation_protocol.domain.fog_patrol import decode_continued_exit_evidence as decode_continued_native_run_exit_evidence
         decoder = decode_revisited_native_run_exit_evidence if revisited else (decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence)
         try:
             evidence = decoder(stored.operation_evidence_canonical)
@@ -862,7 +863,7 @@ def mutation_receipt_from_storage(
                     stored.result_character_record_revision))):
             raise _fail("terminal receipt association")
     elif stored.command_kind == RunMutationKind.CONTINUE_NATIVE_RUN.value:
-        from deviation_protocol.domain.world_continuation import decode_native_run_continuation_evidence
+        from deviation_protocol.domain.fog_patrol import decode_continuation_evidence as decode_native_run_continuation_evidence
         try:
             evidence = decode_native_run_continuation_evidence(stored.operation_evidence_canonical)
         except (TypeError, ValueError, AttributeError) as error:
@@ -1211,7 +1212,7 @@ def validate_stored_run_record_set(
                     "Run binding evidence does not bind adjacent history"
                 )
         elif provenance.mutation_kind is RunMutationKind.CONTINUE_NATIVE_RUN:
-            from deviation_protocol.domain.world_continuation import decode_native_run_continuation_evidence
+            from deviation_protocol.domain.fog_patrol import decode_continuation_evidence as decode_native_run_continuation_evidence
             from deviation_protocol.application.run_operations import CONTINUE_NATIVE_RUN_RESULT_SCHEMA_VERSION, RunSafeResult
             evidence = decode_native_run_continuation_evidence(stored.operation_evidence_canonical)
             request = evidence.request
@@ -1293,6 +1294,7 @@ def validate_stored_run_record_set(
                 decode_revisited_native_run_exit_evidence)
             continued = provenance.mutation_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN
             revisited = provenance.mutation_kind is RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN
+            from deviation_protocol.domain.fog_patrol import decode_continued_exit_evidence as decode_continued_native_run_exit_evidence
             decoder = decode_revisited_native_run_exit_evidence if revisited else (decode_continued_native_run_exit_evidence if continued else decode_native_run_exit_evidence)
             evidence = decoder(stored.operation_evidence_canonical)
             request = evidence.request

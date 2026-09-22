@@ -57,6 +57,10 @@ def regional_result(family):
 
 
 def journey_visit(family, ordinal):
+    from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+    if type(family) in (FogContinuedV1, FogTerminatedV1):
+        from deviation_protocol.application.fog_continuation_service import fog_visit
+        return fog_visit(family, ordinal)
     if ordinal != 3:
         return _visit(family, ordinal)
     visit = regional_family(family).visit
@@ -110,6 +114,9 @@ class RunRegionalRevisitService:
         controller = await self.authority._controller(principal, session_id)
         async with self.authority.session_service.uow_factory() as uow:
             _, (family, character, persisted, state) = await self._read(uow, principal, session_id, controller)
+            from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+            from deviation_protocol.application.fog_continuation_service import FogContinuationService, fog_visit, fog_arrival, NOTICE
+            fog = original_admission(family).world_binding.entry_world.scenario_id == "fog_station"
             run = family.canonical_run
             associations = []
             for ordinal, participation in enumerate(run.trusted_participation_references, 1):
@@ -119,10 +126,13 @@ class RunRegionalRevisitService:
                 game = owned.session
                 associations.append(dict(session_id=game.session_id, session_state_version=game.state_version,
                     scenario_id=game.scenario_id, scenario_content_version=game.scenario_version,
-                    visit=journey_visit(family, ordinal) if len(run.trusted_participation_references) > 1 else None))
+                    visit=(fog_visit(family, ordinal) if fog else journey_visit(family, ordinal)) if len(run.trusted_participation_references) > 1 else None))
             index = next(i for i, row in enumerate(associations) if row["session_id"] == session_id)
             transition = None
-            if self.continuation._eligible(family, character, persisted, state):
+            if fog and self.continuation._eligible(family, character, persisted, state):
+                await FogContinuationService(self.continuation).history(uow, persisted, state)
+                transition = dict(kind="fog_patrol", world_title="雾哨站", region_title="巡路风口", notice=NOTICE)
+            elif self.continuation._eligible(family, character, persisted, state):
                 transition = dict(kind="first_continuation", world_title="未送达的回执", region_title="发运大厅",
                     notice="沿用当前角色和剩余资源进入发运大厅；原有资源不会恢复。")
             elif self._eligible(family, character, persisted, state):
@@ -130,7 +140,9 @@ class RunRegionalRevisitService:
                 self.registry.regional_pool()
                 transition = dict(kind="regional_revisit", world_title="未送达的回执", region_title="核验档案室", notice=ARCHIVE_NOTICE)
             arrival = None
-            if index == 1:
+            if fog and index == 1:
+                arrival = fog_arrival(family, self.registry)
+            elif index == 1:
                 prefix = regional_family(family).continued if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1) else family
                 if type(prefix) is NativeRunContinuedTerminatedV1:
                     prefix = prefix.continued

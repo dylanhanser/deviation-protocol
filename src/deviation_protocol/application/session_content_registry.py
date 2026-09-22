@@ -57,6 +57,10 @@ class SessionContentBundle:
                    hashlib.sha256(payload).hexdigest(), catalog, **services)
 
     def __post_init__(self):
+        from deviation_protocol.application.fog_patrol import CONTENT_IDENTITY as PATROL, CONTENT_SHA256 as PATROL_HASH
+        if (self.scenario_id == PATROL[0] or self.content_version == PATROL[1]) and (
+                (self.scenario_id, self.content_version) != PATROL or self.content_sha256 != PATROL_HASH):
+            raise ValueError("patrol content identity mismatch")
         from deviation_protocol.application.fog_station import CONTENT_IDENTITY as STATION, CONTENT_SHA256 as STATION_HASH
         if (self.scenario_id == STATION[0] or self.content_version == STATION[1]) and (
                 (self.scenario_id, self.content_version) != STATION or self.content_sha256 != STATION_HASH):

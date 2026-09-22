@@ -966,8 +966,12 @@ def build_default_services(
     from deviation_protocol.application.fog_station_services import build_fog_station_bundle
     station_bundle = build_fog_station_bundle(SCENARIO_PACK.with_name("fog_station_v1.json"),
         uow_factory=uow_factory, controller_resolver=controller_binding_resolver)
+    from deviation_protocol.application.fog_patrol_services import build_fog_patrol_bundle
+    patrol_bundle = build_fog_patrol_bundle(SCENARIO_PACK.with_name("fog_patrol_v1.json"),
+        uow_factory=uow_factory, controller_resolver=controller_binding_resolver)
     registry = SessionContentRegistry((
         station_bundle,
+        patrol_bundle,
         escort_bundle,
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=orchestrator),
         SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),

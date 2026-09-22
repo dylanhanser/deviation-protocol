@@ -1303,7 +1303,7 @@ class RunWorldStateRow(Base):
     __tablename__ = "run_world_states"
     __table_args__ = (
         CheckConstraint("world_version BETWEEN 1 AND 9223372036854775807 AND region_version BETWEEN 1 AND 9223372036854775807 AND materialized_state_version = 4", name="ck_run_world_states_versions"),
-        CheckConstraint("state_schema = 'run-world-state/v1'", name="ck_run_world_states_schema"),
+        CheckConstraint("state_schema IN ('run-world-state/v1', 'fog-world-state/v1')", name="ck_run_world_states_schema"),
         CheckConstraint("OCTET_LENGTH(state_canonical) BETWEEN 1 AND 1048576", name="ck_run_world_states_payload_size"),
         UniqueConstraint("run_id", "continuous_story_line_id", "world_id", "world_version", name="uq_run_world_states_exact"),
         ForeignKeyConstraint(("run_id", "continuous_story_line_id", "materialized_state_version"),
@@ -1391,8 +1391,8 @@ class RunWorldPositionRow(Base):
 class RunWorldVisitEntryRow(Base):
     __tablename__ = "run_world_visit_entries"
     __table_args__ = (
-        CheckConstraint("joined_state_version = 5", name="ck_run_world_visit_entries_version"),
-        CheckConstraint("entry_schema = 'run-regional-entry/v1'", name="ck_run_world_visit_entries_schema"),
+        CheckConstraint("(entry_schema = 'run-regional-entry/v1' AND joined_state_version = 5) OR (entry_schema = 'fog-patrol-entry/v1' AND joined_state_version = 4)", name="ck_run_world_visit_entries_version"),
+        CheckConstraint("entry_schema IN ('run-regional-entry/v1', 'fog-patrol-entry/v1')", name="ck_run_world_visit_entries_schema"),
         CheckConstraint("OCTET_LENGTH(entry_canonical) BETWEEN 1 AND 1048576", name="ck_run_world_visit_entries_payload_size"),
         UniqueConstraint("session_id", name="uq_run_world_visit_entries_session"),
         ForeignKeyConstraint(("run_id", "continuous_story_line_id", "visit_id", "session_id"),

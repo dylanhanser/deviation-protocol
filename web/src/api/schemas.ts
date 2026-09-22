@@ -1333,29 +1333,40 @@ export type PublicSuggestedAction = z.infer<
 export type PlayerSessionView = z.infer<typeof playerSessionViewSchema>;
 export type ErrorResponse = z.infer<typeof errorResponseSchema>;
 
+export const FOG_PATROL_NOTICE = "沿着雾哨站的巡路走到风口，与岑舟再会；沿用当前角色与剩余资源。";
+const FOG_ENDINGS = ["带着平安离开", "道谢之后", "各自继续", "门口的告别"];
 export const nativeWorldVisitSchema = z.object({visit_id:safeId128Schema, visit_ordinal:z.union([z.literal(1),z.literal(2)]),
   world_id:safeId128Schema,world_version:z.literal(1),region_id:safeId128Schema,region_version:z.literal(1)}).strict().refine(v =>
+    v.world_id === "world.fog_station" ? v.region_id === (v.visit_ordinal === 1 ? "region.fog_station.station" : "region.fog_station.patrol_pass") :
     v.visit_ordinal === 1 ? v.world_id === "world.death_certificate" && v.region_id === "region.death_certificate.facility"
       : v.world_id === "world.undelivered_receipt" && v.region_id === "region.undelivered_receipt.dispatch_hall");
 export const nativeRunContinuationResultSchema = z.object({schema_version:z.literal("native-run-continuation-result/v1"),
   source_session_id:safeId64Schema,source_session_state_version:nonNegativeIntegerSchema.safe(),run_id:safeId128Schema,
   resulting_run_state_version:z.literal(4),session_id:safeId64Schema,initial_session_state_version:z.literal(0),
-  scenario_id:z.literal("undelivered_receipt"),scenario_content_version:z.literal("undelivered-receipt-1.0.0"),
+  scenario_id:z.enum(["undelivered_receipt","fog_patrol"]),scenario_content_version:z.enum(["undelivered-receipt-1.0.0","fog-patrol-1.0.0"]),
   run_context:publicNativeRunContextSchema,visit:nativeWorldVisitSchema}).strict().refine(r =>
-    r.visit.visit_ordinal === 2 && r.source_session_id !== r.session_id && r.run_id === r.run_context.run_id);
+    r.visit.visit_ordinal === 2 && r.source_session_id !== r.session_id && r.run_id === r.run_context.run_id &&
+    (r.visit.world_id === "world.fog_station" ? r.scenario_id === "fog_patrol" && r.scenario_content_version === "fog-patrol-1.0.0" && r.run_context.entry_world.entry_world_id === "world.fog_station" :
+      r.scenario_id === "undelivered_receipt" && r.scenario_content_version === "undelivered-receipt-1.0.0" && r.run_context.entry_world.entry_world_id === "world.death_certificate"));
 export const nativeRunContinuationStatusSchema = z.object({schema_version:z.literal("native-run-continuation-status/v1"),
   session_id:safeId64Schema,run_id:safeId128Schema,run_state_version:z.union([z.literal(3),z.literal(4),z.literal(5)]),
   session_state_version:nonNegativeIntegerSchema.safe(),lifecycle_status:z.enum(["active","terminated"]),can_continue:z.boolean(),
   current_session_id:safeId64Schema,visit:nativeWorldVisitSchema.nullable(),
-  predecessor:z.object({session_id:safeId64Schema,session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:z.literal("death_certificate"),
-    scenario_content_version:z.literal("death-certificate-1.1.0"),visit:nativeWorldVisitSchema}).strict().refine(p=>p.visit.visit_ordinal===1).nullable(),
+  predecessor:z.object({session_id:safeId64Schema,session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:z.enum(["death_certificate","fog_station"]),
+    scenario_content_version:z.enum(["death-certificate-1.1.0","fog-station-1.0.0"]),visit:nativeWorldVisitSchema}).strict().refine(p=>p.visit.visit_ordinal===1 &&
+      (p.visit.world_id === "world.fog_station" ? p.scenario_id === "fog_station" && p.scenario_content_version === "fog-station-1.0.0" :
+        p.scenario_id === "death_certificate" && p.scenario_content_version === "death-certificate-1.1.0")).nullable(),
   arrival:z.object({previous_ending_status:z.enum(["RESOLVED","FAILED"]),
     previous_ending_title:z.string().min(1).max(120),entry_notice:z.string().min(1).max(300)}).strict().refine(a =>
+      FOG_ENDINGS.includes(a.previous_ending_title) ? a.previous_ending_status === "RESOLVED" && a.entry_notice === FOG_PATROL_NOTICE :
       a.previous_ending_status === "RESOLVED"
         ? ["规程已中断","记录已被质疑"].includes(a.previous_ending_title) && a.entry_notice === "上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。"
         : a.previous_ending_title === "记录成为现实" && a.entry_notice === "上一世界以失败结果结束。你带着原有状态抵达发运大厅，当前队列已经消耗四格期限。").nullable(),
   successor:nativeRunContinuationResultSchema.nullable()}).strict().refine(s=>{
     if ((s.arrival !== null) !== (s.visit?.visit_ordinal === 2)) return false;
+    if (s.visit && s.predecessor && (s.visit.world_id === "world.fog_station") !== (s.predecessor.visit.world_id === "world.fog_station")) return false;
+    if (s.visit && s.arrival && (s.visit.world_id === "world.fog_station") !== (s.arrival.entry_notice === FOG_PATROL_NOTICE)) return false;
+    if (s.visit && s.successor && (s.visit.world_id === "world.fog_station") !== (s.successor.visit.world_id === "world.fog_station")) return false;
     if (s.run_state_version !== (s.visit === null ? 3 : 4) + (s.lifecycle_status === "terminated" ? 1 : 0)) return false;
     if (s.can_continue && (s.run_state_version !== 3 || s.lifecycle_status !== "active" || s.visit !== null)) return false;
     if (s.visit === null) return s.predecessor === null && s.successor === null && s.current_session_id === s.session_id;
@@ -1370,6 +1381,7 @@ export type NativeRunContinuationResult = z.infer<typeof nativeRunContinuationRe
 export const nativeJourneyVisitSchema = z.strictObject({visit_id:safeId128Schema,
   visit_ordinal:z.union([z.literal(1),z.literal(2),z.literal(3)]),world_id:safeId128Schema,
   world_version:z.literal(1),region_id:safeId128Schema,region_version:z.literal(1)}).refine(v =>
+    v.world_id === "world.fog_station" ? v.visit_ordinal <= 2 && v.region_id === ["region.fog_station.station","region.fog_station.patrol_pass"][v.visit_ordinal-1] :
     v.world_id === (v.visit_ordinal === 1 ? "world.death_certificate" : "world.undelivered_receipt") &&
     v.region_id === ["region.death_certificate.facility","region.undelivered_receipt.dispatch_hall",
       "region.undelivered_receipt.verification_archive"][v.visit_ordinal-1]);
@@ -1377,6 +1389,8 @@ export const nativeJourneyAssociationSchema = z.strictObject({session_id:safeId6
   session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:safeId128Schema,
   scenario_content_version:z.string().min(1).max(32).regex(safeIdPattern),visit:nativeJourneyVisitSchema.nullable()}).refine(a => {
     if (a.visit === null && a.scenario_id === "fog_station" && a.scenario_content_version === "fog-station-1.0.0") return true;
+    if (a.visit?.world_id === "world.fog_station") return a.scenario_id === ["fog_station","fog_patrol"][a.visit.visit_ordinal-1] &&
+      a.scenario_content_version === ["fog-station-1.0.0","fog-patrol-1.0.0"][a.visit.visit_ordinal-1];
     const ordinal=a.visit?.visit_ordinal ?? 1;
     return a.scenario_id === ["death_certificate","undelivered_receipt","receipt_archive"][ordinal-1] &&
       a.scenario_content_version === ["death-certificate-1.1.0","undelivered-receipt-1.0.0","receipt-archive-1.0.0"][ordinal-1];
@@ -1395,14 +1409,16 @@ export const nativeRunJourneyV1Schema = z.strictObject({schema_version:z.literal
   lifecycle_status:z.enum(["active","terminated"]),run_context:publicNativeRunContextSchema,
   path:nativeJourneyAssociationSchema,current:nativeJourneyAssociationSchema,
   predecessor:nativeJourneyAssociationSchema.nullable(),successor:nativeJourneyAssociationSchema.nullable(),
-  next_transition:z.strictObject({kind:z.enum(["first_continuation","regional_revisit"]),
+  next_transition:z.strictObject({kind:z.enum(["first_continuation","regional_revisit","fog_patrol"]),
     world_title:codePointBoundedStringSchema(1,120,"world title"),region_title:codePointBoundedStringSchema(1,120,"region title"),
     notice:codePointBoundedStringSchema(1,300,"notice")}).nullable(),arrival:journeyArrivalSchema.nullable()
 }).refine(j => {
-  if (j.run_context.entry_world.entry_world_id === "world.fog_station") {
-    if (j.run_context.entry_world.entry_world_version !== 1 || j.path.scenario_id !== "fog_station" ||
-        j.current.scenario_id !== "fog_station" || j.path.visit !== null || j.current.visit !== null || j.next_transition !== null) return false;
-  } else if (j.path.scenario_id === "fog_station" || j.current.scenario_id === "fog_station") return false;
+  const fog = j.run_context.entry_world.entry_world_id === "world.fog_station";
+  const fogRows = [j.path,j.current,j.predecessor,j.successor].filter(a=>a!==null);
+  if (fog) {
+    if (j.run_context.entry_world.entry_world_version !== 1 || fogRows.some(a=>a.visit ? a.visit.world_id !== "world.fog_station" : a.scenario_id !== "fog_station") ||
+        (j.current.visit && j.current.visit.visit_ordinal !== 2)) return false;
+  } else if (fogRows.some(a=>a.scenario_id === "fog_station" || a.scenario_id === "fog_patrol")) return false;
   const ordinal=j.path.visit?.visit_ordinal ?? 1, last=j.current.visit?.visit_ordinal ?? 1;
   if (j.session_id !== j.path.session_id || j.run_id !== j.run_context.run_id || ordinal>last ||
       j.run_state_version !== last+2+(j.lifecycle_status === "terminated" ? 1 : 0)) return false;
@@ -1418,13 +1434,18 @@ export const nativeRunJourneyV1Schema = z.strictObject({schema_version:z.literal
     } else if (a.session_id===b.session_id || a.visit?.visit_id===b.visit?.visit_id) return false;
   }
   const offer=j.next_transition;
-  if (offer && (j.lifecycle_status!=="active" || ordinal!==last || last===3 ||
-      offer.kind!==(last===1 ? "first_continuation" : "regional_revisit") ||
-      offer.world_title!=="未送达的回执" || offer.region_title!==(last===1 ? "发运大厅" : "核验档案室") ||
-      (last===2 && offer.notice!==ARCHIVE_NOTICE))) return false;
+  if (offer) {
+    if (j.lifecycle_status!=="active" || ordinal!==last || last===3) return false;
+    if (fog) {
+      if (last!==1 || offer.kind!=="fog_patrol" || offer.world_title!=="雾哨站" || offer.region_title!=="巡路风口" || offer.notice!==FOG_PATROL_NOTICE) return false;
+    } else if (offer.kind!==(last===1 ? "first_continuation" : "regional_revisit") ||
+        offer.world_title!=="未送达的回执" || offer.region_title!==(last===1 ? "发运大厅" : "核验档案室") ||
+        (last===2 && offer.notice!==ARCHIVE_NOTICE)) return false;
+  }
   const a=j.arrival;
   if (ordinal===1) return a===null;
   if (!a) return false;
+  if (fog) return a.previous_ending_status === "RESOLVED" && FOG_ENDINGS.includes(a.previous_ending_title) && a.entry_notice === FOG_PATROL_NOTICE;
   if (ordinal===3) return a.previous_ending_status==="RESOLVED" && a.previous_ending_title==="回执待核，发运暂缓" && a.entry_notice===ARCHIVE_NOTICE;
   return a.previous_ending_status==="RESOLVED" ? ["规程已中断","记录已被质疑"].includes(a.previous_ending_title) &&
     a.entry_notice==="上一世界已形成明确结果。你带着原有状态抵达发运大厅，当前队列从零开始计时。" :
@@ -1439,6 +1460,9 @@ export const nativeRunCompletedJourneySchema = z.strictObject({schema_version:z.
     world_title:codePointBoundedStringSchema(1,120,"world title"),region_title:codePointBoundedStringSchema(1,120,"region title"),
     notice:codePointBoundedStringSchema(1,300,"notice")}).nullable(),arrival:journeyArrivalSchema.nullable(),completion:nativeRunCompletionSchema
 }).refine(j => {
+  // The completed family remains the original three-visit route.
+  if (j.run_context.entry_world.entry_world_id === "world.fog_station" ||
+      [j.path,j.current,j.predecessor,j.successor].some(a=>a?.visit?.world_id === "world.fog_station")) return false;
   const ordinal=j.path.visit?.visit_ordinal ?? 1, last=j.current.visit?.visit_ordinal ?? 1;
   if (j.session_id !== j.path.session_id || j.run_id !== j.run_context.run_id || ordinal>last ||
       j.run_state_version !== last+2+(1)) return false;

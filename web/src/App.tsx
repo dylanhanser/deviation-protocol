@@ -2944,7 +2944,7 @@ export default function App({
         </> : <>
           {continuationStatus?.session_id === loadedSession.sessionId && continuationStatus.arrival ?
             <div aria-label="抵达说明">
-              <p>上一世界结局：{continuationStatus.arrival.previous_ending_title}（{continuationStatus.arrival.previous_ending_status}）</p>
+              <p>{continuationStatus.path.visit?.world_id === "world.fog_station" ? "上次访问结局：" : "上一世界结局："}{continuationStatus.arrival.previous_ending_title}（{continuationStatus.arrival.previous_ending_status}）</p>
               <p>{continuationStatus.arrival.entry_notice}</p>
             </div> : null}
           {continuationStatus?.predecessor ? <button type="button" disabled={foregroundOperation !== null || continuationAttempt !== null || exitAttempt !== null || completionAttempt !== null}
@@ -2954,7 +2954,7 @@ export default function App({
               continuationConfirmationRef.current={view:structuredClone(loadedSession.view),authority:structuredClone({journey:continuationStatus,status:runStatus,completion:completionStatus}),client};setContinuationConfirm(true);}}>继续当前旅程</button> : null}
           {continuationConfirm ? <div role="dialog" aria-label="确认继续旅程">
             <p>将进入《{continuationStatus?.next_transition?.world_title}》的{continuationStatus?.next_transition?.region_title}。{continuationStatus?.next_transition?.notice}</p>
-            <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={()=>void handleContinuation()}>{continuationStatus?.next_transition?.kind === "regional_revisit" ? "确认进入核验档案室" : "确认进入下一世界"}</button>
+            <button type="button" disabled={!runAuthorityReady || foregroundOperation !== null} onClick={()=>void handleContinuation()}>{continuationStatus?.next_transition?.kind === "fog_patrol" ? "确认前往巡路风口" : continuationStatus?.next_transition?.kind === "regional_revisit" ? "确认进入核验档案室" : "确认进入下一世界"}</button>
             <button type="button" onClick={()=>setContinuationConfirm(false)}>取消继续</button>
           </div> : null}
           {continuationAttempt ? <>

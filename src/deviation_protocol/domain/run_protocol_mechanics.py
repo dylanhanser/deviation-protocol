@@ -45,6 +45,8 @@ MECHANICS_CATALOGUE = (
     MechanicsCatalogueEntry("world.fog_station", 1, "fog_station",
                             "fog-station-1.0.0",
                             "character.fog_station.traveler", "composure"),
+    MechanicsCatalogueEntry("world.fog_station", 1, "fog_patrol",
+                            "fog-patrol-1.0.0", "character.fog_station.traveler", "composure"),
 )
 
 

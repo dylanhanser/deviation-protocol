@@ -135,7 +135,7 @@ export class PublicApiClient {
     return result;
   }
   async transitionNativeRun(attempt: import("../runJourney").FrozenJourneyTransition, signal?: AbortSignal) {
-    if (attempt.kind === "first_continuation") return this.continueNativeRun(attempt,signal);
+    if (attempt.kind === "first_continuation" || attempt.kind === "fog_patrol") return this.continueNativeRun(attempt,signal);
     const result=await this.request(attempt.url,{method:"POST",headers:{"Content-Type":"application/json","Idempotency-Key":attempt.key},
       body:attempt.serializedBody,...(signal === undefined ? {} : {signal})},200,nativeRunRevisitResultSchema);
     const body=JSON.parse(attempt.serializedBody) as {expected_session_state_version:number};

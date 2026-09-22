@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1, FogContinuationEvidenceV1, FogExitEvidenceV1
+
 from deviation_protocol.domain.run import RunLifecycleStatus
 
 from datetime import datetime, timezone
@@ -221,6 +223,15 @@ class SqlAlchemyRunWorldContinuationRepository:
         from deviation_protocol.infrastructure.world_continuation_persistence import root_to_storage
         from deviation_protocol.infrastructure.orm_models import RunWorldStateRow, RunWorldVisitRow, RunWorldPositionRow
         _require_native_writer(self._session.info.get("native_admission_guard"))
+        from deviation_protocol.domain.fog_patrol import FogContinuedV1
+        if type(continued) is FogContinuedV1:
+            from deviation_protocol.infrastructure.fog_patrol_persistence import fog_rows
+            from deviation_protocol.infrastructure.orm_models import RunWorldVisitEntryRow
+            models = {"run_world_states": RunWorldStateRow, "run_world_visits": RunWorldVisitRow,
+                "run_world_positions": RunWorldPositionRow, "run_world_visit_entries": RunWorldVisitEntryRow}
+            for name, _, values in fog_rows(continued):
+                await _flush_native_binding(self._session, models[name](**values))
+            return
         revalidate_run_model(continued, NativeRunContinuedV1)
         time = continued.canonical_run.current_mutation_provenance.occurred_at
         for root in (continued.source_root, continued.destination_root):
@@ -275,12 +286,12 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
 
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | FogContinuedV1 | FogTerminatedV1 | None:
         return await self._classify(run_id, locking=False)
 
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | FogContinuedV1 | FogTerminatedV1 | None:
         return await self._classify(run_id, locking=True)
 
     async def _read(self, statement, *, locking, many=False):
@@ -461,6 +472,14 @@ class SqlAlchemyRunProtocolBindingRepository(RunProtocolBindingRepository):
                         regional_session=regional_session, regional_snapshot=regional_snapshot, regional_event=regional_event,
                         regional_events=regional_events, regional_has_active_job=job is not None,
                         registry=self._session.info.get("session_content_registry"))
+                if admission.world_binding.entry_world.scenario_id == "fog_station":
+                    from deviation_protocol.infrastructure.fog_patrol_persistence import reconstruct_fog_family
+                    source_events = await SqlAlchemyRunWorldRevisitRepository(self._session).source_events(participation.session_id, locking=locking)
+                    return self._codec(reconstruct_fog_family, admission=admission, run=current_run,
+                        mutations=mutations, creation_evidence=evidence, roots=world_rows[0], visits=world_rows[1],
+                        positions=world_rows[2], entries=world_rows[3], source_session=session_row, source_snapshot=snapshot_row,
+                        source_events=source_events, destination_session=destination_session, destination_snapshot=destination_snapshot,
+                        destination_event=destination_event, registry=self._session.info.get("session_content_registry"))
                 binding_storage._require(not world_rows[3], "entry on old continued family")
                 return self._codec(reconstruct_continued_family,admission=admission,run=current_run,
                     mutations=mutations,creation_evidence=evidence,roots=world_rows[0],visits=world_rows[1],positions=world_rows[2],
@@ -2723,13 +2742,13 @@ class _SqlAlchemyRunRepositorySupport:
             if run.lifecycle_status in (RunLifecycleStatus.TERMINATED, RunLifecycleStatus.COMPLETED):
                 classifier = SqlAlchemyRunProtocolBindingRepository(self._session)
                 family = await classifier._classify(run_id, locking=for_update)
-                if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
+                if type(family) not in (FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
                     raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
             elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
                 if run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
                     from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
                     family = await SqlAlchemyRunProtocolBindingRepository(self._session)._classify(run_id,locking=for_update)
-                    if type(family) is not (NativeRunRegionalRevisitV1 if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else NativeRunContinuedV1):
+                    if type(family) not in ((NativeRunRegionalRevisitV1,) if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else (NativeRunContinuedV1, FogContinuedV1)):
                         raise RunStoredRecordIntegrityError("active continued binding requires complete family")
                 active.append(run)
             else:
@@ -3563,8 +3582,8 @@ class SqlAlchemyRunMutationReceiptRepository(
         receipt: StoredRunSuccessReceipt,
         *,
         created_at: datetime,
-        exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | None = None,
-        continuation_evidence: NativeRunContinuationEvidenceV1 | None = None,
+        exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | FogExitEvidenceV1 | None = None,
+        continuation_evidence: NativeRunContinuationEvidenceV1 | FogContinuationEvidenceV1 | None = None,
         revisit_evidence=None,
         completion_evidence=None,
     ) -> None:
@@ -3620,6 +3639,11 @@ class SqlAlchemyRunMutationReceiptRepository(
                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: (exit_evidence, ContinuedNativeRunExitEvidenceV1),
                 RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: (exit_evidence, RevisitedNativeRunExitEvidenceV1),
             }[receipt.command_kind]
+            from deviation_protocol.domain.fog_patrol import FogContinuationEvidenceV1, FogExitEvidenceV1
+            if receipt.command_kind is RunMutationKind.CONTINUE_NATIVE_RUN and type(carrier) is FogContinuationEvidenceV1:
+                kind = FogContinuationEvidenceV1
+            if receipt.command_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN and type(carrier) is FogExitEvidenceV1:
+                kind = FogExitEvidenceV1
             revalidate_run_model(carrier, kind)
             operation_evidence = canonical_run_operation_bytes(carrier)
         elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:

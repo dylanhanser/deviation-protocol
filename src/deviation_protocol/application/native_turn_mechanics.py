@@ -136,9 +136,9 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("invalid native mechanics catalogue entry")
             key = (entry.world_id, entry.world_version)
             world = next((w for w in worlds if (w.entry_world_id.value, w.entry_world_version.value) == key), None)
-            # Only the two published continuation packs bypass starting-world lookup.
+            # Only the explicitly registered continuation packs bypass starting-world lookup.
             # Adding a starting world must not expand this exception.
-            destination = entry in MECHANICS_CATALOGUE[1:3]
+            destination = entry in (MECHANICS_CATALOGUE[1], MECHANICS_CATALOGUE[2], MECHANICS_CATALOGUE[4])
             if not destination and (key in keys or world is None or (world.scenario_id, world.scenario_content_version,
                     world.default_character_definition_id) != (entry.scenario_id, entry.content_version, entry.character_id)):
                 raise ValueError("native mechanics world association is incompatible")
@@ -173,7 +173,24 @@ class NativeTurnMechanicsCoordinator:
             if family.session_id != session_id:
                 raise NativeTurnBindingError(session_id)
             return None
+        from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
         classified = family
+        if type(family) in (FogContinuedV1, FogTerminatedV1):
+            revalidate_run_model(family, type(family))
+            fog = family.continued if type(family) is FogTerminatedV1 else family
+            if participation not in family.canonical_run.trusted_participation_references:
+                raise NativeTurnBindingError(session_id)
+            if participation.joined_state_version.value == 4:
+                entry = fog.entry
+                if (definition is None or (game_session.scenario_id, game_session.scenario_version)
+                        != (entry.scenario_id, entry.scenario_content_version)
+                        or (definition.scenario_id, definition.content_version) != (entry.scenario_id, entry.scenario_content_version)
+                        or game_session.player_id != state.player.player_id
+                        or state.player.character_definition_id != entry.snapshot["player"]["character_definition_id"]):
+                    raise NativeTurnBindingError(session_id)
+                self.validate_state(state, session_id)
+                return classified
+            family = fog.admission
         if type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
             revalidate_run_model(family, type(family))
             regional = family.revisited if type(family) in (NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1) else family
@@ -245,17 +262,19 @@ class NativeTurnMechanicsCoordinator:
 
     def bind(self, family, state, submission, state_version, frame, *, talents=None) -> TrustedNativeTurnInputs:
         from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1
-        if type(family) not in (NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1):
+        from deviation_protocol.domain.fog_patrol import FogContinuedV1
+        fog = type(family) is FogContinuedV1
+        if type(family) not in (FogContinuedV1,NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1):
             raise NativeTurnBindingError(submission.session_id)
         revalidate_run_model(family, type(family))
         continued = type(family) is NativeRunContinuedV1
         regional = type(family) is NativeRunRegionalRevisitV1
-        admission = family.admission if continued or regional else family
+        admission = family.admission if fog or continued or regional else family
         self.validate_state(state, submission.session_id)
         run = family.canonical_run
         world = admission.world_binding.entry_world
-        scenario_id = family.entry.scenario_id if regional else family.destination_root.scenario_id if continued else world.scenario_id
-        content_version = family.entry.scenario_content_version if regional else family.destination_root.scenario_content_version if continued else world.scenario_content_version
+        scenario_id = family.entry.scenario_id if regional or fog else family.destination_root.scenario_id if continued else world.scenario_id
+        content_version = family.entry.scenario_content_version if regional or fog else family.destination_root.scenario_content_version if continued else world.scenario_content_version
         world_id = "world.undelivered_receipt" if continued or regional else world.entry_world_id.value
         world_version = 1 if continued or regional else world.entry_world_version.value
         if (run.trusted_participation_references[-1].session_id != submission.session_id
@@ -270,7 +289,7 @@ class NativeTurnMechanicsCoordinator:
               content_version, world.default_character_definition_id)), None)
         if entry is None or entry.resource_id not in state.player.resources:
             raise NativeMechanicsIntegrityError(submission.session_id)
-        binding = dict(run_id=run.run_id.value, run_revision=5 if regional else 4 if continued else 3,
+        binding = dict(run_id=run.run_id.value, run_revision=5 if regional else 4 if continued or fog else 3,
             continuous_story_line_id=run.continuous_story_line_id.value,
             session_id=submission.session_id, player_id=state.player.player_id,
             applicable_character_reference=run.player_character_binding.applicable_character_reference.model_dump(mode="json"),
@@ -289,6 +308,9 @@ class NativeTurnMechanicsCoordinator:
             binding.update(visit_id=family.position.visit_id, visit_ordinal=3,
                 world=family.entry.world.model_dump(), region=family.entry.region.model_dump(),
                 regional_entry_fingerprint=family.revisit_evidence.request.fingerprint())
+        if fog:
+            binding.update(visit_id=family.position.visit_id, visit_ordinal=2,
+                fog_entry_sha256=family.entry.digest(), fog_source_sha256=family.source_root.digest())
         if talents is not None:
             talents.validate()
             if talents.run_id != run.run_id.value or talents.state != "CONFIRMED":

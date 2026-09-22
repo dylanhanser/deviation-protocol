@@ -1,4 +1,6 @@
 """Owned, post-ending native Run termination over the pinned native UoW."""
+from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Callable
@@ -70,7 +72,7 @@ class RunExitService:
         family = await get(run_id=participation.run_id)
         if type(family) is LegacyRunCompatibilityV1:
             raise RunExitError("NATIVE_RUN_REQUIRED")
-        if type(family) not in (NativeRunAdmissionV1, NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
+        if type(family) not in (FogContinuedV1,FogTerminatedV1,NativeRunAdmissionV1, NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
             raise SnapshotInvalidError(session_id)
         revalidate_run_model(family, type(family))
         if participation not in family.canonical_run.trusted_participation_references:
@@ -100,7 +102,7 @@ class RunExitService:
                     or records[0].ending_id != runtime.ending_id
                     or records[0].scenario_content_version != runtime.scenario_content_version):
                 raise SnapshotInvalidError(session_id)
-        if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) and session_id == family.exit_evidence.request.session_id and state_fingerprint(state) != family.exit_evidence.snapshot_sha256:
+        if type(family) in (FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) and session_id == family.exit_evidence.request.session_id and state_fingerprint(state) != family.exit_evidence.snapshot_sha256:
             raise SnapshotInvalidError(session_id)
         return family, character, persisted, state
 
@@ -118,7 +120,7 @@ class RunExitService:
         return dict(schema_version="native-run-status/v2" if type(family) is NativeRunRegionalCompletedV1 else "native-run-status/v1", session_id=persisted.session.session_id,
             run_id=run.run_id.value, run_state_version=run.state_version.value,
             session_state_version=persisted.session.state_version, lifecycle_status=run.lifecycle_status.value,
-            can_exit=type(family) in (NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1)
+            can_exit=type(family) in (FogContinuedV1,NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1)
                 and persisted.session.session_id == run.trusted_participation_references[-1].session_id
                 and character.lifecycle is PlayerCharacterLifecycle.ACTIVE and ended)
 
@@ -150,7 +152,8 @@ class RunExitService:
                         or family.canonical_run.player_character_binding.applicable_character_reference.player_character_id != target):
                     raise SnapshotInvalidError(session_id)
                 run = family.canonical_run
-                continued = type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
+                fog = type(family) in (FogContinuedV1, FogTerminatedV1)
+                continued = fog or type(family) in (NativeRunContinuedV1,NativeRunContinuedTerminatedV1)
                 revisited = type(family) in (NativeRunRegionalRevisitV1, NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1)
                 expected_version = 5 if revisited else 4 if continued else 3
                 request_type = RevisitedNativeRunExitRequestV1 if revisited else ContinuedNativeRunExitRequestV1 if continued else NativeRunExitRequestV1
@@ -167,10 +170,10 @@ class RunExitService:
                 if receipt is not None:
                     if receipt.fingerprint.value != request.fingerprint():
                         raise RunExitError("IDEMPOTENCY_CONFLICT")
-                    if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) or family.exit_evidence.request != request:
+                    if type(family) not in (FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1) or family.exit_evidence.request != request:
                         raise SnapshotInvalidError(session_id)
                     return self._status(family, character, persisted, state)
-                if type(family) in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1) or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or session_id != run.trusted_participation_references[-1].session_id:
+                if type(family) in (FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1) or character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or session_id != run.trusted_participation_references[-1].session_id:
                     raise RunExitError("RUN_EXIT_NOT_AVAILABLE")
                 if (command.expected_run_state_version != expected_version
                         or command.expected_session_state_version != persisted.session.state_version):
@@ -178,13 +181,14 @@ class RunExitService:
                 if not self._status(family, character, persisted, state)["can_exit"]:
                     raise RunExitError("RUN_EXIT_NOT_AVAILABLE")
                 runtime = state.scenario_runtime
-                evidence_type = RevisitedNativeRunExitEvidenceV1 if revisited else ContinuedNativeRunExitEvidenceV1 if continued else NativeRunExitEvidenceV1
-                evidence = evidence_type(schema="run.terminate-revisited-native-evidence/v1" if revisited else "run.terminate-continued-native-evidence/v1" if continued else "run.terminate-native-evidence/v1", request=request,
+                from deviation_protocol.domain.fog_patrol import FogExitEvidenceV1, terminate_fog_run
+                evidence_type = FogExitEvidenceV1 if fog else RevisitedNativeRunExitEvidenceV1 if revisited else ContinuedNativeRunExitEvidenceV1 if continued else NativeRunExitEvidenceV1
+                evidence = evidence_type(schema="run.fog-patrol-exit-evidence/v1" if fog else "run.terminate-revisited-native-evidence/v1" if revisited else "run.terminate-continued-native-evidence/v1" if continued else "run.terminate-native-evidence/v1", request=request,
                     scenario_id=persisted.session.scenario_id, scenario_content_version=state.content_version,
                     ending_id=runtime.ending_id, ending_status=runtime.ending_status.value,
                     session_state_version=persisted.session.state_version, snapshot_sha256=state_fingerprint(state))
                 time = self.clock()
-                terminal = (terminate_revisited_native_run if revisited else terminate_continued_native_run if continued else terminate_native_run)(family, request, occurred_at=time)
+                terminal = (terminate_fog_run if fog else terminate_revisited_native_run if revisited else terminate_continued_native_run if continued else terminate_native_run)(family, request, occurred_at=time)
                 receipt = StoredRunSuccessReceipt(key=key, fingerprint=RunOperationFingerprint(value=request.fingerprint()),
                     command_kind=RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN if revisited else RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN if continued else RunMutationKind.TERMINATE_NATIVE_RUN,
                     result=RunSafeResult(result_schema_version=TERMINATE_REVISITED_NATIVE_RUN_RESULT_SCHEMA_VERSION if revisited else TERMINATE_CONTINUED_NATIVE_RUN_RESULT_SCHEMA_VERSION if continued else TERMINATE_NATIVE_RUN_RESULT_SCHEMA_VERSION,
@@ -195,7 +199,7 @@ class RunExitService:
                     raise RunExitError("RUN_EXIT_CONFLICT")
                 await uow.run_mutation_receipts.add(receipt, created_at=time, exit_evidence=evidence)
                 classified = await uow.run_protocol_bindings.get_classified_for_update(run_id=run.run_id)
-                expected_family = NativeRunRegionalRevisitTerminatedV1(revisited=family,canonical_run=terminal,exit_evidence=evidence) if revisited else NativeRunContinuedTerminatedV1(continued=family,canonical_run=terminal,exit_evidence=evidence) if continued else NativeRunTerminatedV1(admission=family, canonical_run=terminal, exit_evidence=evidence)
+                expected_family = FogTerminatedV1(continued=family,canonical_run=terminal,exit_evidence=evidence) if fog else NativeRunRegionalRevisitTerminatedV1(revisited=family,canonical_run=terminal,exit_evidence=evidence) if revisited else NativeRunContinuedTerminatedV1(continued=family,canonical_run=terminal,exit_evidence=evidence) if continued else NativeRunTerminatedV1(admission=family, canonical_run=terminal, exit_evidence=evidence)
                 if classified != expected_family:
                     raise SnapshotInvalidError(session_id)
                 result = self._status(classified, character, persisted, state)

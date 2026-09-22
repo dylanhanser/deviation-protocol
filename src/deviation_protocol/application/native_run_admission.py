@@ -433,7 +433,8 @@ class NativeRunAdmissionService(RunEntryService):
         except ValueError:
             raise SnapshotInvalidError("invalid historical native Run family") from None
         from deviation_protocol.domain.run_protocol_binding import NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1
-        if type(admission) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1):
+        from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+        if type(admission) in (NativeRunTerminatedV1,NativeRunContinuedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitV1,NativeRunRegionalRevisitTerminatedV1, NativeRunRegionalCompletedV1, FogContinuedV1, FogTerminatedV1):
             revalidate_run_model(admission, type(admission))
             admission = admission.admission
         if type(admission) is not NativeRunAdmissionV1:

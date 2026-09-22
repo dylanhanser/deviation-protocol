@@ -28,7 +28,10 @@ class FactCopy:
 from deviation_protocol.application.fog_station import CONTENT_IDENTITY as STATION_IDENTITY, CONTENT_SHA256 as STATION_SHA256
 
 
+from deviation_protocol.application.fog_patrol import CONTENT_IDENTITY as PATROL_IDENTITY, CONTENT_SHA256 as PATROL_SHA256
+
 CONTENT_COPY = {
+    (*PATROL_IDENTITY, PATROL_SHA256): (),
     (*STATION_IDENTITY, STATION_SHA256): (),
     (*SOURCE_CONTENT_IDENTITY, SOURCE_CONTENT_SHA256): (),
     (*DESTINATION_CONTENT_IDENTITY, DESTINATION_CONTENT_SHA256): (
@@ -119,7 +122,7 @@ def render_sources(sources: tuple[RecapSource, ...], lifecycle: str):
     if lifecycle == "completed":
         visits.append("本次旅程正常完成，待核事项保留；完成不改写发运暂缓、送达未证明或封存事实。")
     elif lifecycle == "terminated":
-        visits.append("本次旅程已明确终止；这不是正常完成。" if sources[-1].content_identity[:2] == STATION_IDENTITY
+        visits.append("本次旅程已明确终止；这不是正常完成。" if sources[-1].content_identity[:2] in (STATION_IDENTITY, PATROL_IDENTITY)
                       else "本次旅程已明确终止；这不是正常完成，也不表示核验已结案。")
     # Required facts and visits use canonical ordinal order; optional recent
     # scene copy uses descending ordinal. No timestamps/navigation ordering.

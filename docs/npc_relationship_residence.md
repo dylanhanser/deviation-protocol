@@ -1,14 +1,17 @@
 # NPC Relationship and Temporary Residence
 
-Status: **First bounded slice implemented as an uncommitted candidate; broader Phase 3.4 remains incomplete.**
+Status: **First bounded slice published at `57b107e8`; bounded patrol continuation is an uncommitted candidate; broader Phase 3.4 remains incomplete.**
 
 Phase ownership: **Phase 3.4**
 
 ## First bounded slice: 雾哨站
 
 The owner authorized this slice against published baseline
-`96200883dd00d8639c91579b9518175e197ce856`. It is not an independent approval,
-browser acceptance, local commit or claim of full Phase 3.4 completion.
+`96200883dd00d8639c91579b9518175e197ce856`. It subsequently passed independent
+review and the narrow corrected-title browser retest and was published at
+`57b107e8b3c004c8ff8b07f8b6e50b925d093f31`. The original browser FAILED
+record and subsequent correction evidence remain historical. This is not full
+Phase 3.4 completion.
 The following exact rules supersede the deferred questions below only for
 this authored encounter. The broader product direction remains unchanged.
 
@@ -92,8 +95,9 @@ trusted scenario-start/completion indexing; the bounded relationship projection
 is **not** an NPC-index update or a claim that its memory index contains these
 experiences. See [player_memory.md](player_memory.md) for this explicit boundary.
 
-The first slice verifies only a reunion in the **same Session**. Later-Session
-recovery within the same Run and cross-Run inheritance are not implemented. A
+The published first slice verifies a farewell in the **same Session**. The new
+bounded continuation below adds previous-experience reading in one later Session;
+relationship-state and cross-Run inheritance remain unimplemented. A
 local NPC definition/subject key, repeated name or logical reference does not
 authorize transferring trust, residence, promises or memories into another Run.
 Fresh admission starts unacquainted. Golden-memory retention, cross-Session NPC
@@ -119,14 +123,82 @@ Its wrapper recorded the initial empty test database at `20260916_0007`, deploye
 the actual head, then restored the exact schema, data and constraints. The initial
 cleanup-order failure and its scoped repair remain recorded separately; that
 failed run is not a pass. No application migration or user-data change was needed.
-Browser acceptance and independent review are still pending; no full Phase 3.4
-or limited-trial readiness is claimed by this implementation candidate.
+These are the original implementation checks. The later independent approval and
+corrected-title browser PASS apply to the published first slice only; no full
+Phase 3.4 or limited-trial readiness is inferred.
 
 Final scoped Offline verification passed 227 tests, compileall, dependency checks,
 Alembic metadata and Git diff checks. The complete Web run passed 528 tests with
 one existing skip; typecheck, lint and build passed. These are separate selections,
 not additive totals. Earlier interrupted runs, temporary-path failures and the
 corrected non-hospital composition fixture remain historical evidence, not passes.
+
+## Bounded subsequent visit: 巡路风口 (current candidate)
+
+Authorized from the published `57b107e8` baseline. This is one same-Run,
+same-world later visit, not general relationship inheritance. Destination content
+is `fog_patrol / fog-patrol-1.0.0`, raw UTF-8 SHA-256
+`fdb955dd20693607f7a7a5fffd43811bcb32c933bf28e7588dacc5ffe0344c61`.
+It is registered in normal and Demo composition and available only through the
+closed station continuation branch, never starting-world or standalone discovery.
+The frozen source pack and existing continuation/revisit graph are unchanged.
+
+| Before | Explicit action | Result |
+| --- | --- | --- |
+| Any of four station endings; native Run active at revision 3 | Confirm continuing current journey | Revision 4; fresh second Session in `region.fog_station.patrol_pass/1` |
+| Wind pass arrival | Greet 岑舟 | At most two verified prior experiences; present hazard |
+| Signal-light structure unstable | Secure the rope from inside the railing, or take sheltered bypass | Light removed with assistance, or safe passage without claiming assistance |
+| Result reached | Explicit goodbye | Session ending; Run remains active, no further content |
+| Second Session ended, Run active | Existing explicit Run exit | Revision 5 terminated; character released |
+
+All source endings are eligible regardless of trust/stay/activity history.
+Admission creates Run revisions 1 (create), 2 (bind character), 3 (attach first
+Session). All legal station choices change Session versions only, so second-visit
+participation joins at revision 4. Destination has three CHOOSE submissions on
+either route, zero clocks/resource costs, no injury/reward/stay/progression.
+Terminated/completed Runs never acquire a successor or resume implicitly.
+
+`fog-world-state/v1` seals the first visit's exact content/digest, ended snapshot,
+version and complete bounded committed event stream. `fog-patrol-entry/v1` binds
+that source digest and Session to the new initial snapshot, exact destination
+content, and explicit `authored-person.cen-zhou/v1` mapping between
+`npc.fog_station.cen_zhou` and `npc.fog_patrol.cen_zhou`. Runtime NPC IDs remain
+Session-local. Ownership/controller/character, Run/line participation, ending,
+decisions, events and completed memory provenance are revalidated at transition
+and reconstruction. Missing/conflicting evidence rejects explicitly; no text,
+name, model summary or memory index can fill gaps. Valid absence of an activity
+gets accurate no-activity wording. Early departure and declined stay are distinct.
+
+Only complete `PlayerState` transfers. The new NPC, runtime and PlayerMemoryState
+are fresh; frozen Run talents remain unchanged. Previous-experience text is marked
+“上次访问的回响”; no THIS_SESSION trust or residence eligibility is inherited and
+no relationship panel is synthesized for the destination. Public associations
+expose visits/content and authored arrival information, not sealed snapshots or
+private evidence identifiers. D1 uses exact-version public scenes/endings and the
+existing historical cutoff, explicit failure states and 2,000-code-point budget.
+
+Continuation prepares detached state, then locks native admission/character and
+revalidates authoritative source state plus committed events. Destination Session,
+initial event/memory/snapshot, participation, Run revision/CAS, receipt, single
+Run/world root, two visits, entry and position are one transaction. Exact replay
+uses the closed receipt and does not issue a new identity. Competing requests and
+exit serialize; failed precommit submissions leave no partial transition. GET,
+refresh and historical reading never repair state or auto-submit POST.
+
+Migration `20260922_0013` changes only the root schema whitelist and the two entry
+schema/paired-version CHECKs: old entry schema remains joined revision 5; new
+patrol entry must be revision 4. All columns, foreign keys, uniqueness constraints
+and the single Run/world root remain unchanged. Named-lock acquisition/release
+failure discards its physical owner. A later ALTER failure compensates only the
+tables changed by this invocation and preserves primary/restoration errors.
+Downgrade refuses existing patrol evidence before DDL; it never deletes it.
+
+Focused candidate coverage lives in `test_fog_patrol.py`,
+`test_mysql_fog_patrol.py`, and `App.fog-patrol.test.tsx`, with relevant shared
+codec/mechanics/recap/recovery checks. MySQL uses only `deviation_protocol_test`
+and compares original schema/data/constraints/free-lock state after restoration.
+Independent review and browser acceptance of this new candidate remain pending.
+The original DB-001 and DF-001/DF-002 dispositions are unchanged.
 
 ## Design purpose
 

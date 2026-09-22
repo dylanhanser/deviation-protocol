@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1
+
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from datetime import datetime
@@ -755,13 +757,13 @@ async def _active_run_for_character(
             raise RunStoredRecordIntegrityError("surviving binding character mismatch")
         if run.lifecycle_status in (RunLifecycleStatus.TERMINATED, RunLifecycleStatus.COMPLETED):
             family = await classifier(run_id=run.run_id)
-            if type(family) not in (NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
+            if type(family) not in (FogTerminatedV1,NativeRunTerminatedV1,NativeRunContinuedTerminatedV1,NativeRunRegionalRevisitTerminatedV1,NativeRunRegionalCompletedV1):
                 raise RunStoredRecordIntegrityError("historical binding requires complete native termination")
         elif run.lifecycle_status.is_active_line and binding.binding_state == "active":
             if run.current_mutation_provenance.mutation_kind in (RunMutationKind.CONTINUE_NATIVE_RUN, RunMutationKind.REVISIT_NATIVE_REGION):
                 from deviation_protocol.domain.run_protocol_binding import NativeRunContinuedV1, NativeRunRegionalRevisitV1
                 family=await classifier(run_id=run.run_id)
-                if type(family) is not (NativeRunRegionalRevisitV1 if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else NativeRunContinuedV1):
+                if type(family) not in ((NativeRunRegionalRevisitV1,) if run.current_mutation_provenance.mutation_kind is RunMutationKind.REVISIT_NATIVE_REGION else (NativeRunContinuedV1, FogContinuedV1)):
                     raise RunStoredRecordIntegrityError("active continued binding requires complete family")
             active.append(run)
         else:
@@ -1869,7 +1871,12 @@ class DemoRunMutationReceiptRepository(RunMutationReceiptRepository):
                 RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN: (exit_evidence, ContinuedNativeRunExitEvidenceV1),
                 RunMutationKind.TERMINATE_REVISITED_NATIVE_RUN: (exit_evidence, RevisitedNativeRunExitEvidenceV1),
             }[receipt.command_kind]
-            revalidate_run_model(carrier,kind)
+            from deviation_protocol.domain.fog_patrol import FogContinuationEvidenceV1, FogExitEvidenceV1
+            if receipt.command_kind is RunMutationKind.CONTINUE_NATIVE_RUN and type(carrier) is FogContinuationEvidenceV1:
+                kind = FogContinuationEvidenceV1
+            if receipt.command_kind is RunMutationKind.TERMINATE_CONTINUED_NATIVE_RUN and type(carrier) is FogExitEvidenceV1:
+                kind = FogExitEvidenceV1
+            revalidate_run_model(carrier, kind)
             operation_evidence = canonical_run_operation_bytes(carrier)
         elif receipt.command_kind is RunMutationKind.ATTACH_SESSION:
             if participation is None or character_reference is not None:
@@ -2457,6 +2464,12 @@ def _classify_demo_run(maps, run_id, sessions, snapshots, events, registry=None,
                         regional_events=tuple(e for e in events if e.session_id == participations[2].session_id),
                         regional_has_active_job=regional_has_active_job,
                         source_events=tuple(e for e in events if e.session_id == participations[1].session_id), registry=registry)
+                if admission.world_binding.entry_world.scenario_id == "fog_station":
+                    from deviation_protocol.infrastructure.fog_patrol_persistence import reconstruct_fog_family
+                    return reconstruct_fog_family(admission=admission, run=current_run, mutations=mutations,
+                        creation_evidence=evidence, roots=world_rows[0], visits=world_rows[1], positions=world_rows[2], entries=world_rows[3],
+                        source_session=rows[0], source_snapshot=rows[2], source_events=tuple(e for e in events if e.session_id == participations[0].session_id),
+                        destination_session=destination_rows[0], destination_event=destination_rows[1], destination_snapshot=destination_rows[2], registry=registry)
                 b._require(not world_rows[3], "entry on old continued family")
                 return reconstruct_continued_family(admission=admission,run=current_run,mutations=mutations,
                     creation_evidence=evidence,roots=world_rows[0],visits=world_rows[1],positions=world_rows[2],
@@ -2531,6 +2544,15 @@ class DemoRunWorldContinuationRepository(application_ports.RunWorldContinuationR
         from deviation_protocol.domain.run import revalidate_run_model
         from deviation_protocol.infrastructure.world_continuation_persistence import root_to_storage
         self._uow._require_native_writer()
+        from deviation_protocol.domain.fog_patrol import FogContinuedV1
+        if type(continued) is FogContinuedV1:
+            from deviation_protocol.infrastructure.fog_patrol_persistence import fog_rows
+            maps = self._uow._visible_authority_maps()
+            for name, key, values in fog_rows(continued):
+                if key in getattr(maps, name):
+                    raise application_ports.NativeRunAdmissionWriteConflictError("fog continuation map conflict")
+                getattr(self._uow, "_pending_" + name)[key] = SimpleNamespace(**values)
+            return
         revalidate_run_model(continued,NativeRunContinuedV1)
         maps=self._uow._visible_authority_maps()
         time=continued.canonical_run.current_mutation_provenance.occurred_at

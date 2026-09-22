@@ -920,6 +920,23 @@ class SessionService:
             scenario_content_version=definition.content_version)
         return replace(prepared,initial_state=state,initial_frame=frame)
 
+    def prepare_fog_patrol_initialization(self, principal, *, creation_request_id,
+            source_state, created_at):
+        from dataclasses import replace
+        from deviation_protocol.domain.fog_patrol import DESTINATION
+        definition = self.resolve_run_entry_definition(DESTINATION[0])
+        if (definition.content_version != DESTINATION[1]
+                or source_state.player.player_id != principal.player_id):
+            raise ValueError("patrol initializer association")
+        prepared = self.prepare_run_entry_initialization(principal,
+            creation_request_id=creation_request_id, definition=definition,
+            character_definition_id=source_state.player.character_definition_id, created_at=created_at)
+        state = prepared.initial_state.detached_copy(self.catalog)
+        state.player = source_state.player.model_copy(deep=True)
+        state.validate_against(self.catalog)
+        self.relationship_policy.validate(state, prepared.session.session_id, definition)
+        return replace(prepared, initial_state=state)
+
     def prepare_regional_revisit_initialization(self, principal, *, creation_request_id,
             base, created_at):
         from dataclasses import replace

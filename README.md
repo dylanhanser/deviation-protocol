@@ -116,22 +116,23 @@ and cleans only resources it created. It does not treat the warning literal in
 This acceptance applies to the deterministic local Demo vertical slice. It does
 not establish production readiness or implement later final-product systems.
 
-## Planned or accepted design — not implemented
+## Current scope and remaining design
 
-- **Phase 3.3 — Run Protocol and Difficulty/World Profiles:** approved product
-  design, not implemented. See
+- **Phase 3.3 — Run Protocol and Difficulty/World Profiles:** bounded native Run,
+  difficulty profiles and the published continuation/revisit/completion route are implemented. See
   [Run Protocol, Difficulty, and World Profiles](docs/run_protocol.md).
-- **Phase 3.4 — NPC Relationship and Temporary Residence:** approved product
-  design, not implemented. See
+- **Phase 3.4 — NPC Relationship and Temporary Residence:** the first 雾哨站 slice
+  is published at `57b107e8`. One same-Run patrol reunion is an uncommitted
+  candidate awaiting independent review and browser acceptance; broader Phase 3.4
+  remains incomplete. See
   [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md).
 - **Phase 4.0 — Production Provider Distribution:** accepted architectural
   direction, not implemented. See
   [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md).
 
-The three later systems do not belong to Phase 3.2b. No current code implements
-a frozen `RUN_PROTOCOL`, difficulty/world profiles, NPC residence mode,
-player-selectable multi-Provider routing, commercial quotas, billing, or
-unrestricted daily AI chat.
+These systems do not belong to the historical Phase 3.2b scope. General NPC
+relationship inheritance, player-selectable multi-Provider routing, commercial
+quotas, billing and unrestricted daily AI chat remain unimplemented.
 
 ## Current public action and authority boundary
 

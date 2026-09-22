@@ -3058,7 +3058,7 @@ legacy behavior and migration protection. Browser A/B/C passed; D retains only
 independent automated evidence. Phase 3.3 closure and DF-001/DF-002 conditions
 remain unchanged.
 
-The first bounded Phase 3.4 implementation candidate adds `world.fog_station/1`
+The first bounded Phase 3.4 slice, published at `57b107e8`, adds `world.fog_station/1`
 as a second formal native starting world. Exact bundle selection is used for
 admission, confirmation replay and owned Session reads. Its finite CHOOSE-only
 mechanics have an explicit empty clock mapping and no resource deductions;
@@ -3067,4 +3067,40 @@ trust stages or residence quotas. It reaches its own authored ending and reuses
 explicit native exit, without joining the frozen continuation/revisit graph.
 Its relationship and shared-experience facts remain engine-owned and Session-local.
 See [the station contract](npc_relationship_residence.md#first-bounded-slice-雾哨站).
-This new candidate is not independently approved, browser accepted or published.
+The published slice retains its independent approval and corrected-title browser
+PASS; the original FAILED record is preserved as history.
+
+The new bounded patrol continuation candidate adds a separate same-world branch,
+not an extension of the frozen S7 stored codecs. Admission revisions 1/2/3 are
+unchanged by source Session choices. Explicit continuation from any of four active
+station endings creates revision 4 with two trusted participations, a single
+`fog-world-state/v1` root, two region-specific visits and one
+`fog-patrol-entry/v1` entry/position. A new closed continuation evidence codec
+freezes exact source snapshot/events/content and destination initialization/NPC
+mapping. Existing storage and command namespaces are reused; v1 old-family
+bytes/fingerprints and decoders remain unchanged. No backfill occurs on read.
+
+Both second-visit outcomes require explicit goodbye; they leave Run revision 4
+active with no next content. Explicit exit uses the closed patrol exit evidence
+and existing continued-exit mutation to produce revision 5 terminated and release
+the character. Old terminal Runs cannot be revived. Full PlayerState and frozen
+talents persist, but target memory/runtime/NPC state are new. Reads expose only
+bounded public associations and never create visits or write memories.
+
+The R1/P2 correction recognizes `FogContinuedV1` and `FogTerminatedV1` in the
+shared historical admission replay path. Complete family validation precedes
+unwrapping the original admission, retaining receipt, request, ownership, content
+and original Session checks. Exact original talent confirmation and native entry
+replays return the original response even after explicit exit; they do not return
+the patrol Session, reroll talents, reactivate the Run or write records. Focused
+public Demo and production MySQL regressions cover all three lifecycle stages,
+unchanged state/record counts, changed-intent and ownership rejection. Demo also
+checks missing continuation association rejection. Original review
+`CHANGES_REQUIRED` and failed probes are preserved; the correction awaits R1
+re-review and does not grant approval.
+
+Migration 0013 extends exactly three CHECKs: root schema whitelist, entry schema
+whitelist, and paired entry schema/joined revision (old regional 5; patrol 4).
+Single-root uniqueness, columns, FKs and old branches remain intact. Existing
+patrol evidence prevents downgrade. The new candidate awaits independent review
+and subsequent browser acceptance; no full Phase 3.4 completion is claimed.

@@ -41,7 +41,7 @@ export function assertTransitionResult(source: PlayerSessionView, result: Native
   assertNativeView(source,result.run_context);
   if (source.metadata.session_id !== result.source_session_id || source.metadata.state_version !== result.source_session_state_version ||
       source.scenario_status !== "ENDED" || source.narrative_frame.scenario_id !==
-      (result.visit.visit_ordinal === 3 ? "undelivered_receipt" : "death_certificate")) mismatch();
+      (result.visit.world_id === "world.fog_station" ? "fog_station" : result.visit.visit_ordinal === 3 ? "undelivered_receipt" : "death_certificate")) mismatch();
 }
 export interface ConfirmedTransition {
   source: PlayerSessionView;
@@ -80,7 +80,7 @@ export function assertConfirmedDestination(confirmed: ConfirmedTransition, view:
       journey.run_state_version < result.resulting_run_state_version || view.metadata.state_version < result.initial_session_state_version) mismatch();
 }
 export type FrozenJourneyTransition = FrozenRunExit & {
-  readonly kind: "first_continuation" | "regional_revisit";
+  readonly kind: "first_continuation" | "regional_revisit" | "fog_patrol";
   readonly source: PlayerSessionView;
   readonly authority: NativeRunJourney;
 };

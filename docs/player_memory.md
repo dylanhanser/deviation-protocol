@@ -1,6 +1,6 @@
 # 玩家长期记忆（Phase 2.3b）
 
-## 当前跨世界范围（2026-09-20 对账）
+## 当前跨世界范围（2026-09-22 对账）
 
 Phase 3.3/S7-5 已独立批准并发布于 `a35a1bf`，不改变本文的记忆权威。
 S7 的访问、根状态、参与关系、续接/重访/完成凭据独立保存旅程历史；
@@ -16,22 +16,28 @@ Provider 已使用最多六段本 Session 的已接受正文、有界公开 memo
 本次 Web 阅读改进单独显示索引同步状态和投影截断状态，标明访问范围；
 正文回顾只读，不能生成新事实、NPC 身份或记忆。
 [D1 旅程回顾](open_source_comparison.md#product-decisions) 已于 2026-09-21 获得产品批准，
-并在当前未提交候选中实现：仅 Web 展示，同一 Run，截止正在阅读的访问，正文上限
+现已发布：仅 Web 展示，同一 Run，截止正在阅读的访问，正文上限
 2,000 个 Unicode 码点。它读取经所有权、参与关系、快照版本及精确内容版本验证的
 runtime/结局证据和公开文案，不拼接或更新 `PlayerMemoryState`，不进入 Prompt。
 缺失、冲突、可选内容省略与必要内容超限有显式状态；详见
-[公开回顾契约](public_client_contract.md#d1-read-only-journey-recap)。D2/D3 仍未批准。
+[公开回顾契约](public_client_contract.md#d1-read-only-journey-recap)。限定护送遭遇也已发布；不代表开放自由 Provider 对话。
 
 ## 唯一事实来源
 
-雾哨站的有界 Phase 3.4 候选额外提供只读关系/共同经历展示。它从本次 Session
+已发布的雾哨站有界 Phase 3.4 切片额外提供只读关系/共同经历展示。它从本次 Session
 `ScenarioRuntimeState` 的有限决策路径与精确 outcome 证据验证、派生，随现有快照、
 事件和请求结果原子持久化；最多展示合作、完成收尾、一次暂住（至多三项活动）、
 离开和告别五条经历，不保存聊天全文或模型摘要。该展示不是 `NpcMemoryRecord`
 或 `SignificantExperienceEntry` 写入，也不表示旧索引已收录这些经历。
 `PlayerMemoryState` 在新包中仅复用既有开始/结束规则，继续保留同步与截断契约。
 模型文本、D1 回顾、记忆索引及公开关系面板均不能授权信任、邀请或暂住次数。
-同 Session 告别可以回收实际共同经历；同 Run 后续 Session 及跨 Run 继承尚未实现。
+同 Session 告别可以回收实际共同经历。新的巡路风口候选仅在同 Run 第二次访问中
+读取冻结的第一次访问证据：精确内容版本/摘要、完整已确认事件、结束快照及来源
+Session，与 Run 参与关系和显式 NPC 映射绑定。最多两条作者文案提及实际经历，
+不是继承信任、邀请、暂住名额或可影响资格的关系状态。新 Session 创建自己的
+PlayerMemoryState/runtime/NPC，完整 PlayerState 与冻结天赋继续沿用；不复制旧记忆。
+缺失或冲突证据显式拒绝，不能退回“陌生人”或默认亲密分支。该候选不建立跨 Run
+继承或通用 NPC 记忆检索；D1 截止范围与 2,000 码点预算保持不变。
 详见 [雾哨站契约](npc_relationship_residence.md#first-bounded-slice-雾哨站)。
 
 长期记忆只索引可信历史，不覆盖当前权威状态：

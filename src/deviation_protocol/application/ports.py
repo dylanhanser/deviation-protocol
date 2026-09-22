@@ -45,6 +45,7 @@ from deviation_protocol.domain.run import (
     RunSessionParticipationReference,
 )
 if TYPE_CHECKING:
+    from deviation_protocol.domain.fog_patrol import FogContinuedV1, FogTerminatedV1, FogContinuationEvidenceV1, FogExitEvidenceV1
     from deviation_protocol.application.native_run_admission import NativeRunEntryCreationEvidenceV1
     from deviation_protocol.domain.world_continuation import NativeRunContinuationEvidenceV1
     from deviation_protocol.domain.run_protocol_binding import (
@@ -417,13 +418,13 @@ class RunProtocolBindingRepository(ABC):
     @abstractmethod
     async def get_classified(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | FogContinuedV1 | FogTerminatedV1 | None:
         raise NotImplementedError
 
     @abstractmethod
     async def get_classified_for_update(
         self, *, run_id: RunId
-    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | None:
+    ) -> LegacyRunCompatibilityV1 | NativeRunProtocolBindingV1 | NativeRunAdmissionV1 | NativeRunTerminatedV1 | NativeRunContinuedV1 | NativeRunContinuedTerminatedV1 | NativeRunRegionalRevisitV1 | NativeRunRegionalRevisitTerminatedV1 | NativeRunRegionalCompletedV1 | FogContinuedV1 | FogTerminatedV1 | None:
         raise NotImplementedError
 
 
@@ -544,8 +545,8 @@ class RunMutationReceiptRepository(ABC):
     @abstractmethod
     async def add(
         self, receipt: StoredRunSuccessReceipt, *, created_at: datetime,
-        exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | None = None,
-        continuation_evidence: NativeRunContinuationEvidenceV1 | None = None,
+        exit_evidence: NativeRunExitEvidenceV1 | ContinuedNativeRunExitEvidenceV1 | FogExitEvidenceV1 | None = None,
+        continuation_evidence: NativeRunContinuationEvidenceV1 | FogContinuationEvidenceV1 | None = None,
         revisit_evidence=None,
         completion_evidence=None,
     ) -> None:
@@ -554,8 +555,8 @@ class RunMutationReceiptRepository(ABC):
 
 class RunWorldContinuationRepository(ABC):
     @abstractmethod
-    async def add(self, continued: NativeRunContinuedV1) -> None:
-        """Stage both immutable roots, visits and the unique current position."""
+    async def add(self, continued: NativeRunContinuedV1 | FogContinuedV1) -> None:
+        """Stage the closed family's immutable roots, entries, visits and current position."""
         raise NotImplementedError
 
 

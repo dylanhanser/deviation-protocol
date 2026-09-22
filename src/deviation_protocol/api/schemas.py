@@ -338,6 +338,11 @@ class NativeWorldVisitResponse(BaseModel):
 
     @model_validator(mode="after")
     def _identity(self):
+        if self.world_id == "world.fog_station":
+            expected_region = "region.fog_station.station" if self.visit_ordinal == 1 else "region.fog_station.patrol_pass"
+            if self.region_id != expected_region or self.world_version != 1 or self.region_version != 1:
+                raise ValueError("invalid fog visit identity")
+            return self
         expected = (("world.death_certificate", "region.death_certificate.facility")
             if self.visit_ordinal == 1 else ("world.undelivered_receipt", "region.undelivered_receipt.dispatch_hall"))
         if (self.world_id, self.region_id) != expected or self.world_version != 1 or self.region_version != 1:
@@ -355,6 +360,10 @@ class NativeRunPredecessorResponse(BaseModel):
 
     @model_validator(mode="after")
     def _first(self):
+        if self.visit.world_id == "world.fog_station":
+            if self.visit.visit_ordinal != 1 or (self.scenario_id, self.scenario_content_version) != ("fog_station", "fog-station-1.0.0"):
+                raise ValueError("invalid fog predecessor")
+            return self
         if (self.visit.visit_ordinal != 1 or self.scenario_id != "death_certificate"
                 or self.scenario_content_version != "death-certificate-1.1.0"):
             raise ValueError("predecessor must be visit one")
@@ -370,13 +379,16 @@ class NativeRunContinuationResultResponse(BaseModel):
     resulting_run_state_version: int = Field(ge=4,le=4)
     session_id: str = Field(min_length=1,max_length=64,pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")
     initial_session_state_version: int = Field(ge=0,le=0)
-    scenario_id: Literal["undelivered_receipt"]
-    scenario_content_version: Literal["undelivered-receipt-1.0.0"]
+    scenario_id: Literal["undelivered_receipt", "fog_patrol"]
+    scenario_content_version: Literal["undelivered-receipt-1.0.0", "fog-patrol-1.0.0"]
     run_context: PublicNativeRunContext
     visit: NativeWorldVisitResponse
 
     @model_validator(mode="after")
     def _second(self):
+        expected = ("fog_patrol", "fog-patrol-1.0.0", "world.fog_station") if self.visit.world_id == "world.fog_station" else ("undelivered_receipt", "undelivered-receipt-1.0.0", "world.death_certificate")
+        if (self.scenario_id, self.scenario_content_version, self.run_context.entry_world.entry_world_id) != expected:
+            raise ValueError("crossed continuation world/content")
         if self.visit.visit_ordinal != 2 or self.source_session_id == self.session_id or self.run_id != self.run_context.run_id:
             raise ValueError("invalid continuation edge")
         return self
@@ -390,6 +402,11 @@ class NativeWorldArrivalResponse(BaseModel):
 
     @model_validator(mode="after")
     def _authored(self):
+        from deviation_protocol.application.fog_continuation_service import NOTICE, ENDING_TITLES as FOG_ENDINGS
+        if self.previous_ending_title in FOG_ENDINGS.values():
+            if self.previous_ending_status != "RESOLVED" or self.entry_notice != NOTICE:
+                raise ValueError("invalid fog arrival")
+            return self
         from deviation_protocol.application.world_visit_context import ENTRY_NOTICES, ENDING_TITLES
         titles = (tuple(ENDING_TITLES.values())[:2] if self.previous_ending_status == "RESOLVED"
                   else (ENDING_TITLES["death_certificate.ending.deadline_reached"],))
@@ -444,6 +461,10 @@ class NativeJourneyVisitResponse(NativeWorldVisitResponse):
 
     @model_validator(mode="after")
     def _identity(self):
+        if self.world_id == "world.fog_station":
+            if self.visit_ordinal not in (1, 2):
+                raise ValueError("no third fog visit")
+            return super()._identity()
         pairs = {1: ("world.death_certificate", "region.death_certificate.facility"),
                  2: ("world.undelivered_receipt", "region.undelivered_receipt.dispatch_hall"),
                  3: ("world.undelivered_receipt", "region.undelivered_receipt.verification_archive")}
@@ -468,6 +489,11 @@ class NativeVisitAssociationResponse(BaseModel):
             if any((self.scenario_id, self.scenario_content_version) == (w.scenario_id, w.scenario_content_version)
                    for w in AUTHORED_ENTRY_WORLDS_V1):
                 return self
+        if self.visit is not None and self.visit.world_id == "world.fog_station":
+            expected = ("fog_station", "fog-station-1.0.0") if self.visit.visit_ordinal == 1 else ("fog_patrol", "fog-patrol-1.0.0")
+            if (self.scenario_id, self.scenario_content_version) != expected:
+                raise ValueError("fog visit/content mismatch")
+            return self
         ordinal = 1 if self.visit is None else self.visit.visit_ordinal
         expected = {1: ("death_certificate", "death-certificate-1.1.0"),
                     2: ("undelivered_receipt", "undelivered-receipt-1.0.0"),
@@ -489,13 +515,18 @@ class NativeJourneyArrivalResponse(NativeWorldArrivalResponse):
 
 class NativeNextTransitionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", strict=True)
-    kind: Literal["first_continuation", "regional_revisit"]
+    kind: Literal["first_continuation", "regional_revisit", "fog_patrol"]
     world_title: str = Field(min_length=1, max_length=120)
     region_title: str = Field(min_length=1, max_length=120)
     notice: str = Field(min_length=1, max_length=300)
 
     @model_validator(mode="after")
     def _authored(self):
+        if self.kind == "fog_patrol":
+            from deviation_protocol.application.fog_continuation_service import NOTICE
+            if (self.world_title, self.region_title, self.notice) != ("雾哨站", "巡路风口", NOTICE):
+                raise ValueError("invalid fog transition")
+            return self
         from deviation_protocol.domain.world_revisit import ARCHIVE_NOTICE
         expected = ("核验档案室", ARCHIVE_NOTICE) if self.kind == "regional_revisit" else (
             "发运大厅", "沿用当前角色和剩余资源进入发运大厅；原有资源不会恢复。")
@@ -530,14 +561,14 @@ class NativeRunJourneyResponse(BaseModel):
                     self.run_context.entry_world.entry_world_id, self.run_context.entry_world.entry_world_version)), None)
             if world is None or (self.current.scenario_id, self.current.scenario_content_version) != (world.scenario_id, world.scenario_content_version):
                 raise ValueError("journey admission world mismatch")
-            if world.scenario_id != "death_certificate" and self.next_transition is not None:
+            if world.scenario_id not in ("death_certificate", "fog_station") and self.next_transition is not None:
                 raise ValueError("starting world has no published continuation")
             if (self.path != self.current or self.predecessor is not None or self.successor is not None
                     or self.arrival is not None):
                 raise ValueError("invalid unmaterialized journey")
             count, ordinal = 1, 1
         else:
-            if self.run_context.entry_world.entry_world_id != "world.death_certificate":
+            if self.run_context.entry_world.entry_world_id not in ("world.death_certificate", "world.fog_station"):
                 raise ValueError("unpublished continuation world")
             if self.path.visit is None:
                 raise ValueError("missing materialized path")
@@ -553,6 +584,17 @@ class NativeRunJourneyResponse(BaseModel):
                     raise ValueError("extra journey neighbor")
             if (ordinal == count) != (self.path == self.current):
                 raise ValueError("journey current path mismatch")
+            fog = self.run_context.entry_world.entry_world_id == "world.fog_station"
+            if fog and (count != 2 or any(row is not None and row.visit.world_id != "world.fog_station"
+                    for row in (self.path, self.current, self.predecessor, self.successor))):
+                raise ValueError("crossed fog journey")
+            if not fog and any(row is not None and row.visit.world_id == "world.fog_station"
+                    for row in (self.path, self.current, self.predecessor, self.successor)):
+                raise ValueError("crossed old journey")
+            if ordinal == 2:
+                from deviation_protocol.application.fog_continuation_service import NOTICE
+                if self.arrival is None or (self.arrival.entry_notice == NOTICE) != fog:
+                    raise ValueError("crossed arrival")
             associations = [row for row in (self.path, self.current, self.predecessor, self.successor) if row is not None]
             for index, left in enumerate(associations):
                 for right in associations[index + 1:]:
@@ -571,7 +613,8 @@ class NativeRunJourneyResponse(BaseModel):
             raise ValueError("journey lifecycle mismatch")
         if self.next_transition is not None:
             if (self.path != self.current or self.lifecycle_status != "active" or count == 3
-                    or self.next_transition.kind != ("first_continuation" if count == 1 else "regional_revisit")):
+                    or (self.run_context.entry_world.entry_world_id == "world.fog_station" and count != 1)
+                    or self.next_transition.kind != ("fog_patrol" if self.run_context.entry_world.entry_world_id == "world.fog_station" else "first_continuation" if count == 1 else "regional_revisit")):
                 raise ValueError("unavailable journey transition")
         return self
 
