@@ -33,14 +33,14 @@ export type SessionRecoveryStorageResult<T> =
   | { ok: true; value: T }
   | { ok: false; failure: SessionRecoveryStorageFailure };
 
-function storageFailure<T>(
+export function storageFailure<T>(
   operation: SessionRecoveryStorageOperation,
   cause: unknown,
 ): SessionRecoveryStorageResult<T> {
   return { ok: false, failure: { operation, cause } };
 }
 
-function getSessionStorage(): SessionRecoveryStorageResult<Storage> {
+export function getSessionStorage(): SessionRecoveryStorageResult<Storage> {
   try {
     return { ok: true, value: globalThis.sessionStorage };
   } catch (cause: unknown) {

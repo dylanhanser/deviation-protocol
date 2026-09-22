@@ -107,10 +107,11 @@ class ClockPlan:
     opacity: int
     conflict: int
     after: int
+    talent: int = 0
 
     @property
     def amount(self) -> int:
-        return self.base + self.social + self.severity + self.opacity + self.conflict
+        return self.base + self.social + self.severity + self.opacity + self.conflict + self.talent
 
 
 def clock_plan(clock_id: str, before: int, maximum: int, base: int,

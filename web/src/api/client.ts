@@ -1,3 +1,4 @@
+import { openingPreparationSchema, confirmedTalentsSchema, type OpeningPreparation } from "./schemas";
 import { journeyRecapSchema, nativeRunCompletionStatusSchema, nativeRunCompletionResultSchema } from "./schemas";
 import { assertCompletionResult, type FrozenRunCompletion } from "../runCompletion";
 import type { z } from "zod";
@@ -180,6 +181,10 @@ export class PublicApiClient {
   private readonly baseUrl: URL;
   private readonly fetchImplementation: FetchImplementation | undefined;
 
+  get recoveryScope(): string {
+    return this.baseUrl.href;
+  }
+
   constructor(options: PublicApiClientOptions = {}) {
     if (options.baseUrl instanceof URL) {
       this.baseUrl = normalizeApiBaseUrl(options.baseUrl.toString());
@@ -202,6 +207,41 @@ export class PublicApiClient {
 
   listRunEntryOptions(signal?: AbortSignal): Promise<RunEntryOptions> {
     return this.request("v1/run-entry-options", {method:"GET", ...(signal === undefined ? {} : {signal})}, 200, runEntryOptionsSchema);
+  }
+
+  async getOpeningPreparation(characterId:string, signal?:AbortSignal) {
+    const result = await this.request(`v1/player-characters/${encodeURIComponent(characterId)}/opening-preparation`,
+      {method:"GET", ...(signal === undefined ? {} : {signal})}, 200, openingPreparationSchema.nullable());
+    if (result && result.character_id !== characterId) throw new ApiClientError("Opening character association changed", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+    return result;
+  }
+
+  async prepareOpening(attempt:FrozenNativeEntry, signal?:AbortSignal) {
+    const result = await this.request("v1/opening-preparations", {method:"POST",
+      headers:{"Content-Type":"application/json","Idempotency-Key":attempt.key}, body:attempt.serializedBody,
+      ...(signal === undefined ? {} : {signal})}, 200, openingPreparationSchema);
+    if (result.character_id !== JSON.parse(attempt.serializedBody).player_character_id) throw new ApiClientError("Opening character association changed", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+    return result;
+  }
+
+  async confirmOpening(attempt:FrozenNativeEntry, opening:OpeningPreparation, selected:readonly string[], signal?:AbortSignal) {
+    if (selected.length !== 2 || new Set(selected).size !== 2 || selected.some(id => !opening.candidates.some(t => t.id === id))) throw new ApiClientError("Choose two issued talents", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+    const result = await this.request(`v1/opening-preparations/${opening.preparation_id}/confirm`, {method:"POST",
+      headers:{"Content-Type":"application/json","Idempotency-Key":attempt.key},
+      body:JSON.stringify({character_id:opening.character_id,catalog_version:opening.catalog_version,selected_ids:selected}),
+      ...(signal === undefined ? {} : {signal})}, 200, openingPreparationSchema);
+    if (result.preparation_id !== opening.preparation_id || result.catalog_version !== opening.catalog_version ||
+        JSON.stringify(result.admission) !== JSON.stringify(opening.admission) || JSON.stringify(result.candidates) !== JSON.stringify(opening.candidates) ||
+        result.selected_ids.length !== selected.length || !result.selected_ids.every(id => selected.includes(id)) || result.result === null) {
+      throw new ApiClientError("Opening confirmation association changed", {kind:"invalid-response",reason:"CONTRACT_MISMATCH"});
+    }
+    assertNativeResponse(attempt,result.result);
+    return result.result;
+  }
+
+  getOpeningTalents(sessionId:string, signal?:AbortSignal) {
+    return this.request(`v1/sessions/${encodeURIComponent(sessionId)}/opening-talents`,
+      {method:"GET", ...(signal === undefined ? {} : {signal})}, 200, confirmedTalentsSchema);
   }
 
   freezeNativeEntry(request: NativeRunEntryRequest, key: string, profile: PublicRunProfile, world: PublicEntryWorld): FrozenNativeEntry {

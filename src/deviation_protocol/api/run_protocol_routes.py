@@ -63,6 +63,8 @@ _DECISIONS = {
 
 
 def install_run_protocol_routes(app):
+    from deviation_protocol.api.opening_talent_routes import install_opening_talent_routes
+    install_opening_talent_routes(app)
     from deviation_protocol.api.main import (
         _public_error_responses, _validate_run_entry_transport,
         _request_validation_failure, _reject_duplicate_json_members, _openapi_schema_values_match,

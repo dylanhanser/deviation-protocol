@@ -1,3 +1,4 @@
+import { prepareAndConfirmFirstTwo, openingConfirmedFixture } from "./test/openingFixtures";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
@@ -38,7 +39,7 @@ async function selectNativeSetup() {
   await screen.findByLabelText("选择难度");
   fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
   fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
-  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
   fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
 }
 
@@ -89,10 +90,10 @@ describe("native admission and storage recovery", () => {
         scenarioHandler(),
         ...postGuards(() => { unexpectedPosts++; }),
         http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
-        http.post(`${apiOrigin}/v1/runs/native`, () => {
+        http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`, () => {
           events.push("admission");
           storage.failSet = true;
-          return HttpResponse.json(nativeEntryFixture());
+          return HttpResponse.json(openingConfirmedFixture(nativeEntryFixture()));
         }),
         http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
           expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
@@ -104,7 +105,7 @@ describe("native admission and storage recovery", () => {
         renderRecoveryApp();
         await screen.findByLabelText("Player Character");
         await selectNativeSetup();
-        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await prepareAndConfirmFirstTwo();
         await screen.findByRole("button", {name: "重试保存进度"});
         expect(events).toEqual(["admission"]);
         expectNoLoadedGameplay();
@@ -155,10 +156,10 @@ describe("native admission and storage recovery", () => {
         scenarioHandler(),
         ...postGuards(() => { posts++; }),
         http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
-        http.post(`${apiOrigin}/v1/runs/native`, () => {
+        http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`, () => {
           posts++;
           storage.failSet = true;
-          return HttpResponse.json(nativeEntryFixture());
+          return HttpResponse.json(openingConfirmedFixture(nativeEntryFixture()));
         }),
         http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => HttpResponse.json(replacementView)),
       );
@@ -166,7 +167,7 @@ describe("native admission and storage recovery", () => {
         const rendered = renderRecoveryApp({client: oldClient});
         await screen.findByLabelText("Player Character");
         await selectNativeSetup();
-        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await prepareAndConfirmFirstTwo();
         await screen.findByRole("button", {name: "重试保存进度"});
         expect(oldView).not.toHaveBeenCalled();
         storage.failSet = false;
@@ -208,10 +209,10 @@ describe("native admission and storage recovery", () => {
         scenarioHandler(),
         ...postGuards(() => { unexpectedPosts++; }),
         http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
-        http.post(`${apiOrigin}/v1/runs/native`, () => {
+        http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`, () => {
           events.push("admission");
           storage.failSet = true;
-          return HttpResponse.json(nativeEntryFixture());
+          return HttpResponse.json(openingConfirmedFixture(nativeEntryFixture()));
         }),
         http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
           expect(storedRecoveryRecord()).toEqual({version: 1, session_id: "session-public-1"});
@@ -223,7 +224,7 @@ describe("native admission and storage recovery", () => {
         renderRecoveryApp();
         await screen.findByLabelText("Player Character");
         await selectNativeSetup();
-        fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+        await prepareAndConfirmFirstTwo();
         await screen.findByRole("button", {name: "重试保存进度"});
         expect(events).toEqual(["admission"]);
         expectNoLoadedGameplay();
@@ -257,9 +258,9 @@ describe("native admission and storage recovery", () => {
         scenarioHandler(),
         ...postGuards(() => { unexpectedPosts++; }),
         http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
-        http.post(`${apiOrigin}/v1/runs/native`, () => {
+        http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`, () => {
           posts++;
-          return HttpResponse.json(nativeEntryFixture());
+          return HttpResponse.json(openingConfirmedFixture(nativeEntryFixture()));
         }),
         http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => {
           views++;
@@ -273,7 +274,7 @@ describe("native admission and storage recovery", () => {
       renderRecoveryApp();
       await screen.findByLabelText("Player Character");
       await selectNativeSetup();
-      fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+      await prepareAndConfirmFirstTwo();
       await screen.findByRole("button", {name: "重试读取权威 View"});
       fireEvent.change(screen.getByLabelText("Session ID"), {target: {value: "  session-public-1  "}});
       fireEvent.click(screen.getByRole("button", {name: "读取 PlayerSessionView"}));
@@ -300,9 +301,9 @@ describe("native admission and storage recovery", () => {
         scenarioHandler(),
         ...postGuards(() => { unexpectedPosts++; }),
         http.get(`${apiOrigin}/v1/run-entry-options`, () => HttpResponse.json(runOptionsFixture)),
-        http.post(`${apiOrigin}/v1/runs/native`, () => {
+        http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`, () => {
           posts++;
-          return HttpResponse.json(nativeEntryFixture());
+          return HttpResponse.json(openingConfirmedFixture(nativeEntryFixture()));
         }),
         http.get(`${apiOrigin}/v1/sessions/session-public-1/view`, () => HttpResponse.json(recoveryView("matching View"))),
         http.get(`${apiOrigin}/v1/sessions/session-other/view`, () => HttpResponse.json(replacement)),
@@ -310,7 +311,7 @@ describe("native admission and storage recovery", () => {
       renderRecoveryApp();
       await screen.findByLabelText("Player Character");
       await selectNativeSetup();
-      fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+      await prepareAndConfirmFirstTwo();
       await screen.findByText("当前 Session：session-public-1");
       fireEvent.change(screen.getByLabelText("Session ID"), {target: {value: "session-other"}});
       fireEvent.click(screen.getByRole("button", {name: "读取 PlayerSessionView"}));
@@ -325,13 +326,13 @@ describe("native admission and storage recovery", () => {
   it.each(["client replacement", "unmount"])("ignores native completion after %s even when abort is ignored", async (transition) => {
     const late=deferred<ReturnType<typeof nativeEntryFixture>>();
     const oldClient=new PublicApiClient({baseUrl:`${apiOrigin}/`});
-    const post=vi.spyOn(oldClient,"enterNativeRun").mockImplementation(()=>late.promise);
+    const post=vi.spyOn(oldClient,"confirmOpening").mockImplementation(()=>late.promise);
     let views=0;
     server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,()=>HttpResponse.json(runOptionsFixture)),
       http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,()=>{views++;return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:nativeEntryFixture().run_context});}));
     const rendered=renderRecoveryApp({client:oldClient});
     await screen.findByLabelText("Player Character"); await selectNativeSetup();
-    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+    await prepareAndConfirmFirstTwo();
     await waitFor(()=>expect(post).toHaveBeenCalledTimes(1));
     if (transition==="unmount") rendered.unmount();
     else rendered.rerender(<App client={testClient} />);
@@ -344,11 +345,11 @@ describe("native admission and storage recovery", () => {
     let views=0;
     const response=nativeEntryFixture();
     server.use(scenarioHandler(), http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
-      http.post(`${apiOrigin}/v1/runs/native`,async ({request}) => {
+      http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`,async ({request}) => {
         requests.push({body:await request.text(),key:request.headers.get("Idempotency-Key")});
         if (requests.length===1) return HttpResponse.error();
         if (requests.length===2) return HttpResponse.json(errorFixture("INVALID_RUN_PROTOCOL","Run settings are not available"),{status:422});
-        return HttpResponse.json(response);
+        return HttpResponse.json(openingConfirmedFixture(response));
       }),http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
         views++; expect(storedRecoveryRecord()).toEqual({version:1,session_id:"session-public-1"});
         return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});
@@ -356,8 +357,8 @@ describe("native admission and storage recovery", () => {
     renderRecoveryApp();
     await screen.findByLabelText("Player Character");
     await selectNativeSetup();
-    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
-    fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+    await prepareAndConfirmFirstTwo();
+    fireEvent.click(screen.getByRole("button",{name:"确认天赋并开始"}));
     const retry=await screen.findByRole("button",{name:"手动重试完全相同的操作"});
     await waitFor(() => expect(retry).toBeEnabled());
     expect(requests).toHaveLength(1);
@@ -378,11 +379,11 @@ describe("native admission and storage recovery", () => {
     const response=nativeEntryFixture();
     const storage=new FaultInjectingStorage(); const restore=installSessionStorage(storage);
     server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
-      http.post(`${apiOrigin}/v1/runs/native`,() => {posts++; storage.failSet=true; return HttpResponse.json(response);}),
+      http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`,() => {posts++; storage.failSet=true; return HttpResponse.json(openingConfirmedFixture(response));}),
       http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {views++; return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});}));
     try {
       renderRecoveryApp(); await screen.findByLabelText("Player Character"); await selectNativeSetup();
-      fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+      await prepareAndConfirmFirstTwo();
       await screen.findByRole("button",{name:"重试保存进度"});
       expect(posts).toBe(1); expect(views).toBe(0);
       storage.failSet=false;
@@ -397,7 +398,7 @@ describe("native admission and storage recovery", () => {
   it("learns native context with GET-only reload and pauses on backend restart", async () => {
     seedRecoveryRecord("session-public-1"); let posts=0,gets=0;
     const response=nativeEntryFixture();
-    server.use(scenarioHandler(),...postGuards(() => {posts++;}),http.post(`${apiOrigin}/v1/runs/native`,() => {posts++;return HttpResponse.json(response);}),
+    server.use(scenarioHandler(),...postGuards(() => {posts++;}),http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`,() => {posts++;return HttpResponse.json(openingConfirmedFixture(response));}),
       http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {gets++;return HttpResponse.json({...nativeViewFixture(activeViewFixture),run_context:response.run_context});}));
     const page=renderRecoveryApp(); await screen.findByText("当前 Session：session-public-1");
     fireEvent.click(screen.getByText("场景提示与技术信息"));

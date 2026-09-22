@@ -101,7 +101,7 @@ class NativeMechanicsDecision:
             self.resource.actual, self.resource.after))
         clocks = tuple(tuple((type(value), value) for value in (
             row.clock_id, row.before, row.base, row.social, row.severity, row.opacity,
-            row.conflict, row.after)) for row in self.clocks)
+            row.conflict, row.after, row.talent)) for row in self.clocks)
         return (self.inputs, resource, clocks, self.selected_rule,
                 type(self.selected_result), self.selected_result, self.action_type)
 
@@ -111,7 +111,9 @@ class NativeMechanicsDecision:
                 "selected_rule": self.selected_rule,
                 "selected_result": self.selected_result.value if self.selected_result is not None else None,
                 "resource": asdict(self.resource),
-                "clocks": [asdict(row) for row in sorted(self.clocks, key=lambda r: r.clock_id)]}
+                "clocks": [{k: v for k, v in asdict(row).items()
+                    if k != "talent" or "opening_talents" in json.loads(self.inputs.binding_bytes)}
+                    for row in sorted(self.clocks, key=lambda r: r.clock_id)]}
 
 
 def _mint(cls, **fields):
@@ -239,7 +241,7 @@ class NativeTurnMechanicsCoordinator:
         except (TypeError, ValueError, AttributeError, DomainRuleViolation):
             raise NativeMechanicsIntegrityError(session_id) from None
 
-    def bind(self, family, state, submission, state_version, frame) -> TrustedNativeTurnInputs:
+    def bind(self, family, state, submission, state_version, frame, *, talents=None) -> TrustedNativeTurnInputs:
         from deviation_protocol.domain.run_protocol_binding import NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1
         if type(family) not in (NativeRunAdmissionV1,NativeRunContinuedV1,NativeRunRegionalRevisitV1):
             raise NativeTurnBindingError(submission.session_id)
@@ -285,6 +287,13 @@ class NativeTurnMechanicsCoordinator:
             binding.update(visit_id=family.position.visit_id, visit_ordinal=3,
                 world=family.entry.world.model_dump(), region=family.entry.region.model_dump(),
                 regional_entry_fingerprint=family.revisit_evidence.request.fingerprint())
+        if talents is not None:
+            talents.validate()
+            if talents.run_id != run.run_id.value or talents.state != "CONFIRMED":
+                raise NativeTurnBindingError(submission.session_id)
+            binding["opening_talents"] = {"catalog_version": talents.catalog_version, "selected_ids": list(talents.selections)}
+        elif run.run_id.value.startswith("opening."):
+            raise NativeTurnBindingError(submission.session_id)
         envelope = protocol.resolution_input.envelope
         fields = dict(binding_bytes=canonical(binding), snapshot_bytes=canonical(state.to_snapshot()),
                       objectives=tuple(getattr(protocol.final_values, name).value for name in OBJECTIVES),
@@ -359,6 +368,19 @@ class NativeTurnMechanicsCoordinator:
         conflict = ConflictIntensityPolicy().extra(c)
         clocks = tuple(clock_plan(a.clock_id, runtime.threat_clocks[a.clock_id].value,
             definition.clock(a.clock_id).maximum, a.amount, social, severity, opacity, conflict) for a in advances)
+        talent_binding = json.loads(inputs.binding_bytes).get("opening_talents")
+        if talent_binding is not None and action_type is not None:
+            from dataclasses import replace
+            from deviation_protocol.domain.opening_talents import OpeningTalentClockPolicy
+            policy = OpeningTalentClockPolicy()
+            modifier = policy.modifier(talent_binding["catalog_version"], tuple(talent_binding["selected_ids"]), submission.action_type.value)
+            adjusted = []
+            for row in clocks:
+                original = row.social + row.severity + row.opacity + row.conflict
+                delta = policy.additional(original, modifier) - original
+                adjusted.append(replace(row, talent=delta,
+                    after=min(definition.clock(row.clock_id).maximum, row.before + row.amount + delta)))
+            clocks = tuple(adjusted)
         decision = _mint(NativeMechanicsDecision, inputs=inputs, resource=rp, clocks=clocks,
                          selected_rule=rule.rule_id if rule is not None else None,
                          selected_result=result, action_type=action_type)
@@ -442,6 +464,13 @@ def _validate_evidence(binding, mechanics, *, visit=False, regional=False):
                 or any(type(binding.get(k)) is not str or re.fullmatch(r"[0-9a-f]{64}", binding[k]) is None
                        for k in ("visit_id", "regional_entry_fingerprint"))):
             raise ValueError("invalid regional turn binding")
+    opening = binding.get("opening_talents")
+    if opening is not None:
+        from deviation_protocol.domain.opening_talents import OpeningTalentClockPolicy
+        if not isinstance(opening, dict) or set(opening) != {"catalog_version", "selected_ids"}:
+            raise ValueError("invalid opening talent evidence")
+        OpeningTalentClockPolicy().modifier(opening["catalog_version"], tuple(opening["selected_ids"]), "OBSERVE")
+        keys.add("opening_talents")
     if set(binding) != keys or binding["mechanics_version"] != MECHANICS_VERSION:
         raise ValueError("invalid native binding fields")
     for key in ("run_revision", "state_version"):
@@ -485,10 +514,13 @@ def _validate_evidence(binding, mechanics, *, visit=False, regional=False):
         raise ValueError("invalid clock rows")
     ids = []
     for row in rows:
-        if not isinstance(row, dict) or set(row) != {"clock_id", "before", "base", "social", "severity", "opacity", "conflict", "after"}:
+        if not isinstance(row, dict) or set(row) != ({"clock_id", "before", "base", "social", "severity", "opacity", "conflict", "after"} | ({"talent"} if opening is not None else set())):
             raise ValueError("invalid clock row")
         if type(row["clock_id"]) is not str or not 1 <= len(row["clock_id"]) <= 128:
             raise ValueError("invalid clock ID")
+        if opening is not None and (type(row["talent"]) is not int or not -2 <= row["talent"] <= 2
+                or sum(row[k] for k in ("social", "severity", "opacity", "conflict")) + row["talent"] < 0):
+            raise ValueError("invalid talent clock adjustment")
         ids.append(row["clock_id"])
         for key in ("before", "base", "after", "social", "severity", "opacity", "conflict"):
             maximum = 2 if key in {"social", "severity", "opacity", "conflict"} else MAX_SCENARIO_COUNTER

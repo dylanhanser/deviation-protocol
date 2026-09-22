@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { prepareAndConfirmFirstTwo } from "./test/openingFixtures";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import path from "node:path";
@@ -314,14 +315,14 @@ it.each(["resolved","failed","lost-response","contradictory-result","storage-fai
     if(profile==="storage-failure") {
       remove.mockImplementation(()=>{throw new DOMException("storage unavailable");});
       await user.click(screen.getByRole("button",{name:"返回设置"}));
-      expect(screen.queryByRole("button",{name:"确认并开始"})).not.toBeInTheDocument();
+      expect(screen.queryByRole("button",{name:"查看开局天赋"})).not.toBeInTheDocument();
       remove.mockRestore();
     }
     await user.click(screen.getByRole("button",{name:profile==="storage-failure"?"重试清除并返回设置":"返回设置"}));
     await user.selectOptions(await screen.findByLabelText("选择难度"),"difficulty.open-expedition");
     await user.selectOptions(screen.getByLabelText("选择起始世界"),"world.death_certificate");
     await user.selectOptions(await screen.findByLabelText("Player Character"),created.player_character_id.value);
-    await user.click(screen.getByRole("button",{name:"确认并开始"}));
+    await prepareAndConfirmFirstTwo();
     await waitFor(()=>expect(JSON.parse(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)!).session_id).not.toBe(third));
     const fresh=JSON.parse(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)!).session_id as string;
     await client.submitAction(fresh,{action_type:"OBSERVE",description:"查看环境",turn_id:"fresh.observe",client_request_id:"fresh.observe"});

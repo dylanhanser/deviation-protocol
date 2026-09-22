@@ -1915,3 +1915,13 @@ owns discovery and safe encounter projection. The
 preserves the earlier proposal and exact later approval, state table and non-goals.
 This candidate changes no existing frozen pack, Run lifecycle, D1 source,
 multiline validation, Provider configuration or deferred-finding disposition.
+## Opening preparation candidate
+
+The approved opening-talents scope is implemented as an uncommitted candidate
+described in [Opening talents](opening_talents.md). A new durable preparation
+repository participates in the existing native-admission UoW; confirmation uses
+the extracted commit-free admission staging seam. One Alembic migration adds
+only `opening_preparations`. Demo uses the same application/domain policy over
+its process store. Confirmed Run-bound selections are reconstructed before turn
+mechanics and affect only additional clock costs; old Runs remain explicitly
+talent-free. Independent review and browser acceptance are not claimed.

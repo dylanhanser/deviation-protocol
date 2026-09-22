@@ -1799,3 +1799,17 @@ manually.
   [`docs/engineering/codex_workflow.md`](docs/engineering/codex_workflow.md).
 - Phase 3.2 specification and evidence:
   [`docs/phase_3_2_deterministic_demo_environment.md`](docs/phase_3_2_deterministic_demo_environment.md).
+## Opening talents — current implementation candidate
+
+On 2026-09-21 the owner authorized the complete 100-entry authored catalog, the
+12 CURRENT-only playable pool and one narrow persistent-preparation migration.
+The working-tree candidate implements preparation recovery, explicit selection
+of two of five talents, atomic native admission, Run-bound additional-clock
+modifiers and Web presentation. The remaining 88 talents are FUTURE content,
+not implemented mechanics. See [Opening talents](docs/opening_talents.md).
+The initial independent review returned `CHANGES_REQUIRED` for uncertain
+confirmation refresh recovery and the retained legacy entry's pending-offer
+bypass. Their narrow correction retains the original review history and is an
+uncommitted candidate pending focused independent re-review;
+browser acceptance and publication are not claimed. D1, D2/D3, Phase 3.3 closure
+and DF-001/DF-002 retain their existing scope and disposition.

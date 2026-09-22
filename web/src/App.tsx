@@ -1,3 +1,8 @@
+import { useOpeningPreparation } from "./useOpeningPreparation";
+import { useOpeningRecovery } from "./useOpeningRecovery";
+import { clearOpeningRecovery, readOpeningRecovery, writeOpeningRecovery, assertOpeningReference } from "./openingRecovery";
+import { OpeningTalentChoices, ConfirmedOpeningTalents } from "./OpeningTalents";
+import type { OpeningPreparation } from "./api/schemas";
 import { SessionReading } from "./SessionReading";
 import { JourneyRecap } from "./JourneyRecap";
 import { assertCompletionHistory, assertCompletionAuthorities, assertCompletionSubmission, assertCompletionReconciliation, assertConfirmedCompletion, freezeRunCompletion, type FrozenRunCompletion } from "./runCompletion";
@@ -10,7 +15,7 @@ import { assertJourney as assertContinuationStatus, assertTransitionResult as as
 import type { NativeRunJourney as NativeRunContinuationStatus, NativeTransitionResult as NativeRunContinuationResult } from "./api/schemas";
 import type { NativeRunStatus } from "./api/schemas";
 import { ApiClientError, formatApiClientError } from "./api/errors";
-import { assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPresentation, type FrozenNativeEntry } from "./runSetup";
+import { assertNativeResponse, assertNativeView, nativeFailureIsUncertain, objectiveLabels, proposedPresentation, type FrozenNativeEntry } from "./runSetup";
 import { objectiveNames, type RunEntryOptions, type NativeRunEntryResponse, type PublicNativeRunContext } from "./api/schemas";
 import {
   actionRequestSchema,
@@ -81,6 +86,7 @@ interface RunEntryAttempt extends MutationAttemptBase {
 interface NativeEntryAttempt extends MutationAttemptBase {
   kind: "native-entry";
   frozen: FrozenNativeEntry;
+  opening?: {record:OpeningPreparation;selected:readonly string[]};
   retainedResponse?: NativeRunEntryResponse;
 }
 interface SessionCreateAttempt extends MutationAttemptBase {
@@ -808,9 +814,11 @@ export default function App({
       }
       recoveryRecordRef.current = result.value;
       setRecoveryRecord(result.value);
+      const cleared=clearOpeningRecovery(client);
+      if (!cleared.ok) {enterRecoveryStorageFailure(cleared.failure);return false;}
       return true;
     },
-    [enterRecoveryStorageFailure],
+    [client, enterRecoveryStorageFailure],
   );
 
   const clearRecoveryForSessionTransition = useCallback((nextSessionId?: string): boolean => {
@@ -1227,6 +1235,11 @@ export default function App({
             character.player_character_id.value === selectedPlayerCharacterId,
         );
 
+  const openingRecovery=useOpeningRecovery(client,recoveryRecord === null && recoveryStorageFailure === null);
+  const opening = useOpeningPreparation(client,selectedPlayerCharacterId,entryMode === "native" && recoveryRecord === null &&
+    !openingRecovery.loading && !openingRecovery.error && !openingRecovery.record);
+  const openingRecord=openingRecovery.record ?? opening.record;
+
   function handleScenarioChange(scenarioId: string) {
     setSelectedScenarioId(scenarioId);
   }
@@ -1558,8 +1571,19 @@ export default function App({
         }
         return;
       }
+      if (attempt.kind === "native-entry" && attempt.opening && !attempt.retainedResponse) {
+        // Explicit retries must retain the same recovery route too.
+        const saved=writeOpeningRecovery(client,attempt.opening.record);
+        if (!saved.ok) {
+          updateMutationAttempt(attempt.generation,current=>({...current,inFlight:false}));
+          setOperationError("无法保存开局恢复入口；确认请求未发送。请恢复此标签页的存储后重试。");
+          return;
+        }
+      }
       const entered = attempt.kind === "native-entry"
-        ? attempt.retainedResponse ?? await client.enterNativeRun(attempt.frozen, operation.controller.signal)
+        ? attempt.retainedResponse ?? (attempt.opening
+          ? await client.confirmOpening(attempt.frozen,attempt.opening.record,attempt.opening.selected,operation.controller.signal)
+          : await client.enterNativeRun(attempt.frozen, operation.controller.signal))
         : await client.enterRun(attempt.exactFrozenBody, attempt.idempotencyKey, operation.controller.signal);
       if (!isCurrentOperation(operation)) {
         return;
@@ -1747,11 +1771,11 @@ export default function App({
     );
   }
 
-  function handleNativeEntry(event: FormEvent<HTMLFormElement>) {
+  async function handleNativeEntry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (entryMode !== "native" || !selectedProfile || !selectedWorld || !selectedPlayerCharacter ||
         foregroundOperationRef.current || mutationAttemptRef.current || recoveryRecordRef.current || recoveryStorageFailure ||
-        recoveryInterruption || requiredCatalogRefresh || !runOptions?.native_entry_available) return;
+        recoveryInterruption || requiredCatalogRefresh || opening.loading || opening.error || opening.record?.state === "PENDING" || !runOptions?.native_entry_available) return;
     const key = buildMutationIdentity();
     if (key === null) return;
     try {
@@ -1760,9 +1784,67 @@ export default function App({
         expected_record_revision:selectedPlayerCharacter.record_revision.value, profile_ref:selectedProfile.profile_ref,
         entry_world:selectedWorld.entry_world, overrides:objectiveNames.filter((n) => n in overrides).map((n) => ({parameter:n,value:Number(overrides[n])})),
         presentation:runPresentation}, key, selectedProfile, selectedWorld);
-      const generation = ++mutationGenerationRef.current;
-      installAndSendMutation({kind:"native-entry", generation, idempotencyKey:key, frozen, uncertaintyTainted:false, inFlight:true}, "entering");
+      const operation = beginForegroundOperation("entering", {clearSession:false});
+      if (!operation) return;
+      try { await opening.prepare(frozen,operation.controller.signal); }
+      catch { if (isCurrentOperation(operation)) setOperationError("开局准备暂未读回。请再次读取；重试不会更换候选。"); }
+      finally {finishForegroundOperation(operation);}
+
     } catch {setOperationError("请检查难度范围与步长；请求未发送。");}
+  }
+
+  async function handleOpeningConfirmation(selected:readonly string[]) {
+    const record=openingRecord;
+    if (!record || foregroundOperationRef.current || mutationAttemptRef.current || recoveryRecordRef.current ||
+        recoveryStorageFailure || recoveryInterruption || openingRecovery.loading || openingRecovery.error || !runOptions ||
+        (!openingRecovery.record && record.character_id !== selectedPlayerCharacterId)) return;
+    const profile=runOptions.profiles.find(p => p.profile_ref.profile_id === record.admission.profile_ref.profile_id && p.profile_ref.profile_version === record.admission.profile_ref.profile_version);
+    const world=runOptions.entry_worlds.find(w => w.entry_world.entry_world_id === record.admission.entry_world.entry_world_id && w.entry_world.entry_world_version === record.admission.entry_world.entry_world_version);
+    if (!profile || !world) {setOperationError("原先的入场设置暂不可用，请重新读取准备。");return;}
+    const key=record.state === "CONFIRMED" ? "opening.recovery" : buildMutationIdentity();
+    if (!key) return;
+    try {
+      const frozen=client.freezeNativeEntry(record.admission,key,profile,world);
+      if (record.state === "CONFIRMED") {
+        const operation=beginForegroundOperation("recovering",{clearSession:false});
+        if (!operation) return;
+        try {
+          // Refresh the owned preparation before using its result. Local IDs are only locators.
+          const authoritative=await client.getOpeningPreparation(record.character_id,operation.controller.signal);
+          if (!isCurrentOperation(operation)) return;
+          assertOpeningReference({version:1,character_id:record.character_id,preparation_id:record.preparation_id},authoritative);
+          if (!authoritative.result || JSON.stringify(authoritative)!==JSON.stringify(record)) throw new Error("Opening confirmation changed");
+          const entered=authoritative.result;
+          assertNativeResponse(frozen,entered);
+          const view=await client.getSessionView(entered.session_id,operation.controller.signal);
+          if (!isCurrentOperation(operation)) return;
+          const expected={sessionId:entered.session_id,context:entered.run_context,scenarioId:entered.scenario_id,contentVersion:entered.scenario_content_version};
+          assertViewAssociation(entered.session_id,view,expected);
+          const journey=await client.getNativeRunJourney(entered.session_id,operation.controller.signal);
+          assertContinuationStatus(view,journey);
+          // A concurrent/manual recovery target always wins over this older locator.
+          const storedSession=readSessionRecoveryRecord();
+          const storedOpening=readOpeningRecovery(client);
+          if (!isCurrentOperation(operation) || recoveryRecordRef.current || !storedSession.ok || storedSession.value ||
+              !storedOpening.ok || (openingRecovery.record && !storedOpening.value) ||
+              (storedOpening.value && (storedOpening.value.preparation_id!==record.preparation_id || storedOpening.value.character_id!==record.character_id))) return;
+          if (!persistRecoveryRecord(entered.session_id)) return;
+          nativeExpected.current=expected;
+          commitLoadedSession(entered.session_id,view);
+          const current=loadedSessionRef.current;
+          if (current) setRestoredReading({owner:current,client,journey});
+          setContinuationStatus(journey);
+        } catch (error) {
+          if (isCurrentOperation(operation)) setOperationError(`开局恢复尚未完成，恢复入口已保留：${formatApiClientError(error)}`);
+        } finally {finishForegroundOperation(operation);}
+        return;
+      }
+      const saved=writeOpeningRecovery(client,record);
+      if (!saved.ok) {setOperationError("无法保存开局恢复入口；确认请求未发送。请恢复此标签页的存储后重试。");return;}
+      const generation=++mutationGenerationRef.current;
+      installAndSendMutation({kind:"native-entry",generation,idempotencyKey:key,frozen,
+        opening:{record:structuredClone(record),selected:Object.freeze([...selected])},uncertaintyTainted:false,inFlight:true},"entering");
+    } catch {setOperationError("天赋与入场设置不一致，请重新读取准备。");}
   }
 
   function handleNativeStorageRetry() {
@@ -2471,7 +2553,7 @@ export default function App({
         : null;
   const isDeterministicDemo =
     import.meta.env.VITE_APP_MODE === "deterministic-demo";
-  const prePlayControlsDisabled =
+  const openingControlsDisabled =
     historicalSession !== null || historyLoading || continuationAttempt !== null ||
     exitAttempt !== null || completionAttempt !== null || exitClearFailed ||
     foregroundOperation !== null ||
@@ -2480,6 +2562,7 @@ export default function App({
     recoveryStorageFailure !== null ||
     recoveryRecord !== null ||
     requiredCatalogRefresh !== null;
+  const prePlayControlsDisabled=openingControlsDisabled || openingRecovery.loading || openingRecovery.error !== null || openingRecovery.record !== null;
 
   const entryControls = <>
       {scenarios?.some(story => story.entry_mode === "SESSION") ?
@@ -2493,7 +2576,7 @@ export default function App({
             </div>)}
         </section> : null}
       <section className="panel" aria-label="进入方式">
-        <p>进入请求尚未确认并保存时仅保存在内存中；刷新页面将无法恢复该请求。已保存的进度仅限此标签页。</p>
+        <p>开局天赋确认前会保存恢复入口，刷新后只读核实结果。其他尚未确认并保存的进入请求仅保存在内存中。已保存的进度仅限此标签页。</p>
         <fieldset disabled={prePlayControlsDisabled}>
           <legend>选择进入方式</legend>
           <button type="button" aria-pressed={entryMode === "native"} onClick={() => {setEntryMode("native"); if (!createdPlayerCharacter) setSelectedPlayerCharacterId("");}}>原生 Run 设置</button>
@@ -2504,7 +2587,7 @@ export default function App({
         <button type="button" disabled={mutationAttempt !== null || foregroundOperation !== null || recoveryRecord !== null || recoveryStorageFailure !== null}
           onClick={() => {setRunOptions(null); setOptionsError(null); setOptionsRefresh((v) => v + 1);}}>刷新可用选项</button>
         {entryMode === "native" && runOptions?.native_entry_available ? <form onSubmit={handleNativeEntry}>
-          <fieldset disabled={prePlayControlsDisabled}>
+          <fieldset disabled={prePlayControlsDisabled || opening.loading || opening.error !== null || opening.record?.state === "PENDING"}>
             <legend>确认原生 Run 设置</legend>
             <label>选择难度<select value={profileId} onChange={(e) => {setProfileId(e.target.value); setWorldId(""); setOverrides({});}}>
               <option value="">请选择难度</option>{runOptions.profiles.map((p) => <option key={p.profile_ref.profile_id} value={p.profile_ref.profile_id}>{p.label}</option>)}
@@ -2522,13 +2605,19 @@ export default function App({
             <label>世界基调<select value={runPresentation.world_tone} onChange={(e) => setRunPresentation({...runPresentation,world_tone:e.target.value as typeof runPresentation.world_tone})}>{runOptions.presentation_options.world_tone.map((v) => <option key={v}>{v}</option>)}</select></label>
             <label>现实边界<select value={runPresentation.reality_boundary} onChange={(e) => setRunPresentation({...runPresentation,reality_boundary:e.target.value as typeof runPresentation.reality_boundary})}>{runOptions.presentation_options.reality_boundary.map((v) => <option key={v}>{v}</option>)}</select></label>
             <label>人际氛围<select value={runPresentation.relationship_overlay} onChange={(e) => setRunPresentation({...runPresentation,relationship_overlay:e.target.value as typeof runPresentation.relationship_overlay})}>{runOptions.presentation_options.relationship_overlay.map((v) => <option key={v}>{v}</option>)}</select></label>
-            <p>确认以上难度、世界、数值与表现设置后开始。表现设置仅影响叙述。</p>
+            <p>确认以上设置后查看五项天赋，再选择两项启程。准备生成后设置固定，表现设置仅影响叙述。</p>
             <button type="submit" disabled={!selectedProfile || !selectedWorld || !selectedPlayerCharacter || Object.entries(overrides).some(([name,value]) => {
               const r=selectedProfile?.override_rules.find((r) => r.parameter === name); const n=Number(value);
               return !r || value.trim()==="" || !Number.isSafeInteger(n) || n % 5 !== 0 || n < r.minimum || n > r.maximum;
-            })}>确认并开始</button>
+            })}>查看开局天赋</button>
           </fieldset>
         </form> : null}
+        {entryMode === "native" && opening.loading ? <p role="status">正在读取开局准备…</p> : null}
+        {entryMode === "native" && opening.error ? <div role="alert"><p>{opening.error}</p><button type="button" disabled={prePlayControlsDisabled} onClick={opening.retry}>重读开局准备</button></div> : null}
+        {openingRecovery.loading ? <p role="status">正在核实开局恢复入口…</p> : null}
+        {openingRecovery.error ? <div role="alert"><p>{openingRecovery.error}</p><button type="button" disabled={openingControlsDisabled} onClick={openingRecovery.retry}>重读开局恢复</button></div> : null}
+        {(entryMode === "native" || openingRecovery.record) && openingRecord && recoveryRecord === null ? <OpeningTalentChoices key={openingRecord.preparation_id}
+          record={openingRecord} disabled={openingControlsDisabled || openingRecovery.loading || openingRecovery.error !== null} onConfirm={handleOpeningConfirmation}/> : null}
       </section>
 
       <section className="panel" aria-labelledby="scenario-heading">
@@ -2935,6 +3024,7 @@ export default function App({
         />
       )}
 
+      {(historicalSession ?? loadedSession)?.view.run_context ? <ConfirmedOpeningTalents client={client} sessionId={(historicalSession ?? loadedSession)!.sessionId}/> : null}
       {historicalSession || recoveryStorageFailure !== null || loadedSession === null ? null : (
         <DynamicNarrativeEvidenceSummary
           response={committedActionResponse}

@@ -200,6 +200,8 @@ class RunEntryService:
                     stored=stored,
                 )
 
+            if await self._has_pending_opening(uow, command.player_character_id):
+                return self._decision(RunEntryDecisionCode.PLAYER_CHARACTER_NOT_ELIGIBLE)
             if reference.record_revision != command.expected_record_revision:
                 return self._decision(RunEntryDecisionCode.PLAYER_CHARACTER_STALE)
             if (
@@ -342,6 +344,15 @@ class RunEntryService:
                 return self._decision(RunEntryDecisionCode.RUN_ENTRY_CONFLICT)
             await uow.commit()
             return result
+
+    @staticmethod
+    async def _has_pending_opening(uow, character_id: PlayerCharacterId) -> bool:
+        """Call after owned-character locking and exact receipt replay, before writes."""
+        preparations = getattr(uow, "opening_preparations", None)
+        if preparations is None:
+            return False  # Historical UoW implementations have no opening flow.
+        record = await preparations.latest(character_id.value, locked=True)
+        return record is not None and record.state == "PENDING"
 
     async def _replay(
         self,

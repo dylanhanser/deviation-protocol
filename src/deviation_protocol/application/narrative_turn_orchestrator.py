@@ -286,6 +286,8 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             )
             visible_npcs = self._visible_runtime_npc_ids(state, definition)
             native_family = await self.native_coordinator.load(uow, game_session, state, definition) if self.native_coordinator is not None else None
+            from deviation_protocol.application.opening_preparation import load_run_talents
+            opening_talents = await load_run_talents(uow, native_family, game_session.player_id)
             trusted = self.context_factory.create_trusted(
                 submission,
                 state=state,
@@ -308,6 +310,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
                 definition,
                 state_version=game_session.state_version,
                 native_family=native_family,
+                opening_talents=opening_talents,
             )
             active = await uow.narrative_jobs.get_active_for_session(
                 submission.session_id
@@ -351,7 +354,7 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             native_plan = None
             if native_family is not None:
                 allowed = select_native_outcome(allowed)
-                inputs = self.native_coordinator.bind(native_family, state, submission, game_session.state_version, frame)
+                inputs = self.native_coordinator.bind(native_family, state, submission, game_session.state_version, frame, talents=opening_talents)
                 native_plan = self.native_coordinator.decide(inputs, state, definition, submission, selected=allowed[0])
             recent = await uow.narrative_jobs.recent_committed_texts(
                 submission.session_id, limit=6
@@ -413,7 +416,9 @@ class DurableNarrativeTurnOrchestrator(FirstPhaseTurnOrchestrator):
             state=state, state_version=game_session.state_version, definition=definition, frame=frame))
         if not allowed or request.outcome_candidates != (allowed[0].candidate,):
             raise NarrativeJobStaleError(submission.session_id)
-        inputs = self.native_coordinator.bind(family, state, submission, game_session.state_version, frame)
+        from deviation_protocol.application.opening_preparation import load_run_talents
+        talents = await load_run_talents(uow, family, game_session.player_id)
+        inputs = self.native_coordinator.bind(family, state, submission, game_session.state_version, frame, talents=talents)
         decision = self.native_coordinator.decide(inputs, state, definition, submission, selected=allowed[0])
         if canonical(native_request_envelope(request, decision)) != canonical(envelope):
             raise NarrativeJobStaleError(submission.session_id)

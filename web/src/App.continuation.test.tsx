@@ -1,4 +1,5 @@
 /// <reference types="node" />
+import { prepareAndConfirmFirstTwo } from "./test/openingFixtures";
 import { spawn } from "node:child_process";
 import { createInterface } from "node:readline";
 import path from "node:path";
@@ -289,14 +290,14 @@ it.each(["normal","failed-arrival","challenged-arrival","confirmed-visit","confi
       await screen.findByLabelText("选择难度");
       expect(screen.getByLabelText("选择难度")).toHaveValue("");
       expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
-      expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+      expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
       expect(demo.calls.filter(c=>c.method==="POST"&&c.path==="/v1/runs/native")).toHaveLength(1);
       await user.selectOptions(screen.getByLabelText("选择难度"),"difficulty.open-expedition");
       await user.selectOptions(screen.getByLabelText("选择起始世界"),"world.death_certificate");
       await user.selectOptions(await screen.findByLabelText("Player Character"),created.player_character_id.value);
-      await user.click(screen.getByRole("button",{name:"确认并开始"}));
+      await prepareAndConfirmFirstTwo();
       await waitFor(()=>expect(JSON.parse(sessionStorage.getItem(SESSION_RECOVERY_STORAGE_KEY)!).session_id).not.toBe(record.session_id));
-      expect(demo.calls.filter(c=>c.method==="POST"&&c.path==="/v1/runs/native")).toHaveLength(2);
+      expect(demo.calls.filter(c=>c.method==="POST"&&c.path.endsWith("/confirm"))).toHaveLength(1);
       expect(demo.calls.filter(c=>c.method==="POST"&&c.path.endsWith("/run-exit"))).toHaveLength(1);
       mounted.unmount();
     }

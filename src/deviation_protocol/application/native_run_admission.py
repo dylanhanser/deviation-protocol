@@ -234,6 +234,8 @@ class NativeRunAdmissionService(RunEntryService):
 
     def __post_init__(self):
         RunEntryService.__post_init__(self)
+        from deviation_protocol.domain.opening_talents import load_catalog
+        load_catalog()
         # This lookup is file-backed only at composition, before any database lock.
         from deviation_protocol.domain.entry_world import AUTHORED_ENTRY_WORLDS_V1
         for entry in AUTHORED_ENTRY_WORLDS_V1:
@@ -283,67 +285,15 @@ class NativeRunAdmissionService(RunEntryService):
                 stored = await uow.run_creation_receipts.get_with_evidence(key)
                 if stored is not None:
                     return await self._native_replay(uow, principal, command, controller, stored)
-                reference = character.applicable_character_reference
-                if reference.record_revision != command.expected_record_revision:
-                    return _decision("PLAYER_CHARACTER_STALE")
-                if character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or not reference.record_revision.has_successor:
-                    return _decision("PLAYER_CHARACTER_NOT_ELIGIBLE")
-                if await uow.runs.get_active_for_player_character_for_update(command.player_character_id) is not None:
-                    return _decision("PLAYER_CHARACTER_NOT_ELIGIBLE")
-                s1.validate_run_protocol_envelope_v1(command.protocol)
-                try:
-                    resolved = s2.resolve_run_protocol_objectives(command.protocol, command.overrides,
-                                expected_epoch=s2.RUN_PROTOCOL_RESOLUTION_EPOCH, expected_version=1)
-                except (s2.RunProtocolProfileLookupError, s2.RunProtocolOverrideValidationError):
-                    return _decision("INVALID_PROTOCOL")
-                try:
-                    world = lookup_entry_world(command.entry_world)
-                except EntryWorldLookupError:
-                    return _decision("INVALID_ENTRY_WORLD")
-                try:
-                    definition = self._definition(world)
-                except InvalidScenarioDefinitionError:
-                    return _decision("INVALID_SCENARIO_DEFINITION")
-                if await uow.sessions.get_by_creation_request(principal.player_id, ids.session_creation_request_id) is not None:
+                # Opening confirmation stages admission internally. Its server-owned
+                # key cannot be claimed through the retained older public entry route.
+                if command.public_operation_key.value.startswith("opening."):
                     return _decision("RUN_ENTRY_CONFLICT")
-                time = self._occurred_at()
-                run_id = revalidate_run_model(self.run_id_issuer.issue(), RunId)
-                line_id = revalidate_run_model(self.continuous_story_line_id_issuer.issue(), ContinuousStoryLineId)
-                prepared = self.session_service.prepare_run_entry_initialization(principal,
-                            creation_request_id=ids.session_creation_request_id, definition=definition,
-                            character_definition_id=world.default_character_definition_id, created_at=time)
-                evidence = NativeRunEntryCreationEvidenceV1(
-                    controller_operation=_RunEntryControllerOperation(controller_binding=controller, public_operation_key=command.public_operation_key.value),
-                    player_id=principal.player_id,
-                    player_character=_RunEntryPlayerCharacter(player_character_id=command.player_character_id, pre_entry_record_revision=command.expected_record_revision),
-                    scenario=_RunEntryScenario(scenario_id=world.scenario_id, content_version=world.scenario_content_version, default_character_definition_id=world.default_character_definition_id),
-                    trusted_run_source=_RunEntrySource(source_reference=self.source_reference), entry_world=command.entry_world,
-                    resolution_input_hex=s2.encode_run_protocol_resolution_input_v1(resolved.resolution_input).hex(),
-                    resolution_fingerprint=resolved.fingerprint.value,
-                )
-                initial = construct_created_run(CreateRunCommand(source_reference=self.source_reference), run_id=run_id,
-                          continuous_story_line_id=line_id, operation_id=ids.creation, occurred_at=time)
-                _, fingerprint = native_run_entry_creation_fingerprint(evidence)
-                receipt = StoredRunSuccessReceipt(key=key, fingerprint=fingerprint, command_kind=RunMutationKind.CREATE, result=creation_result(initial))
-                bound, bind_receipt = self._build_binding(initial, reference=reference, ids=ids, occurred_at=time)
-                active, attach_receipt = self._build_activation(bound, session_id=prepared.session.session_id, ids=ids, occurred_at=time)
-                protocol_binding = NativeRunProtocolBindingV1(run_id=run_id, continuous_story_line_id=line_id,
-                                   bound_state_version=RunStateVersion(value=3), resolved_protocol=resolved)
-                world_binding = RunEntryWorldBindingV1(run_id=run_id, continuous_story_line_id=line_id,
-                                bound_state_version=RunStateVersion(value=3), entry_world=world)
-                intended = _result(NativeRunAdmissionV1(canonical_run=active, protocol_binding=protocol_binding, world_binding=world_binding))
-                await uow.runs.add_initial(initial, created_at=time)
-                await uow.run_creation_receipts.add_native_with_evidence(receipt, evidence, created_at=time)
-                if not await stage_run_entry_binding(uow, bound, bind_receipt, created_at=time):
-                    raise _AdmissionCollision()
-                await self.session_service.stage_run_entry_initialization(uow, prepared)
-                if not await stage_run_entry_activation(uow, active, attach_receipt, created_at=time):
-                    raise _AdmissionCollision()
-                await uow.run_protocol_bindings.add_native(protocol_binding, created_at=time)
-                await uow.run_entry_world_bindings.add_native(world_binding, created_at=time)
-                reconstructed = await uow.run_protocol_bindings.get_classified_for_update(run_id=run_id)
-                if type(reconstructed) is not NativeRunAdmissionV1 or _result(reconstructed) != intended:
-                    raise NativeRunAdmissionIntegrityError("staged admission differs from intended result") from None
+                if await self._has_pending_opening(uow, command.player_character_id):
+                    return _decision("PLAYER_CHARACTER_NOT_ELIGIBLE")
+                intended = await self.stage_entry(uow, principal, command, controller, character)
+                if type(intended) is not NativeRunAdmissionResult:
+                    return intended
                 await uow.commit()
                 return intended
         except _WRITE_CONFLICTS:
@@ -355,6 +305,73 @@ class NativeRunAdmissionService(RunEntryService):
                 if stored is None:
                     return _decision("RUN_ENTRY_CONFLICT")
                 return await self._native_replay(uow, principal, command, controller, stored)
+
+    async def stage_entry(self, uow, principal, command, controller, character, *, run_id=None):
+        """Stage a complete admission in the caller's transaction; never commit here."""
+        ids = self._derive_ids(controller, command.public_operation_key)
+        key = RunReceiptKey(operation_namespace=RunOperationNamespace.CREATE_V1, operation_id=ids.creation)
+        reference = character.applicable_character_reference
+        if reference.record_revision != command.expected_record_revision:
+            return _decision("PLAYER_CHARACTER_STALE")
+        if character.lifecycle is not PlayerCharacterLifecycle.ACTIVE or not reference.record_revision.has_successor:
+            return _decision("PLAYER_CHARACTER_NOT_ELIGIBLE")
+        if await uow.runs.get_active_for_player_character_for_update(command.player_character_id) is not None:
+            return _decision("PLAYER_CHARACTER_NOT_ELIGIBLE")
+        s1.validate_run_protocol_envelope_v1(command.protocol)
+        try:
+            resolved = s2.resolve_run_protocol_objectives(command.protocol, command.overrides,
+                        expected_epoch=s2.RUN_PROTOCOL_RESOLUTION_EPOCH, expected_version=1)
+        except (s2.RunProtocolProfileLookupError, s2.RunProtocolOverrideValidationError):
+            return _decision("INVALID_PROTOCOL")
+        try:
+            world = lookup_entry_world(command.entry_world)
+        except EntryWorldLookupError:
+            return _decision("INVALID_ENTRY_WORLD")
+        try:
+            definition = self._definition(world)
+        except InvalidScenarioDefinitionError:
+            return _decision("INVALID_SCENARIO_DEFINITION")
+        if await uow.sessions.get_by_creation_request(principal.player_id, ids.session_creation_request_id) is not None:
+            return _decision("RUN_ENTRY_CONFLICT")
+        time = self._occurred_at()
+        run_id = revalidate_run_model(run_id or self.run_id_issuer.issue(), RunId)
+        line_id = revalidate_run_model(self.continuous_story_line_id_issuer.issue(), ContinuousStoryLineId)
+        prepared = self.session_service.prepare_run_entry_initialization(principal,
+                    creation_request_id=ids.session_creation_request_id, definition=definition,
+                    character_definition_id=world.default_character_definition_id, created_at=time)
+        evidence = NativeRunEntryCreationEvidenceV1(
+            controller_operation=_RunEntryControllerOperation(controller_binding=controller, public_operation_key=command.public_operation_key.value),
+            player_id=principal.player_id,
+            player_character=_RunEntryPlayerCharacter(player_character_id=command.player_character_id, pre_entry_record_revision=command.expected_record_revision),
+            scenario=_RunEntryScenario(scenario_id=world.scenario_id, content_version=world.scenario_content_version, default_character_definition_id=world.default_character_definition_id),
+            trusted_run_source=_RunEntrySource(source_reference=self.source_reference), entry_world=command.entry_world,
+            resolution_input_hex=s2.encode_run_protocol_resolution_input_v1(resolved.resolution_input).hex(),
+            resolution_fingerprint=resolved.fingerprint.value,
+        )
+        initial = construct_created_run(CreateRunCommand(source_reference=self.source_reference), run_id=run_id,
+                  continuous_story_line_id=line_id, operation_id=ids.creation, occurred_at=time)
+        _, fingerprint = native_run_entry_creation_fingerprint(evidence)
+        receipt = StoredRunSuccessReceipt(key=key, fingerprint=fingerprint, command_kind=RunMutationKind.CREATE, result=creation_result(initial))
+        bound, bind_receipt = self._build_binding(initial, reference=reference, ids=ids, occurred_at=time)
+        active, attach_receipt = self._build_activation(bound, session_id=prepared.session.session_id, ids=ids, occurred_at=time)
+        protocol_binding = NativeRunProtocolBindingV1(run_id=run_id, continuous_story_line_id=line_id,
+                           bound_state_version=RunStateVersion(value=3), resolved_protocol=resolved)
+        world_binding = RunEntryWorldBindingV1(run_id=run_id, continuous_story_line_id=line_id,
+                        bound_state_version=RunStateVersion(value=3), entry_world=world)
+        intended = _result(NativeRunAdmissionV1(canonical_run=active, protocol_binding=protocol_binding, world_binding=world_binding))
+        await uow.runs.add_initial(initial, created_at=time)
+        await uow.run_creation_receipts.add_native_with_evidence(receipt, evidence, created_at=time)
+        if not await stage_run_entry_binding(uow, bound, bind_receipt, created_at=time):
+            raise _AdmissionCollision()
+        await self.session_service.stage_run_entry_initialization(uow, prepared)
+        if not await stage_run_entry_activation(uow, active, attach_receipt, created_at=time):
+            raise _AdmissionCollision()
+        await uow.run_protocol_bindings.add_native(protocol_binding, created_at=time)
+        await uow.run_entry_world_bindings.add_native(world_binding, created_at=time)
+        reconstructed = await uow.run_protocol_bindings.get_classified_for_update(run_id=run_id)
+        if type(reconstructed) is not NativeRunAdmissionV1 or _result(reconstructed) != intended:
+            raise NativeRunAdmissionIntegrityError("staged admission differs from intended result") from None
+        return intended
 
     async def _owned_character(self, uow, controller, command):
         character = await self.player_character_binding_evidence.lock_owned_for_binding(uow,

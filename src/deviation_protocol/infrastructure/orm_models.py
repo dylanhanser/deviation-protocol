@@ -48,6 +48,29 @@ def _legacy_session_id_varchar() -> mysql.VARCHAR:
     )
 
 
+class OpeningPreparationRow(Base):
+    __tablename__ = "opening_preparations"
+    __table_args__ = (
+        UniqueConstraint("owner", "request_key", name="uq_opening_request"),
+        UniqueConstraint("character_id", "ordinal", name="uq_opening_character_ordinal"),
+        UniqueConstraint("pending_character_id", name="uq_opening_pending_character"),
+        UniqueConstraint("run_id", name="uq_opening_run"),
+        CheckConstraint("ordinal >= 1", name="ck_opening_ordinal"),
+        CheckConstraint("OCTET_LENGTH(record_canonical) BETWEEN 1 AND 16384", name="ck_opening_record"),
+        CheckConstraint("(state = 'PENDING' AND pending_character_id IS NOT NULL AND pending_character_id = character_id AND run_id IS NULL) OR (state = 'CONFIRMED' AND pending_character_id IS NULL AND run_id IS NOT NULL)", name="ck_opening_lifecycle"),
+        PLAYER_CHARACTER_TABLE_OPTIONS,
+    )
+    preparation_id: Mapped[str] = mapped_column(_ascii_varchar(32), primary_key=True)
+    owner: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    character_id: Mapped[str] = mapped_column(_ascii_varchar(128), ForeignKey("player_character_current.player_character_id"), nullable=False)
+    ordinal: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    request_key: Mapped[str] = mapped_column(_ascii_varchar(128), nullable=False)
+    pending_character_id: Mapped[str | None] = mapped_column(_ascii_varchar(128), nullable=True)
+    state: Mapped[str] = mapped_column(_ascii_varchar(16), nullable=False)
+    run_id: Mapped[str | None] = mapped_column(_ascii_varchar(128), ForeignKey("run_current.run_id"), nullable=True)
+    record_canonical: Mapped[bytes] = mapped_column(mysql.BLOB, nullable=False)
+
+
 class RunProtocolBindingRow(Base):
     __tablename__ = "run_protocol_bindings"
     __table_args__ = (

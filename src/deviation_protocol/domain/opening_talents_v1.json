@@ -1,0 +1,802 @@
+[
+  {
+    "id": "T001",
+    "name": "临机决断",
+    "tier": "TOP",
+    "description": "混乱越近，你越知道下一步该做什么。探索与自由行动的额外耗时各减少 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "EXPLORE -1；CUSTOM -1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T002",
+    "name": "天命之子",
+    "tier": "TOP",
+    "description": "险境总会在最后关头露出一线生机。拟提高危险事件出现有利转机的机会，并提高稀有奇遇的出现倾向。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "调整危险结果权重与稀有遭遇权重。依赖：危险结果策略；稀有遭遇池"
+  },
+  {
+    "id": "T003",
+    "name": "万众归心",
+    "tier": "TOP",
+    "description": "你不必高声说服，别人也愿意听你把话说完。拟更容易获得帮助、庇护、护送、临时盟友或关键行动资格，但不会保证任何角色改变立场。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高部分社交协助与关系事件的可用性。依赖：NPC 关系成长；盟友系统；行动资格"
+  },
+  {
+    "id": "T004",
+    "name": "时隙旁观者",
+    "tier": "TOP",
+    "description": "你偶尔能看见选择落下之后的影子。拟在每个世界的一次核心选择前预览一个选项的结果方向；预览不改变选项和既定事件。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "每个 Session 一次结果方向预览。依赖：核心事件系统；结果预览；Session 重置"
+  },
+  {
+    "id": "T005",
+    "name": "百战熔炉",
+    "tier": "TOP",
+    "description": "每次冲突都会在你身上留下新的本领。拟在完成高风险冲突后强化已有技能，或在严格限制下学习敌人的一项能力。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "冲突结算后触发受限技能成长。依赖：战斗与冲突结算；技能成长；敌人技能库"
+  },
+  {
+    "id": "T006",
+    "name": "巧舌如簧",
+    "tier": "TRADEOFF",
+    "description": "你很会把话接下去，却常常忘了留意脚下。交谈额外耗时减少 1 点；探索额外耗时增加 1 点。不增加好感、信任或成功率。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "TALK -1；EXPLORE +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T007",
+    "name": "静观其变",
+    "tier": "TRADEOFF",
+    "description": "你习惯先把局面看明白，再决定说什么。观察额外耗时减少 1 点；交谈额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "OBSERVE -1；TALK +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T008",
+    "name": "先做再说",
+    "tier": "TRADEOFF",
+    "description": "你偏爱立即动手，不愿把时间耗在反复确认上。自由行动额外耗时减少 1 点；观察额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "CUSTOM -1；OBSERVE +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T009",
+    "name": "天妒英才",
+    "tier": "TRADEOFF",
+    "description": "你学得太快，能留给自己的时间却更少。拟显著提高学习效率，同时缩短可用寿命。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "降低寿命上限；提高技能或属性学习效率。依赖：寿命系统；悟性与成长系统"
+  },
+  {
+    "id": "T010",
+    "name": "赌徒直觉",
+    "tier": "TRADEOFF",
+    "description": "你相信最大的收获总藏在最危险的选择后面。拟开放高风险高收益方案；成功收益更高，失败时资源与状态代价也更重。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高风险选项的收益与失败代价。依赖：危险结果策略；资源与状态系统"
+  },
+  {
+    "id": "T011",
+    "name": "灾星体质",
+    "tier": "TRADEOFF",
+    "description": "麻烦总能找到你，麻烦之后也常留下罕见的东西。拟增加危险事件的出现倾向，并提高完成危险事件后的奇遇收益。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高危险事件权重与危险后的奇遇收益。依赖：危险事件池；奇遇系统"
+  },
+  {
+    "id": "T012",
+    "name": "夜行者",
+    "tier": "TRADEOFF",
+    "description": "夜色让你清醒，白昼反而拖慢你的判断。拟在夜间获得行动资格和时间优势；白天的观察或交谈略受影响。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "夜间行动加成；白天行动减益。依赖：昼夜系统；行动资格；行动时钟"
+  },
+  {
+    "id": "T013",
+    "name": "契约至上",
+    "tier": "TRADEOFF",
+    "description": "你把承诺看得比退路更重。拟通过契约提前取得资源或资格；违约会留下持续且明确的惩罚。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "契约收益；违约状态与后果。依赖：契约系统；资源系统；状态标签"
+  },
+  {
+    "id": "T014",
+    "name": "冷心者",
+    "tier": "TRADEOFF",
+    "description": "你不容易被打动，也不容易被情绪牵着走。拟提高对情绪操控和精神干扰的抵抗，但关系成长速度降低。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "精神干扰抗性；关系成长减益。依赖：精神状态系统；NPC 关系成长"
+  },
+  {
+    "id": "T015",
+    "name": "莽撞先锋",
+    "tier": "TRADEOFF",
+    "description": "你总能抢到先手，也总是最先承担代价。拟在危险与冲突中提高先手机会；受伤和资源消耗风险同时增加。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高先手权重；提高失败或受伤代价。依赖：危险处理；冲突结算；生命与资源系统"
+  },
+  {
+    "id": "T016",
+    "name": "守财奴",
+    "tier": "TRADEOFF",
+    "description": "你舍不得浪费任何东西，也不愿轻易求人。拟降低部分资源消耗；交涉和寻求帮助的成本提高。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "资源消耗减免；社交行动成本增加。依赖：资源系统；社交行动规则"
+  },
+  {
+    "id": "T017",
+    "name": "苦修者",
+    "tier": "TRADEOFF",
+    "description": "你用长期的不适换取更快的成长。拟提高属性或技能成长速度，同时降低恢复效率或生活类关系收益。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "成长加速；恢复或关系减益。依赖：属性成长；恢复系统；关系系统"
+  },
+  {
+    "id": "T018",
+    "name": "胜势追击",
+    "tier": "TRADEOFF",
+    "description": "一旦占到上风，你就不愿让局面重新冷却。拟在冲突、追逐或逃脱获胜后取得额外收益；主动妥协和安全撤退的收益降低。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "胜利后追加收益；妥协与撤退收益减益。依赖：冲突与追逐结算；事件奖励"
+  },
+  {
+    "id": "T019",
+    "name": "机缘感应",
+    "tier": "TRADEOFF",
+    "description": "你能感觉到机会靠近，却看不清机会后面的代价。拟提示可能藏有机遇的地点或事件，但隐藏其风险类型与代价。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高机遇线索出现倾向；隐藏风险信息。依赖：奇遇系统；区域系统；风险信息展示"
+  },
+  {
+    "id": "T020",
+    "name": "亡命之徒",
+    "tier": "TRADEOFF",
+    "description": "你很会摆脱追兵，却不擅长停下来谈条件。拟强化追逐和逃脱行动；正面交涉与对峙受到轻微惩罚。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "追逐与逃脱加成；交涉与对峙减益。依赖：追逐逃脱规则；对话与对峙系统"
+  },
+  {
+    "id": "T021",
+    "name": "冲阵者",
+    "tier": "TRADEOFF",
+    "description": "你越接近冲突中心，行动越果断。拟提高冲突中的行动收益，并临时强化已有技能；和平选项的可用性降低。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "冲突收益与临时强化；和平行动资格减少。依赖：冲突结算；技能系统；行动资格"
+  },
+  {
+    "id": "T022",
+    "name": "盗火者",
+    "tier": "TRADEOFF",
+    "description": "你能借走别人的本事，也会把追索者引到身后。拟临时借用一项技能或关键资源；使用后获得追捕或债务标记。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "临时技能或资源借用；追加追捕状态。依赖：技能系统；资源系统；追捕事件"
+  },
+  {
+    "id": "T023",
+    "name": "噬痛之人",
+    "tier": "TRADEOFF",
+    "description": "伤痛让你更清醒，也让你更难恢复。拟在受伤后获得短时行动优势；恢复速度降低。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "受伤状态加成；恢复减益。依赖：生命与状态系统；恢复规则"
+  },
+  {
+    "id": "T024",
+    "name": "假面行者",
+    "tier": "TRADEOFF",
+    "description": "你擅长扮演别人期待看见的那个人。拟通过伪装身份或信息取得额外行动资格；暴露后承担严重关系或追捕后果。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "伪装行动资格；识破后的关系与事件惩罚。依赖：身份系统；声望关系；追捕事件"
+  },
+  {
+    "id": "T025",
+    "name": "聆听者",
+    "tier": "TRADEOFF",
+    "description": "你能从杂音里听出有用的消息，也会听见不该存在的低语。拟提高传闻和线索的获得倾向；偶尔承受精神干扰。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高消息线索权重；间歇精神状态减益。依赖：消息传闻系统；精神状态；奇遇系统"
+  },
+  {
+    "id": "T026",
+    "name": "能言善道",
+    "tier": "ORDINARY",
+    "description": "你知道怎样把对话推进到下一步。交谈额外耗时减少 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "TALK -1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T027",
+    "name": "明察秋毫",
+    "tier": "ORDINARY",
+    "description": "你习惯在行动前多看一眼细节。观察额外耗时减少 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "OBSERVE -1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T028",
+    "name": "轻车熟路",
+    "tier": "ORDINARY",
+    "description": "陌生道路也很少让你停下太久。探索额外耗时减少 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "EXPLORE -1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T029",
+    "name": "临场应变",
+    "tier": "ORDINARY",
+    "description": "计划赶不上变化时，你反而更快作出决定。自由行动额外耗时减少 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "CUSTOM -1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T030",
+    "name": "探险家",
+    "tier": "ORDINARY",
+    "description": "陌生环境会让你警觉，却不会让你退缩。拟在首次进入新区域时降低一次探索额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "新区域首次探索时间减免。依赖：区域系统；行动时钟"
+  },
+  {
+    "id": "T031",
+    "name": "危险嗅觉",
+    "tier": "ORDINARY",
+    "description": "真正的危险到来前，你常会先感觉到不对劲。拟在危险行动前显示一个不含结果的风险标签。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "显示一个危险类别提示。依赖：危险标签系统"
+  },
+  {
+    "id": "T032",
+    "name": "轻装疾行",
+    "tier": "ORDINARY",
+    "description": "你只携带真正需要的东西。拟降低负重造成的探索消耗。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "降低负重惩罚或探索资源消耗。依赖：负重系统；资源系统"
+  },
+  {
+    "id": "T033",
+    "name": "夜巡者",
+    "tier": "ORDINARY",
+    "description": "光线不足时，你反而更专注。拟降低夜间探索的额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "夜间探索时间减免。依赖：昼夜系统；行动时钟"
+  },
+  {
+    "id": "T034",
+    "name": "攀爬好手",
+    "tier": "ORDINARY",
+    "description": "陡墙和断崖在你眼中只是另一种道路。拟解锁符合地形条件的攀爬行动。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加攀爬行动资格。依赖：地形标签；行动资格"
+  },
+  {
+    "id": "T035",
+    "name": "游泳健将",
+    "tier": "ORDINARY",
+    "description": "水域很少能真正截断你的路线。拟解锁符合环境条件的涉水或游泳行动。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加涉水行动资格。依赖：水域标签；行动资格"
+  },
+  {
+    "id": "T036",
+    "name": "追逐经验",
+    "tier": "ORDINARY",
+    "description": "你追过别人，也知道追兵会怎样判断。拟降低追逐行动的额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "追逐行动时间减免。依赖：追逐规则；行动时钟"
+  },
+  {
+    "id": "T037",
+    "name": "逃脱直觉",
+    "tier": "ORDINARY",
+    "description": "你总能比别人更早注意到可以脱身的缺口。拟在符合条件的危险中增加一个逃脱选项。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加受限逃脱行动资格。依赖：逃脱规则；行动资格"
+  },
+  {
+    "id": "T038",
+    "name": "对峙气场",
+    "tier": "ORDINARY",
+    "description": "你能让混乱的场面暂时安静下来。拟在符合条件的冲突中解锁一次正面对峙。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加对峙行动资格。依赖：对峙规则；行动资格"
+  },
+  {
+    "id": "T039",
+    "name": "谈判预备",
+    "tier": "ORDINARY",
+    "description": "开口前，你会先想清楚自己能让出什么。拟在每个 Session 获得一次谈判准备标记。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "Session 初始谈判准备状态。依赖：对话系统；状态标记"
+  },
+  {
+    "id": "T040",
+    "name": "察言观色",
+    "tier": "ORDINARY",
+    "description": "你会留意语气、停顿和回避的目光。拟在交谈时查看一个公开情绪标签。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "显示 NPC 当前情绪提示。依赖：NPC 情绪系统"
+  },
+  {
+    "id": "T041",
+    "name": "临时同盟",
+    "tier": "ORDINARY",
+    "description": "你擅长找到愿意同行一小段路的人。拟在满足关系和场景条件时获得一次临时协助。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "创建一次受限临时盟友协助。依赖：NPC 关系；盟友系统"
+  },
+  {
+    "id": "T042",
+    "name": "黑市门路",
+    "tier": "ORDINARY",
+    "description": "你知道哪些门不会在白天打开。拟解锁符合世界设定的非公开交易入口。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加黑市交易资格。依赖：经济交易系统；世界内容"
+  },
+  {
+    "id": "T043",
+    "name": "野外食谱",
+    "tier": "ORDINARY",
+    "description": "你知道哪些东西能入口，哪些只能留作燃料。拟将特定材料加工成可用消耗品。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "材料转化为食物或补给。依赖：材料用途；制作与消耗品系统"
+  },
+  {
+    "id": "T044",
+    "name": "拆解癖",
+    "tier": "ORDINARY",
+    "description": "复杂装置总让你想看看里面还剩什么。拟拆解符合条件的物品并回收部分零件。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "物品拆解与受限产出。依赖：物品与制作系统"
+  },
+  {
+    "id": "T045",
+    "name": "巧手",
+    "tier": "ORDINARY",
+    "description": "你的手比语言更擅长处理故障。拟提高制作和修理类行动的有效产出。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加制作或修理产出。依赖：制作系统；资源系统"
+  },
+  {
+    "id": "T046",
+    "name": "应急包",
+    "tier": "ORDINARY",
+    "description": "你习惯为最常见的意外留一点余量。拟在开局获得一个由内容包批准的基础消耗品。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "授予受限初始消耗品。依赖：物品与消耗品系统"
+  },
+  {
+    "id": "T047",
+    "name": "人脉便签",
+    "tier": "ORDINARY",
+    "description": "你会记下名字、地点和下次见面的理由。拟在每个 Session 标记一个已见 NPC，方便之后重新寻找。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "创建一个 Session 内 NPC 追踪标记。依赖：NPC 追踪；关系系统"
+  },
+  {
+    "id": "T048",
+    "name": "安全距离",
+    "tier": "ORDINARY",
+    "description": "情况失控前，你总会给自己留出半步。拟在符合条件的危险升级前获得一次退出机会。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加一次受限危险退出资格。依赖：危险处理；行动资格"
+  },
+  {
+    "id": "T049",
+    "name": "耐心等待",
+    "tier": "ORDINARY",
+    "description": "你愿意等到局面自然露出破绽。拟让每个 Session 的第一次等待不产生额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "首次等待额外耗时归零。依赖：等待行动；行动时钟"
+  },
+  {
+    "id": "T050",
+    "name": "快速整备",
+    "tier": "ORDINARY",
+    "description": "你能在别人检查第二遍前收拾好行装。拟降低 Session 之间的整备耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "整备阶段时间减免。依赖：整备阶段规则"
+  },
+  {
+    "id": "T051",
+    "name": "废墟嗅觉",
+    "tier": "ORDINARY",
+    "description": "进入废墟后，你很快就能判断哪里值得查看。拟在废墟区域标记一个可能具有较高价值的地点。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "显示一个区域价值提示。依赖：区域价值与地图系统"
+  },
+  {
+    "id": "T052",
+    "name": "杂学",
+    "tier": "ORDINARY",
+    "description": "你对很多事只懂一点，但这一点偶尔正好够用。拟在受限条件下临时满足一次低阶技能资格。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "一次性替代受限技能前置。依赖：技能系统；行动资格"
+  },
+  {
+    "id": "T053",
+    "name": "预演",
+    "tier": "ORDINARY",
+    "description": "接近危险前，你会先在脑中走一遍流程。拟在每个 Session 的第一次危险前获得一次不增加额外耗时的观察。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "危险前一次观察时间豁免。依赖：危险处理；行动时钟"
+  },
+  {
+    "id": "T054",
+    "name": "窗口观察",
+    "tier": "ORDINARY",
+    "description": "你更喜欢隔着一段距离确认目标。拟通过远距离观察标记一个可见目标。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "增加远程观察标记。依赖：观察规则；目标标记"
+  },
+  {
+    "id": "T055",
+    "name": "硬汉",
+    "tier": "ORDINARY",
+    "description": "受伤会拖慢你，却不容易扰乱你的判断。拟在受伤后短暂抵抗部分行动干扰。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "受伤状态下获得有限抗性。依赖：生命与状态系统"
+  },
+  {
+    "id": "T056",
+    "name": "应急治疗",
+    "tier": "ORDINARY",
+    "description": "你知道怎样先止住问题，再考虑之后的代价。拟使用批准的医疗消耗品完成一次基础治疗。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "允许一次受限消耗品治疗。依赖：生命与消耗品系统"
+  },
+  {
+    "id": "T057",
+    "name": "地形记忆",
+    "tier": "ORDINARY",
+    "description": "你走过的路线会在脑中留下清晰轮廓。拟降低已探索区域中的移动耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "熟悉区域移动时间减免。依赖：地图记忆；区域系统"
+  },
+  {
+    "id": "T058",
+    "name": "小队默契",
+    "tier": "ORDINARY",
+    "description": "你很快就能适应临时同行者的节奏。拟降低与临时盟友共同执行行动时的额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "盟友协同行动时间减免。依赖：盟友系统；行动时钟"
+  },
+  {
+    "id": "T059",
+    "name": "逐风而行",
+    "tier": "ORDINARY",
+    "description": "开阔地形会让你走得更快。拟降低平原、荒野等开阔区域的探索耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "开阔地形探索时间减免。依赖：区域标签；行动时钟"
+  },
+  {
+    "id": "T060",
+    "name": "城市通",
+    "tier": "ORDINARY",
+    "description": "街区、站点和人流会替你指路。拟降低城市区域的探索耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "城市区域探索时间减免。依赖：区域标签；行动时钟"
+  },
+  {
+    "id": "T061",
+    "name": "沉默寡言",
+    "tier": "WEAK",
+    "description": "你每句话都要在心里绕上几遍。交谈额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "TALK +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T062",
+    "name": "眼神不济",
+    "tier": "WEAK",
+    "description": "细节常在你确认之前从视线里溜走。观察额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "OBSERVE +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T063",
+    "name": "路感欠佳",
+    "tier": "WEAK",
+    "description": "你常常要多走一段才能确认方向。探索额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "EXPLORE +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T064",
+    "name": "临事迟疑",
+    "tier": "WEAK",
+    "description": "轮到你决定下一步时，你总会再想一遍。自由行动额外耗时增加 1 点。",
+    "status": "CURRENT",
+    "effect_and_dependencies": "CUSTOM +1。依赖：现有行动时钟"
+  },
+  {
+    "id": "T065",
+    "name": "慢热",
+    "tier": "WEAK",
+    "description": "你需要更长时间才能适应陌生的人。拟让每个 Session 的第一次交谈增加额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "首次 TALK 追加时间成本。依赖：Session 状态；行动时钟"
+  },
+  {
+    "id": "T066",
+    "name": "乌鸦嘴",
+    "tier": "WEAK",
+    "description": "你说出口的担忧偶尔会变成新的麻烦。拟让部分不谨慎的交谈增加危险事件的出现倾向。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "特定 TALK 追加危险事件权重。依赖：对话系统；危险事件池"
+  },
+  {
+    "id": "T067",
+    "name": "冒失鬼",
+    "tier": "WEAK",
+    "description": "你总会碰到本来可以绕开的东西。拟让首次进入未知区域时更容易触发轻微环境麻烦。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "新区域追加轻度负面事件。依赖：区域系统；环境事件"
+  },
+  {
+    "id": "T068",
+    "name": "歧路缘",
+    "tier": "WEAK",
+    "description": "你经常走错路，也偶尔因此撞见不在地图上的地方。拟增加探索耗时，并小幅提高发现隐藏地点的机会。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "探索时间惩罚；隐藏地点倾向小幅提高。依赖：区域系统；隐藏地点池"
+  },
+  {
+    "id": "T069",
+    "name": "紧张性打嗝",
+    "tier": "WEAK",
+    "description": "越需要安静，你越难控制自己的声音。拟在紧张交谈或潜行时增加暴露风险。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高特定行动的声音暴露风险。依赖：潜行或暴露系统；对话状态"
+  },
+  {
+    "id": "T070",
+    "name": "生人勿近",
+    "tier": "WEAK",
+    "description": "陌生人很难从你的表情里找到善意。拟降低陌生 NPC 的初始合作倾向。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "陌生 NPC 初始关系减益。依赖：NPC 关系系统"
+  },
+  {
+    "id": "T071",
+    "name": "多管闲事",
+    "tier": "WEAK",
+    "description": "你很难对眼前的麻烦视而不见。拟让部分求助事件更难直接拒绝。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "限制特定求助事件的回避选项。依赖：事件系统；行动资格"
+  },
+  {
+    "id": "T072",
+    "name": "怕黑",
+    "tier": "WEAK",
+    "description": "光线不足时，你很难保持原来的判断速度。拟增加夜间观察和探索的额外耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "夜间 OBSERVE 与 EXPLORE 时间惩罚。依赖：昼夜系统；行动时钟"
+  },
+  {
+    "id": "T073",
+    "name": "恐高",
+    "tier": "WEAK",
+    "description": "靠近高处边缘时，你的动作会明显变慢。拟限制高处行动，或增加攀爬与高空移动耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "高处行动资格或时间惩罚。依赖：地形标签；行动资格"
+  },
+  {
+    "id": "T074",
+    "name": "晕船",
+    "tier": "WEAK",
+    "description": "持续摇晃会迅速耗尽你的专注。拟在船只或强烈摇晃环境中增加行动耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "特定环境行动时间惩罚。依赖：环境标签；行动时钟"
+  },
+  {
+    "id": "T075",
+    "name": "洁癖",
+    "tier": "WEAK",
+    "description": "脏乱环境会让你把精力花在不必要的地方。拟在污染或恶劣环境中增加整备与资源消耗。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "污染环境资源与时间惩罚。依赖：环境标签；资源与整备系统"
+  },
+  {
+    "id": "T076",
+    "name": "囤积癖",
+    "tier": "WEAK",
+    "description": "你总觉得下一件东西以后一定用得上。拟更快触发负重惩罚，并降低整理物品的效率。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高负重；增加整理耗时。依赖：背包与负重系统"
+  },
+  {
+    "id": "T077",
+    "name": "话多必失",
+    "tier": "WEAK",
+    "description": "你常在说服别人之后又多补一句。拟让连续追问更容易暴露额外信息或提高关系风险。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "连续 TALK 追加信息或关系风险。依赖：对话系统；关系后果"
+  },
+  {
+    "id": "T078",
+    "name": "耳根子软",
+    "tier": "WEAK",
+    "description": "别人的请求很容易动摇你原来的计划。拟降低对劝诱和情绪操控的抵抗。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "关系操控抗性减益。依赖：NPC 关系；精神状态系统"
+  },
+  {
+    "id": "T079",
+    "name": "好奇过头",
+    "tier": "WEAK",
+    "description": "越像警告的东西，越容易吸引你靠近。拟让危险线索更容易生成进一步调查选项，并减少部分安全退出机会。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高危险调查倾向；限制部分退出资格。依赖：危险事件；行动资格"
+  },
+  {
+    "id": "T080",
+    "name": "三分钟热度",
+    "tier": "WEAK",
+    "description": "你上手很快，却很难把练习坚持到最后。拟提高首次学习速度，但降低长期技能成长。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "首次学习加成；后续成长减益。依赖：技能成长系统"
+  },
+  {
+    "id": "T081",
+    "name": "认床",
+    "tier": "WEAK",
+    "description": "陌生住处很难让你真正休息。拟降低每个新世界第一次休息的恢复效果。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "首次休息恢复减益。依赖：休息与恢复系统"
+  },
+  {
+    "id": "T082",
+    "name": "临行拖延",
+    "tier": "WEAK",
+    "description": "真正出发前，你总还要再检查一件东西。拟增加开局整备或 Session 转换耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "开局或整备阶段时间惩罚。依赖：整备阶段规则"
+  },
+  {
+    "id": "T083",
+    "name": "易受惊扰",
+    "tier": "WEAK",
+    "description": "突发声响会让你的思路短暂中断。拟在首次遭遇突发危险后获得短暂行动减益。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "突发事件后附加临时减益。依赖：危险事件；状态系统"
+  },
+  {
+    "id": "T084",
+    "name": "嘴硬",
+    "tier": "WEAK",
+    "description": "你不愿承认自己需要帮助。拟提高主动求助的行动成本，并关闭部分直接接受援助的选项。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "求助成本增加；部分援助资格关闭。依赖：对话与行动资格"
+  },
+  {
+    "id": "T085",
+    "name": "路见不平",
+    "tier": "WEAK",
+    "description": "遇到明显的不公时，你很难置身事外。拟在部分冲突中减少袖手旁观的选项。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "限制特定冲突的中立行动资格。依赖：冲突事件；行动资格"
+  },
+  {
+    "id": "T086",
+    "name": "逞强",
+    "tier": "WEAK",
+    "description": "你习惯把还能坚持说成毫无问题。拟在低状态时隐藏部分撤退提示，并提高继续行动的风险。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "弱化撤退提示；增加低状态风险。依赖：生命状态；危险处理"
+  },
+  {
+    "id": "T087",
+    "name": "穷讲究",
+    "tier": "WEAK",
+    "description": "条件越差，你越难放下自己的习惯。拟提高休息、饮食或整备的最低资源消耗。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "生活类资源成本增加。依赖：资源与休息系统"
+  },
+  {
+    "id": "T088",
+    "name": "旧伤",
+    "tier": "WEAK",
+    "description": "某些动作会提醒你，过去并没有完全过去。拟在高强度移动或冲突中增加状态恶化风险。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "特定高强度行动追加伤势风险。依赖：生命与伤势系统"
+  },
+  {
+    "id": "T089",
+    "name": "噩梦缠身",
+    "tier": "WEAK",
+    "description": "真正让你疲惫的东西总在睡着之后出现。拟降低部分休息的精神恢复效果。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "精神恢复减益。依赖：休息与精神状态系统"
+  },
+  {
+    "id": "T090",
+    "name": "不合群",
+    "tier": "WEAK",
+    "description": "你更习惯独自处理问题。拟降低团队协作收益，并减慢长期盟友关系成长。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "协作加成与关系成长减益。依赖：盟友系统；NPC 关系"
+  },
+  {
+    "id": "T091",
+    "name": "时运不济",
+    "tier": "WEAK",
+    "description": "小麻烦总比预想中更早出现。拟小幅提高普通负面事件的出现倾向，不影响核心结局规则。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高轻度负面事件权重。依赖：事件池与权重系统"
+  },
+  {
+    "id": "T092",
+    "name": "记性欠佳",
+    "tier": "WEAK",
+    "description": "不重要的细节常在需要时想不起来。拟降低可同时保留的次要线索数量；关键事实不会被删除。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "限制次要线索容量。依赖：线索与记忆系统"
+  },
+  {
+    "id": "T093",
+    "name": "手脚冰凉",
+    "tier": "WEAK",
+    "description": "寒冷环境会更快拖慢你的动作。拟在低温环境中增加精细操作和移动耗时。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "低温环境行动时间惩罚。依赖：环境标签；行动时钟"
+  },
+  {
+    "id": "T094",
+    "name": "水土不服",
+    "tier": "WEAK",
+    "description": "每次抵达新世界，你都需要更久才能适应。拟让每个新世界的首次恢复或整备效果降低。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "新世界首次恢复减益。依赖：世界转换；恢复系统"
+  },
+  {
+    "id": "T095",
+    "name": "过度谨慎",
+    "tier": "WEAK",
+    "description": "你总想再确认一次，哪怕局面已经很清楚。拟增加连续观察的额外耗时，但降低遗漏公开危险标签的可能。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "观察时间惩罚；危险提示稳定性提高。依赖：观察规则；危险标签"
+  },
+  {
+    "id": "T096",
+    "name": "声名狼藉",
+    "tier": "WEAK",
+    "description": "有些人会在见到你之前先听见你的名字。拟降低守序或谨慎 NPC 的初始合作倾向。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "特定 NPC 初始关系减益。依赖：声望与NPC关系系统"
+  },
+  {
+    "id": "T097",
+    "name": "债务缠身",
+    "tier": "WEAK",
+    "description": "旅程开始前，你已经欠下需要偿还的东西。拟让部分初始或后续资源优先用于偿还债务。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "创建债务记录并扣减可支配资源。依赖：经济与债务系统"
+  },
+  {
+    "id": "T098",
+    "name": "忌口繁多",
+    "tier": "WEAK",
+    "description": "能入口的补给总比别人少一些。拟限制部分食物和恢复品的使用。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "限制特定消耗品资格。依赖：食物与消耗品系统"
+  },
+  {
+    "id": "T099",
+    "name": "睡眠浅",
+    "tier": "WEAK",
+    "description": "一点动静就足以打断你的休息。拟让危险区域中的休息更容易被事件中断。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "提高休息中断事件权重。依赖：休息系统；危险事件"
+  },
+  {
+    "id": "T100",
+    "name": "冲动消费",
+    "tier": "WEAK",
+    "description": "稀罕东西出现时，你很难坚持原来的预算。拟提高特殊交易中的最低支出，或减少放弃购买的选项。",
+    "status": "FUTURE",
+    "effect_and_dependencies": "特殊交易成本增加；部分退出资格受限。依赖：交易与资源系统"
+  }
+]

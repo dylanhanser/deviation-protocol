@@ -32,6 +32,8 @@ class SqlAlchemyUnitOfWork(UnitOfWork):
     async def __aenter__(self) -> "SqlAlchemyUnitOfWork":
         self._session = self._session_factory()
         self._session.info["session_content_registry"] = self._content_registry
+        from deviation_protocol.infrastructure.opening_preparation_persistence import SqlOpeningPreparationRepository
+        self.opening_preparations = SqlOpeningPreparationRepository(self._session)
         from deviation_protocol.infrastructure.repositories import SqlAlchemyRunWorldContinuationRepository
         self.run_world_continuations = SqlAlchemyRunWorldContinuationRepository(self._session)
         from deviation_protocol.infrastructure.repositories import SqlAlchemyRunWorldRevisitRepository

@@ -3046,3 +3046,14 @@ P8-S7, and leaves completed P8-S6/Phase 8, paused Phase 6, and inactive Phase 7
 exactly as recorded in `PLANS.md`. The DNVS and its bounded autonomous
 improvement lifecycle are closed; neither supplies Phase 3.3 implementation
 evidence or Provider/world authority.
+## Opening talents candidate
+
+The owner approved the 100-entry catalog, 12 CURRENT talent pool and one narrow
+preparation migration on 2026-09-21. The uncommitted implementation inserts
+persistent five-candidate preparation and explicit two-talent confirmation into
+native entry. Difficulty/world choices are frozen with the offer; confirmation
+and native Run/Session admission are atomic. Only additional action clock costs
+change. See [Opening talents](opening_talents.md) for exact effects, replay,
+legacy behavior and migration protection. This candidate is not independently
+approved or browser accepted and does not change Phase 3.3 closure or DF-001/
+DF-002 conditions.

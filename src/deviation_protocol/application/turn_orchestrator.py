@@ -156,6 +156,8 @@ class FirstPhaseTurnOrchestrator:
             )
             visible_npc_ids = self._visible_runtime_npc_ids(state, definition)
             native_family = await self.native_coordinator.load(uow, game_session, state, definition) if self.native_coordinator is not None else None
+            from deviation_protocol.application.opening_preparation import load_run_talents
+            opening_talents = await load_run_talents(uow, native_family, game_session.player_id)
 
             # This capability is minted only after the authoritative state has been
             # loaded. Scene visibility and skill-learning authority remain empty
@@ -186,6 +188,7 @@ class FirstPhaseTurnOrchestrator:
                 definition,
                 state_version=game_session.state_version,
                 native_family=native_family,
+                opening_talents=opening_talents,
             )
 
             return await self._commit_local_result(
@@ -551,6 +554,7 @@ class FirstPhaseTurnOrchestrator:
         *,
         state_version: int,
         native_family=None,
+        opening_talents=None,
     ) -> tuple[ResolutionResult, NarrativeFrame | None]:
         if definition is None and submission.action_type is ActionType.CONTINUE:
             return self._scenario_rejection("CONTINUE_REQUIRES_ACTIVE_SCENARIO"), None
@@ -589,7 +593,7 @@ class FirstPhaseTurnOrchestrator:
                 before_phase_id = runtime.current_phase_id
                 before_beat_index = runtime.phase_beat_index
                 native_plan = self._native_local_plan(native_family, state, definition,
-                    submission, state_version, current_frame)
+                    submission, state_version, current_frame, talents=opening_talents)
                 directed = self.story_director.advance_after_verified_result(
                     state,
                     definition,
@@ -705,7 +709,7 @@ class FirstPhaseTurnOrchestrator:
                 base_state = resolution.updated_state
                 mechanical_events = resolution.events
             native_plan = self._native_local_plan(native_family, state, definition,
-                submission, state_version, current_frame, event=issued.sealed_event)
+                submission, state_version, current_frame, event=issued.sealed_event, talents=opening_talents)
             directed = self.story_director.advance_after_verified_result(
                 base_state,
                 definition,
@@ -763,10 +767,10 @@ class FirstPhaseTurnOrchestrator:
         except StoryDirectorError:
             raise CandidateStateInvalidError(submission.session_id) from None
 
-    def _native_local_plan(self, family, state, definition, submission, version, frame, *, event=None):
+    def _native_local_plan(self, family, state, definition, submission, version, frame, *, event=None, talents=None):
         if family is None:
             return None
-        inputs = self.native_coordinator.bind(family, state, submission, version, frame)
+        inputs = self.native_coordinator.bind(family, state, submission, version, frame, talents=talents)
         return self.native_coordinator.decide(inputs, state, definition, submission, event=event)
 
     def _native_audit(self, plan):

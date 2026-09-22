@@ -1,3 +1,4 @@
+import { prepareAndConfirmFirstTwo, openingConfirmedFixture } from "./test/openingFixtures";
 import {
   act,
   fireEvent,
@@ -64,7 +65,7 @@ it.each([true,false])("native setup follows authoritative action affordances and
     run_id:admitted.run_context.run_id,session_state_version:7,run_state_version:3,lifecycle_status:"active",can_exit:true});
   vi.spyOn(PublicApiClient.prototype,"getNativeRunCompletion").mockResolvedValue(completionStatusFixture(nativeJourneyFixture(nativeViewFixture(endedViewFixture("RESOLVED")))));
   server.use(scenarioHandler(),http.get(`${apiOrigin}/v1/run-entry-options`,() => HttpResponse.json(runOptionsFixture)),
-    http.post(`${apiOrigin}/v1/runs/native`,() => {entries++;return HttpResponse.json(admitted);}),
+    http.post(`${apiOrigin}/v1/opening-preparations/:preparation/confirm`,() => {entries++;return HttpResponse.json(openingConfirmedFixture(admitted));}),
     http.get(`${apiOrigin}/v1/sessions/session-public-1/view`,() => {
       views++;
       if (views===1) return HttpResponse.json(nativeViewFixture(activeViewFixture));
@@ -73,11 +74,11 @@ it.each([true,false])("native setup follows authoritative action affordances and
   renderActionApp(); await screen.findByLabelText("Player Character");
   fireEvent.click(screen.getByRole("button",{name:"原生 Run 设置"}));
   await screen.findByLabelText("选择难度");
-  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
   fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
   fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
-  fireEvent.click(screen.getByRole("button",{name:"确认并开始"}));
+  await prepareAndConfirmFirstTwo();
   await screen.findByText("当前 Session：session-public-1");
   await waitFor(()=>expect(screen.getByRole("button",{name:"检查灯塔信号"})).toBeEnabled());
   fireEvent.click(screen.getByRole("button",{name:"检查灯塔信号"}));

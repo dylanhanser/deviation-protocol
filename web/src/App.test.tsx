@@ -1,3 +1,4 @@
+import { prepareAndConfirmFirstTwo } from "./test/openingFixtures";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, delay, http } from "msw";
@@ -68,7 +69,7 @@ describe("S7-1 explicit exit and return to setup", () => {
     await screen.findByLabelText("选择难度");
     expect(screen.getByLabelText("选择难度")).toHaveValue("");
     expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
-    expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+    expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
     expect(c.entry).not.toHaveBeenCalled();
   });
 
@@ -185,7 +186,7 @@ describe("S7-1 explicit exit and return to setup", () => {
     expect(retry).toBeVisible();
     fireEvent.click(retry);
     await waitFor(() => expect(screen.queryByRole("button",{name:"重试 eligible Player Character GET"})).not.toBeInTheDocument());
-    expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+    expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
     expect(screen.getByLabelText("选择难度")).toHaveValue("");
     expect(c.entry).not.toHaveBeenCalled(); expect(c.exit).not.toHaveBeenCalled();
   });
@@ -202,7 +203,8 @@ describe("S6 correction: late eligible characters", () => {
     const client = new PublicApiClient({baseUrl: `${apiOrigin}/`});
     vi.spyOn(client, "listScenarios").mockResolvedValue(scenarioCatalogFixture);
     vi.spyOn(client, "listRunEntryOptions").mockResolvedValue(runOptionsFixture);
-    vi.spyOn(client, "enterNativeRun").mockResolvedValue(nativeEntryFixture());
+    vi.spyOn(client, "confirmOpening").mockResolvedValue(nativeEntryFixture());
+    vi.spyOn(client, "enterNativeRun");
     vi.spyOn(client, "getNativeRunJourney").mockResolvedValue(nativeJourneyFixture());
     vi.spyOn(client, "getSessionView").mockResolvedValue(nativeViewFixture(activeViewFixture));
     return client;
@@ -216,8 +218,8 @@ describe("S6 correction: late eligible characters", () => {
   }
 
   function expectExplicitSelectionRequired(client: PublicApiClient) {
-    expect(screen.getByRole("button", {name: "确认并开始"})).toBeDisabled();
-    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    expect(screen.getByRole("button", {name: "查看开局天赋"})).toBeDisabled();
+    fireEvent.click(screen.getByRole("button", {name: "查看开局天赋"}));
     expect(client.enterNativeRun).not.toHaveBeenCalled();
   }
 
@@ -240,11 +242,11 @@ describe("S6 correction: late eligible characters", () => {
     expect(screen.getByLabelText("选择难度")).toHaveValue("difficulty.open-expedition");
     expect(screen.getByLabelText("选择起始世界")).toHaveValue("world.death_certificate");
     fireEvent.change(screen.getByLabelText("Player Character"), {target: {value: playerCharacterFixture.player_character_id.value}});
-    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", {name: "查看开局天赋"})).toBeEnabled());
     expect(client.enterNativeRun).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    await prepareAndConfirmFirstTwo();
     await screen.findByText("当前 Session：session-public-1");
-    expect(client.enterNativeRun).toHaveBeenCalledTimes(1);
+    expect(client.confirmOpening).toHaveBeenCalledTimes(1);
   });
 
   it("ignores an obsolete list after client replacement and a newer explicit native selection", async () => {
@@ -270,7 +272,7 @@ describe("S6 correction: late eligible characters", () => {
     });
     expect(screen.getByLabelText("Player Character")).toHaveValue(playerCharacterFixture.player_character_id.value);
     expect(screen.queryByText(/pc.obsolete/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", {name: "查看开局天赋"})).toBeEnabled());
     expect(oldClient.enterNativeRun).not.toHaveBeenCalled();
     expect(newClient.enterNativeRun).not.toHaveBeenCalled();
   });
@@ -287,7 +289,7 @@ describe("S6 correction: late eligible characters", () => {
     await waitFor(() => expect(client.listRunEntryOptions).toHaveBeenCalledTimes(2));
     await screen.findByLabelText("选择难度");
     expect(screen.getByLabelText("Player Character")).toHaveValue(playerCharacterFixture.player_character_id.value);
-    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", {name: "查看开局天赋"})).toBeEnabled());
     expect(client.enterNativeRun).not.toHaveBeenCalled();
   });
 
@@ -312,12 +314,12 @@ describe("S6 correction: late eligible characters", () => {
     fireEvent.click(await screen.findByRole("button", {name: "创建最小 Player Character"}));
     await screen.findByText(/已选择服务器返回的创建结果/);
     await chooseNativeWorld();
-    expect(screen.getByRole("button", {name: "确认并开始"})).toBeEnabled();
+    await waitFor(() => expect(screen.getByRole("button", {name: "查看开局天赋"})).toBeEnabled());
     expect(client.createPlayerCharacter).toHaveBeenCalledTimes(1);
     expect(client.enterNativeRun).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", {name: "确认并开始"}));
+    await prepareAndConfirmFirstTwo();
     await screen.findByText("当前 Session：session-public-1");
-    expect(client.enterNativeRun).toHaveBeenCalledTimes(1);
+    expect(client.confirmOpening).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -330,15 +332,15 @@ it("native selections and exact override bounds require explicit confirmation",a
   await screen.findByLabelText("选择难度");
   expect(screen.getByLabelText("选择难度")).toHaveValue("");
   expect(screen.getByLabelText("选择起始世界")).toHaveValue("");
-  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
   fireEvent.change(screen.getByLabelText("Player Character"),{target:{value:playerCharacterFixture.player_character_id.value}});
   fireEvent.change(screen.getByLabelText("选择难度"),{target:{value:"difficulty.open-expedition"}});
   fireEvent.change(screen.getByLabelText("选择起始世界"),{target:{value:"world.death_certificate"}});
   fireEvent.click(screen.getByLabelText("调整资源压力"));
   fireEvent.change(screen.getByLabelText("资源压力"),{target:{value:"31"}});
-  expect(screen.getByRole("button",{name:"确认并开始"})).toBeDisabled();
+  expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeDisabled();
   fireEvent.change(screen.getByLabelText("资源压力"),{target:{value:"30"}});
-  expect(screen.getByRole("button",{name:"确认并开始"})).toBeEnabled();
+  await waitFor(() => expect(screen.getByRole("button",{name:"查看开局天赋"})).toBeEnabled());
   fireEvent.click(screen.getByRole("button",{name:"刷新可用选项"}));
   await screen.findByLabelText("选择难度");
   expect(screen.getByLabelText("资源压力")).toHaveValue(30);

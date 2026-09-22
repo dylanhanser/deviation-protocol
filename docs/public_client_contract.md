@@ -2007,3 +2007,50 @@ acceptance should start the short story, take the 失衡 recovery route, refresh
 the midpoint, finish successfully, then exercise safe withdrawal in a separate
 Session; check visible state/choices, keyboard focus and pending-button locking.
 No browser acceptance or database-server restart is claimed by implementation.
+## Opening talent preparation candidate
+
+The native launcher now uses a two-step opening preparation before admission.
+The detailed authority, lifecycle, legacy and clock rules are in
+[Opening talents](opening_talents.md). This is an uncommitted implementation
+candidate; independent approval and browser acceptance remain outstanding.
+
+- `POST /v1/opening-preparations`: strict existing `NativeRunEntryRequest` and
+  `Idempotency-Key`; returns `opening-preparation/v1` only after persistence.
+- `GET /v1/player-characters/{character_id}/opening-preparation`: owned latest
+  preparation or null; no issuance, reroll or admission.
+- `POST /v1/opening-preparations/{preparation_id}/confirm`: strict character ID,
+  catalog version and two selected IDs with `Idempotency-Key`. The preparation
+  identity and complete choice are the durable confirmation identity; changing
+  an HTTP key cannot change already confirmed choices. Exact retry returns the
+  original native admission association.
+- `GET /v1/sessions/{session_id}/opening-talents`: owned immutable talent cards,
+  or an empty list for explicit no-talent legacy Runs/Sessions. Historical reads
+  do not change current recovery storage or enable gameplay.
+
+The preparation response enumerates schema/preparation/character/catalog IDs,
+PENDING or CONFIRMED state, frozen public admission parameters, five cards,
+confirmed selected IDs and optional native admission result. Cards expose only
+ID, name, tier and description. Neither private seed nor dependency metadata is
+public. The 88 FUTURE entries are not selectable public content. Existing
+strict raw-JSON, transport limits, opaque errors and authentication rules apply;
+OpenAPI declares bodies, required headers and public error envelopes.
+
+The Web requires two distinct choices and an explicit confirmation. Pending
+preparations survive refresh and retry without replacement. Frozen settings
+cannot be changed by leaving/re-entering the launcher. Confirmed responses must
+match the issued preparation, settings, candidates, selected IDs and native
+admission association before Session storage or View adoption. Existing stale
+operation, client replacement, storage-failure and mutation-retry locks remain
+in force. Display-only talent GETs cannot authorize actions.
+
+Opening confirmation additionally requires a successful pre-POST tab-local
+recovery-reference write/readback. The versioned reference contains only the
+character and preparation IDs, partitioned by normalized API base URL; server
+authentication remains the ownership authority. Refresh reads it without the
+eligible-character list. Pending recovery requires fresh explicit selection;
+confirmed recovery uses only GET and validates preparation, admission, character,
+Run, Session View and Journey before adopting the Session. No recovery POST is
+automatic. Existing/newer Session targets take priority over late preparation
+reads. Network/storage/identity failures retain the route and block adoption;
+successful Session persistence supersedes it. Other entry recovery contracts
+remain unchanged.

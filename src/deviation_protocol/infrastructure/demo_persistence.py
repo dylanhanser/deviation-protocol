@@ -183,6 +183,7 @@ class DemoStoreSnapshot:
     player_character_mutation_receipts: dict[
         tuple[str, str, str], StoredMutationReceiptRecord
     ]
+    opening_preparations: dict[str, bytes]
     run_revisions: dict[tuple[str, int], StoredRunRevisionRecord]
     run_current: dict[str, StoredCurrentRunRecord]
     run_protocol_bindings: dict[str, native_storage._StoredRunProtocolBindingV1]
@@ -233,6 +234,7 @@ class DemoProcessStore:
         ] = {}
         self._run_current: dict[str, StoredCurrentRunRecord] = {}
         self._run_protocol_bindings = {}
+        self._opening_preparations = {}
         self._run_entry_world_bindings = {}
         self._run_world_states = {}
         self._run_world_visits = {}
@@ -299,6 +301,7 @@ class DemoProcessStore:
             ),
             run_revisions=deepcopy(self._run_revisions),
             run_current=deepcopy(self._run_current),
+            opening_preparations=deepcopy(self._opening_preparations),
             run_protocol_bindings=deepcopy(self._run_protocol_bindings),
             run_entry_world_bindings=deepcopy(self._run_entry_world_bindings),
             run_world_states=deepcopy(self._run_world_states),
@@ -2579,6 +2582,9 @@ class DemoUnitOfWork(UnitOfWork):
     def __init__(self, store: DemoProcessStore, *, native_capability=None) -> None:
         self._store = store
         self._native_capability = native_capability
+        from deviation_protocol.infrastructure.opening_preparation_persistence import DemoOpeningPreparationRepository
+        self.opening_preparations = DemoOpeningPreparationRepository(store, self)
+        self._pending_opening_preparations = {}
         self.run_protocol_bindings = DemoRunProtocolBindingRepository(store, self)
         self.run_entry_world_bindings = DemoRunEntryWorldBindingRepository(store, self)
         self.run_world_continuations = DemoRunWorldContinuationRepository(store,self)
@@ -3230,6 +3236,20 @@ class DemoUnitOfWork(UnitOfWork):
         for identity in sorted(native_ids | set(authority.run_protocol_bindings) | set(authority.run_entry_world_bindings)):
             _classify_demo_run(authority, RunId(value=identity), sessions, snapshots, events, self._store._content_registry,
                 jobs=jobs)
+        opening = {**self._store._opening_preparations, **self._pending_opening_preparations}
+        from deviation_protocol.infrastructure.opening_preparation_persistence import decode as decode_opening
+        opening_records = [decode_opening(raw) for raw in opening.values()]
+        for keys in ([r.preparation_id for r in opening_records],
+                     [(r.owner, r.request_key) for r in opening_records],
+                     [(r.character_id, r.ordinal) for r in opening_records],
+                     [r.character_id for r in opening_records if r.state == "PENDING"],
+                     [r.run_id for r in opening_records if r.state == "CONFIRMED"]):
+            if len(keys) != len(set(keys)):
+                raise ValueError("duplicate opening preparation")
+        if any(r.character_id not in authority.player_character_current or
+               (r.run_id is not None and r.run_id not in authority.run_current) for r in opening_records):
+            raise ValueError("orphan opening preparation")
+        self._store._opening_preparations = opening
         self._store._sessions = sessions
         self._store._run_protocol_bindings = authority.run_protocol_bindings
         self._store._run_entry_world_bindings = authority.run_entry_world_bindings
@@ -3265,6 +3285,7 @@ class DemoUnitOfWork(UnitOfWork):
         self._clear_staged()
 
     def _clear_staged(self) -> None:
+        self._pending_opening_preparations.clear()
         self._pending_run_protocol_bindings.clear()
         self._pending_run_entry_world_bindings.clear()
         self._pending_run_world_states.clear()

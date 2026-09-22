@@ -319,3 +319,11 @@ dd {
 .run-override { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-block: 0.75rem; }
 .run-override input[type="number"] { width: 6rem; }
 button[aria-pressed="true"] { outline: 2px solid currentColor; outline-offset: 2px; }
+/* Text tier labels remain meaningful without color; cards wrap at narrow widths. */
+.talent-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .75rem; }
+.talent-card { display: flex; flex-direction: column; gap: .5rem; padding: 1rem; border: 2px solid #7b8793; border-radius: .5rem; overflow-wrap: anywhere; }
+.talent-card input { margin-right: .5rem; }
+.talent-top { border-color: #9d741f; }
+.talent-tradeoff { border-color: #966ba8; }
+.talent-ordinary { border-color: #527e91; }
+.talent-weak { border-color: #7b8793; }

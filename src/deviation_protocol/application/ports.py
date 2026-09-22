@@ -571,7 +571,20 @@ class RunWorldRevisitRepository(ABC):
         raise NotImplementedError
 
 
+if TYPE_CHECKING:
+    from deviation_protocol.application.opening_preparation import OpeningPreparation
+
+
+class OpeningPreparationRepository(Protocol):
+    async def get(self, identity: str, *, locked: bool = False) -> OpeningPreparation | None: ...
+    async def latest(self, character_id: str, *, locked: bool = True) -> OpeningPreparation | None: ...
+    async def by_request(self, owner: str, key: str) -> OpeningPreparation | None: ...
+    async def by_run(self, run_id: str) -> OpeningPreparation | None: ...
+    async def save(self, record: OpeningPreparation) -> None: ...
+
+
 class UnitOfWork(ABC):
+    opening_preparations: OpeningPreparationRepository
     sessions: GameSessionRepository
     turn_requests: TurnRequestRepository
     narrative_jobs: NarrativeJobRepository

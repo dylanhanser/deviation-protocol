@@ -1114,6 +1114,25 @@ export type PublicNativeRunContext = z.infer<typeof publicNativeRunContextSchema
 export type NativeRunEntryRequest = z.infer<typeof nativeRunEntryRequestSchema>;
 export type NativeRunEntryResponse = z.infer<typeof nativeRunEntryResponseSchema>;
 
+export const activeTalentIds = ["T001","T006","T007","T008","T026","T027","T028","T029","T061","T062","T063","T064"] as const;
+export const talentCardSchema = z.strictObject({
+  id:z.enum(activeTalentIds), name:codePointBoundedStringSchema(1,80,"talent name"),
+  tier:z.enum(["TOP","TRADEOFF","ORDINARY","WEAK"]), description:codePointBoundedStringSchema(1,500,"talent description"),
+}).refine(t => t.tier === (t.id === "T001" ? "TOP" : ["T006","T007","T008"].includes(t.id) ? "TRADEOFF" : Number(t.id.slice(1)) < 60 ? "ORDINARY" : "WEAK"));
+export const confirmedTalentsSchema = z.array(talentCardSchema).refine(t => (t.length === 0 || t.length === 2) && new Set(t.map(c => c.id)).size === t.length);
+export const openingPreparationSchema = z.strictObject({
+  schema_version:z.literal("opening-preparation/v1"), preparation_id:z.string().regex(/^[0-9a-f]{32}$/),
+  character_id:safeId128Schema, catalog_version:z.literal("opening-talents/v1"),
+  state:z.enum(["PENDING","CONFIRMED"]), admission:nativeRunEntryRequestSchema,
+  candidates:z.array(talentCardSchema).length(5), selected_ids:z.array(z.enum(activeTalentIds)).max(2),
+  result:nativeRunEntryResponseSchema.nullable(),
+}).refine(p => p.character_id === p.admission.player_character_id && new Set(p.candidates.map(t => t.id)).size === 5 &&
+  p.candidates.filter(t => t.tier === "TOP").length <= 1 && new Set(p.selected_ids).size === p.selected_ids.length &&
+  p.selected_ids.every(id => p.candidates.some(t => t.id === id)) &&
+  (p.state === "PENDING" ? p.selected_ids.length === 0 && p.result === null : p.selected_ids.length === 2 && p.result !== null));
+export type OpeningPreparation = z.infer<typeof openingPreparationSchema>;
+export type TalentCard = z.infer<typeof talentCardSchema>;
+
 export const escortEncounterSchema = z.strictObject({
   presentation_version: z.literal(1),
   objective: plainStringSchema,
