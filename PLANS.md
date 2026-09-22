@@ -298,7 +298,7 @@ implementation is approved and published at `f49ee342`, with bounded browser
 acceptance. S7-5 integration/acceptance is independently approved and published at `a35a1bf` under
 [the complete requirement matrix](docs/phase_3_3_s7_5_integration_acceptance.md).
 No separate S6 closeout or decomposition gate is due.
-Phase 3.4 remains later. Phase 6 is paused under
+Phase 3.4 now has the bounded 雾哨站 implementation candidate described below; its broader scope remains incomplete. Phase 6 is paused under
 `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE`; Phase 7 is inactive. Phase 8 is complete
 at P8-S6 with no P8-S7. Dynamic Narrative corrective and publication work
 remains closed. Production Provider Distribution remains deferred.
@@ -819,7 +819,7 @@ itself authorize Optional Live, staging, or commit.
 | Phase 3.2a | **Implemented, verified, committed, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.2b | **Implemented, verified, accepted, and closed** | [Phase 3.2 specification and evidence](docs/phase_3_2_deterministic_demo_environment.md) |
 | Phase 3.3 | **G0 complete; S1/S2 published and closed; S3 plan published at `465c53d`; S3 implementation published at `a53f8e65ad74c62bc6c40b9de26222eb889084f0`, independently approved with DF-001 deferred; S4 plan approved and published at `42411b2`; S4 internal implementation independently approved and published at `34dc752295ba270617e5d29020f3a0c0b133544e`; S5 plan independently approved and published at `ff866d2`; S5 implementation independently approved with DF-001 deferred and published at `86c258e9ad2e64199cabf8650bf6f3a7b5f04d87`; S6 plan independently approved and published at `4365721`; S6 implementation independently approved and published at `2f144599`; two CHANGES_REQUIRED reviews preserved as history; representative local deterministic Demo browser journey demonstrated with bounded recovery limitations; DF-001/DF-002 deferred; S7-1 plan approved and published at `9fab18d`, implementation published at `41d68aac` with bounded both-ending browser acceptance; earlier nullable terminal-CHECK CHANGES_REQUIRED/correction retained as history; S7-2 plan independently approved and published at `2c272487`, P01–P08 approved, implementation published at `6dfbd37` with inspected bounded both-source browser journeys; four P2 findings/corrections retained as history; S7-3 plan published at `0ea295e`, P01–P09 approved, implementation published at `0b20dcd` with inspected bounded browser evidence; S7-4 plan independently approved and published at `684f7d1`, P01–P09 approved; implementation independently approved and published at `f49ee342` with bounded browser acceptance; S7-5 integration/acceptance is independently approved and published at `a35a1bf`; bounded S7 and Phase 3.3 complete** | [Run Protocol design](docs/run_protocol.md), [frozen parent plan](docs/phase_3_3_run_protocol_implementation_plan.md), [published S2 plan](docs/phase_3_3_s2_deterministic_profile_resolution_plan.md), [published S3 plan](docs/phase_3_3_s3_persistence_legacy_native_compatibility_plan.md), [Published S4 plan](docs/phase_3_3_s4_native_run_admission_entry_world_plan.md) |
-| Phase 3.4 | **Approved product design — not implemented; later than Phase 3.3** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
+| Phase 3.4 | **Bounded 雾哨站 candidate remains uncommitted; original candidate independently approved, browser acceptance FAILED on one P2 title; correction awaits focused re-review and narrow retest; full Phase 3.4 incomplete** | [NPC Relationship and Temporary Residence](docs/npc_relationship_residence.md) |
 | Phase 4.0 | **Accepted architectural direction — implementation deferred** | [ADR 0001: Production Provider Distribution](docs/decisions/0001-production-provider-distribution.md) |
 | Structured Player Character Phase 5 | **Implemented and complete at P5-S3** | [Downstream implementation plan](docs/structured_player_character_implementation_plan.md) |
 | Structured Player Character Phase 6 | **Paused under `PHASE_6_NO_CURRENT_EXECUTABLE_SURFACE` — not implemented** | Subject-reference compatibility hooks in the [downstream implementation plan](docs/structured_player_character_implementation_plan.md#phase-6--subject-reference-compatibility-hooks) |
@@ -1551,7 +1551,27 @@ under the published parent plan.
 
 ## Phase 3.4: NPC Relationship and Temporary Residence
 
-Status: **Approved product design — not implemented.**
+Status: **First bounded 雾哨站 slice implemented as an uncommitted candidate.**
+
+Authorized against `96200883dd00d8639c91579b9518175e197ce856`: a second native
+starting world, adult patrol officer 岑舟 (32), two engine-confirmed relationship
+advancements, one optional residence with three unique activities, explicit
+departure, same-Session farewell, authored ending and existing explicit Run exit.
+It uses fixed text and the existing atomic snapshot/event/receipt persistence;
+there is no schema migration or published continuation-graph change. Later-Session
+NPC recovery and cross-Run relationship continuity remain unimplemented. The
+original 33-path candidate received independent `APPROVED`; subsequent browser
+acceptance was `FAILED` for one P2: the frozen station preparation displayed the
+literal original-world title. The presentation-only correction binds that title
+to the preparation's versioned public world definition and awaits focused
+independent re-review, then a narrow original-world/station label and refresh
+retest. The original approval and failed browser result remain historical;
+applicable A/B/C gameplay evidence is retained. This revised candidate is not
+independently approved, browser accepted, published or full Phase 3.4 completion.
+Prior Phase 3.3, D1, D2/D3, multiline feedback and opening
+talents remain published and closed. Opening talent browser A/B/C and D's
+independent automated-only evidence retain their original scope. DF-001/DF-002
+retain their existing dispositions; Phase 6/7 and Provider distribution stay paused.
 
 Phase 3.4 owns engine-confirmed relationship progression, residence eligibility
 and lifecycle, bounded dialogue, temporary fixed-scene activities, departure,
@@ -1799,7 +1819,13 @@ manually.
   [`docs/engineering/codex_workflow.md`](docs/engineering/codex_workflow.md).
 - Phase 3.2 specification and evidence:
   [`docs/phase_3_2_deterministic_demo_environment.md`](docs/phase_3_2_deterministic_demo_environment.md).
-## Opening talents — current implementation candidate
+## Opening talents — published; historical candidate record
+
+Current status: published at the task baseline
+`96200883dd00d8639c91579b9518175e197ce856`. Browser A/B/C passed;
+D retains independent automated evidence only. The following candidate-time
+record preserves the original failure and correction history; it is not the
+current approval or publication status.
 
 On 2026-09-21 the owner authorized the complete 100-entry authored catalog, the
 12 CURRENT-only playable pool and one narrow persistent-preparation migration.

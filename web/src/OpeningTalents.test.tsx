@@ -4,7 +4,85 @@ import { OpeningTalentChoices, ConfirmedOpeningTalents } from "./OpeningTalents"
 import { openingPreparedFixture, openingConfirmedFixture } from "./test/openingFixtures";
 import { nativeEntryFixture, runOptionsFixture } from "./test/fixtures";
 import { PublicApiClient } from "./api/client";
-import { openingPreparationSchema } from "./api/schemas";
+import { openingPreparationSchema, type PublicEntryWorld } from "./api/schemas";
+
+const originalWorld={...runOptionsFixture.entry_worlds[0]!,title:"死亡证明"};
+const stationWorld: PublicEntryWorld = {...originalWorld,
+  entry_world:{entry_world_id:"world.fog_station",entry_world_version:1},
+  scenario_id:"fog_station",scenario_content_version:"fog-station-1.0.0",title:"雾哨站"};
+
+describe("frozen opening world title", () => {
+  it.each([originalWorld, stationWorld])("uses the public title for $title", world => {
+    const record=openingPreparedFixture();
+    record.admission.entry_world=world.entry_world;
+    const confirm=vi.fn();
+    const worlds=[originalWorld,stationWorld];
+    const rendered=render(<OpeningTalentChoices record={record} worlds={worlds} disabled={false} onConfirm={confirm}/>);
+    expect(screen.getByText(`初始世界：${world.title}。`,{exact:false})).toBeVisible();
+    rendered.rerender(<OpeningTalentChoices record={record} worlds={[...worlds].reverse()} disabled={false} onConfirm={confirm}/>);
+    expect(screen.getByText(`初始世界：${world.title}。`,{exact:false})).toBeVisible();
+    rendered.rerender(<OpeningTalentChoices record={record} worlds={[{...world,title:"公开定义中的标题"}]} disabled={false} onConfirm={confirm}/>);
+    expect(screen.getByText(/初始世界：公开定义中的标题/)).toBeVisible();
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it.each(["missing", "other world", "new version", "old version"])("does not substitute a pending world's %s metadata", kind => {
+    const record=openingPreparedFixture();
+    record.admission.entry_world=structuredClone(stationWorld.entry_world);
+    const world=structuredClone(stationWorld);
+    if(kind==="other world") world.entry_world.entry_world_id="world.other";
+    if(kind==="new version") world.entry_world.entry_world_version=2;
+    if(kind==="old version") record.admission.entry_world.entry_world_version=2;
+    render(<OpeningTalentChoices record={record} worlds={kind==="missing" ? undefined : [originalWorld,world]} disabled={false} onConfirm={vi.fn()}/>);
+    expect(screen.getByText(/初始世界：名称暂不可用（未核实）/)).toBeVisible();
+    expect(screen.queryByText(/初始世界：死亡证明/)).not.toBeInTheDocument();
+  });
+
+  it.each(["missing", "other world", "new world version", "old world version", "new content version", "other scenario", "result world", "result version"])(
+    "shows unavailable metadata for %s without changing selection eligibility", kind => {
+      const record=openingConfirmedFixture(nativeEntryFixture());
+      record.admission.entry_world=structuredClone(stationWorld.entry_world);
+      record.result!.run_context.entry_world=structuredClone(stationWorld.entry_world);
+      record.result!.scenario_id=stationWorld.scenario_id;
+      record.result!.scenario_content_version=stationWorld.scenario_content_version;
+      const world=structuredClone(stationWorld);
+      if(kind==="other world") world.entry_world.entry_world_id="world.other";
+      if(kind==="new world version") world.entry_world.entry_world_version=2;
+      if(kind==="old world version") record.admission.entry_world.entry_world_version=2;
+      if(kind==="new content version") world.scenario_content_version="fog-station-2.0.0";
+      if(kind==="other scenario") world.scenario_id="other";
+      if(kind==="result world") record.result!.run_context.entry_world.entry_world_id="world.other";
+      if(kind==="result version") record.result!.run_context.entry_world.entry_world_version=2;
+      const confirm=vi.fn();
+      const worlds=kind==="missing" ? undefined : [runOptionsFixture.entry_worlds[0]!,world];
+      const rendered=render(<OpeningTalentChoices record={record} worlds={worlds} disabled={false} onConfirm={confirm}/>);
+      expect(screen.getByText(/初始世界：名称暂不可用（未核实）/)).toBeVisible();
+      expect(screen.queryByText(/初始世界：死亡证明/)).not.toBeInTheDocument();
+      expect(screen.getByRole("button",{name:"读取已开始的旅程"})).toBeEnabled();
+      expect(confirm).not.toHaveBeenCalled();
+      const pending={...record,state:"PENDING" as const,selected_ids:[],result:null};
+      rendered.rerender(<OpeningTalentChoices key="pending" record={pending} worlds={[]} disabled={false} onConfirm={confirm}/>);
+      // The title lookup neither grants nor revokes confirmation eligibility.
+      const button=screen.getByRole("button",{name:"确认天赋并开始"});
+      expect(button).toBeDisabled();
+      fireEvent.click(screen.getAllByRole("checkbox")[0]!);
+      fireEvent.click(screen.getAllByRole("checkbox")[1]!);
+      expect(button).toBeEnabled();
+      expect(confirm).not.toHaveBeenCalled();
+    });
+
+  it("keeps the matching title and immutable choices in the confirmed summary", () => {
+    const record=openingConfirmedFixture(nativeEntryFixture());
+    record.admission.entry_world=stationWorld.entry_world;
+    record.result!.run_context.entry_world=stationWorld.entry_world;
+    record.result!.scenario_id=stationWorld.scenario_id;
+    record.result!.scenario_content_version=stationWorld.scenario_content_version;
+    render(<OpeningTalentChoices record={record} worlds={[stationWorld]} disabled={false} onConfirm={vi.fn()}/>);
+    expect(screen.getByText(/初始世界：雾哨站/)).toBeVisible();
+    expect(screen.getAllByRole("checkbox").every(c => c.matches(":disabled"))).toBe(true);
+    expect(screen.getAllByRole("checkbox",{checked:true})).toHaveLength(2);
+  });
+});
 
 describe("opening talent selection",() => {
   it("requires exactly two, permits deselection, and makes confirmation explicit",() => {

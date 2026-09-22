@@ -463,6 +463,11 @@ class NativeVisitAssociationResponse(BaseModel):
 
     @model_validator(mode="after")
     def _catalogue(self):
+        if self.visit is None:
+            from deviation_protocol.domain.entry_world import AUTHORED_ENTRY_WORLDS_V1
+            if any((self.scenario_id, self.scenario_content_version) == (w.scenario_id, w.scenario_content_version)
+                   for w in AUTHORED_ENTRY_WORLDS_V1):
+                return self
         ordinal = 1 if self.visit is None else self.visit.visit_ordinal
         expected = {1: ("death_certificate", "death-certificate-1.1.0"),
                     2: ("undelivered_receipt", "undelivered-receipt-1.0.0"),
@@ -519,11 +524,21 @@ class NativeRunJourneyResponse(BaseModel):
         if self.session_id != self.path.session_id or self.run_id != self.run_context.run_id:
             raise ValueError("crossed journey identity")
         if self.current.visit is None:
+            from deviation_protocol.domain.entry_world import AUTHORED_ENTRY_WORLDS_V1
+            world = next((w for w in AUTHORED_ENTRY_WORLDS_V1
+                if (w.entry_world_id.value, w.entry_world_version.value) == (
+                    self.run_context.entry_world.entry_world_id, self.run_context.entry_world.entry_world_version)), None)
+            if world is None or (self.current.scenario_id, self.current.scenario_content_version) != (world.scenario_id, world.scenario_content_version):
+                raise ValueError("journey admission world mismatch")
+            if world.scenario_id != "death_certificate" and self.next_transition is not None:
+                raise ValueError("starting world has no published continuation")
             if (self.path != self.current or self.predecessor is not None or self.successor is not None
                     or self.arrival is not None):
                 raise ValueError("invalid unmaterialized journey")
             count, ordinal = 1, 1
         else:
+            if self.run_context.entry_world.entry_world_id != "world.death_certificate":
+                raise ValueError("unpublished continuation world")
             if self.path.visit is None:
                 raise ValueError("missing materialized path")
             count, ordinal = self.current.visit.visit_ordinal, self.path.visit.visit_ordinal

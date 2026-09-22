@@ -232,6 +232,8 @@ _WRITE_CONFLICTS = (
 class NativeRunAdmissionService(RunEntryService):
     """Uses the existing pure revision constructors, never the legacy coordinator."""
 
+    content_registry: object = None
+
     def __post_init__(self):
         RunEntryService.__post_init__(self)
         from deviation_protocol.domain.opening_talents import load_catalog
@@ -239,18 +241,25 @@ class NativeRunAdmissionService(RunEntryService):
         # This lookup is file-backed only at composition, before any database lock.
         from deviation_protocol.domain.entry_world import AUTHORED_ENTRY_WORLDS_V1
         for entry in AUTHORED_ENTRY_WORLDS_V1:
+            if self.content_registry is None and entry.scenario_content_version != self.session_service.catalog.content_version:
+                continue
             world = lookup_entry_world(EntryWorldRefV1(entry_world_id=entry.entry_world_id,
                                                        entry_world_version=entry.entry_world_version))
             self._definition(world)
 
     def _definition(self, world):
-        definition = self.session_service.resolve_run_entry_definition(world.scenario_id)
+        definition = self._world_service(world).resolve_run_entry_definition(world.scenario_id)
         if (definition.scenario_id != world.scenario_id
                 or definition.content_version != world.scenario_content_version
                 or definition.public_client is None
                 or definition.public_client.default_character_definition_id != world.default_character_definition_id):
             raise InvalidScenarioDefinitionError(world.scenario_id)
         return definition
+
+    def _world_service(self, world):
+        if self.content_registry is None:
+            return self.session_service
+        return self.content_registry.resolve(world.scenario_id, world.scenario_content_version).session_service
 
     def _occurred_at(self):
         # Existing Session/event DATETIME columns have second precision. Choose
@@ -336,7 +345,8 @@ class NativeRunAdmissionService(RunEntryService):
         time = self._occurred_at()
         run_id = revalidate_run_model(run_id or self.run_id_issuer.issue(), RunId)
         line_id = revalidate_run_model(self.continuous_story_line_id_issuer.issue(), ContinuousStoryLineId)
-        prepared = self.session_service.prepare_run_entry_initialization(principal,
+        world_service = self._world_service(world)
+        prepared = world_service.prepare_run_entry_initialization(principal,
                     creation_request_id=ids.session_creation_request_id, definition=definition,
                     character_definition_id=world.default_character_definition_id, created_at=time)
         evidence = NativeRunEntryCreationEvidenceV1(
@@ -363,7 +373,7 @@ class NativeRunAdmissionService(RunEntryService):
         await uow.run_creation_receipts.add_native_with_evidence(receipt, evidence, created_at=time)
         if not await stage_run_entry_binding(uow, bound, bind_receipt, created_at=time):
             raise _AdmissionCollision()
-        await self.session_service.stage_run_entry_initialization(uow, prepared)
+        await world_service.stage_run_entry_initialization(uow, prepared)
         if not await stage_run_entry_activation(uow, active, attach_receipt, created_at=time):
             raise _AdmissionCollision()
         await uow.run_protocol_bindings.add_native(protocol_binding, created_at=time)
@@ -435,7 +445,7 @@ class NativeRunAdmissionService(RunEntryService):
         if persisted is None or event is None or snapshot is None:
             raise NativeRunAdmissionIntegrityError("missing owned native Session family") from None
         try:
-            self.session_service.validate_native_run_entry_replay_initialization(persisted, snapshot, event, evidence,
+            self._world_service(lookup_entry_world(evidence.entry_world)).validate_native_run_entry_replay_initialization(persisted, snapshot, event, evidence,
                 ids.session_creation_request_id, participation=admission.canonical_run.trusted_participation_references[0],
                 applicable_character_reference=result.applicable_character_reference,
                 transaction_time=admission.canonical_run.creation_provenance.occurred_at)

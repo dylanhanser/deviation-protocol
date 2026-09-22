@@ -1,18 +1,27 @@
 import { useEffect, useState } from "react";
 import type { PublicApiClient } from "./api/client";
-import type { OpeningPreparation, TalentCard } from "./api/schemas";
+import type { OpeningPreparation, PublicEntryWorld, TalentCard } from "./api/schemas";
 
 const tiers = {TOP:"卓越",TRADEOFF:"取舍",ORDINARY:"普通",WEAK:"弱势"};
 const parameterLabels = {resource_pressure:"资源压力",social_trust:"社会信任",consequence_severity:"后果强度",information_opacity:"信息不透明度",conflict_intensity:"冲突强度"};
 
-export function OpeningTalentChoices({record,disabled,onConfirm}:{record:OpeningPreparation;disabled:boolean;onConfirm:(selected:readonly string[])=>void}) {
+export function OpeningTalentChoices({record,worlds,disabled,onConfirm}:{record:OpeningPreparation;worlds?:readonly PublicEntryWorld[]|undefined;disabled:boolean;onConfirm:(selected:readonly string[])=>void}) {
   const [chosen,setChosen]=useState<readonly string[]>(record.selected_ids);
   const confirmed=record.state === "CONFIRMED";
   const selected=confirmed ? record.selected_ids : chosen;
+  // Pending preparations freeze the versioned world ref; confirmed results also bind content.
+  const world=worlds?.find(candidate =>
+    candidate.entry_world.entry_world_id === record.admission.entry_world.entry_world_id &&
+    candidate.entry_world.entry_world_version === record.admission.entry_world.entry_world_version &&
+    (!confirmed || (record.result !== null &&
+      record.result.run_context.entry_world.entry_world_id === candidate.entry_world.entry_world_id &&
+      record.result.run_context.entry_world.entry_world_version === candidate.entry_world.entry_world_version &&
+      record.result.scenario_id === candidate.scenario_id &&
+      record.result.scenario_content_version === candidate.scenario_content_version)));
   return <section className="opening-talents" aria-labelledby="opening-talents-heading">
     <h3 id="opening-talents-heading">选择伴你启程的两项天赋</h3>
     <p>这五项天赋已为本次旅程保留。暂时离开或刷新后仍是同一组，入场设置也已固定。</p>
-    <p>难度：{record.admission.profile_ref.profile_id === "difficulty.fragile-alliance" ? "脆弱同盟" : record.admission.profile_ref.profile_id === "difficulty.open-expedition" ? "开放探索" : "寂静猎场"}。初始世界：死亡证明。</p>
+    <p>难度：{record.admission.profile_ref.profile_id === "difficulty.fragile-alliance" ? "脆弱同盟" : record.admission.profile_ref.profile_id === "difficulty.open-expedition" ? "开放探索" : "寂静猎场"}。初始世界：{world?.title ?? "名称暂不可用（未核实）"}。</p>
     <p>世界基调：{{grim:"冷峻",balanced:"均衡",heroic:"昂扬"}[record.admission.presentation.world_tone]}；现实边界：{{lawful:"遵循常理",deviant:"容许偏离",chaotic:"混沌"}[record.admission.presentation.reality_boundary]}；人际氛围：{{off:"不额外渲染",veiled:"含蓄",charged:"浓烈"}[record.admission.presentation.relationship_overlay]}。</p>
     {record.admission.overrides.length ? <ul aria-label="已固定的难度调整">{record.admission.overrides.map(value => <li key={value.parameter}>{parameterLabels[value.parameter]}：{value.value}</li>)}</ul> : <p>使用所选难度的默认数值。</p>}
     <fieldset disabled={disabled || confirmed}>

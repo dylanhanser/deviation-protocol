@@ -569,6 +569,9 @@ from pydantic.json_schema import SkipJsonSchema
 from deviation_protocol.application.escort_encounter import PublicEscortEncounter
 
 
+from deviation_protocol.application.fog_station import PublicStationRelationship
+
+
 class PlayerSessionView(BaseModel):
     """Reconnect-safe aggregate built only from validated player projections."""
 
@@ -589,9 +592,12 @@ class PlayerSessionView(BaseModel):
     ending_id: str | None = None
     run_context: PublicNativeRunContext | SkipJsonSchema[None] = None
     encounter: PublicEscortEncounter | None = None
+    relationship: PublicStationRelationship | None = None
 
     @model_validator(mode="after")
     def validate_view_shape(self) -> PlayerSessionView:
+        if self.relationship is not None and (self.run_context is None or self.encounter is not None):
+            raise ValueError("relationship requires native participation")
         if self.encounter is not None and (
             self.run_context is not None
             or (self.encounter.outcome == "ACTIVE") != (self.scenario_status == "ACTIVE")
@@ -638,6 +644,8 @@ class PlayerSessionView(BaseModel):
             data.pop("run_context", None)
         if self.encounter is None:
             data.pop("encounter", None)
+        if self.relationship is None:
+            data.pop("relationship", None)
         return data
 
 
@@ -668,6 +676,7 @@ class SessionService:
     native_view_coordinator: Any = None
     native_controller_resolver: Any = None
     encounter_policy: Any = None
+    relationship_policy: Any = None
 
     def __post_init__(self) -> None:
         if (self.native_view_coordinator is None) != (self.native_controller_resolver is None):
@@ -842,6 +851,8 @@ class SessionService:
         except ScenarioInitializationError:
             raise InvalidScenarioDefinitionError(scenario_id) from None
         state = started.candidate_state
+        if self.relationship_policy is not None:
+            self.relationship_policy.initialize(state, session.session_id, definition)
         state.validate_against(self.catalog)
         if state.scenario_runtime is None:
             raise InvalidScenarioDefinitionError(scenario_id)
@@ -1201,6 +1212,8 @@ class SessionService:
                 if self.native_view_coordinator is not None:
                     run_context = await read_native_context(uow, principal, persisted, state, definition,
                         self.native_view_coordinator, self.native_controller_resolver)
+                if self.relationship_policy is not None and run_context is None:
+                    raise SnapshotInvalidError(session_id)
                 character = self.catalog.character(
                     state.player.character_definition_id
                 )
@@ -1247,6 +1260,8 @@ class SessionService:
                 session_id, limit=MAX_VIEW_RECENT_NARRATIVES
             )
             return PlayerSessionView(
+                relationship=(self.relationship_policy.project(state, session_id, definition)
+                              if self.relationship_policy is not None else None),
                 encounter=(self.encounter_policy.project(state, session_id, definition)
                            if self.encounter_policy is not None else None),
                 run_context=run_context,
@@ -1414,6 +1429,9 @@ class SessionService:
             raise SnapshotSessionMismatchError(session.session_id)
         if self.encounter_policy is not None:
             self.encounter_policy.validate(state, session.session_id, self._scenario_definition(session.scenario_id))
+        if self.relationship_policy is not None:
+            self.relationship_policy.validate(state, session.session_id, self._scenario_definition(session.scenario_id))
+        if self.encounter_policy is not None or self.relationship_policy is not None:
             if session.state_version != len(state.scenario_runtime.decisions_made):
                 raise SnapshotInvalidError(session.session_id)
         return state

@@ -190,6 +190,9 @@ async def test_e02_non_hospital_catalog_valid_ended_fixture(monkeypatch, tmp_pat
     catalog = ScenarioCatalog.model_validate(payload)
     path = tmp_path / "alpine.json"
     path.write_text(catalog.model_dump_json(),encoding="utf-8")
+    # Composition also registers the independently pinned sibling packs.
+    for name in ("wind_gate_v1.json", "fog_station_v1.json"):
+        (tmp_path / name).write_bytes(demo_composition.SCENARIO_PACK.with_name(name).read_bytes())
     monkeypatch.setattr(demo_composition,"SCENARIO_PACK",path)
     world = entry_world.AUTHORED_ENTRY_WORLDS_V1[0].model_copy(update={"scenario_id":definition["scenario_id"],
         "scenario_content_version":catalog.content_version,"default_character_definition_id":"character.alpine.scout"})

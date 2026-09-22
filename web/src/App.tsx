@@ -524,10 +524,10 @@ function ActionPanel({
 
   return (
     <section className="panel action-panel" aria-labelledby="actions-heading">
-      {view.encounter ? null : <p className="eyebrow">action_affordances · {affordances.mode}</p>}
+      {view.encounter || view.relationship ? null : <p className="eyebrow">action_affordances · {affordances.mode}</p>}
       <h2 id="actions-heading">当前可执行行动</h2>
       <p className="supporting-copy">
-        {view.encounter ? "选择接下来如何带同行者一起行动。" : "这里只提交当前权威 View 明确提供的行动；服务器 Gateway 与策略仍是最终权威。"}
+        {view.relationship ? "选择接下来在哨站的行动。只有明确提交选择才会推进这段行程。" : view.encounter ? "选择接下来如何带同行者一起行动。" : "这里只提交当前权威 View 明确提供的行动；服务器 Gateway 与策略仍是最终权威。"}
       </p>
       {disabledReason === null ? null : (
         <p className="disabled-reason">行动已禁用：{disabledReason}</p>
@@ -2617,7 +2617,7 @@ export default function App({
         {openingRecovery.loading ? <p role="status">正在核实开局恢复入口…</p> : null}
         {openingRecovery.error ? <div role="alert"><p>{openingRecovery.error}</p><button type="button" disabled={openingControlsDisabled} onClick={openingRecovery.retry}>重读开局恢复</button></div> : null}
         {(entryMode === "native" || openingRecovery.record) && openingRecord && recoveryRecord === null ? <OpeningTalentChoices key={openingRecord.preparation_id}
-          record={openingRecord} disabled={openingControlsDisabled || openingRecovery.loading || openingRecovery.error !== null} onConfirm={handleOpeningConfirmation}/> : null}
+          record={openingRecord} worlds={runOptions?.entry_worlds} disabled={openingControlsDisabled || openingRecovery.loading || openingRecovery.error !== null} onConfirm={handleOpeningConfirmation}/> : null}
       </section>
 
       <section className="panel" aria-labelledby="scenario-heading">
@@ -2810,7 +2810,7 @@ export default function App({
       <header className="hero">
         <p className="eyebrow">Public Web Client</p>
         <h1>Deviation Protocol</h1>
-        <p>{loadedSession?.view.encounter ? "故事会在你做出选择后继续。" : "所有行动控件均来自最新的权威 action_affordances。"}</p>
+        <p>{loadedSession?.view.encounter || loadedSession?.view.relationship ? "故事会在你做出选择后继续。" : "所有行动控件均来自最新的权威 action_affordances。"}</p>
         {isDeterministicDemo ? (
           <p className="demo-warning">{DETERMINISTIC_DEMO_WARNING}</p>
         ) : null}

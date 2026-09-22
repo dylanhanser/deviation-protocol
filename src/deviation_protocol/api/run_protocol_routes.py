@@ -76,7 +76,7 @@ def install_run_protocol_routes(app):
         if http_request.scope["query_string"] or await http_request.body():
             _request_validation_failure()
         return project_entry_options(services.session_service, services.session_service.native_view_coordinator
-            if services.native_run_admission_service is not None else None)
+            if services.native_run_admission_service is not None else None, getattr(services, "content_registry", None))
 
     @app.post("/v1/runs/native", operation_id="enter_native_run", response_model=NativeRunEntryResponse,
         responses=_public_error_responses(404, 409, 422, 500, 503), tags=["runs"])

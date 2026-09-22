@@ -72,6 +72,13 @@ AUTHORED_ENTRY_WORLDS_V1 = (
         scenario_content_version="death-certificate-1.1.0",
         default_character_definition_id="character.death_certificate.investigator",
     ),
+    AuthoredEntryWorldV1(
+        entry_world_id=EntryWorldId(value="world.fog_station"),
+        entry_world_version=EntryWorldVersion(value=1),
+        scenario_id="fog_station",
+        scenario_content_version="fog-station-1.0.0",
+        default_character_definition_id="character.fog_station.traveler",
+    ),
 )
 
 

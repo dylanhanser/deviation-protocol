@@ -24,6 +24,16 @@ runtime/结局证据和公开文案，不拼接或更新 `PlayerMemoryState`，�
 
 ## 唯一事实来源
 
+雾哨站的有界 Phase 3.4 候选额外提供只读关系/共同经历展示。它从本次 Session
+`ScenarioRuntimeState` 的有限决策路径与精确 outcome 证据验证、派生，随现有快照、
+事件和请求结果原子持久化；最多展示合作、完成收尾、一次暂住（至多三项活动）、
+离开和告别五条经历，不保存聊天全文或模型摘要。该展示不是 `NpcMemoryRecord`
+或 `SignificantExperienceEntry` 写入，也不表示旧索引已收录这些经历。
+`PlayerMemoryState` 在新包中仅复用既有开始/结束规则，继续保留同步与截断契约。
+模型文本、D1 回顾、记忆索引及公开关系面板均不能授权信任、邀请或暂住次数。
+同 Session 告别可以回收实际共同经历；同 Run 后续 Session 及跨 Run 继承尚未实现。
+详见 [雾哨站契约](npc_relationship_residence.md#first-bounded-slice-雾哨站)。
+
 长期记忆只索引可信历史，不覆盖当前权威状态：
 
 | 数据 | 唯一事实来源 |

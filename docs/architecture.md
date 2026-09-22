@@ -1208,8 +1208,17 @@ components described above:
   Distribution Gateway**) and explicit Provider/model distribution:
   [`ADR 0001`](decisions/0001-production-provider-distribution.md).
 
+The bounded Phase 3.4 candidate installs `FogStationPolicy` and its version-pinned
+bundle in both application compositions. Native admission chooses the exact
+entry-world Session service for initialization/replay; owned Session routing,
+native locking and atomic snapshot/event/receipt commits remain shared.
+The finite authored decisions supply relationship and one three-activity residence
+without new ORM fields or Alembic migration. A safe read-only relationship projection
+derives from validated decision evidence; its shared experience is Session-scoped,
+not a general long-term NPC-memory platform. No Provider participates in this pack.
+
 Current architecture does not implement player-selectable multi-Provider
-routing, commercial quota or billing, NPC residence mode, or
+routing, commercial quota or billing, general NPC residence across visits, or
 unrestricted daily AI chat. Resolved difficulty profiles are applied by S5,
 and its canonical `run-prompt-context/v1` carries permitted rendering data.
 The future selected Provider/model channel remains distinct from both the

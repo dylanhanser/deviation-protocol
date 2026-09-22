@@ -136,7 +136,9 @@ class NativeTurnMechanicsCoordinator:
                 raise ValueError("invalid native mechanics catalogue entry")
             key = (entry.world_id, entry.world_version)
             world = next((w for w in worlds if (w.entry_world_id.value, w.entry_world_version.value) == key), None)
-            destination = entry in MECHANICS_CATALOGUE[1:]
+            # Only the two published continuation packs bypass starting-world lookup.
+            # Adding a starting world must not expand this exception.
+            destination = entry in MECHANICS_CATALOGUE[1:3]
             if not destination and (key in keys or world is None or (world.scenario_id, world.scenario_content_version,
                     world.default_character_definition_id) != (entry.scenario_id, entry.content_version, entry.character_id)):
                 raise ValueError("native mechanics world association is incompatible")

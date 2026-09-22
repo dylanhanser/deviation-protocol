@@ -53,7 +53,7 @@ subsequent approval/publication establish current status.
 
 | Implemented public surface | Closed projection / compatibility decision |
 | --- | --- |
-| `GET /v1/run-entry-options` | `schema_version=run-entry-options/v1`, `native_entry_available`, `profiles`, `entry_worlds`, `presentation_options`. No query/body/private character data. Exact S2 three profiles/defaults/ranges; one S4 authored world. HTTP 200/422/500. |
+| `GET /v1/run-entry-options` | `schema_version=run-entry-options/v1`, `native_entry_available`, `profiles`, `entry_worlds`, `presentation_options`. No query/body/private character data. Exact S2 three profiles/defaults/ranges; the normal/Demo graph now exposes two authored native starting worlds (死亡证明 and 雾哨站). HTTP 200/422/500. |
 | `POST /v1/runs/native` | Required exact Idempotency-Key and strict 4,096-byte JSON body containing only player_character_id, expected_record_revision, profile_ref, entry_world, overrides, presentation. Calls existing S4 admission once. First success/replay HTTP 200: session_id, scenario_id, scenario_content_version, run_context. Error statuses 404/409/422/500/503 use ErrorResponse. |
 | Optional `PlayerSessionView.run_context` | `schema_version=public-run-context/v1`, run_id, admitted four-field player_character projection, entry_world pair, profile_ref pair, exact five objectives, three presentation fields and resource_pressure_label. Reconstructed in the View read UoW; omitted for positively established legacy/standalone Sessions. No recovery write. |
 
@@ -2054,3 +2054,33 @@ automatic. Existing/newer Session targets take priority over late preparation
 reads. Network/storage/identity failures retain the route and block adoption;
 successful Session persistence supersedes it. Other entry recovery contracts
 remain unchanged.
+
+## Bounded Phase 3.4 station candidate
+
+Normal application and deterministic Demo native discovery include
+`world.fog_station/1` -> `fog_station/fog-station-1.0.0`. Existing preparation,
+confirmation and native admission envelopes are unchanged. The Web accepts up to
+two distinct native world references; no world is selected or admitted by GET.
+Version-exact native Journey association validation accepts this starting world
+only with an unmaterialized single-Session path, matching admission world and no
+continuation offer. It cannot use the frozen S7 graph. Its exact content is
+registered for the existing read-only D1 scene/ending recap; this grants no new
+recap authority or model/memory write.
+
+`PlayerSessionView.relationship` is absent for older/other content. For the station
+it has exactly `presentation_version=1`, `npc_name=岑舟`, `npc_age=32`,
+`scope=THIS_SESSION`, `stage`, `residence`, `activities_used`, `remaining_slots`,
+`shared_experiences`, and `reunited`. Stages are 未相识/相识/合作/信任; residence
+states are 未开放/待决定/已谢绝/暂住中/已离开. The three closed activity labels are
+unique; remaining slots are 3 minus accepted activities only while residing,
+otherwise zero. Shared-experience presentation is bounded to five authored
+statements derived from actual decision evidence. It publishes no runtime NPC ID,
+logical identity key, internal fact, event ID, snapshot, authority seal or transcript.
+Native ownership/participation and precise content are checked before projection.
+
+The panel is read-only and renders plain text. Historical reading preserves the
+existing history labels and current recovery target. Choices continue to come from
+the current authoritative affordances; no new endpoint, auto-write, retry, adoption
+or residence control bypasses existing mutation locks. The pack has no action clocks
+and the three activity slots are independent of talents. Full Phase 3.4, browser
+acceptance and cross-Session/cross-Run relationship recovery are not claimed.

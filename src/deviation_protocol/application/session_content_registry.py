@@ -57,6 +57,10 @@ class SessionContentBundle:
                    hashlib.sha256(payload).hexdigest(), catalog, **services)
 
     def __post_init__(self):
+        from deviation_protocol.application.fog_station import CONTENT_IDENTITY as STATION, CONTENT_SHA256 as STATION_HASH
+        if (self.scenario_id == STATION[0] or self.content_version == STATION[1]) and (
+                (self.scenario_id, self.content_version) != STATION or self.content_sha256 != STATION_HASH):
+            raise ValueError("station content identity mismatch")
         from deviation_protocol.application.escort_encounter import CONTENT_IDENTITY, CONTENT_SHA256
         if (self.scenario_id == CONTENT_IDENTITY[0] or self.content_version == CONTENT_IDENTITY[1]) and (
                 (self.scenario_id, self.content_version) != CONTENT_IDENTITY or self.content_sha256 != CONTENT_SHA256):
@@ -96,6 +100,8 @@ class SessionContentBundle:
             raise ValueError("snapshot scenario/content association mismatch")
         runtime.validate_against(self.scenario_catalog.scenarios[0])
         state.validate_player_memory_against(self.scenario_catalog)
+        if getattr(self.session_service, "relationship_policy", None) is not None:
+            self.session_service.relationship_policy.validate(state, None, self.scenario_catalog.scenarios[0])
         return state
 
 

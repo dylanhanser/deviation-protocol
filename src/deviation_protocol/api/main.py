@@ -866,6 +866,7 @@ def build_native_run_admission_service(*, engine, run_service: RunService, sessi
     from deviation_protocol.infrastructure.unit_of_work import SqlAlchemyNativeRunAdmissionUnitOfWorkFactory
     return NativeRunAdmissionService(
         uow_factory=SqlAlchemyNativeRunAdmissionUnitOfWorkFactory(engine,content_registry=content_registry),
+        content_registry=content_registry,
         run_id_issuer=run_service.run_id_issuer,
         continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
         source_reference=run_service.source_reference, clock=run_service.clock,
@@ -962,7 +963,11 @@ def build_default_services(
     from deviation_protocol.application.escort_encounter_services import build_escort_bundle
     escort_bundle = build_escort_bundle(
         SCENARIO_PACK.with_name("wind_gate_v1.json"), uow_factory=uow_factory)
+    from deviation_protocol.application.fog_station_services import build_fog_station_bundle
+    station_bundle = build_fog_station_bundle(SCENARIO_PACK.with_name("fog_station_v1.json"),
+        uow_factory=uow_factory, controller_resolver=controller_binding_resolver)
     registry = SessionContentRegistry((
+        station_bundle,
         escort_bundle,
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=orchestrator),
         SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),

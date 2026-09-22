@@ -1,0 +1,2100 @@
+{
+  "schema_version": 1,
+  "content_version": "fog-station-1.0.0",
+  "content_catalog": {
+    "schema_version": 1,
+    "content_version": "fog-station-1.0.0",
+    "characters": [
+      {
+        "definition_id": "character.fog_station.traveler",
+        "display_name": "旅人",
+        "tags": [
+          "player"
+        ],
+        "resource_caps": [
+          {
+            "key": "composure",
+            "value": 100
+          }
+        ]
+      },
+      {
+        "definition_id": "character.fog_station.patrol",
+        "display_name": "岑舟",
+        "tags": [
+          "npc",
+          "adult"
+        ]
+      }
+    ],
+    "npcs": [
+      {
+        "definition_id": "npc.fog_station.cen_zhou",
+        "character_definition_id": "character.fog_station.patrol",
+        "display_name": "岑舟",
+        "persona_summary": "32 岁的成年巡路员。谨慎、坦率，只谈已公开的巡路经历。尊重玩家离开的选择，不作永久承诺。"
+      }
+    ],
+    "items": [],
+    "equipment": [],
+    "skills": [],
+    "effects": []
+  },
+  "scenarios": [
+    {
+      "scenario_id": "fog_station",
+      "schema_version": 1,
+      "content_version": "fog-station-1.0.0",
+      "title": "雾哨站",
+      "summary": "观测台的灯光在浓雾中反复出现，远处却没有船。站内一位巡路员正查看异响。你可以上前与他会面。",
+      "initial_phase_id": "fog_station.arrival",
+      "initial_location_id": "fog_station.platform",
+      "phases": [
+        {
+          "phase_id": "fog_station.arrival",
+          "title": "雾中的哨站",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.arrival"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.meet",
+              "target_phase_id": "fog_station.met",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "met"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.met",
+          "title": "并肩应对",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.met"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.cooperate",
+              "target_phase_id": "fog_station.cooperated",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "cooperated"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.cooperated",
+          "title": "已经安全",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.cooperated"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.leave_now",
+              "target_phase_id": "fog_station.immediate",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "immediate"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.delay",
+              "target_phase_id": "fog_station.work",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "work"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.work",
+          "title": "留下收尾",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.work"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.finish_work",
+              "target_phase_id": "fog_station.invitation",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "invitation"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.invitation",
+          "title": "短暂停留的邀请",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.invitation"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.decline",
+              "target_phase_id": "fog_station.declined",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "declined"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.enter",
+              "target_phase_id": "fog_station.stay0",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay0"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay0",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay0"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.review_0",
+              "target_phase_id": "fog_station.stay1",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay1"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.story_0",
+              "target_phase_id": "fog_station.stay2",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay2"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.records_0",
+              "target_phase_id": "fog_station.stay4",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay4"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_0",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay1",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay1"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.story_1",
+              "target_phase_id": "fog_station.stay3",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay3"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.records_1",
+              "target_phase_id": "fog_station.stay5",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay5"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_1",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay2",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay2"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.review_2",
+              "target_phase_id": "fog_station.stay3",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay3"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.records_2",
+              "target_phase_id": "fog_station.stay6",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay6"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_2",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay3",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay3"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.records_3",
+              "target_phase_id": "fog_station.stay7",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_3",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay4",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay4"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.review_4",
+              "target_phase_id": "fog_station.stay5",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay5"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.story_4",
+              "target_phase_id": "fog_station.stay6",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay6"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_4",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay5",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay5"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.story_5",
+              "target_phase_id": "fog_station.stay7",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_5",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay6",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay6"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.review_6",
+              "target_phase_id": "fog_station.stay7",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.depart_6",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.stay7",
+          "title": "哨站暂住",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.stay7"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.depart_7",
+              "target_phase_id": "fog_station.departed",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.departed",
+          "title": "走出哨站",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.departed"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.outside",
+              "target_phase_id": "fog_station.outside",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "outside"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.outside",
+          "title": "雾中的回望",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 3,
+          "terminal": false,
+          "rapid_decision_allowed": true,
+          "decision_window_ids": [
+            "fog_station.decision.outside"
+          ],
+          "action_time_costs": [
+            {
+              "action_type": "choose",
+              "clock_advances": []
+            }
+          ],
+          "transitions": [
+            {
+              "transition_id": "fog_station.transition.finish",
+              "target_phase_id": "fog_station.finished",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "finished"
+                }
+              ],
+              "max_uses": 1
+            },
+            {
+              "transition_id": "fog_station.transition.farewell",
+              "target_phase_id": "fog_station.reunited",
+              "trigger": "DECISION",
+              "conditions": [
+                {
+                  "rule_type": "FACT_EQUALS",
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "reunited"
+                }
+              ],
+              "max_uses": 1
+            }
+          ]
+        },
+        {
+          "phase_id": "fog_station.immediate",
+          "title": "带着平安离开",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true
+        },
+        {
+          "phase_id": "fog_station.declined",
+          "title": "道谢之后",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true
+        },
+        {
+          "phase_id": "fog_station.finished",
+          "title": "各自继续",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true
+        },
+        {
+          "phase_id": "fog_station.reunited",
+          "title": "门口的告别",
+          "visible_location_ids": [
+            "fog_station.interior",
+            "fog_station.platform"
+          ],
+          "allowed_action_types": [
+            "choose"
+          ],
+          "min_auto_beats": 0,
+          "max_auto_beats": 0,
+          "terminal": true
+        }
+      ],
+      "locations": [
+        {
+          "location_id": "fog_station.interior",
+          "title": "哨站内室",
+          "summary": "一间可供短暂停留的值守室，挡板隔开浓雾。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.fog_station.cen_zhou"
+          ]
+        },
+        {
+          "location_id": "fog_station.platform",
+          "title": "站外观察台",
+          "summary": "紧贴哨站的有护栏观察台，望向雾中。",
+          "initially_open": true,
+          "visible_entity_ids": [
+            "npc.fog_station.cen_zhou"
+          ]
+        }
+      ],
+      "npc_references": [
+        {
+          "npc_definition_id": "npc.fog_station.cen_zhou"
+        }
+      ],
+      "facts": [
+        {
+          "fact_id": "fog_station.fact.progress",
+          "kind": "MUTABLE",
+          "visibility": "HIDDEN",
+          "value": "arrival",
+          "mutable_transitions": [
+            {
+              "from_value": "arrival",
+              "to_value": "met",
+              "event_type": "fog_station.event.meet"
+            },
+            {
+              "from_value": "met",
+              "to_value": "cooperated",
+              "event_type": "fog_station.event.cooperate"
+            },
+            {
+              "from_value": "cooperated",
+              "to_value": "immediate",
+              "event_type": "fog_station.event.leave_now"
+            },
+            {
+              "from_value": "cooperated",
+              "to_value": "work",
+              "event_type": "fog_station.event.delay"
+            },
+            {
+              "from_value": "work",
+              "to_value": "invitation",
+              "event_type": "fog_station.event.finish_work"
+            },
+            {
+              "from_value": "invitation",
+              "to_value": "declined",
+              "event_type": "fog_station.event.decline"
+            },
+            {
+              "from_value": "invitation",
+              "to_value": "stay0",
+              "event_type": "fog_station.event.enter"
+            },
+            {
+              "from_value": "stay0",
+              "to_value": "stay1",
+              "event_type": "fog_station.event.review_0"
+            },
+            {
+              "from_value": "stay0",
+              "to_value": "stay2",
+              "event_type": "fog_station.event.story_0"
+            },
+            {
+              "from_value": "stay0",
+              "to_value": "stay4",
+              "event_type": "fog_station.event.records_0"
+            },
+            {
+              "from_value": "stay0",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_0"
+            },
+            {
+              "from_value": "stay1",
+              "to_value": "stay3",
+              "event_type": "fog_station.event.story_1"
+            },
+            {
+              "from_value": "stay1",
+              "to_value": "stay5",
+              "event_type": "fog_station.event.records_1"
+            },
+            {
+              "from_value": "stay1",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_1"
+            },
+            {
+              "from_value": "stay2",
+              "to_value": "stay3",
+              "event_type": "fog_station.event.review_2"
+            },
+            {
+              "from_value": "stay2",
+              "to_value": "stay6",
+              "event_type": "fog_station.event.records_2"
+            },
+            {
+              "from_value": "stay2",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_2"
+            },
+            {
+              "from_value": "stay3",
+              "to_value": "stay7",
+              "event_type": "fog_station.event.records_3"
+            },
+            {
+              "from_value": "stay3",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_3"
+            },
+            {
+              "from_value": "stay4",
+              "to_value": "stay5",
+              "event_type": "fog_station.event.review_4"
+            },
+            {
+              "from_value": "stay4",
+              "to_value": "stay6",
+              "event_type": "fog_station.event.story_4"
+            },
+            {
+              "from_value": "stay4",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_4"
+            },
+            {
+              "from_value": "stay5",
+              "to_value": "stay7",
+              "event_type": "fog_station.event.story_5"
+            },
+            {
+              "from_value": "stay5",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_5"
+            },
+            {
+              "from_value": "stay6",
+              "to_value": "stay7",
+              "event_type": "fog_station.event.review_6"
+            },
+            {
+              "from_value": "stay6",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_6"
+            },
+            {
+              "from_value": "stay7",
+              "to_value": "departed",
+              "event_type": "fog_station.event.depart_7"
+            },
+            {
+              "from_value": "departed",
+              "to_value": "outside",
+              "event_type": "fog_station.event.outside"
+            },
+            {
+              "from_value": "outside",
+              "to_value": "finished",
+              "event_type": "fog_station.event.finish"
+            },
+            {
+              "from_value": "outside",
+              "to_value": "reunited",
+              "event_type": "fog_station.event.farewell"
+            }
+          ]
+        }
+      ],
+      "clues": [],
+      "clue_groups": [],
+      "threat_clocks": [],
+      "decision_windows": [
+        {
+          "decision_id": "fog_station.decision.arrival",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "arrival"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.meet",
+              "action_type": "choose",
+              "label_hint": "走近并与巡路员会面",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.meet",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "met"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你走进哨站，与巡路员岑舟面对面。他自我介绍：32 岁，在这里负责巡路。窗外灯光忽明忽暗，挡板发出撞击声。你们已经相识。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.met",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "met"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.cooperate",
+              "action_type": "choose",
+              "label_hint": "配合岑舟固定挡板",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.cooperate",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "cooperated"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你在内侧稳住挡板，岑舟处理外侧卡扣。撞击声停了，你们安全完成配合。岑舟确认这次合作；现在可以离开。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.cooperated",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "cooperated"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.leave_now",
+              "action_type": "choose",
+              "label_hint": "现在离开哨站",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.leave_now",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "immediate"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟点头告别，走下观察台。这次合作止于安全脱险；你没有留下暂住，也没有作出承诺。"
+            },
+            {
+              "action_id": "fog_station.choice.delay",
+              "action_type": "choose",
+              "label_hint": "暂缓离开，留下帮忙收尾",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.delay",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "work"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你放弃了立即离开的机会，答应留下完成这一轮观察记录。还需要一次明确的收尾行动；没有资源扣除或隐藏惩罚。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.work",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "work"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.finish_work",
+              "action_type": "choose",
+              "label_hint": "完成观察记录的收尾",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.finish_work",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "invitation"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你与岑舟核对灯光的方向，将未能证实的原因留空。安全之后仍留下完成工作，让他对你建立了信任。他邀请你短暂停留，也接受你谢绝。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.invitation",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "invitation"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.decline",
+              "action_type": "choose",
+              "label_hint": "谢绝暂住并道别",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.decline",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "declined"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你谢过岑舟的邀请，选择继续自己的行程。他尊重你的决定。共同脱险与完成记录的经历仍被保留。"
+            },
+            {
+              "action_id": "fog_station.choice.enter",
+              "action_type": "choose",
+              "label_hint": "接受邀请，入住哨站",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.enter",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay0"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你明确接受了邀请，进入哨站短暂停留。这里提供三项各一次的活动；入住本身不消耗活动次数，也不进一步提升关系。你随时可以离开。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay0",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay0"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.review_0",
+              "action_type": "choose",
+              "label_hint": "复盘脱险",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.review_0",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay1"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们复盘挡板震动时的配合：一人稳住内侧，一人处理外侧。岑舟指出两次手势让彼此没有抢错时机。"
+            },
+            {
+              "action_id": "fog_station.choice.story_0",
+              "action_type": "choose",
+              "label_hint": "听一段已公开的巡路往事",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.story_0",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay2"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "岑舟讲起一段公开的巡路往事：去年浓雾里，他曾沿站外栏杆逐段检查反光标记。那次没有发现险情，却让他养成先确认同伴位置的习惯。"
+            },
+            {
+              "action_id": "fog_station.choice.records_0",
+              "action_type": "choose",
+              "label_hint": "一起整理观察记录",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.records_0",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay4"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们把今晚灯光出现的方向和间隔分列记录。无法确认的部分仍标作未知，没有把猜测写成事实。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_0",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_0",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay1",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay1"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.story_1",
+              "action_type": "choose",
+              "label_hint": "听一段已公开的巡路往事",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.story_1",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay3"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "岑舟讲起一段公开的巡路往事：去年浓雾里，他曾沿站外栏杆逐段检查反光标记。那次没有发现险情，却让他养成先确认同伴位置的习惯。"
+            },
+            {
+              "action_id": "fog_station.choice.records_1",
+              "action_type": "choose",
+              "label_hint": "一起整理观察记录",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.records_1",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay5"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们把今晚灯光出现的方向和间隔分列记录。无法确认的部分仍标作未知，没有把猜测写成事实。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_1",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_1",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay2",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay2"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.review_2",
+              "action_type": "choose",
+              "label_hint": "复盘脱险",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.review_2",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay3"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们复盘挡板震动时的配合：一人稳住内侧，一人处理外侧。岑舟指出两次手势让彼此没有抢错时机。"
+            },
+            {
+              "action_id": "fog_station.choice.records_2",
+              "action_type": "choose",
+              "label_hint": "一起整理观察记录",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.records_2",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay6"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们把今晚灯光出现的方向和间隔分列记录。无法确认的部分仍标作未知，没有把猜测写成事实。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_2",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_2",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay3",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay3"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.records_3",
+              "action_type": "choose",
+              "label_hint": "一起整理观察记录",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.records_3",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们把今晚灯光出现的方向和间隔分列记录。无法确认的部分仍标作未知，没有把猜测写成事实。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_3",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_3",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay4",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay4"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.review_4",
+              "action_type": "choose",
+              "label_hint": "复盘脱险",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.review_4",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay5"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们复盘挡板震动时的配合：一人稳住内侧，一人处理外侧。岑舟指出两次手势让彼此没有抢错时机。"
+            },
+            {
+              "action_id": "fog_station.choice.story_4",
+              "action_type": "choose",
+              "label_hint": "听一段已公开的巡路往事",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.story_4",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay6"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "岑舟讲起一段公开的巡路往事：去年浓雾里，他曾沿站外栏杆逐段检查反光标记。那次没有发现险情，却让他养成先确认同伴位置的习惯。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_4",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_4",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay5",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay5"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.story_5",
+              "action_type": "choose",
+              "label_hint": "听一段已公开的巡路往事",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.story_5",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "岑舟讲起一段公开的巡路往事：去年浓雾里，他曾沿站外栏杆逐段检查反光标记。那次没有发现险情，却让他养成先确认同伴位置的习惯。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_5",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_5",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay6",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay6"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.review_6",
+              "action_type": "choose",
+              "label_hint": "复盘脱险",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.review_6",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "stay7"
+                }
+              ],
+              "new_location_id": "fog_station.interior",
+              "server_narrative_text": "你们复盘挡板震动时的配合：一人稳住内侧，一人处理外侧。岑舟指出两次手势让彼此没有抢错时机。"
+            },
+            {
+              "action_id": "fog_station.choice.depart_6",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_6",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.stay7",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "stay7"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.depart_7",
+              "action_type": "choose",
+              "label_hint": "结束暂住，明确离开",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.depart_7",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "departed"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你向岑舟说明要离开，走到站外观察台。此次暂住已结束，未做的活动不会补做，也不能再次入住。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.departed",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "departed"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.outside",
+              "action_type": "choose",
+              "label_hint": "沿观察台护栏确认雾中灯光",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.outside",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "outside"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你沿站外观察台的护栏走了一段，确认灯光已经消失。你没有推断它的来历。回望哨站门口，岑舟仍在值守。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        },
+        {
+          "decision_id": "fog_station.decision.outside",
+          "reason": "NPC_COMMITMENT",
+          "earliest_beat": 0,
+          "latest_beat": 3,
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "outside"
+            }
+          ],
+          "suggested_actions": [
+            {
+              "action_id": "fog_station.choice.finish",
+              "action_type": "choose",
+              "label_hint": "直接结束这段行程",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.finish",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "finished"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你在观察台挥手，继续自己的行程。这次暂住结束，没有新的奖励或永久约定。"
+            },
+            {
+              "action_id": "fog_station.choice.farewell",
+              "action_type": "choose",
+              "label_hint": "回门口向岑舟道别",
+              "target_ids": [
+                "npc.fog_station.cen_zhou"
+              ],
+              "server_event_type": "fog_station.event.farewell",
+              "mutable_fact_updates": [
+                {
+                  "fact_id": "fog_station.fact.progress",
+                  "value": "reunited"
+                }
+              ],
+              "new_location_id": "fog_station.platform",
+              "server_narrative_text": "你回到哨站门口，向岑舟道别。你们共同固定挡板并完成了观察记录。"
+            }
+          ],
+          "custom_action_constraints": {
+            "allowed_action_types": [
+              "choose"
+            ]
+          }
+        }
+      ],
+      "endings": [
+        {
+          "ending_id": "fog_station.ending.immediate",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "immediate"
+            }
+          ]
+        },
+        {
+          "ending_id": "fog_station.ending.declined",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "declined"
+            }
+          ]
+        },
+        {
+          "ending_id": "fog_station.ending.finished",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "finished"
+            }
+          ]
+        },
+        {
+          "ending_id": "fog_station.ending.reunited",
+          "status": "RESOLVED",
+          "conditions": [
+            {
+              "rule_type": "FACT_EQUALS",
+              "fact_id": "fog_station.fact.progress",
+              "value": "reunited"
+            }
+          ]
+        }
+      ],
+      "narrative_length": {
+        "minimum": 1,
+        "target": 100,
+        "maximum": 1000
+      },
+      "memory_rules": [
+        {
+          "rule_id": "fog_station.memory.started",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioStarted",
+          "operation": "START_SCENARIO"
+        },
+        {
+          "rule_id": "fog_station.memory.completed",
+          "rule_version": "1.0.0",
+          "source_event_type": "ScenarioDecisionSelected",
+          "operation": "COMPLETE_SCENARIO",
+          "requires_scenario_completed": true,
+          "allowed_ending_ids": [
+            "fog_station.ending.immediate",
+            "fog_station.ending.declined",
+            "fog_station.ending.finished",
+            "fog_station.ending.reunited"
+          ]
+        }
+      ],
+      "public_client": {
+        "title": "雾哨站",
+        "hook": "观测台的灯光在浓雾中反复出现，远处却没有船。站内一位巡路员正查看异响。你可以上前与他会面。",
+        "playable_characters": [
+          {
+            "character_definition_id": "character.fog_station.traveler",
+            "description": "以已有角色的身份抵达雾哨站，选择如何与巡路员合作及告别。"
+          }
+        ],
+        "default_character_definition_id": "character.fog_station.traveler",
+        "scenes": [
+          {
+            "phase_id": "fog_station.arrival",
+            "title": "雾中的哨站",
+            "summary": "观测台的灯光在浓雾中反复出现，远处却没有船。站内一位巡路员正查看异响。你可以上前与他会面。"
+          },
+          {
+            "phase_id": "fog_station.met",
+            "title": "并肩应对",
+            "summary": "岑舟是这里的巡路员，32 岁。雾压使观察窗的挡板震动，他请求你在内侧固定挡板，自己处理外侧卡扣。"
+          },
+          {
+            "phase_id": "fog_station.cooperated",
+            "title": "已经安全",
+            "summary": "挡板已固定，异响停止。你可以立即离开；也可以自愿放弃立即离开，留下完成一次观察记录的收尾，不会扣除资源。"
+          },
+          {
+            "phase_id": "fog_station.work",
+            "title": "留下收尾",
+            "summary": "你已选择暂缓离开。还需明确提交一次收尾行动，与岑舟核对这次异常灯光的观测记录。"
+          },
+          {
+            "phase_id": "fog_station.invitation",
+            "title": "短暂停留的邀请",
+            "summary": "岑舟认可你在安全后仍留下帮忙，邀请你在哨站暂住。可以谢绝，也可以入住；入住后最多进行三项不同活动，随时可以离开。"
+          },
+          {
+            "phase_id": "fog_station.stay0",
+            "title": "哨站暂住",
+            "summary": "已完成 0/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay1",
+            "title": "哨站暂住",
+            "summary": "已完成 1/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay2",
+            "title": "哨站暂住",
+            "summary": "已完成 1/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay3",
+            "title": "哨站暂住",
+            "summary": "已完成 2/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay4",
+            "title": "哨站暂住",
+            "summary": "已完成 1/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay5",
+            "title": "哨站暂住",
+            "summary": "已完成 2/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay6",
+            "title": "哨站暂住",
+            "summary": "已完成 2/3 项活动。每项活动只能进行一次；活动不会继续提升关系。你也可以现在离开。"
+          },
+          {
+            "phase_id": "fog_station.stay7",
+            "title": "哨站暂住",
+            "summary": "已完成 3/3 项活动。每项活动只能进行一次；活动不会继续提升关系。三项活动已用完，请明确选择离开。"
+          },
+          {
+            "phase_id": "fog_station.departed",
+            "title": "走出哨站",
+            "summary": "你已离开暂住处，本次不能再次入住。站外观察台仍在同一处哨站范围内，可以沿护栏确认雾中的灯是否还在。"
+          },
+          {
+            "phase_id": "fog_station.outside",
+            "title": "雾中的回望",
+            "summary": "你沿观察台护栏确认：灯光已经消失，原因仍未知。你可以回门口向岑舟道别，也可以直接结束这段行程。"
+          },
+          {
+            "phase_id": "fog_station.immediate",
+            "title": "带着平安离开",
+            "summary": "你在共同处理挡板后离开了哨站。双方合作过，但没有建立暂住关系。"
+          },
+          {
+            "phase_id": "fog_station.declined",
+            "title": "道谢之后",
+            "summary": "你帮助完成记录后谢绝了暂住。岑舟尊重你的决定，你们在站外道别。"
+          },
+          {
+            "phase_id": "fog_station.finished",
+            "title": "各自继续",
+            "summary": "你结束了这次暂住并离开哨站。已发生的共同经历被保留，没有新的约定或奖励。"
+          },
+          {
+            "phase_id": "fog_station.reunited",
+            "title": "门口的告别",
+            "summary": "你在同一次哨站行程中回到门口道别。岑舟提及你们真正做过的事，随后回站值守；暂住不会重新开放。"
+          }
+        ],
+        "endings": [
+          {
+            "ending_id": "fog_station.ending.immediate",
+            "title": "带着平安离开",
+            "summary": "你在共同处理挡板后离开了哨站。双方合作过，但没有建立暂住关系。"
+          },
+          {
+            "ending_id": "fog_station.ending.declined",
+            "title": "道谢之后",
+            "summary": "你帮助完成记录后谢绝了暂住。岑舟尊重你的决定，你们在站外道别。"
+          },
+          {
+            "ending_id": "fog_station.ending.finished",
+            "title": "各自继续",
+            "summary": "你结束了这次暂住并离开哨站。已发生的共同经历被保留，没有新的约定或奖励。"
+          },
+          {
+            "ending_id": "fog_station.ending.reunited",
+            "title": "门口的告别",
+            "summary": "你在同一次哨站行程中回到门口道别。岑舟提及你们真正做过的事，随后回站值守；暂住不会重新开放。"
+          }
+        ],
+        "actions": [
+          {
+            "action_type": "CONTINUE",
+            "label": "继续"
+          }
+        ]
+      }
+    }
+  ]
+}

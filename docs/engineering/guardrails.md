@@ -110,12 +110,19 @@ Observed failure:
 - Historical migration tests directly amended 008 CHECKs while their shared
   runtime fixture deployed 010. Teardown then refused the mismatched schema and
   subsequent tests inherited it.
+- The station integration fixture deleted native protocol bindings before their
+  entry-world children. MySQL correctly refused cleanup, leaving scoped test rows
+  and preventing safe restoration of the original migration revision.
 
 Rule:
 
 - Use MySQL 8, SQLAlchemy `AsyncSession`, and `asyncmy`.
 - Never add a SQLite fallback.
 - Tests may write only to `deviation_protocol_test`.
+- Scoped test cleanup follows actual foreign-key dependency order: remove opening
+  preparations and entry-world bindings before protocol bindings, then the Run
+  family. Verify no test rows remain before a restoring downgrade; never disable
+  foreign-key checks or delete unrelated rows to make cleanup pass.
 - Verify each schema-changing suite's actual migration and runtime-fixture
   preconditions before combining selections. After failed restoration, stop
   later schema mutations, inspect the exact failed prefix, and restore the

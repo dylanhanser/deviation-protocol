@@ -1087,13 +1087,14 @@ export const publicEntryWorldSchema = z.strictObject({
 });
 export const runEntryOptionsSchema = z.strictObject({
   schema_version: z.literal("run-entry-options/v1"), native_entry_available: z.boolean(),
-  profiles: z.array(publicRunProfileSchema).max(3), entry_worlds: z.array(publicEntryWorldSchema).max(1),
+  profiles: z.array(publicRunProfileSchema).max(3), entry_worlds: z.array(publicEntryWorldSchema).max(2),
   presentation_options: z.strictObject({
     world_tone: z.tuple([z.literal("grim"), z.literal("balanced"), z.literal("heroic")]),
     reality_boundary: z.tuple([z.literal("lawful"), z.literal("deviant"), z.literal("chaotic")]),
     relationship_overlay: z.tuple([z.literal("off"), z.literal("veiled"), z.literal("charged")]),
   }),
-}).refine((c) => c.native_entry_available ? c.profiles.length === 3 && c.entry_worlds.length === 1 &&
+}).refine((c) => c.native_entry_available ? c.profiles.length === 3 && c.entry_worlds.length >= 1 &&
+  new Set(c.entry_worlds.map(w => `${w.entry_world.entry_world_id}:${w.entry_world.entry_world_version}`)).size === c.entry_worlds.length &&
   new Set(c.profiles.map((p) => JSON.stringify(p.profile_ref))).size === 3 &&
   c.entry_worlds.every((w) => w.eligible_profiles.every((p,i) => p.profile_id === c.profiles[i]?.profile_ref.profile_id && p.profile_version === c.profiles[i]?.profile_ref.profile_version))
   : c.profiles.length === 0 && c.entry_worlds.length === 0);
@@ -1149,6 +1150,17 @@ export const playerSessionViewSchema = z
     metadata: sessionMetadataSchema,
     run_context: publicNativeRunContextSchema.optional(),
     encounter: escortEncounterSchema.optional(),
+    relationship: z.object({
+      presentation_version: z.literal(1), npc_name: z.literal("岑舟"), npc_age: z.literal(32),
+      scope: z.literal("THIS_SESSION"), stage: z.enum(["未相识", "相识", "合作", "信任"]),
+      residence: z.enum(["未开放", "待决定", "已谢绝", "暂住中", "已离开"]),
+      activities_used: z.array(z.enum(["复盘脱险", "听一段已公开的巡路往事", "一起整理观察记录"])).max(3),
+      remaining_slots: z.number().int().min(0).max(3),
+      shared_experiences: z.array(z.string().min(1).max(300)).max(5), reunited: z.boolean(),
+    }).strict().refine(r => new Set(r.activities_used).size === r.activities_used.length &&
+      r.remaining_slots === (r.residence === "暂住中" ? 3-r.activities_used.length : 0) &&
+      (r.residence === "未开放" || r.stage === "信任") &&
+      (!r.reunited || r.residence === "已离开")).optional(),
     narrative_frame: narrativeFrameSchema,
     player_state: playerVisibleStateProjectionSchema,
     player_memory: playerMemoryProjectionSchema,
@@ -1186,6 +1198,11 @@ export const playerSessionViewSchema = z
       });
     }
 
+    if (view.relationship && (!view.run_context || view.encounter ||
+        view.run_context.entry_world.entry_world_id !== "world.fog_station" ||
+        view.metadata.content_version !== "fog-station-1.0.0")) {
+      context.addIssue({code: "custom", message: "relationship requires matching native participation"});
+    }
     if (view.encounter && (view.run_context !== undefined ||
         (view.encounter.outcome === "ACTIVE") !== (view.scenario_status === "ACTIVE") ||
         (view.encounter.outcome === "SUCCESS" && view.ending_status !== "RESOLVED") ||
@@ -1359,6 +1376,7 @@ export const nativeJourneyVisitSchema = z.strictObject({visit_id:safeId128Schema
 export const nativeJourneyAssociationSchema = z.strictObject({session_id:safeId64Schema,
   session_state_version:nonNegativeIntegerSchema.safe(),scenario_id:safeId128Schema,
   scenario_content_version:z.string().min(1).max(32).regex(safeIdPattern),visit:nativeJourneyVisitSchema.nullable()}).refine(a => {
+    if (a.visit === null && a.scenario_id === "fog_station" && a.scenario_content_version === "fog-station-1.0.0") return true;
     const ordinal=a.visit?.visit_ordinal ?? 1;
     return a.scenario_id === ["death_certificate","undelivered_receipt","receipt_archive"][ordinal-1] &&
       a.scenario_content_version === ["death-certificate-1.1.0","undelivered-receipt-1.0.0","receipt-archive-1.0.0"][ordinal-1];
@@ -1381,6 +1399,10 @@ export const nativeRunJourneyV1Schema = z.strictObject({schema_version:z.literal
     world_title:codePointBoundedStringSchema(1,120,"world title"),region_title:codePointBoundedStringSchema(1,120,"region title"),
     notice:codePointBoundedStringSchema(1,300,"notice")}).nullable(),arrival:journeyArrivalSchema.nullable()
 }).refine(j => {
+  if (j.run_context.entry_world.entry_world_id === "world.fog_station") {
+    if (j.run_context.entry_world.entry_world_version !== 1 || j.path.scenario_id !== "fog_station" ||
+        j.current.scenario_id !== "fog_station" || j.path.visit !== null || j.current.visit !== null || j.next_transition !== null) return false;
+  } else if (j.path.scenario_id === "fog_station" || j.current.scenario_id === "fog_station") return false;
   const ordinal=j.path.visit?.visit_ordinal ?? 1, last=j.current.visit?.visit_ordinal ?? 1;
   if (j.session_id !== j.path.session_id || j.run_id !== j.run_context.run_id || ordinal>last ||
       j.run_state_version !== last+2+(j.lifecycle_status === "terminated" ? 1 : 0)) return false;

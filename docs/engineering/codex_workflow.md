@@ -357,6 +357,19 @@ commands covered 211 passes and one existing Windows symlink-privilege skip, not
 212 passes. Preserve the skipped node, reason and unexercised assertion; do not
 add overlapping selection totals.
 
+The first station integration run also reproduced a scoped cleanup failure from
+reversing entry-world/protocol binding deletion order. Its restoring wrapper
+refused downgrade while test rows remained. Keep failed logs, stop later schema
+work, repair only the recorded test Run/character/Session scopes in foreign-key
+order, and compare schema/data/constraint digests with the initial record before
+retesting. Use fail-fast for a new database fixture until restoration succeeds.
+
+Station verification also confirmed that unquoted Windows backslashes in
+`PYTEST_ADDOPTS` are consumed by pytest's shell-style argument parsing. Supply
+task-owned temporary paths with forward slashes (and quote paths with spaces);
+check the effective path before treating a resulting permission error as a
+sandbox denial. Keep the malformed-command failure separate from its correction.
+
 A sandbox network failure does not prove that a provider key is invalid.
 
 ## Live Provider calls

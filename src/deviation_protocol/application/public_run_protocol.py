@@ -95,7 +95,7 @@ class RunEntryOptionsResponse(PublicRunModel):
     schema_version: Literal["run-entry-options/v1"]
     native_entry_available: bool
     profiles: Annotated[tuple[PublicRunProfile, ...], Field(max_length=3)]
-    entry_worlds: Annotated[tuple[PublicEntryWorld, ...], Field(max_length=1)]
+    entry_worlds: Annotated[tuple[PublicEntryWorld, ...], Field(max_length=2)]
     presentation_options: PublicPresentationOptions
 
 
@@ -135,7 +135,7 @@ def project_native_context(result):
         resource_pressure_label=resource_pressure_label(resolved.final_values.resource_pressure.value))
 
 
-def project_entry_options(session_service, coordinator):
+def project_entry_options(session_service, coordinator, content_registry=None):
     from deviation_protocol.domain.entry_world import AUTHORED_ENTRY_WORLDS_V1
     profiles, worlds = [], []
     if coordinator is not None:
@@ -146,18 +146,23 @@ def project_entry_options(session_service, coordinator):
                     parameter=r.parameter.value, minimum=r.minimum.value, maximum=r.maximum.value, step=r.step)
                     for r in profile.override_rules)))
         for candidate in AUTHORED_ENTRY_WORLDS_V1:
+            if content_registry is None and candidate.scenario_content_version != session_service.catalog.content_version:
+                continue
             world = lookup_entry_world(EntryWorldRefV1(entry_world_id=candidate.entry_world_id, entry_world_version=candidate.entry_world_version))
-            definition = session_service.resolve_run_entry_definition(world.scenario_id)
+            service = (content_registry.resolve(world.scenario_id, world.scenario_content_version).session_service
+                       if content_registry is not None else session_service)
+            active_coordinator = service.native_view_coordinator if content_registry is not None else coordinator
+            definition = service.resolve_run_entry_definition(world.scenario_id)
             if (definition.content_version != world.scenario_content_version
                     or definition.public_client.default_character_definition_id != world.default_character_definition_id
                     or not any((e.world_id, e.world_version, e.scenario_id, e.content_version, e.character_id) == (
                         world.entry_world_id.value, world.entry_world_version.value, world.scenario_id,
-                        world.scenario_content_version, world.default_character_definition_id) for e in coordinator.catalogue)):
+                        world.scenario_content_version, world.default_character_definition_id) for e in active_coordinator.catalogue)):
                 raise ValueError("invalid native discovery association")
             worlds.append(PublicEntryWorld(entry_world=project_world_ref(world), scenario_id=world.scenario_id,
                 scenario_content_version=world.scenario_content_version, title=definition.public_client.title,
                 hook=definition.public_client.hook, eligible_profiles=tuple(p.profile_ref for p in profiles)))
-        if len(profiles) != 3 or len(worlds) != 1:
+        if len(profiles) != 3 or len(worlds) != (len(AUTHORED_ENTRY_WORLDS_V1) if content_registry is not None else 1):
             raise ValueError("incomplete native discovery catalogue")
     return RunEntryOptionsResponse(schema_version="run-entry-options/v1", native_entry_available=coordinator is not None,
         profiles=tuple(profiles), entry_worlds=tuple(sorted(worlds, key=lambda w: (w.entry_world.entry_world_id, w.entry_world.entry_world_version))),

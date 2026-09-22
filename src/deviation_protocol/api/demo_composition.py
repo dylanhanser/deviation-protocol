@@ -696,13 +696,19 @@ def build_demo_runtime(
     from deviation_protocol.application.escort_encounter_services import build_escort_bundle
     escort_bundle = build_escort_bundle(
         SCENARIO_PACK.with_name("wind_gate_v1.json"), uow_factory=runtime_store.unit_of_work, generators=runtime_generators)
+    from deviation_protocol.application.fog_station_services import build_fog_station_bundle
+    station_bundle = build_fog_station_bundle(SCENARIO_PACK.with_name("fog_station_v1.json"),
+        uow_factory=runtime_store.unit_of_work, controller_resolver=controller_binding_resolver,
+        generators=runtime_generators)
     registry = SessionContentRegistry((
+        station_bundle,
         escort_bundle,
         SessionContentBundle.from_bytes(SCENARIO_PACK.read_bytes(),session_service=session_service,turn_orchestrator=dispatcher),
         SessionContentBundle.from_bytes(destination_path.read_bytes(),session_service=destination_service,turn_orchestrator=destination_orchestrator),
         SessionContentBundle.from_bytes(archive_path.read_bytes(),session_service=archive_service,turn_orchestrator=archive_orchestrator)))
     runtime_store._content_registry = registry
     admission = NativeRunAdmissionService(uow_factory=runtime_store.native_admission_unit_of_work,
+        content_registry=registry,
         run_id_issuer=run_service.run_id_issuer, continuous_story_line_id_issuer=run_service.continuous_story_line_id_issuer,
         source_reference=run_service.source_reference, clock=run_service.clock,
         controller_binding_resolver=controller_binding_resolver,

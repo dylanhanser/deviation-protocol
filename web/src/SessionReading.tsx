@@ -55,6 +55,21 @@ export function SessionReading({ view, staleKind, readingIdentity = "current", j
       </dl>
     </section> : null}
 
+    {view.relationship ? <section aria-labelledby="relationship-heading">
+      <h3 id="relationship-heading">{historical ? "这次访问的关系与暂住记录" : "哨站关系与暂住"}</h3>
+      <p>{view.relationship.npc_name} · {view.relationship.npc_age} 岁 · 巡路员</p>
+      <dl className="compact-list">
+        <div><dt>已确认的关系</dt><dd>{view.relationship.stage}</dd></div>
+        <div><dt>暂住</dt><dd>{view.relationship.residence}</dd></div>
+        {view.relationship.residence === "暂住中" ? <div><dt>剩余活动次数</dt><dd>{view.relationship.remaining_slots} / 3</dd></div> : null}
+      </dl>
+      <p>仅记录这次哨站行程；不代表跨访问或跨 Run 继承，也不决定你对岑舟的感情。</p>
+      <p>这段行程不计行动时钟；天赋不会增加暂住次数或重复开放活动。</p>
+      {view.relationship.residence === "暂住中" ? <p>每项活动只能进行一次。你可以随时明确离开，离开后不能再次入住；阅读与刷新不消耗次数。</p> : null}
+      <h4>已确认的共同经历</h4>
+      {view.relationship.shared_experiences.length ? <ul>{view.relationship.shared_experiences.map(text => <li key={text}>{text}</li>)}</ul> : <p>尚无已确认的共同经历。</p>}
+    </section> : null}
+
     <section aria-labelledby="narrative-heading">
       <h3 id="narrative-heading">{historical ? "历史公开正文" : unconfirmed ? "所显示访问的公开正文" : "当前公开正文"}</h3>
       <NarrativeText text={latestNarrative ?? "当前尚无已接受的叙事正文。"} />

@@ -48,7 +48,7 @@ class ApiServices:
                     or self.native_run_admission_service.session_service is not self.session_service
                     or self.native_run_admission_service.controller_binding_resolver is not self.session_service.native_controller_resolver):
                 raise ValueError("incomplete native public service graph")
-            project_entry_options(self.session_service, coordinator)
+            project_entry_options(self.session_service, coordinator, self.content_registry)
             if self.run_exit_service is None:
                 from deviation_protocol.application.run_exit_service import RunExitService
                 admission = self.native_run_admission_service

@@ -1,9 +1,13 @@
-# Opening talents — implementation candidate
+# Opening talents — published bounded feature
 
 The owner approved the revised 100-entry talent document, the 12-entry CURRENT
-pool, and one narrow persistence migration on 2026-09-21. This implementation
-is an unstaged candidate, not independently approved, published, or browser
-accepted. It does not reopen D1, D2/D3, Phase 3.3 or DF-001/DF-002.
+pool, and one narrow persistence migration on 2026-09-21. The bounded feature and
+its corrections are published in baseline `96200883dd00d8639c91579b9518175e197ce856`.
+Browser A/B/C passed; D retains independent automated evidence only. Historical
+candidate-time evidence below does not reopen this completed work. The new
+雾哨站 candidate reuses the same frozen preparation/confirmation and catalog;
+its CHOOSE-only, clock-free mechanics introduce no additional talent effects.
+This does not reopen D1, D2/D3, Phase 3.3 or DF-001/DF-002.
 
 ## Authored content and authority
 
@@ -46,6 +50,18 @@ than silently rewriting frozen intent. A new preparation becomes available
 only after the preceding confirmed Run is terminal and the character is again
 eligible. Retrying the original preparation request still returns its original
 record. The owner can choose another character, which has separate preparation.
+
+The Web confirmation summary resolves the initial-world title from the public
+entry definition matching the server preparation's frozen world ID **and** world
+version, never from the dropdown or catalogue order. A pending preparation exposes
+that versioned world reference; a confirmed preparation additionally requires its
+result's world reference, scenario ID and content version to match the definition.
+Fresh preparation, pending reload and confirmed recovery share this display path.
+Missing or mismatched metadata displays `名称暂不可用（未核实）`, without changing
+confirmation eligibility, frozen payloads, candidate talents or recovery locators.
+The station browser finding exposed the former literal `死亡证明` label. Its
+presentation correction awaits focused independent re-review and narrow browser
+retest; the original failed acceptance remains historical evidence.
 
 Confirmation validates current ownership, character eligibility/revision, the
 preparation identity/state/version, and exactly two distinct issued CURRENT IDs.
